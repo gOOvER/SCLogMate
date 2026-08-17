@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
+
+## [1.1.18] - 2026-08-18
 ### Behoben
 - **Fracht-KÄUFE (Cargo-Trading) wurden gar nicht erfasst** — nur Verkäufe. Für Trader fehlte damit die komplette Einkaufsseite → Gewinn & Saldo massiv überschätzt. Jetzt zählt der Kauf (`SShopCommodityBuyRequest`) als Geld raus. Achtung Falle: Kauf-Menge steht in **cSCU** (÷100 = SCU), Verkauf in SCU. „Handel" zeigt jetzt das **Netto** (Verkauf − Einkauf); die „Handel je Ware"-Ø-Preise bleiben reine Verkaufspreise.
 ### Hinzugefügt
@@ -108,6 +110,7 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 ## [1.0.0] - 2026-06-28
 ### Hinzugefügt
 - Erste öffentliche Version: Geld/Handel/Käufe, Aufträge mit Namen+Rang, Baupläne, Schiffe/Flotte, Crew, Tode, Ausrüstung, Quantum, Orte; Filter, Geld-Stats, Saldo, JSON/CSV-Export, Auto-Updater, Single-`.exe`.
+
 
 
 
