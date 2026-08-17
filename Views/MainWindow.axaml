@@ -321,6 +321,31 @@
             </StackPanel>
           </Border>
 
+          <!-- Marktpreise (aus eigenen Runs) -->
+          <Border Classes="card" IsVisible="{Binding HasMarket}">
+            <StackPanel>
+              <TextBlock Classes="label" Text="MARKTPREISE — GESEHEN IN DEINEN RUNS (Ø Preis/SCU · Terminal)" Margin="0,0,0,8" />
+              <Grid ColumnDefinitions="140,*,*,Auto" Margin="0,0,0,4">
+                <TextBlock Grid.Column="0" Text="WARE" Foreground="#8B949E" FontSize="10" />
+                <TextBlock Grid.Column="1" Text="↥ BESTER VERKAUF" Foreground="#3FB950" FontSize="10" />
+                <TextBlock Grid.Column="2" Text="↧ GÜNSTIGSTER KAUF" Foreground="#F0883E" FontSize="10" />
+                <TextBlock Grid.Column="3" Text="MARGE" Foreground="#8B949E" FontSize="10" Margin="10,0,0,0" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding MarketPrices}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="m:MarketPrice">
+                    <Grid ColumnDefinitions="140,*,*,Auto" Margin="0,3">
+                      <TextBlock Grid.Column="0" Text="{Binding Commodity}" Foreground="#F0F6FC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding SellText}" Foreground="#3FB950" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding BuyText}" Foreground="#F0883E" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="{Binding MarginText}" Foreground="#58A6FF" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
           <!-- Größte Einzel-Posten -->
           <Border Classes="card">
             <StackPanel>

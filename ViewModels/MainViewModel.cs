@@ -250,6 +250,9 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<StatItem> RecentMoney { get; } = new();
     public ObservableCollection<StatItem> CommodityTrades { get; } = new();
     public bool HasTrades => CommodityTrades.Count > 0;
+
+    public ObservableCollection<MarketPrice> MarketPrices { get; } = new();
+    public bool HasMarket => MarketPrices.Count > 0;
     public string IncomeTotalText => $"{IncomeAll:N0} aUEC";
     public string SpendTotalText => $"{SpendAll:N0} aUEC";
 
@@ -266,6 +269,7 @@ public partial class MainViewModel : ObservableObject
                         .ToList();
         SetTopTransactions(top);
         RebuildCommodityTrades(Events.Where(e => e.Kind == EventKind.Trade));
+        RebuildMarketPrices(Events.Where(e => e.Kind == EventKind.Trade));
     }
 
     void SetTopTransactions(System.Collections.Generic.IEnumerable<LogEntry> events)
@@ -366,6 +370,48 @@ public partial class MainViewModel : ObservableObject
             });
         }
         OnPropertyChanged(nameof(HasTrades));
+    }
+
+    static readonly System.Text.RegularExpressions.Regex MarketDetail =
+        new(@"^(?<ware>.+?) ×(?<scu>\d+) SCU\s*·\s*(?<shop>.+?)(?<kauf>\s*\(Kauf\))?\s*$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // „Marktpreise": pro Ware bester Verkaufs- und günstigster Kaufpreis (pro SCU) + Terminal + Marge.
+    void RebuildMarketPrices(System.Collections.Generic.IEnumerable<LogEntry> trades)
+    {
+        var m = new System.Collections.Generic.Dictionary<string,
+            (long sell, string sShop, long buy, string bShop)>();
+        foreach (var e in trades)
+        {
+            var mm = MarketDetail.Match(e.Detail ?? "");
+            if (!mm.Success) continue;
+            var ware = mm.Groups["ware"].Value.Trim();
+            long scu = long.TryParse(mm.Groups["scu"].Value, out var s) ? s : 0;
+            if (scu <= 0) continue;
+            var shop = mm.Groups["shop"].Value.Trim();
+            bool isBuy = mm.Groups["kauf"].Success || e.Amount < 0;
+            long perScu = System.Math.Abs(e.Amount) / scu;
+            var cur = m.TryGetValue(ware, out var v) ? v : (sell: 0L, sShop: "", buy: 0L, bShop: "");
+            if (isBuy) { if (cur.buy == 0 || perScu < cur.buy) { cur.buy = perScu; cur.bShop = shop; } }
+            else { if (perScu > cur.sell) { cur.sell = perScu; cur.sShop = shop; } }
+            m[ware] = cur;
+        }
+
+        MarketPrices.Clear();
+        foreach (var kv in m.OrderByDescending(x => x.Value.sell))
+        {
+            var d = kv.Value;
+            long margin = d.sell > 0 && d.buy > 0 ? d.sell - d.buy : 0;
+            MarketPrices.Add(new MarketPrice
+            {
+                Commodity = kv.Key,
+                SellText = d.sell > 0 ? $"{d.sell:N0}/SCU · {d.sShop}" : "—",
+                BuyText = d.buy > 0 ? $"{d.buy:N0}/SCU · {d.bShop}" : "—",
+                MarginText = margin != 0 ? $"{margin:+#,##0;-#,##0}/SCU" : "",
+                MarginValue = margin
+            });
+        }
+        OnPropertyChanged(nameof(HasMarket));
     }
 
     static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
@@ -698,6 +744,7 @@ public partial class MainViewModel : ObservableObject
         _dbTrades = Database.AllTrades();
         _liveMoney.Clear();
         RebuildCommodityTrades(_dbTrades);
+        RebuildMarketPrices(_dbTrades);
 
         // Basis-Summen = nur fertige Sessions (DB). Live kommt per Tailer oben drauf.
         TotalIn = agg.In; TotalReward = agg.Reward; TotalSales = agg.Sales;
@@ -777,6 +824,8 @@ public partial class MainViewModel : ObservableObject
         TopTransactions.Clear();
         RecentMoney.Clear();
         CommodityTrades.Clear();
+        MarketPrices.Clear();
+        OnPropertyChanged(nameof(HasMarket));
         _dbTrades = new System.Collections.Generic.List<LogEntry>();
         TotalIn = TotalReward = TotalOut = TotalPurchases = TotalSales = TotalTrade = 0;
         MissionsDone = 0;
@@ -939,6 +988,7 @@ public partial class MainViewModel : ObservableObject
                         .OrderBy(x => System.Math.Abs(x.Amount)));
                     if (e.Kind == EventKind.Trade)
                         RebuildCommodityTrades(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
+                        RebuildMarketPrices(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
                 }
                 else RebuildStats();
             }
