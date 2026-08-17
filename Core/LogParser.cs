@@ -52,9 +52,14 @@ public class LogParser
         new(@"SShopSellRequest.*?shopName\[(?<shop>[^\]]*)\].*?client_price\[(?<price>[\d.]+)\].*?itemClassGUID\[(?<guid>[^\]]*)\].*?itemName\[(?<item>[^\]]*)\].*?quantity\[(?<qty>\d+)\]",
             RegexOptions.Compiled);
 
-    // Fracht-/Waren-Verkauf (Commodity): Gesamtbetrag + resourceGUID + Menge.
+    // Fracht-/Waren-Verkauf (Commodity): Gesamtbetrag + resourceGUID + Menge (in SCU).
     static readonly Regex Commodity =
         new(@"SShopCommoditySellRequest.*?shopName\[(?<shop>[^\]]*)\].*?amount\[(?<amt>[\d.]+)\].*?resourceGUID\[(?<guid>[^\]]*)\].*?quantity\[(?<qty>\d+)\]",
+            RegexOptions.Compiled);
+
+    // Fracht-/Waren-KAUF (Cargo-Trading): price = Gesamtbetrag, quantity in cSCU (÷100 = SCU!).
+    static readonly Regex CommodityBuy =
+        new(@"SShopCommodityBuyRequest.*?shopName\[(?<shop>[^\]]*)\].*?price\[(?<price>[\d.]+)\].*?resourceGUID\[(?<guid>[^\]]*)\].*?quantity\[(?<qty>[\d.]+)\s*cSCU\]",
             RegexOptions.Compiled);
 
     // Notification-Kopfzeile (einmal pro Ereignis): Text bis ':' , '"' oder Zeilenende.
@@ -241,6 +246,23 @@ public class LogParser
                 Kind = EventKind.Trade,
                 Amount = amt,
                 Detail = $"{ware} ×{qty} SCU  · {shop}"
+            };
+        }
+
+        // Fracht-KAUF: price = Gesamtbetrag (Geld raus), Menge in cSCU → ÷100 = SCU.
+        var cb = CommodityBuy.Match(line);
+        if (cb.Success)
+        {
+            long price = (long)ParseDouble(cb.Groups["price"].Value);
+            long scu = (long)System.Math.Round(ParseDouble(cb.Groups["qty"].Value) / 100.0);
+            var shop = CleanShop(cb.Groups["shop"].Value);
+            var ware = Commodities.Resolve(cb.Groups["guid"].Value);
+            return new LogEntry
+            {
+                Time = ParseTs(line),
+                Kind = EventKind.Trade,
+                Amount = -price,
+                Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)"
             };
         }
 

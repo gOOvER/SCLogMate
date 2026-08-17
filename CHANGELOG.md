@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
+### Behoben
+- **Fracht-KÄUFE (Cargo-Trading) wurden gar nicht erfasst** — nur Verkäufe. Für Trader fehlte damit die komplette Einkaufsseite → Gewinn & Saldo massiv überschätzt. Jetzt zählt der Kauf (`SShopCommodityBuyRequest`) als Geld raus. Achtung Falle: Kauf-Menge steht in **cSCU** (÷100 = SCU), Verkauf in SCU. „Handel" zeigt jetzt das **Netto** (Verkauf − Einkauf); die „Handel je Ware"-Ø-Preise bleiben reine Verkaufspreise.
 ### Hinzugefügt
 - **Loot vollständiger**: auch **direkt ausgerüstetes** Gear wird erfasst (`Equip looting entity` — Armor-Swap am Körper, z.B. Ghost-Hollow-Farming). Vorher nur ins Inventar gestautes Zeug (`OnInventoryStoreItem`). Fängt jetzt Rüstung/Waffen, die du direkt anziehst/greifst.
 

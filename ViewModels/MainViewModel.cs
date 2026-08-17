@@ -340,6 +340,7 @@ public partial class MainViewModel : ObservableObject
         var agg = new System.Collections.Generic.Dictionary<string, (long scu, long erloes)>();
         foreach (var e in trades)
         {
+            if (e.Amount <= 0) continue;   // nur Verkäufe → Ø Preis/SCU sauber (Käufe verfälschen nicht)
             var m = TradeDetail.Match(e.Detail ?? "");
             if (!m.Success) continue;
             var ware = m.Groups["ware"].Value.Trim();
