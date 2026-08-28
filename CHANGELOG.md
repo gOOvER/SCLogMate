@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
+
+## [1.1.19] - 2026-08-28
 ### Hinzugefügt
 - **Neuer Tab „❖ Missionen" (Ruf-Proxy)**: zeigt **Missionen je Auftraggeber/Fraktion** (RedWind, Hockrow, Covalex, Vaughn, InterSec, HeadHunters …) mit Balken, Anzahl und häufigstem Auftrags-Typ. Star Citizen loggt keine Ruf-Werte — die Anzahl gespielter Missionen je Auftraggeber ist der funktionierende Ersatz, um zu sehen wo du am aktivsten bist. Fällt automatisch aus den Missions-Markern deiner Logs ab (`CreateMarker`, je Mission einmal gezählt) und deckt die komplette Historie ab.
 ### Verbessert
@@ -114,6 +116,7 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 ## [1.0.0] - 2026-06-28
 ### Hinzugefügt
 - Erste öffentliche Version: Geld/Handel/Käufe, Aufträge mit Namen+Rang, Baupläne, Schiffe/Flotte, Crew, Tode, Ausrüstung, Quantum, Orte; Filter, Geld-Stats, Saldo, JSON/CSV-Export, Auto-Updater, Single-`.exe`.
+
 
 
 
