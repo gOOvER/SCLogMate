@@ -153,6 +153,13 @@ public class LogParser
     readonly System.Collections.Generic.HashSet<string> _channelSeen = new();
     readonly System.Collections.Generic.HashSet<string> _gearSeen = new();
     readonly System.Collections.Generic.HashSet<string> _missionsDone = new();
+    readonly System.Collections.Generic.HashSet<string> _missionsTaken = new();
+
+    // Angenommene/aktive Mission mit Auftraggeber + Contract (feuert je Mission viele Male
+    // als Objektiv-Marker → wir nehmen je missionId nur EINEN Eintrag).
+    static readonly Regex MissionMarker =
+        new(@"missionId \[(?<id>[0-9a-f-]+)\], generator name \[(?<gen>[A-Za-z0-9_]+)\], contract \[(?<con>[A-Za-z0-9_]+)\]",
+            RegexOptions.Compiled);
 
     /// <summary>Session-Metadaten (Build, Hardware, Charakter, Shard, …).</summary>
     public System.Collections.Generic.Dictionary<string, string> Meta { get; } = new();
@@ -420,6 +427,18 @@ public class LogParser
             var item = gb.Groups["item"].Value.Trim();
             if (item.Length > 0 && _gearSeen.Add(item))
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Gear, Detail = $"{item} unbrauchbar" };
+            return null;
+        }
+
+        // Angenommene Mission mit Auftraggeber/Fraktion – je missionId nur EINMAL
+        var mk = MissionMarker.Match(line);
+        if (mk.Success)
+        {
+            if (_missionsTaken.Add(mk.Groups["id"].Value))
+            {
+                var info = Missions.Derive(mk.Groups["gen"].Value, mk.Groups["con"].Value);
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+            }
             return null;
         }
 

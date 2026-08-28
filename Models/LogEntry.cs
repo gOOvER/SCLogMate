@@ -37,6 +37,7 @@ public enum EventKind
     Refinery,
     Injury,
     Loot,
+    MissionTaken,
     Info
 }
 
@@ -95,6 +96,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Refinery => "Veredelung",
         EventKind.Injury => "Verletzung",
         EventKind.Loot => "Loot",
+        EventKind.MissionTaken => "Auftraggeber",
         _ => "Info"
     };
 
@@ -162,6 +164,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Refinery => "⚗",
         EventKind.Injury => "⚕",
         EventKind.Loot => "◈",
+        EventKind.MissionTaken => "❖",
         _ => "·"
     };
 }

@@ -51,7 +51,7 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private bool running;
 
-    public ObservableCollection<LogEntry> Events { get; } = new();
+    public Core.BulkObservableCollection<LogEntry> Events { get; } = new();
     public ObservableCollection<SessionInfo> Sessions { get; } = new();
 
     // Gefilterte Ansicht für das DataGrid (Filter-Chips + Spalten-Sortierung)
@@ -65,7 +65,7 @@ public partial class MainViewModel : ObservableObject
         ["Alle"] = null,
         ["Geld"] = new() { EventKind.TransferIn, EventKind.TransferOut, EventKind.MissionReward,
                            EventKind.Purchase, EventKind.Sale, EventKind.Trade, EventKind.Offer, EventKind.Fine },
-        ["Aufträge"] = new() { EventKind.Mission, EventKind.MissionDone },
+        ["Aufträge"] = new() { EventKind.Mission, EventKind.MissionDone, EventKind.MissionTaken },
         ["Baupläne"] = new() { EventKind.Blueprint },
         ["Schiffe"] = new() { EventKind.Vehicle, EventKind.Quantum, EventKind.ShipLoss },
         ["Orte"] = new() { EventKind.Location, EventKind.Jurisdiction, EventKind.Hangar },
@@ -253,6 +253,11 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<MarketPrice> MarketPrices { get; } = new();
     public bool HasMarket => MarketPrices.Count > 0;
+
+    public ObservableCollection<MissionStat> MissionFactions { get; } = new();
+    public bool HasMissionFactions => MissionFactions.Count > 0;
+    public string MissionsTotalText => $"{_missionTotal:N0} Missionen · {MissionFactions.Count} Auftraggeber";
+    int _missionTotal;
     public string IncomeTotalText => $"{IncomeAll:N0} aUEC";
     public string SpendTotalText => $"{SpendAll:N0} aUEC";
 
@@ -270,6 +275,7 @@ public partial class MainViewModel : ObservableObject
         SetTopTransactions(top);
         RebuildCommodityTrades(Events.Where(e => e.Kind == EventKind.Trade));
         RebuildMarketPrices(Events.Where(e => e.Kind == EventKind.Trade));
+        RebuildMissions(Events.Where(e => e.Kind == EventKind.MissionTaken));
     }
 
     void SetTopTransactions(System.Collections.Generic.IEnumerable<LogEntry> events)
@@ -412,6 +418,48 @@ public partial class MainViewModel : ObservableObject
             });
         }
         OnPropertyChanged(nameof(HasMarket));
+    }
+
+    // Missionen je Auftraggeber/Fraktion (Ruf-Proxy) aus den MissionTaken-Events.
+    // Detail-Form: "Faction · Type · Difficulty · System" – Fraktion ist das erste Segment.
+    void RebuildMissions(System.Collections.Generic.IEnumerable<LogEntry> missions)
+    {
+        var byFaction = new System.Collections.Generic.Dictionary<string,
+            (int count, System.Collections.Generic.Dictionary<string,int> types)>();
+        int total = 0;
+        foreach (var e in missions)
+        {
+            var parts = (e.Detail ?? "").Split(" · ");
+            if (parts.Length < 2) continue;
+            var faction = parts[0].Trim();
+            if (faction.Length == 0) continue;
+            var type = parts[1].Trim();
+            total++;
+            if (!byFaction.TryGetValue(faction, out var cur))
+                cur = (0, new System.Collections.Generic.Dictionary<string,int>());
+            cur.count++;
+            cur.types[type] = cur.types.TryGetValue(type, out var tc) ? tc + 1 : 1;
+            byFaction[faction] = cur;
+        }
+
+        _missionTotal = total;
+        int max = 1;
+        foreach (var v in byFaction.Values) max = System.Math.Max(max, v.count);
+
+        MissionFactions.Clear();
+        foreach (var kv in byFaction.OrderByDescending(x => x.Value.count))
+        {
+            var topType = kv.Value.types.OrderByDescending(t => t.Value).First().Key;
+            MissionFactions.Add(new MissionStat
+            {
+                Faction = kv.Key,
+                Count = kv.Value.count,
+                BarWidth = kv.Value.count / (double)max * BarMax,
+                SubText = topType
+            });
+        }
+        OnPropertyChanged(nameof(HasMissionFactions));
+        OnPropertyChanged(nameof(MissionsTotalText));
     }
 
     static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
@@ -745,6 +793,7 @@ public partial class MainViewModel : ObservableObject
         _liveMoney.Clear();
         RebuildCommodityTrades(_dbTrades);
         RebuildMarketPrices(_dbTrades);
+        RebuildMissions(recent.Where(e => e.Kind == EventKind.MissionTaken));
 
         // Basis-Summen = nur fertige Sessions (DB). Live kommt per Tailer oben drauf.
         TotalIn = agg.In; TotalReward = agg.Reward; TotalSales = agg.Sales;
@@ -763,9 +812,10 @@ public partial class MainViewModel : ObservableObject
         foreach (var sh in agg.Ships)
             if (_shipSet.Add(sh)) ShipsSeen.Add(sh);
 
-        // Tabelle: neueste ~3000 aus DB (neueste zuerst)
-        Events.Clear();
-        foreach (var e in recent.AsEnumerable().Reverse()) Events.Add(e);
+        // Tabelle: ALLE Events aus DB (neueste zuerst). WICHTIG: in EINEM Rutsch via
+        // ReplaceAll → genau EIN Reset an die EventsView, statt ≈60k Einzel-Adds die die
+        // View jedes Mal neu filtern/sortieren (das war die „ewig lange"-Bremse).
+        Events.ReplaceAll(recent.AsEnumerable().Reverse());
 
         CurrentLocation = Events.FirstOrDefault(e => e.Kind == EventKind.Location)?.Detail ?? "—";
         CurrentShip = Events.FirstOrDefault(e => e.Kind == EventKind.Vehicle)?.Detail ?? "—";
@@ -826,6 +876,10 @@ public partial class MainViewModel : ObservableObject
         CommodityTrades.Clear();
         MarketPrices.Clear();
         OnPropertyChanged(nameof(HasMarket));
+        MissionFactions.Clear();
+        _missionTotal = 0;
+        OnPropertyChanged(nameof(HasMissionFactions));
+        OnPropertyChanged(nameof(MissionsTotalText));
         _dbTrades = new System.Collections.Generic.List<LogEntry>();
         TotalIn = TotalReward = TotalOut = TotalPurchases = TotalSales = TotalTrade = 0;
         MissionsDone = 0;
@@ -970,6 +1024,9 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.Blueprint:
                     AddBlueprint(e.Detail);
+                    break;
+                case EventKind.MissionTaken:
+                    RebuildMissions(Events.Where(x => x.Kind == EventKind.MissionTaken));
                     break;
             }
 

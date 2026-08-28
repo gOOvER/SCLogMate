@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an diesem Projekt. Format nach
 [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
+### Hinzugefügt
+- **Neuer Tab „❖ Missionen" (Ruf-Proxy)**: zeigt **Missionen je Auftraggeber/Fraktion** (RedWind, Hockrow, Covalex, Vaughn, InterSec, HeadHunters …) mit Balken, Anzahl und häufigstem Auftrags-Typ. Star Citizen loggt keine Ruf-Werte — die Anzahl gespielter Missionen je Auftraggeber ist der funktionierende Ersatz, um zu sehen wo du am aktivsten bist. Fällt automatisch aus den Missions-Markern deiner Logs ab (`CreateMarker`, je Mission einmal gezählt) und deckt die komplette Historie ab.
+### Verbessert
+- **Gesamt-Log lädt drastisch schneller**: „Alle Sessions" füllte die Tabelle bisher mit ~60k Einzel-Einfügungen, wobei die Ansicht jedes Mal neu filterte/sortierte (O(n²)). Jetzt ein einziger Batch-Reset → spürbar schnelleres Laden. Zusätzlich **DB-Indexe** auf `kind` und `time` für schnellere Summen-/Sortier-Abfragen.
 
 ## [1.1.18] - 2026-08-18
 ### Behoben

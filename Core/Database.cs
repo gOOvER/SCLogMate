@@ -16,7 +16,7 @@ namespace SCLogReader.Core;
 public static class Database
 {
     const int SchemaVersion = 1;
-    const int ParserVersion = 11;  // erhöhen, wenn der Parser neue Felder/Events liefert
+    const int ParserVersion = 12;  // erhöhen, wenn der Parser neue Felder/Events liefert
 
     static string DbPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogReader", "sessions.db");
@@ -32,7 +32,9 @@ public static class Database
         Exec(db, @"CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
                    CREATE TABLE IF NOT EXISTS sessions(name TEXT PRIMARY KEY, start TEXT, end TEXT);
                    CREATE TABLE IF NOT EXISTS events(session TEXT, time TEXT, kind TEXT, amount INTEGER, detail TEXT, ship TEXT);
-                   CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);");
+                   CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                   CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                   CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);");
 
         // Parser-Version prüfen -> bei Änderung Cache leeren (wird neu indexiert)
         var stored = GetMeta(db, "parserVersion");
