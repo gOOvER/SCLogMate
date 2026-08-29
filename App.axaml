@@ -5,7 +5,7 @@
 
   <TrayIcon.Icons>
     <TrayIcons>
-      <TrayIcon Icon="/SCLogReader.ico" ToolTipText="SC Log Reader" Clicked="TrayOpen">
+      <TrayIcon Icon="/SCLogReader.ico" ToolTipText="SCLogMate" Clicked="TrayOpen">
         <TrayIcon.Menu>
           <NativeMenu>
             <NativeMenuItem Header="Öffnen" Click="TrayOpen" />

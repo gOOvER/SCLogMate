@@ -6,10 +6,22 @@ namespace SCLogReader.Views;
 
 public partial class MainWindow : Window
 {
+    public static bool IsExplicitExit { get; set; } = false;
+
     public MainWindow()
     {
         AvaloniaXamlLoader.Load(this);
         UiServices.TopLevel = this;   // für Datei-Dialoge im ViewModel
+        Closing += OnMainWindowClosing;
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (!IsExplicitExit)
+        {
+            e.Cancel = true;
+            Hide();
+        }
     }
 
     void OnGridDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)

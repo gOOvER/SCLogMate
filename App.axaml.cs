@@ -25,9 +25,13 @@ public partial class App : Application
             w.Show();
             w.WindowState = Avalonia.Controls.WindowState.Normal;
             w.Activate();
+            w.Focus();
         }
     }
 
     void TrayExit(object? sender, System.EventArgs e)
-        => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+    {
+        MainWindow.IsExplicitExit = true;
+        (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+    }
 }
