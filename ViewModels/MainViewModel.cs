@@ -119,6 +119,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool toastOverlayEnabled = true;
     private Views.AchievementToastWindow? _toastWindow;
 
+    // Fenster-Verhalten
+    [ObservableProperty] private bool minimizeToTrayOnClose = true;
+
     // Bauplan-Datenbank (Crafting Blueprints)
     public ObservableCollection<BlueprintItem> BlueprintCatalogList { get; } = new();
     public DataGridCollectionView BlueprintsView { get; }
@@ -1382,6 +1385,7 @@ public partial class MainViewModel : ObservableObject
         {
             IsOverlayActive = true;
         }
+        MinimizeToTrayOnClose = _settings.MinimizeToTrayOnClose;
 
         _walletCapture = new WalletCapture(_ocrEngine, () => _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(), () => AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
@@ -2444,6 +2448,13 @@ public partial class MainViewModel : ObservableObject
         _settings.UexApiKey = cleanKey;
         Settings.Save(_settings);
         UexApiClient.SetApiKey(cleanKey);
+    }
+
+    partial void OnMinimizeToTrayOnCloseChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.MinimizeToTrayOnClose = value;
+        Settings.Save(_settings);
     }
 
     [RelayCommand]

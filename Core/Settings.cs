@@ -50,6 +50,9 @@ public class AppSettings
 
     /// <summary>Anzeigedauer des Banners in Sekunden.</summary>
     public double ToastDurationSeconds { get; set; } = 5.5;
+
+    /// <summary>Beim Klick auf das Schließen-Kreuz (X) ins Tray minimieren (sonst App direkt beenden).</summary>
+    public bool MinimizeToTrayOnClose { get; set; } = true;
 }
 
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>

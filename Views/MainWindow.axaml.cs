@@ -17,10 +17,19 @@ public partial class MainWindow : Window
 
     private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (!IsExplicitExit)
+        if (IsExplicitExit) return;
+
+        var vm = DataContext as ViewModels.MainViewModel;
+        if (vm?.MinimizeToTrayOnClose == true)
         {
             e.Cancel = true;
             Hide();
+        }
+        else
+        {
+            IsExplicitExit = true;
+            (Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Shutdown();
         }
     }
 

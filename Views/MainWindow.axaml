@@ -26,7 +26,7 @@
   <DockPanel Margin="18">
 
     <!-- Kopfzeile: Super Clean (Pfad-Einstellung ist im Tab '⚙ Einstellungen') -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,14">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,14">
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
         <Border Background="#1F6FEB" CornerRadius="8" Width="34" Height="34">
           <TextBlock Text="✦" Foreground="White" FontSize="18"
@@ -45,8 +45,8 @@
         </StackPanel>
       </StackPanel>
 
-      <!-- Rechts: Star Citizen Status, Mini-HUD, Update-Button (falls verfügbar) & Start/Stop -->
-      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,8,0">
+      <!-- Rechts: Star Citizen Status, Mini-HUD & Update-Button (falls verfügbar) -->
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <!-- Star Citizen Prozess-Status Badge -->
         <Border Background="{Binding GameStatusBadgeBg}" BorderBrush="{Binding GameStatusColor}" BorderThickness="1"
                 CornerRadius="6" Height="32" Padding="10,0" ToolTip.Tip="{Binding GameStatusTooltip}" VerticalAlignment="Center">
@@ -69,11 +69,6 @@
                 Command="{Binding UpdateCommand}" Content="{Binding UpdateText}"
                 ToolTip.Tip="Neue Version herunterladen und installieren" />
       </StackPanel>
-
-      <Button Grid.Column="3" Classes="accent" MinWidth="95" Height="32" VerticalAlignment="Center"
-              HorizontalContentAlignment="Center"
-              Command="{Binding ToggleCommand}" Content="{Binding ToggleText}"
-              ToolTip.Tip="Live-Überwachung starten oder stoppen" />
     </Grid>
 
     <!-- Session-Auswahl Bar -->
@@ -1428,6 +1423,19 @@
                 </Border>
               </Grid>
 
+            </StackPanel>
+          </Border>
+
+          <!-- 6. Fenster- & Schließverhalten -->
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="label" Text="🗔  FENSTER- &amp; SCHLIESSVERHALTEN" />
+              <CheckBox IsChecked="{Binding MinimizeToTrayOnClose}">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Beim Klick auf das Schließen-Kreuz (X) ins System-Tray minimieren" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Text="Die App läuft im Hintergrund im Infobereich weiter (Tracking, OCR &amp; Overlays bleiben aktiv). Wenn deaktiviert, wird die App bei 'X' vollständig beendet." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+              </CheckBox>
             </StackPanel>
           </Border>
 
