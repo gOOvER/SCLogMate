@@ -2620,18 +2620,6 @@ public partial class MainViewModel : ObservableObject
         Status = ToastOverlayEnabled ? "✦ Achievement-Banner aktiviert" : "Achievement-Banner deaktiviert";
     }
 
-    [RelayCommand]
-    public async Task SaveAndTestUexApiKey()
-    {
-        _settings.UexApiKey = UexApiKeyInput?.Trim();
-        Settings.Save(_settings);
-        UexApiClient.SetApiKey(_settings.UexApiKey);
-        UexStatusMessage = "Prüfe Verbindung zu UEX API…";
-        UexStatusColor = "#38BDF8";
-        var (ok, msg) = await UexApiClient.TestConnectionAsync();
-        UexStatusMessage = msg;
-        UexStatusColor = ok ? "#4ADE80" : "#F87171";
-    }
 
     partial void OnBlueprintSearchTextChanged(string value) => RefreshBlueprintFilter();
     partial void OnSelectedBlueprintCategoryChanged(string value) => RefreshBlueprintFilter();
