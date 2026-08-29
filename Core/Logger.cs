@@ -32,7 +32,7 @@ public static class Logger
         {
             // pro Start frische Datei
             File.WriteAllText(Path,
-                $"=== SC Log Reader {Updater.CurrentVersion} · Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
+                $"=== SCLogMate {Updater.CurrentVersion} · Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
         }
         catch { /* nicht schreibbar -> egal */ }
     }

@@ -66,7 +66,7 @@ public static class Updater
         await File.WriteAllBytesAsync(tmp, bytes);
 
         // Batch: warten bis App zu ist, alte exe ersetzen, neu starten, sich selbst löschen.
-        var bat = Path.Combine(Path.GetTempPath(), "sclr_update.bat");
+        var bat = Path.Combine(Path.GetTempPath(), "sclm_update.bat");
         await File.WriteAllTextAsync(bat,
             "@echo off\r\n" +
             "timeout /t 2 /nobreak >nul\r\n" +
