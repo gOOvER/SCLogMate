@@ -1431,7 +1431,7 @@
             </StackPanel>
           </Border>
 
-          <!-- 7. Über SCLogMate -->
+          <!-- 7. Über SCLogMate Kurz-Info -->
           <Border Classes="card">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Spacing="4">
@@ -1445,6 +1445,287 @@
               <Button Grid.Column="1" Classes="ghost" Padding="10,5" VerticalAlignment="Center"
                       Command="{Binding OpenChangelogCommand}" Content="📜  Changelog &amp; Releases" />
             </Grid>
+          </Border>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- Tab 7: ℹ Über SCLogMate & Update-Übersicht -->
+    <TabItem Header="ℹ  Über" FontSize="13">
+      <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+
+          <!-- 1. Hero Brand Header Card -->
+          <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="10" Padding="20,16">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <!-- Logo Icon -->
+              <Border Grid.Column="0" Background="#1F6FEB" CornerRadius="12" Width="52" Height="52" VerticalAlignment="Center" Margin="0,0,16,0">
+                <TextBlock Text="✦" Foreground="White" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+
+              <!-- App Name, Version & Pitch -->
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <TextBlock Text="SCLogMate" Foreground="#F0F6FC" FontSize="22" FontWeight="Bold" />
+                  <Border Background="#21262D" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="8,2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding VersionText}" Foreground="#58A6FF" FontSize="12" FontWeight="Bold" />
+                  </Border>
+                  <Border Background="#0D2D20" BorderBrush="#238636" BorderThickness="1" CornerRadius="6" Padding="8,2" VerticalAlignment="Center">
+                    <TextBlock Text="RELEASE" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                  </Border>
+                </StackPanel>
+                <TextBlock Text="Der moderne, all-in-one Star Citizen Live Log Companion &amp; Analytics Assistant."
+                           Foreground="#8B949E" FontSize="12" />
+                <TextBlock Text="{Binding RuntimeInfoText}" Foreground="#6E7681" FontSize="11" />
+              </StackPanel>
+
+              <!-- Quick Links Buttons -->
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="ghost" Padding="10,6" CornerRadius="6" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/gOOvER/SCLogMate">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="🌐" FontSize="11" />
+                    <TextBlock Text="GitHub Repo" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="10,6" CornerRadius="6" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/gOOvER/SCLogMate/issues">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="🐞" FontSize="11" />
+                    <TextBlock Text="Issues &amp; Feedback" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- 2. Update-Status & Update-Center -->
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <TextBlock Classes="label" Text="🔄  UPDATE-STATUS &amp; VERSIONSPRÜFUNG" />
+                  <TextBlock Text="Prüft automatisch alle 6 Stunden oder manuell auf Knopfdruck auf neue Releases auf GitHub." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="10,5" CornerRadius="5"
+                        Command="{Binding CheckForUpdateManualCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="🔄" FontSize="11" />
+                    <TextBlock Text="Jetzt nach Updates suchen" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <!-- Update Verfügbar Banner (falls neues Release vorliegt) -->
+              <Border Background="#0D2D20" BorderBrush="#238636" BorderThickness="1" CornerRadius="8" Padding="14,10"
+                      IsVisible="{Binding UpdateAvailable}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <TextBlock Grid.Column="0" Text="⬆" FontSize="20" Foreground="#3FB950" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Neues Update verfügbar!" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                    <TextBlock Text="{Binding UpdateText, StringFormat='Ein neues Release {0} steht bereit.'}" Foreground="#8B949E" FontSize="11" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="accent" Background="#238636" Padding="14,6" CornerRadius="5"
+                          Command="{Binding UpdateCommand}" Content="{Binding UpdateText}" />
+                </Grid>
+              </Border>
+
+              <Grid ColumnDefinitions="*,*,*" Margin="0,2,0,0">
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Installierte Version" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="{Binding VersionText}" Foreground="#F0F6FC" FontSize="14" FontWeight="Bold" />
+                    <TextBlock Text="Offizielles Single-File Release" Foreground="#58A6FF" FontSize="10" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="GitHub Release-Kanal" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="gOOvER/SCLogMate" Foreground="#F0F6FC" FontSize="14" FontWeight="Bold" />
+                    <TextBlock Text="Releases / Tags (v1.*)" Foreground="#8B949E" FontSize="10" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Auto-Update Modus" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="1-Klick Installer" Foreground="#3FB950" FontSize="14" FontWeight="Bold" />
+                    <TextBlock Text="Nahtloser Hot-Swap &amp; Neustart" Foreground="#8B949E" FontSize="10" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 3. Fork-Information & Danksagung -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="🤝  FORK-INFORMATION &amp; DANKSAGUNG" />
+              <TextBlock Foreground="#C9D1D9" FontSize="12" TextWrapping="Wrap" LineHeight="18"
+                         Text="SCLogMate ist ein umfassend erweiterter, modernisierter Fork des ursprünglichen Basis-Projekts SCLogReader von miwidot. Ein herzliches Dankeschön an miwidot für die hervorragende Vorarbeit und das Fundament der Log-Analyse!" />
+
+              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,6,0">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="Original-Projekt (Basis)" Foreground="#8B949E" FontSize="11" />
+                      <TextBlock Text="SCLogReader von miwidot" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                      <TextBlock Text="https://github.com/miwidot/SCLogReader" Foreground="#58A6FF" FontSize="10" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4" VerticalAlignment="Center"
+                            Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/miwidot/SCLogReader" Content="🔗 Öffnen" />
+                  </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,0,0,0">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="Maintainer / Fork-Autor" Foreground="#8B949E" FontSize="11" />
+                      <TextBlock Text="gOOvER (SCLogMate)" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                      <TextBlock Text="Lizenz: MIT (Open Source)" Foreground="#4ADE80" FontSize="10" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4" VerticalAlignment="Center"
+                            Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/gOOvER/SCLogMate" Content="🔗 Repo" />
+                  </Grid>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 4. Integrierte Datenquellen & Schnittstellen -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="🌐  INTEGRIERTE DATENQUELLEN &amp; SCHNITTSTELLEN" />
+              <Grid ColumnDefinitions="*,*,*" Margin="0,2,0,0">
+                
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="scunpacked-data" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Missions- &amp; Bauplan-Datenbank" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="Master-Katalog aller SC 4.x Aufträge, NPCs &amp; Blueprints" Foreground="#6E7681" FontSize="10" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Star Citizen Wiki API" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Fahrzeugdaten &amp; HD-Bilder" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="Asynchroner Bild-Cache &amp; Schiffsspezifikationen" Foreground="#6E7681" FontSize="10" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="UEX Corp API 2.0" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Handels- &amp; Preisdaten" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="Live-Verknüpfung für Warenpreise und Terminals" Foreground="#6E7681" FontSize="10" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 5. Release Highlights & Feature-Übersicht (v1.0.0) -->
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <TextBlock Classes="label" Text="📋  RELEASE HIGHLIGHTS — VERSION 1.0.0" />
+                  <TextBlock Text="Alle neuen Kernfunktionen von SCLogMate auf einen Blick." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4"
+                        Command="{Binding OpenChangelogCommand}" Content="📜 Vollständiges Changelog" />
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                <!-- Spalte Links -->
+                <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,8,0">
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="✦ WoW-Style Achievement &amp; Reward Toasts" Foreground="#FBBF24" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Echtzeit-Banner für neu erlernte Baupläne und Missionsbelohnungen. Gestapelte Liste, frei verschiebbar, kein Fokusverlust." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="🗔 In-Game Floating Mini-HUD" Foreground="#38BDF8" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Always-on-Top Live-Overlay mit Kontostand, Standort, Schutzzonen-Status, fokussiertem Auftrag und Ping." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="❖ Zero-OCR Missions-Tracking &amp; Browser" Foreground="#A371F7" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Automatischer Abgleich mit der Master-Missionsdatenbank. Erkennt angenommene, fertige und abgebrochene Aufträge." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
+                <!-- Spalte Rechts -->
+                <StackPanel Grid.Column="1" Spacing="8" Margin="8,0,0,0">
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="⬡ Crafting Bauplan-Katalog" Foreground="#34D399" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Master-Katalog aller SC 4.x Blueprints mit Fortschrittsanzeige, Kategorien und Erfassungsdatum." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="🗺 Starmap &amp; Schutzzonen-Resolver" Foreground="#F43F5E" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Standort-Erkennung für Stanton, Pyro und Nyx (inkl. Keeger Depot, Wikelo Emporium) &amp; Live-Armistice-Zonen." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="👁 mobiGlas Native OCR Screenreader" Foreground="#38BDF8" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="Liest beim Öffnen des mobiGlas (F1) vollautomatisch deinen echten aUEC-Kontostand per Windows Native OCR ab." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 6. Diagnose-Pfade & Speicherorte -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="📁  SYSTEM- &amp; SPEICHERPFADE" />
+              <Grid ColumnDefinitions="*,*,*" Margin="0,2,0,0">
+                <!-- AppData -->
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="AppData-Verzeichnis" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="%APPDATA%\SCLogMate" Foreground="#8B949E" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4,0,0"
+                            Command="{Binding OpenAppDataFolderCommand}" Content="📂 Ordner öffnen" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Debug Log -->
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Debug-Logdatei" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="SCLogMate.debug.log" Foreground="#8B949E" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4,0,0"
+                            Command="{Binding OpenDebugLogCommand}" Content="📄 Log ansehen" />
+                  </StackPanel>
+                </Border>
+
+                <!-- SQLite DB -->
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Lokale Datenbank" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding DatabaseSummaryText}" Foreground="#58A6FF" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4,0,0"
+                            Command="{Binding OpenAppDataFolderCommand}" Content="💾 DB-Dateien" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
           </Border>
 
         </StackPanel>

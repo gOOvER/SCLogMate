@@ -1529,6 +1529,24 @@ public partial class MainViewModel : ObservableObject
         catch { /* ignore process lookup errors */ }
     }
 
+    [RelayCommand]
+    public async Task CheckForUpdateManual()
+    {
+        Status = "Prüfe auf Updates...";
+        var info = await Updater.CheckAsync();
+        if (info != null)
+        {
+            _update = info;
+            UpdateAvailable = true;
+            UpdateText = $"⬆ Update {info.Version}";
+            Status = $"Update {info.Version} verfügbar!";
+        }
+        else
+        {
+            Status = $"SCLogMate ist auf dem neuesten Stand (v{Updater.CurrentVersion}).";
+        }
+    }
+
     async void CheckForUpdate()
     {
         var info = await Updater.CheckAsync();
