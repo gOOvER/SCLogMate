@@ -2436,6 +2436,33 @@ public partial class MainViewModel : ObservableObject
         OpenUrl(url);
     }
 
+    partial void OnUexApiKeyInputChanged(string value)
+    {
+        if (_initializing || !_ready) return;
+        var cleanKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        _settings.UexApiKey = cleanKey;
+        Settings.Save(_settings);
+        UexApiClient.SetApiKey(cleanKey);
+    }
+
+    [RelayCommand]
+    public async Task SaveAndTestUexApiKey()
+    {
+        var cleanKey = string.IsNullOrWhiteSpace(UexApiKeyInput) ? null : UexApiKeyInput.Trim();
+        _settings.UexApiKey = cleanKey;
+        Settings.Save(_settings);
+        UexApiKeyInput = cleanKey ?? "";
+        UexApiClient.SetApiKey(cleanKey);
+
+        UexStatusMessage = "Prüfe UEX Corp API-Verbindung...";
+        UexStatusColor = "#58A6FF";
+
+        var (success, msg) = await UexApiClient.TestConnectionAsync(cleanKey);
+        UexStatusMessage = msg;
+        UexStatusColor = success ? "#4ADE80" : "#F87171";
+        Status = $"UEX API: {msg}";
+    }
+
     async partial void OnCurrentShipChanged(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == "—")
