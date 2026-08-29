@@ -40,46 +40,92 @@ public class FilterActiveConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Akzentfarbe je Event-Typ (für den Icon-Punkt).</summary>
+/// <summary>Akzentfarbe je Event-Typ (für den Icon-Punkt) – mit vorberechneten statischen Brushes.</summary>
 public class KindToBrushConverter : IValueConverter
 {
     public static readonly KindToBrushConverter Instance = new();
 
+    static readonly IBrush Green = new SolidColorBrush(Color.Parse("#4ADE80"));
+    static readonly IBrush Red = new SolidColorBrush(Color.Parse("#F87171"));
+    static readonly IBrush DarkRed = new SolidColorBrush(Color.Parse("#EF4444"));
+    static readonly IBrush Amber = new SolidColorBrush(Color.Parse("#FBBF24"));
+    static readonly IBrush Cyan = new SolidColorBrush(Color.Parse("#22D3EE"));
+    static readonly IBrush Sky = new SolidColorBrush(Color.Parse("#38BDF8"));
+    static readonly IBrush Purple = new SolidColorBrush(Color.Parse("#A78BFA"));
+    static readonly IBrush BrightPurple = new SolidColorBrush(Color.Parse("#C084FC"));
+    static readonly IBrush Orange = new SolidColorBrush(Color.Parse("#FB923C"));
+    static readonly IBrush Pink = new SolidColorBrush(Color.Parse("#F472B6"));
+    static readonly IBrush Rose = new SolidColorBrush(Color.Parse("#FB7185"));
+    static readonly IBrush Slate = new SolidColorBrush(Color.Parse("#94A3B8"));
+    static readonly IBrush Neutral = new SolidColorBrush(Color.Parse("#8B949E"));
+
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         var kind = value is EventKind k ? k : EventKind.Info;
-        var hex = kind switch
+        return kind switch
         {
-            EventKind.TransferIn => "#4ADE80",
-            EventKind.TransferOut => "#F87171",
-            EventKind.MissionReward => "#FBBF24",
-            EventKind.Sale => "#4ADE80",
-            EventKind.Trade => "#22D3EE",
-            EventKind.Location => "#38BDF8",
-            EventKind.Inventory => "#A78BFA",
-            EventKind.Vehicle => "#FB923C",
-            EventKind.Quantum => "#22D3EE",
-            EventKind.Mission => "#FBBF24",
-            EventKind.Jurisdiction => "#F472B6",
-            EventKind.Party => "#A78BFA",
-            EventKind.MedBed => "#F87171",
-            EventKind.Hangar => "#38BDF8",
-            EventKind.Loadout => "#94A3B8",
-            EventKind.Offer => "#FBBF24",
-            EventKind.ShipLoss => "#F87171",
-            EventKind.Death => "#EF4444",
-            EventKind.Impound => "#FB923C",
-            EventKind.Friend => "#4ADE80",
-            EventKind.Entitlement => "#94A3B8",
-            EventKind.Blueprint => "#C084FC",
-            EventKind.Gear => "#FB7185",
-            EventKind.Kill => "#EF4444",
-            EventKind.MissionDone => "#FBBF24",
-            _ => "#8B949E"
+            EventKind.TransferIn or EventKind.Sale or EventKind.Friend => Green,
+            EventKind.TransferOut or EventKind.Fine or EventKind.MedBed or EventKind.ShipLoss => Red,
+            EventKind.Death or EventKind.Kill or EventKind.Crime => DarkRed,
+            EventKind.MissionReward or EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken or EventKind.Offer => Amber,
+            EventKind.Trade or EventKind.Quantum or EventKind.Refinery => Cyan,
+            EventKind.Location or EventKind.Hangar => Sky,
+            EventKind.Inventory or EventKind.Party => Purple,
+            EventKind.Blueprint or EventKind.Loot => BrightPurple,
+            EventKind.Vehicle or EventKind.Impound or EventKind.Purchase => Orange,
+            EventKind.Jurisdiction => Pink,
+            EventKind.Gear or EventKind.Injury => Rose,
+            EventKind.Loadout or EventKind.Entitlement => Slate,
+            _ => Neutral
         };
-        return new SolidColorBrush(Color.Parse(hex));
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>Wandelt boolean in Akzentfarbe (aktiv = Gold/Gelb, inaktiv = gedimmt).</summary>
+public class BoolToActiveBrushConverter : IValueConverter
+{
+    public static readonly BoolToActiveBrushConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#FBBF24"));
+    static readonly IBrush Inactive = new SolidColorBrush(Color.Parse("#8B949E"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Active : Inactive;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Wandelt boolean in Statusfarbe: true = Grün (#4ADE80), false = Rot (#F87171).</summary>
+public class BoolToGreenRedBrushConverter : IValueConverter
+{
+    public static readonly BoolToGreenRedBrushConverter Instance = new();
+
+    static readonly IBrush Green = new SolidColorBrush(Color.Parse("#4ADE80"));
+    static readonly IBrush Red = new SolidColorBrush(Color.Parse("#F87171"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Green : Red;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Wandelt boolean in dezente Status-Hintergrundfarbe: true = Grün (#1F4ADE80), false = Rot (#1FF87171).</summary>
+public class BoolToGreenRedBgConverter : IValueConverter
+{
+    public static readonly BoolToGreenRedBgConverter Instance = new();
+
+    static readonly IBrush GreenBg = new SolidColorBrush(Color.Parse("#1F4ADE80"));
+    static readonly IBrush RedBg = new SolidColorBrush(Color.Parse("#1FF87171"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? GreenBg : RedBg;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+

@@ -31,8 +31,8 @@ if ($cl -match $verPat) {
 }
 
 # Release-Notes zusammenbauen
-$notes = "$body`r`n`r`n---`r`n📋 Vollständiges Changelog: https://github.com/miwidot/SCLogReader/blob/main/CHANGELOG.md"
-$notesFile = Join-Path $env:TEMP "sclr_notes_$ver.md"
+$notes = "$body`r`n`r`n---`r`n📋 Vollständiges Changelog: https://github.com/gOOvER/SCLogMate/blob/main/CHANGELOG.md"
+$notesFile = Join-Path $env:TEMP "sclm_notes_$ver.md"
 Set-Content $notesFile $notes -Encoding UTF8
 
 # Single-file exe bauen
@@ -41,7 +41,7 @@ dotnet publish -c Release -r win-x64 --self-contained true `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
   -o (Join-Path $root 'publish')
 if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen.' }
-$exe = Join-Path $root 'publish\SCLogReader.exe'
+$exe = Join-Path $root 'publish\SCLogMate.exe'
 if (-not (Test-Path $exe)) { throw "exe nicht gefunden: $exe" }
 Write-Host ("   gebaut: {0:N1} MB" -f ((Get-Item $exe).Length/1MB)) -ForegroundColor Green
 
@@ -52,4 +52,4 @@ Write-Host ("   gebaut: {0:N1} MB" -f ((Get-Item $exe).Length/1MB)) -ForegroundC
 git tag $tag 2>$null
 git push origin $tag
 gh release create $tag $exe --title $tag --notes-file $notesFile
-Write-Host "==> Release $tag erstellt: https://github.com/miwidot/SCLogReader/releases/tag/$tag" -ForegroundColor Cyan
+Write-Host "==> Release $tag erstellt: https://github.com/gOOvER/SCLogMate/releases/tag/$tag" -ForegroundColor Cyan

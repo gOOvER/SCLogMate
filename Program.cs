@@ -1,13 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Avalonia;
 using SCLogReader.Core;
 using SCLogReader.Models;
 
 namespace SCLogReader;
 
-internal static class Program
+internal static partial class Program
 {
     [STAThread]
     public static void Main(string[] args)
@@ -162,12 +163,12 @@ internal static class Program
         return s;
     }
 
-    static readonly System.Text.RegularExpressions.Regex TsRe =
-        new(@"<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>", System.Text.RegularExpressions.RegexOptions.Compiled);
+    [GeneratedRegex(@"<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>")]
+    private static partial Regex TsRegex();
 
     static DateTime? TimeOf(string line)
     {
-        var m = TsRe.Match(line);
+        var m = TsRegex().Match(line);
         return m.Success && DateTime.TryParse(m.Groups["ts"].Value, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var dt)
             ? dt : null;

@@ -2,20 +2,26 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.1.19</Version>
-    <Authors>miwidot</Authors>
-    <RepositoryUrl>https://github.com/miwidot/SCLogReader</RepositoryUrl>
+    <AssemblyName>SCLogMate</AssemblyName>
+    <Product>SCLogMate</Product>
+    <Title>SCLogMate</Title>
+    <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
+    <Version>1.0.0</Version>
+    <Authors>gOOvER</Authors>
+    <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
     <ApplicationIcon>SCLogReader.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="SCLogReader.ico" />
+    <EmbeddedResource Include="Data\blueprints.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,7 +31,9 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.3" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.2" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.0" />
   </ItemGroup>
 
 </Project>

@@ -15,11 +15,10 @@ namespace SCLogReader.Core;
 /// </summary>
 public static class Database
 {
-    const int SchemaVersion = 1;
-    const int ParserVersion = 12;  // erhöhen, wenn der Parser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 2;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 15; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
-    static string DbPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogReader", "sessions.db");
+    static string DbPath => Path.Combine(Settings.Dir, "sessions.db");
 
     static string Conn => $"Data Source={DbPath}";
 
@@ -29,22 +28,74 @@ public static class Database
         using var db = new SqliteConnection(Conn);
         db.Open();
 
-        Exec(db, @"CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
-                   CREATE TABLE IF NOT EXISTS sessions(name TEXT PRIMARY KEY, start TEXT, end TEXT);
-                   CREATE TABLE IF NOT EXISTS events(session TEXT, time TEXT, kind TEXT, amount INTEGER, detail TEXT, ship TEXT);
-                   CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
-                   CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
-                   CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);");
+        Exec(db, @"PRAGMA journal_mode = WAL;
+                   PRAGMA synchronous = NORMAL;
+                   PRAGMA busy_timeout = 5000;");
 
-        // Parser-Version prüfen -> bei Änderung Cache leeren (wird neu indexiert)
+        // 1. Schema-Migrationen anwenden (PRAGMA user_version)
+        ApplySchemaMigrations(db);
+
+        // 2. Parser-Version prüfen -> bei Änderung Cache leeren & neu indexieren
+        CheckParserVersion(db);
+    }
+
+    /// <summary>
+    /// Führt inkrementelle Schema-Upgrades (Tabellen, Spalten, Indizes) strukturiert aus.
+    /// </summary>
+    private static void ApplySchemaMigrations(SqliteConnection db)
+    {
+        var versionObj = Scalar(db, "PRAGMA user_version;");
+        int dbSchemaVersion = Convert.ToInt32(versionObj ?? 0);
+
+        if (dbSchemaVersion < 1)
+        {
+            // Initial-Schema v1
+            Exec(db, @"
+                CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+                CREATE TABLE IF NOT EXISTS sessions(name TEXT PRIMARY KEY, start TEXT, end TEXT);
+                CREATE TABLE IF NOT EXISTS events(session TEXT, time TEXT, kind TEXT, amount INTEGER, detail TEXT, ship TEXT);
+                CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
+            ");
+            Exec(db, "PRAGMA user_version = 1;");
+            dbSchemaVersion = 1;
+            Logger.Log("DB Schema: Initialversion 1 angewendet.");
+        }
+
+        if (dbSchemaVersion < 2)
+        {
+            Exec(db, @"
+                CREATE TABLE IF NOT EXISTS contracts(
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    reward INTEGER NOT NULL,
+                    contracted_by TEXT NOT NULL,
+                    scanned_at TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'Active'
+                );
+                CREATE INDEX IF NOT EXISTS ix_contracts_status ON contracts(status);
+            ");
+            Exec(db, "PRAGMA user_version = 2;");
+            dbSchemaVersion = 2;
+            Logger.Log("DB Schema: Migration auf v2 (contracts Tabelle) erfolgreich angewendet.");
+        }
+
+        SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// Prüft, ob der Log-Parser aktualisiert wurde. Wenn ja, werden Rohlogs neu indexiert.
+    /// </summary>
+    private static void CheckParserVersion(SqliteConnection db)
+    {
         var stored = GetMeta(db, "parserVersion");
-        if (stored != ParserVersion.ToString(CultureInfo.InvariantCulture))
+        if (stored != CurrentParserVersion.ToString(CultureInfo.InvariantCulture))
         {
             Exec(db, "DELETE FROM events; DELETE FROM sessions;");
-            SetMeta(db, "parserVersion", ParserVersion.ToString(CultureInfo.InvariantCulture));
-            Logger.Log($"DB: Parser-Version geändert -> Cache geleert (rebuild).");
+            SetMeta(db, "parserVersion", CurrentParserVersion.ToString(CultureInfo.InvariantCulture));
+            Logger.Log($"DB: Parser-Version auf v{CurrentParserVersion} aktualisiert -> Cache für Re-Indexierung geleert.");
         }
-        SetMeta(db, "schemaVersion", SchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>Parst und speichert alle Logs, die noch nicht in der DB sind. Liefert Anzahl neuer.</summary>
@@ -105,6 +156,148 @@ public static class Database
         return added;
     }
 
+    /// <summary>Leert die Datenbank vollständig (Events + Sessions) und komprimiert per VACUUM.</summary>
+    public static void ClearAll()
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        Exec(db, "DELETE FROM events; DELETE FROM sessions;");
+        Exec(db, "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
+        Logger.Log("DB: Alle Events und Sessions vollständig zurückgesetzt.");
+    }
+
+    /// <summary>Führt eine vollständige Neu-Indexierung aller Logs durch (Re-Scan).</summary>
+    public static (int indexedSessions, int totalEvents) RescanAll(IEnumerable<string> logFiles, Action<int, int, string>? onProgress = null)
+    {
+        ClearAll();
+        var files = new List<string>(logFiles);
+        int totalFiles = files.Count;
+        int sessionCount = 0;
+        int eventCount = 0;
+
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+
+        for (int i = 0; i < totalFiles; i++)
+        {
+            var file = files[i];
+            var name = Path.GetFileName(file);
+            onProgress?.Invoke(i + 1, totalFiles, name);
+
+            try
+            {
+                var parser = new LogParser();
+                DateTime? first = null, last = null;
+                using var tx = db.BeginTransaction();
+                using var cmd = db.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
+                var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
+                var pt = cmd.Parameters.Add("$t", SqliteType.Text);
+                var pk = cmd.Parameters.Add("$k", SqliteType.Text);
+                var pa = cmd.Parameters.Add("$a", SqliteType.Integer);
+                var pd = cmd.Parameters.Add("$d", SqliteType.Text);
+                var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
+
+                int sessionEvents = 0;
+                foreach (var line in ReadShared(file))
+                {
+                    var e = parser.Feed(line);
+                    if (e == null) continue;
+                    if (first == null || e.Time < first) first = e.Time;
+                    if (last == null || e.Time > last) last = e.Time;
+                    pt.Value = e.Time.ToString("o", CultureInfo.InvariantCulture);
+                    pk.Value = e.Kind.ToString();
+                    pa.Value = e.Amount;
+                    pd.Value = e.Detail ?? "";
+                    psh.Value = (object?)e.Ship ?? DBNull.Value;
+                    cmd.ExecuteNonQuery();
+                    sessionEvents++;
+                }
+
+                using (var s = db.CreateCommand())
+                {
+                    s.Transaction = tx;
+                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end) VALUES($n,$st,$en)";
+                    s.Parameters.AddWithValue("$n", name);
+                    s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                    s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                    s.ExecuteNonQuery();
+                }
+                tx.Commit();
+                sessionCount++;
+                eventCount += sessionEvents;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Rescan " + name, ex);
+            }
+        }
+
+        Exec(db, "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
+        Logger.Log($"DB: Re-Scan beendet: {sessionCount} Sessions, {eventCount} Events.");
+        return (sessionCount, eventCount);
+    }
+
+    /// <summary>Bereinigt verwaiste Einträge, optimiert Indizes und führt VACUUM aus.</summary>
+    public static (int cleanedEvents, int cleanedSessions, long sizeBefore, long sizeAfter) Cleanup()
+    {
+        long sizeBefore = GetDatabaseSizeBytes();
+        int cleanedEvents = 0;
+        int cleanedSessions = 0;
+
+        using (var db = new SqliteConnection(Conn))
+        {
+            db.Open();
+            using (var tx = db.BeginTransaction())
+            {
+                // Ungültige/leere Datensätze entfernen
+                using var c1 = db.CreateCommand();
+                c1.Transaction = tx;
+                c1.CommandText = "DELETE FROM events WHERE time IS NULL OR kind IS NULL OR trim(time) = ''";
+                cleanedEvents += c1.ExecuteNonQuery();
+
+                // Verwaiste Sessions ohne Events entfernen
+                using var c2 = db.CreateCommand();
+                c2.Transaction = tx;
+                c2.CommandText = "DELETE FROM sessions WHERE name NOT IN (SELECT DISTINCT session FROM events WHERE session IS NOT NULL)";
+                cleanedSessions += c2.ExecuteNonQuery();
+
+                tx.Commit();
+            }
+
+            Exec(db, "PRAGMA optimize;");
+            Exec(db, "PRAGMA wal_checkpoint(TRUNCATE);");
+            Exec(db, "VACUUM;");
+        }
+
+        long sizeAfter = GetDatabaseSizeBytes();
+        Logger.Log($"DB: Cleanup abgeschlossen. Vorher: {FormatBytes(sizeBefore)}, Nachher: {FormatBytes(sizeAfter)}.");
+        return (cleanedEvents, cleanedSessions, sizeBefore, sizeAfter);
+    }
+
+    public static long GetDatabaseSizeBytes()
+    {
+        try
+        {
+            long total = 0;
+            if (File.Exists(DbPath)) total += new FileInfo(DbPath).Length;
+            var wal = DbPath + "-wal";
+            if (File.Exists(wal)) total += new FileInfo(wal).Length;
+            var shm = DbPath + "-shm";
+            if (File.Exists(shm)) total += new FileInfo(shm).Length;
+            return total;
+        }
+        catch { return 0; }
+    }
+
+    public static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+
     /// <summary>Alle gespeicherten Events chronologisch (älteste zuerst).</summary>
     public static IEnumerable<LogEntry> LoadAllEvents()
     {
@@ -157,6 +350,25 @@ public static class Database
         c.CommandText = "SELECT DISTINCT detail FROM events WHERE kind='Blueprint' ORDER BY detail";
         using var r = c.ExecuteReader();
         while (r.Read()) if (!r.IsDBNull(0)) list.Add(r.GetString(0));
+        return list;
+    }
+
+    /// <summary>Alle erhaltenen Bauplan-Events mit Zeitstempel über alle Sessions.</summary>
+    public static List<LogEntry> AllBlueprintEvents()
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        c.CommandText = "SELECT time, detail FROM events WHERE kind='Blueprint' ORDER BY time ASC";
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            var tStr = r.GetString(0);
+            DateTime.TryParse(tStr, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var t);
+            var detail = r.IsDBNull(1) ? "" : r.GetString(1);
+            list.Add(new LogEntry { Time = t, Kind = EventKind.Blueprint, Detail = detail });
+        }
         return list;
     }
 
@@ -217,7 +429,14 @@ public static class Database
                 if (DateTime.TryParse(pr.GetString(0), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var st) &&
                     DateTime.TryParse(pr.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var en) &&
                     en > st)
-                    a.PlaytimeSeconds += (en - st).TotalSeconds;
+                {
+                    var dur = (en - st).TotalSeconds;
+                    // Plausibilitätsprüfung: Sessions über 36h ignorieren/kappen
+                    if (dur > 0 && dur < 36 * 3600)
+                    {
+                        a.PlaytimeSeconds += dur;
+                    }
+                }
             }
         }
         a.MissionsDone = Convert.ToInt32(Scalar(db, "SELECT COUNT(*) FROM events WHERE kind='MissionDone'") ?? 0);
@@ -300,6 +519,70 @@ public static class Database
     static string? GetMeta(SqliteConnection db, string key) =>
         Scalar(db, "SELECT value FROM meta WHERE key=$k", ("$k", key)) as string;
 
-    static void SetMeta(SqliteConnection db, string key, string value) =>
-        Exec(db, $"INSERT OR REPLACE INTO meta(key,value) VALUES('{key}','{value}')");
+    static void SetMeta(SqliteConnection db, string key, string value)
+    {
+        using var c = db.CreateCommand();
+        c.CommandText = "INSERT OR REPLACE INTO meta(key,value) VALUES($k,$v)";
+        c.Parameters.AddWithValue("$k", key);
+        c.Parameters.AddWithValue("$v", value);
+        c.ExecuteNonQuery();
+    }
+
+    public static void SaveContract(Models.ContractDetails contract)
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = @"
+            INSERT OR REPLACE INTO contracts (id, title, reward, contracted_by, scanned_at, status)
+            VALUES ($id, $title, $reward, $org, $time, 'Active');";
+        cmd.Parameters.AddWithValue("$id", $"{contract.Title.Trim()}:{contract.Reward}");
+        cmd.Parameters.AddWithValue("$title", contract.Title);
+        cmd.Parameters.AddWithValue("$reward", contract.Reward);
+        cmd.Parameters.AddWithValue("$org", contract.ContractedBy ?? "");
+        cmd.Parameters.AddWithValue("$time", contract.ScannedAt.ToString("o"));
+        cmd.ExecuteNonQuery();
+    }
+
+    public static List<Models.ContractDetails> GetActiveContracts()
+    {
+        var list = new List<Models.ContractDetails>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT title, reward, contracted_by, scanned_at FROM contracts WHERE status='Active' ORDER BY scanned_at DESC;";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(3), out var dt);
+            list.Add(new Models.ContractDetails
+            {
+                Title = r.GetString(0),
+                Reward = r.GetInt32(1),
+                ContractedBy = r.GetString(2),
+                ScannedAt = dt != default ? dt : DateTime.UtcNow
+            });
+        }
+        return list;
+    }
+
+    public static void ClearActiveContracts()
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM contracts;";
+        cmd.ExecuteNonQuery();
+    }
+
+    public static void RemoveContract(string title, int reward)
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM contracts WHERE title=$t AND reward=$r;";
+        cmd.Parameters.AddWithValue("$t", title);
+        cmd.Parameters.AddWithValue("$r", reward);
+        cmd.ExecuteNonQuery();
+    }
 }

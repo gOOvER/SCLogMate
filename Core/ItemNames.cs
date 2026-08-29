@@ -13,7 +13,11 @@ namespace SCLogReader.Core;
 /// </summary>
 public static class ItemNames
 {
-    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
+    static readonly HttpClient Http = new()
+    {
+        Timeout = TimeSpan.FromSeconds(8),
+        DefaultRequestHeaders = { { "User-Agent", "SCLogReader" } }
+    };
     static readonly ConcurrentDictionary<string, string> Cache = new();
 
     /// <summary>Liefert den UEX-Namen oder null (dann Fallback verwenden).</summary>

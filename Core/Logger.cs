@@ -4,7 +4,7 @@ using System.IO;
 namespace SCLogReader.Core;
 
 /// <summary>
-/// Schreibt eine Debug-Datei NEBEN die .exe (SCLogReader.debug.log).
+/// Schreibt eine Debug-Datei in %AppData%\SCLogReader\SCLogReader.debug.log (mit Fallback).
 /// Zweck: bei fremden Logs sehen, was schiefläuft und welche Events wir
 /// noch nicht abdecken (unbekannte Notifications etc.).
 /// </summary>
@@ -16,13 +16,21 @@ public static class Logger
     static Logger()
     {
         string dir;
-        try { dir = System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? "."; }
-        catch { dir = "."; }
-        Path = System.IO.Path.Combine(dir, "SCLogReader.debug.log");
+        try
+        {
+            dir = Settings.Dir;
+            Directory.CreateDirectory(dir);
+        }
+        catch
+        {
+            try { dir = System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? "."; }
+            catch { dir = "."; }
+        }
+        Path = System.IO.Path.Combine(dir, "SCLogMate.debug.log");
 
         try
         {
-            // pro Start frische Datei (außer sie ist riesig -> sowieso neu)
+            // pro Start frische Datei
             File.WriteAllText(Path,
                 $"=== SC Log Reader {Updater.CurrentVersion} · Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
         }

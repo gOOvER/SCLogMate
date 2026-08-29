@@ -1,150 +1,178 @@
-# 🛰️ SC Log Reader
+# 🛰️ SCLogMate
 
-**Live-Auswertung deiner Star-Citizen `Game.log`** — Geld, Aufträge, Schiffe, Handel,
-Baupläne, Crew, Tode u.v.m. In Echtzeit, mit Geld-Statistik, mitlaufendem Kontostand
-und persistentem Archiv. Eine einzige Windows-`.exe`, kein Setup, kein .NET nötig.
-
-> ⚠️ **Inoffizielles Community-/Fan-Projekt.** Nicht mit Cloud Imperium Games (CIG)
-> oder Roberts Space Industries (RSI) verbunden, von ihnen unterstützt oder autorisiert.
-> Liest **ausschließlich lokal** die `Game.log` (**read-only**) — kein Eingriff ins Spiel,
-> kein Memory-Zugriff, **AntiCheat-konform**. Siehe [Disclaimer](#-disclaimer).
-
-![SC Log Reader](docs/screenshot.png)
+[🇬🇧 English](#-english) &nbsp;|&nbsp; [🇩🇪 Deutsch](#-deutsch)
 
 ---
 
-## ✨ Was es kann
+<a name="-english"></a>
+# 🇬🇧 English
 
-**💰 Geld & Wirtschaft**
-- Geld rein/raus: Spieler-Überweisungen, Missions-Belohnungen, Käufe, Item-Verkäufe, Fracht-Handel, Angebote
-- **Eigener Kontostand-Eingabe** → **mitlaufender Saldo** nach jedem rein/raus + „erwarteter Stand"
-- **Geld-Statistik-Tab**: Einnahmen/Ausgaben nach Quelle (Balken), größte Posten, letzte Bewegungen (mit Datum)
-- Item-Namen via **UEX-API**, ~750 Waren-Namen offline aus **scunpacked**
+**The modern, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
 
-**📋 Aufträge & Fortschritt**
-- Angenommene/abgeschlossene/geteilte Aufträge **mit Namen + Rang** (z.B. „RED WIND – Easy Cargo Recovery")
-- Zähler für abgeschlossene Aufträge, **erhaltene Baupläne**, Rang-Aufstieg (NEULING → JUNIOR)
+SCLogMate analyzes your Star Citizen `Game.log` in real-time: Finances, contracts, fleet, cargo trading, crafting blueprints, party/crew, combat kills, locations, and more. Features an In-Game Mini-HUD, WoW-style achievement toast banners, native Windows mobiGlas OCR, and persistent SQLite archiving.
 
-**🚀 Schiffe & Orte**
-- Geflogene Flotte, aktuelles Schiff, **Quantum-Ankünfte**, Schiffsverluste (Kollision)
-- Standorte mit **echten Namen** (z.B. `RR_HUR_LEO` → „Everus Harbor · Hurston"), Rechtsgebiete, Hangar
-
-**👥 Crew & Sonstiges**
-- Party-Mitglieder rein/raus (mit Namen), Freunde, Tode/Kampfunfähig, Fahrzeug-Beschlagnahmung, getragene Ausrüstung
-
-**🛠️ Komfort**
-- **Filter-Chips** (Geld, Aufträge, Schiffe, Crew …) + sortierbare Spalten
-- **„Alle Sessions"** zusammen — schnell per **SQLite-Index**, Roh-Logs werden **archiviert** (überleben SC-Backup-Löschung)
-- Live-Mitlesen während du spielst · **CSV/JSON-Export** · **Auto-Updater** · Tray-Icon
-- **Online nachschlagen** (Rechtsklick/Doppelklick) · Deutsch
+Single standalone Windows `.exe`, no installation required, no .NET runtime setup needed.
 
 ---
 
-## 🚧 Aktive Entwicklung — und warum es „nur meine Logs" kann
-
-Dieses Tool ist in **aktiver Entwicklung**. Wichtig zu wissen:
-
-> **Ich kann nur das einbauen, was in MEINEN eigenen `Game.log`-Dateien auftaucht.**
-
-Star Citizen schreibt je nach **Spielweise** unterschiedliche Dinge ins Log. Ich mache
-v.a. Cargo/Handel/Salvage — also fehlen mir z.B. **Combat-Kills, Mining-Erträge, Refining,
-bestimmte Missionstypen**, weil sie in meinen Logs schlicht **nicht vorkommen**.
-
-Das heißt: Wenn du etwas spielst, das ich nicht spiele, hat **dein** Log Events,
-die ich **nie sehe** — und genau die kann das Tool dann (noch) nicht.
+> ℹ️ **Fork Notice & Acknowledgments**:  
+> **SCLogMate** is an extensively expanded and modernized fork of the original project [**SCLogReader**](https://github.com/miwidot/SCLogReader) by [**miwidot**](https://github.com/miwidot).  
+> Huge thanks to **miwidot** for providing the rock-solid foundation of log parsing and base architecture!
 
 ---
 
-## 🤝 Mithelfen (ganz einfach!)
-
-Das Tool wertet die aktuelle **`Game.log`** **und** die älteren Sessions aus dem
-**`logbackups\`**-Ordner aus (die werden zusätzlich archiviert). Beim Auswerten
-schreibt es eine **`SCLogReader.debug.log`** neben die `.exe` mit einer Liste
-**„unbekannte Event-Typen"** — also alles, was in **deinen** Logs (aktuelle + Backups)
-auftaucht, aber noch nicht ausgewertet wird.
-
-**→ Schick mir diese `SCLogReader.debug.log`** (oder die „unbekannte Events"-Zeilen)
-per [Issue](https://github.com/miwidot/SCLogReader/issues) — dann baue ich Support dafür ein.
-
-So wächst das Tool über das hinaus, was ich allein erlebe. 💪
+> ⚠️ **Unofficial Community Project.** Not affiliated with, endorsed by, or authorized by Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). Reads exclusively your local `Game.log` file (**read-only**) — no game process hooks, no memory access, **100% AntiCheat compliant**.
 
 ---
 
-## ⬇️ Download
+## ✨ Features & Highlights (English)
 
-Neueste **[`SCLogReader.exe` → Releases](https://github.com/miwidot/SCLogReader/releases/latest)**
-— eine Datei, doppelklicken, fertig. Prüft beim Start automatisch auf Updates.
-Was sich geändert hat: **[CHANGELOG](CHANGELOG.md)**.
+### ✦ In-Game Overlays (Gaming-Style)
+- **WoW-Style Achievement & Reward Toast Banner**:
+  - Pops up on newly learned blueprints (`⬡ BLUEPRINT LEARNED`) and mission completions (`★ MISSION COMPLETE: +aUEC`).
+  - Dynamic stacked list: Multiple sequential rewards queue neatly underneath rather than overwriting each other.
+  - Operates completely autonomously and independently from the Mini-HUD, smoothly fades out after ~5.5 seconds.
+  - Freely draggable anywhere on screen via Drag & Drop (position saved persistently).
+  - Never steals focus from gameplay (`WS_EX_NOACTIVATE` — no input lag while flying or shooting).
+- **Floating Mini-HUD Overlay**:
+  - Freely repositionable in-game HUD displaying live balance, location, armistice status, focused contract, and server ping.
+
+### 📋 Contract & Mission Manager
+- **Built-in Master Mission Catalog (`scunpacked-data`)**:
+  - Complete SC 4.x PU mission database featuring contractors (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch*, etc.), factions, standard rewards, reputation XP, star systems, and crafting blueprint drops.
+  - Searchable mission browser tab with instant category filtering.
+- **Zero-OCR Log-Matching & Auto-Sync**:
+  - Automatically identifies `Accepted`, `Complete`, `Abandoned`, and `Failed` missions from game telemetry.
+  - Completed or abandoned missions are immediately cleared from active contract tracking and the SQLite database in real-time.
+
+### ⬡ Crafting Blueprint Catalog
+- **Complete SC 4.x Blueprint Database**:
+  - Weapons, armor, multi-tools, ammunition, ship components, and medical gear.
+  - Progress tracker (`X of Y learned`, percentage overview), category filters, and acquisition date tracking.
+
+### 👁 mobiGlas Screenreader (Windows Native OCR)
+- **Automated aUEC Balance Capture**:
+  - Reads your genuine live aUEC balance via native Windows OCR whenever opening mobiGlas (`F1`).
+  - Multi-monitor area calibration (`⊕ Area`) with DPI-aware hardware pixel scaling and in-game indicator box.
+
+### 💰 Economy & Cargo Tracking
+- Running balance calculations for every store purchase, sale, commodity run, reward, or fine.
+- In-depth financial analytics, profit margins, and commodity market prices.
+- **UEX Corp API 2.0 Integration**: Connect your personal UEX Bearer Token for live trade terminal and pricing data.
+
+### 🚀 Fleet, Starmap & Navigation
+- Fleets flown, Quantum travel arrivals, and collision vessel losses.
+- **Star Citizen Wiki Integration**: In-app vehicle inspection modal with HD imagery, manufacturer specifications, and lore.
+- **Starmap & Armistice Resolver**: Full support for Stanton, Pyro, and Nyx (including *Keeger Depot*, *Wikelo Emporium*, hangars, caves, and contested zones) with live armistice zone state detection (🟢 Safe / 🔴 Unprotected).
 
 ---
 
-## 🚀 Nutzung
+## ⬇️ Download & Quick Start (English)
 
-**GUI:** Starten → Pfad wird **automatisch erkannt** (alle Laufwerke, LIVE/PTU/EPTU…),
-sonst per **📁 Durchsuchen** wählen. **Start** liest live mit, während SC läuft.
-Eigenen aUEC-Stand eintragen → **✓ Setzen** für den mitlaufenden Saldo.
+1. Download the latest **[`SCLogMate.exe` from Releases](https://github.com/gOOvER/SCLogMate/releases/latest)**.
+2. Run the `.exe` (portable, no installation).
+3. Your Star Citizen log path will be detected automatically.
+4. Check the **[CHANGELOG](CHANGELOG.md)** for release notes.
 
-**CLI (Batch über alle Logs):**
+---
+
+## 🏗️ Technical Specifications
+
+- **Framework**: .NET 10 (Win-x64, Self-Contained Single-File)
+- **UI**: Avalonia UI 11.2 (Fluent Dark Theme)
+- **OCR**: Windows.Media.Ocr (Native Windows 10/11 Engine)
+- **Storage & Index**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`)
+- **RegEx Core**: Zero-Allocation C# Source Generator Expressions (`[GeneratedRegex]`)
+
+Build via PowerShell / .NET CLI:
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
 ```
-SCLogReader.exe --scan "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE"
-```
 
 ---
 
-## 🔍 Was im Log erkannt wird
-
-| Typ | Quelle im Log |
-|-----|----------------|
-| Geld rein/raus | `Überweisung erhalten von …` / `Sie haben … gesendet:` + Betragszeile |
-| Belohnung | `<betrag> aUEC erhalten` |
-| Kauf/Verkauf | `SShopBuyRequest` / `SShopSellRequest` (Item, Preis, GUID) |
-| Handel (Fracht) | `SShopCommoditySellRequest` (Betrag, resourceGUID, Menge) |
-| Auftrag | `Auftrag angenommen/abgeschlossen/geteilt` + `MissionEnded` |
-| Schiff / Quantum | `ClearDriver … token for '<schiff>'` / `Quantum Drive Arrived` |
-| Standort / Gebiet | `RequestLocationInventory … Location[<id>]` / Rechtsgebiete |
-| Crew / Tode / Ausrüstung | Party-Beitritt/-Austritt, Kampfunfähig, `AttachmentReceived` … |
+<br/>
 
 ---
 
-## 🧱 Bekannte Grenzen (Log-bedingt, nicht behebbar)
+<a name="-deutsch"></a>
+# 🇩🇪 Deutsch
 
-- **Auftrags-Belohnungen**: der Betrag wird **serverseitig** aufs Konto gebucht und steht
-  **nicht im Log** — nur ein paar spezielle Rewards erzeugen eine sichtbare Meldung.
-  (Das Tool zeigt deshalb die **Anzahl** abgeschlossener Aufträge + Hinweis.)
-- **Lager**: nur **Stückzahl**, keine Warennamen/SCU.
-- **Flotte/Schiffslager**: ASOP liefert nur eine *Anzahl*, keine Namen/Standorte (serverseitig).
-- **Quantum**: nur **Ankunft** sicher; **Zielnamen** stehen nicht im Log.
-- Käufe/Verkäufe sind Shop-*Requests* (mit `result[Success]` bestätigt).
+**Der moderne, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
 
----
+SCLogMate wertet deine Star Citizen `Game.log` in Echtzeit aus: Finanzen, Aufträge, Flotte, Frachthandel, Crafting-Baupläne, Crew, Kills, Standorte und vieles mehr. Mit In-Game Mini-HUD, Gaming-Achievement-Banner (WoW-Style), nativer mobiGlas-OCR und persistentem SQLite-Archiv.
 
-## 🏗️ Technik
-
-.NET 8 / **Avalonia** (Cross-platform), **SQLite**-Index + Roh-Log-Archiv, Single-File-`.exe`.
-- `Core/LogParser.cs` — Zeilen-Parsing (Regex), `Core/LogTailer.cs` — Live-Lesen (Shared-Read)
-- `Core/Database.cs` + `LogArchive.cs` — Session-Cache + Archiv (nachbaubar)
-- `Core/Locations.cs` / `Ships.cs` / `CommoditiesData.cs` — lesbare Namen
-
-Bauen: `dotnet build -c Release` · Release: `./release.ps1`
+Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforderlich.
 
 ---
 
-## 📜 Disclaimer
+> ℹ️ **Fork-Hinweis & Danksagung**:  
+> **SCLogMate** ist ein umfassend erweiterter und modernisierter Fork des ursprünglichen Projekts [**SCLogReader**](https://github.com/miwidot/SCLogReader) von [**miwidot**](https://github.com/miwidot).  
+> Ein großes Dankeschön an **miwidot** für das exzellente Fundament des Log-Parsings und der Basis-Architektur!
 
-Dies ist ein **inoffizielles, von Fans erstelltes Community-Tool** und steht in
-**keiner Verbindung** zu Cloud Imperium Games (CIG) oder der Roberts Space Industries
-Group of Companies (RSI) und wird von diesen weder unterstützt, gesponsert noch autorisiert.
+---
 
-„Star Citizen", „Squadron 42", „Roberts Space Industries" und „Cloud Imperium" sind
-Marken der jeweiligen Inhaber. Alle Spiel-Inhalte gehören CIG.
+> ⚠️ **Inoffizielles Community-Projekt.** Nicht mit Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI) verbunden oder autorisiert. Liest ausschließlich lokal deine `Game.log` (**read-only**) — kein Eingriff in den Spielprozess, kein Memory-Hook, **100% AntiCheat-konform**.
 
-Das Tool liest ausschließlich die **lokale `Game.log`** (read-only) zur Auswertung
-**deiner eigenen** Spielsitzungen. Es verändert das Spiel nicht, greift nicht in den
-Spielprozess ein und liest keinen Speicher — daher AntiCheat-konform.
-Nutzung auf **eigene Verantwortung**, ohne Gewähr.
+---
 
-Externe Daten: Item-Namen via [UEX](https://uexcorp.space),
-Waren-/Spieldaten via [scunpacked](https://github.com/StarCitizenWiki/scunpacked-data).
+## ✨ Features & Highlights (Deutsch)
 
-## Lizenz
-[MIT](LICENSE) — frei nutzbar, anpassbar, teilbar. Beiträge willkommen.
+### ✦ In-Game Overlays (Gaming-Style)
+- **WoW-Style Achievement & Reward Toast Banner**:
+  - Plopt bei neuen Bauplänen (`⬡ BAUPLAN ERLERNT`) und Missionsbelohnungen (`★ AUFTRAG ABGESCHLOSSEN: +aUEC`) auf.
+  - Dynamisch gestapelte Liste: Mehrere aufeinanderfolgende Erfolge überschreiben sich nicht, sondern reihen sich sauber untereinander ein.
+  - Läuft völlig autonom und unabhängig vom Mini-HUD, fadet nach ~5,5 Sekunden sanft aus.
+  - Frei per Drag & Drop auf dem Bildschirm verschiebbar (Position wird dauerhaft gespeichert).
+  - Stört das Gameplay nicht (`WS_EX_NOACTIVATE` — kein Fokusverlust beim Fliegen oder Kämpfen).
+- **Floating Mini-HUD Overlay**:
+  - Frei positionierbares In-Game Overlay mit Kontostand, Standort, Schutzzonen-Status, fokussiertem Auftrag und Live-Server-Ping.
+
+### 📋 Auftrags- & Missions-Manager
+- **Integrierter Master-Missionskatalog (`scunpacked-data`)**:
+  - Vollständige SC 4.x PU-Missionsdatenbank mit Auftraggebern (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch* etc.), Fraktionen, Standard-Belohnungen, Ruf-XP, Sonnensystemen und Bauplan-Drops.
+  - Durchsuchbarer Missions-Browser im Tab *❖ Missionen*.
+- **Zero-OCR Log-Matching & Auto-Sync**:
+  - Erkennt angenommene (`Accepted`), abgeschlossene (`Complete`), abgebrochene (`Abandoned`) und fehlgeschlagene (`Failed`) Aufträge automatisch.
+  - Abgeschlossene oder abgebrochene Missionen werden in Echtzeit aus der Liste aktiver Aufträge ausgetragen.
+
+### ⬡ Bauplan-Datenbank (Crafting Blueprints)
+- **Vollständiger SC 4.x Bauplan-Katalog**:
+  - Rüstung, Waffen, Werkzeuge, Munition, Komponenten und Medizin.
+  - Fortschrittsanzeige (`X von Y erlernt`, Prozentanzeige), Kategorie-Filter und Datums-Tracking gefundener Baupläne.
+
+### 👁 mobiGlas Screenreader (Windows Native OCR)
+- **Automatischer aUEC Kontostand-Scan**:
+  - Liest beim Öffnen des mobiGlas (`F1`) den echten Kontostand per Windows Native OCR ab.
+  - Multi-Monitor Bereichsauswahl (`⊕ Bereich`) mit pixelgenauer DPI-Synchronisation und In-Game Scan-Box.
+
+### 💰 Finanzen & Wirtschaft
+- Mitlaufender Kontostand bei jedem Kauf, Verkauf, Handel, Belohnungseingang oder Bußgeld.
+- Detaillierte Finanz-Statistiken, Margen-Rechner und Marktpreise je Ware.
+- **UEX Corp API 2.0 Integration**: Hinterlegung des persönlichen UEX Bearer Tokens für Live-Handelsdaten und Terminals.
+
+### 🚀 Flotte, Starmap & Standorte
+- Geflogene Schiffe, Quantum-Ankünfte und Schiffsverluste.
+- **Star Citizen Wiki Integration**: Detailanzeigen mit HD-Schiffsbildern, Herstellern und technischen Daten.
+- **Starmap & Schutzzonen-Resolver**: Stanton, Pyro und Nyx (inkl. *Keeger Depot*, *Wikelo Emporium*, Hangars, Höhlen und Contested Zones) mit Live-Erkennung von Waffenstillstandszonen (🟢 Grün / 🔴 Rot).
+
+---
+
+## ⬇️ Download & Installation (Deutsch)
+
+1. Lade die neueste **[`SCLogMate.exe` aus den Releases](https://github.com/gOOvER/SCLogMate/releases/latest)** herunter.
+2. Starte die `.exe` (keine Installation nötig).
+3. Dein Star Citizen Installationspfad wird automatisch erkannt.
+4. Alle Änderungen und Updates findest du im **[CHANGELOG](CHANGELOG.md)**.
+
+---
+
+## 📜 Disclaimer & Lizenz
+
+Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
+
+- Basiert auf dem Originalprojekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot**.
+- Externe Spieldaten via [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
+- Externe Handelsdaten via [UEX Corp](https://uexcorp.space).
+
+Lizenziert unter der [MIT-Lizenz](LICENSE).

@@ -38,6 +38,8 @@ public enum EventKind
     Injury,
     Loot,
     MissionTaken,
+    Crash,
+    SessionChange,
     Info
 }
 
@@ -97,6 +99,8 @@ public partial class LogEntry : ObservableObject
         EventKind.Injury => "Verletzung",
         EventKind.Loot => "Loot",
         EventKind.MissionTaken => "Auftraggeber",
+        EventKind.Crash => "Crash",
+        EventKind.SessionChange => "Session",
         _ => "Info"
     };
 
@@ -114,12 +118,16 @@ public partial class LogEntry : ObservableObject
     {
         get
         {
+            if (Kind == EventKind.Crash) return _missRed;
+            if (Kind == EventKind.SessionChange) return _missAmber;
             if (Kind == EventKind.MissionDone) return _missGreen;
             if (Kind != EventKind.Mission) return _detailDefault;
             var d = Detail ?? "";
-            if (d.StartsWith("Auftrag abgeschlossen") || d.StartsWith("Contract Complete")) return _missGreen;
-            if (d.StartsWith("Auftrag fehlgeschlagen") || d.StartsWith("Contract Failed")) return _missRed;
-            if (d.StartsWith("Auftrag zurückgezogen")) return _missAmber;
+            if (d.StartsWith("Auftrag abgeschlossen", StringComparison.OrdinalIgnoreCase) || d.StartsWith("Contract Complete", StringComparison.OrdinalIgnoreCase)) return _missGreen;
+            if (d.StartsWith("Auftrag fehlgeschlagen", StringComparison.OrdinalIgnoreCase) || d.StartsWith("Contract Failed", StringComparison.OrdinalIgnoreCase) ||
+                d.StartsWith("Auftrag abgebrochen", StringComparison.OrdinalIgnoreCase) || d.StartsWith("Contract Abandoned", StringComparison.OrdinalIgnoreCase) ||
+                d.StartsWith("Auftrag aufgegeben", StringComparison.OrdinalIgnoreCase) || d.StartsWith("Contract Cancelled", StringComparison.OrdinalIgnoreCase)) return _missRed;
+            if (d.StartsWith("Auftrag zurückgezogen", StringComparison.OrdinalIgnoreCase) || d.StartsWith("Contract Withdrawn", StringComparison.OrdinalIgnoreCase)) return _missAmber;
             return _missBlue;   // angenommen / Neuer Auftrag / New Objective
         }
     }
@@ -165,6 +173,8 @@ public partial class LogEntry : ObservableObject
         EventKind.Injury => "⚕",
         EventKind.Loot => "◈",
         EventKind.MissionTaken => "❖",
+        EventKind.Crash => "💥",
+        EventKind.SessionChange => "⚡",
         _ => "·"
     };
 }

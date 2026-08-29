@@ -1,128 +1,84 @@
-# Changelog
+# Changelog — SCLogMate
 
-Alle nennenswerten Änderungen an diesem Projekt. Format nach
-[Keep a Changelog](https://keepachangelog.com/de/), Versionen nach
-[SemVer](https://semver.org/lang/de/).
+All notable changes to this project are documented in this file. Format based on
+[Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
+[SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-29 — *SCLogMate Initial Release*
+
+### Project Rebranding & Architecture
+- **Project Rebranded to SCLogMate**: Full rebranding from *SCLogReader* to **SCLogMate** (Executable: `SCLogMate.exe`).
+- **Seamless Data Migration (%APPDATA%\SCLogMate)**: Automatic, non-destructive import of all previous settings, SQLite databases, and OCR calibrations.
+- **.NET 10 & High-Performance Core**: Zero-allocation compiled Source Generator regular expressions (`[GeneratedRegex]`), SQLite WAL mode, and optimized DataGrid render pipelines.
+
+### Gaming & HUD Overlays
+- **WoW-Style In-Game Achievement & Reward Toast Overlay**:
+  - Gaming-style achievement banners for new blueprints (`⬡ BLUEPRINT LEARNED`) and mission completions (`★ MISSION COMPLETE: +aUEC`).
+  - Stacked list support: Multiple simultaneous or sequential rewards queue neatly underneath rather than overwriting each other.
+  - Operates completely autonomously and independently from the Mini-HUD, smoothly fades out after ~5.5s, never steals game focus (`WS_EX_NOACTIVATE`), and can be freely repositioned anywhere on screen.
+  - 1-click test button in the Settings menu for easy positioning and previewing.
+- **In-Game Floating Mini-HUD Overlay**:
+  - Freely repositionable, borderless Always-on-Top live overlay displaying real-time aUEC balance, current location, armistice zone state, focused mission, and server ping.
+
+### Mission Tracking & Master Catalog
+- **Built-in Master Mission Database (`scunpacked-data`)**:
+  - Comprehensive catalog of all Star Citizen 4.x PU missions including contractors (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch*, etc.), factions, default rewards, reputation XP, star systems, and crafting blueprint drops.
+  - Interactive **Mission Browser** tab with instant text search and category filters.
+- **Zero-OCR Log-Matching & Auto-Sync**:
+  - Automatic extraction of contractor, faction, and reward details directly from `Game.log`.
+  - **Comprehensive Status Tracking**: Detects `Accepted`, `Complete`, `Abandoned`, and `Failed` mission states in real-time.
+  - **Automatic Mission Sync**: Completed, abandoned, or failed missions are immediately cleared from active contract tracking and the SQLite database.
+
+### Blueprint Database (Crafting Blueprints)
+- **New Tab: ⬡ Blueprints**:
+  - Complete master database of all SC 4.x crafting blueprints (armor, weapons, multi-tools, ammunition, ship components, medical).
+  - Learning progress tracker (`X of Y learned`, percentage display), filter chips, and acquisition timestamp history.
+
+### mobiGlas Screenreader (Windows Native OCR)
+- **Automated aUEC Balance Capture**:
+  - Reads your genuine live balance whenever opening mobiGlas (`F1`) via native Windows OCR.
+  - **Robust Multi-Monitor Synchronization**: Pixel-perfect calibration (`⊕ Area`) and a non-intrusive in-game indicator box (`▣ Scan-Box`) with hardware DPI scaling.
+
+### Locations, Starmap & Economy
+- **Starmap & Armistice Resolver**:
+  - Location resolution for Stanton, Pyro, and Nyx (including *Keeger Depot*, *Wikelo Emporium*, hangars, caves, and contested zones).
+  - Real-time armistice zone detection (🟢 Safe Zone / 🔴 Unprotected).
+- **UEX Corp API 2.0 Integration & Star Citizen Wiki**:
+  - Personal UEX Bearer Token configuration with 1-click connection testing.
+  - In-game wiki modal with HD vehicle artwork, manufacturer specs, and lore.
+- **Economy & Cargo Tracking**:
+  - Real-time accounting for cargo buy/sell orders, shop purchases, player transfers, refinery jobs, and fines.
+
+---
+
+# Archive: Legacy SCLogReader Changelog (Base Fork by miwidot)
+
+Historical changelog from the original *SCLogReader* foundation by **miwidot**:
+
+## [1.2.0] - 2026-08-29
+- Settings Page tab with grouped cards.
+- Star Citizen crash & fatal error detection with automated contract reset.
+- Bilingual English/German mobiGlas scanning.
+- Multi-monitor area calibration.
+
 ## [1.1.19] - 2026-08-28
-### Hinzugefügt
-- **Neuer Tab „❖ Missionen" (Ruf-Proxy)**: zeigt **Missionen je Auftraggeber/Fraktion** (RedWind, Hockrow, Covalex, Vaughn, InterSec, HeadHunters …) mit Balken, Anzahl und häufigstem Auftrags-Typ. Star Citizen loggt keine Ruf-Werte — die Anzahl gespielter Missionen je Auftraggeber ist der funktionierende Ersatz, um zu sehen wo du am aktivsten bist. Fällt automatisch aus den Missions-Markern deiner Logs ab (`CreateMarker`, je Mission einmal gezählt) und deckt die komplette Historie ab.
-### Verbessert
-- **Gesamt-Log lädt drastisch schneller**: „Alle Sessions" füllte die Tabelle bisher mit ~60k Einzel-Einfügungen, wobei die Ansicht jedes Mal neu filterte/sortierte (O(n²)). Jetzt ein einziger Batch-Reset → spürbar schnelleres Laden. Zusätzlich **DB-Indexe** auf `kind` und `time` für schnellere Summen-/Sortier-Abfragen.
+- Mission Reputation Proxy tab by contractor/faction.
+- Database query performance optimization via SQL batching.
 
 ## [1.1.18] - 2026-08-18
-### Behoben
-- **Fracht-KÄUFE (Cargo-Trading) wurden gar nicht erfasst** — nur Verkäufe. Für Trader fehlte damit die komplette Einkaufsseite → Gewinn & Saldo massiv überschätzt. Jetzt zählt der Kauf (`SShopCommodityBuyRequest`) als Geld raus. Achtung Falle: Kauf-Menge steht in **cSCU** (÷100 = SCU), Verkauf in SCU. „Handel" zeigt jetzt das **Netto** (Verkauf − Einkauf); die „Handel je Ware"-Ø-Preise bleiben reine Verkaufspreise.
-### Hinzugefügt
-- **Marktpreise (aus deinen Runs)** im Geld-Stats-Tab: pro Ware **bester Verkaufs-** und **günstigster Kaufpreis pro SCU** — jeweils **mit Terminal** — plus **Marge**. Fällt automatisch aus deinen Fracht-Käufen/-Verkäufen ab (kein manuelles Melden). Beantwortet „wo verkauf/kauf ich Ware X am besten".
-- **Loot vollständiger**: auch **direkt ausgerüstetes** Gear wird erfasst (`Equip looting entity` — Armor-Swap am Körper, z.B. Ghost-Hollow-Farming). Vorher nur ins Inventar gestautes Zeug (`OnInventoryStoreItem`). Fängt jetzt Rüstung/Waffen, die du direkt anziehst/greifst.
+- Cargo buy requests (`SShopCommodityBuyRequest`) included in balance calculations.
+- Commodity market prices and extended loot tracking.
 
 ## [1.1.17] - 2026-07-19
-### Behoben
-- **Kontostand/„Erwartet" war falsch**: Der eingetragene Wert wurde als *Startwert vor der gesamten Historie* behandelt — es wurden **alle je geloggten Bewegungen** draufaddiert. Da die Log-Historie zudem lückenhaft ist (SC löscht alte Backups), war die Erwartung doppelt daneben. Jetzt gilt der Wert **ab dem Zeitpunkt des Eintrags**: nur **spätere** Bewegungen werden angerechnet, und die Saldo-Spalte bleibt für ältere Ereignisse bewusst leer statt falsch.
-
-## [1.1.16] - 2026-07-17
-### Geändert
-- **Commodity-Tabelle auf Patch 4.9** aktualisiert (763 Waren, +9 neue aus scunpacked `4.9.0-LIVE`).
-
-## [1.1.15] - 2026-07-14
-### Hinzugefügt
-- **Missions-Status farbig**: abgeschlossen = grün, **fehlgeschlagen = rot** (wird jetzt auch mit Namen erfasst), angenommen/neu = blau, zurückgezogen = gelb.
-- **Missions-Nachschlagen zuverlässiger**: sendet nur den **Basis-Namen** vor dem Doppelpunkt (CitizenHQ speichert variable Schiff-/Ziel-Namen als Platzhalter, z.B. „CRITICAL REFUEL REQUEST: Ship") → trifft jetzt statt 0. Nicht übersetzbare deutsche Namen (Ziele mit Variablen) gehen in eine **breite Suche**.
-### Behoben
-- **Spielzeit im „Alle Sessions"-Header** zeigte die **Kalender-Spanne** (erste bis letzte Session) statt der echten Spielzeit — bei alten Logs (z.B. 2023) wurden daraus absurde Werte wie 29288h. Jetzt: **Summe der Session-Dauern** + Datumsbereich. Danke an **Saturin**!
+- Balance calculations fixed relative to timestamp entry.
 
 ## [1.1.14] - 2026-07-14
-### Hinzugefügt
-- **Loot-Erfassung** (`◈ Loot`-Filter): von der Welt gespawnte Items, die du aufsammelst (Kisten/Gegner) — nur echter Loot (`Runtime-spawned`), nicht Kauf/Umräumen. Namen bereinigt, dedupliziert.
-- **Echte Item-Namen** für Loot: rohe Codes werden über die lokale `global.ini` aufgelöst (`rrs_specialist_light_helmet…` → „Arden-SL Helmet", „Karna Rifle", „Pyro RYT Multi-Tool" …).
-
-## [1.1.13] - 2026-07-05
-### Behoben
-- **Mehrfachkäufe/-verkäufe wurden × Stückzahl zu teuer gerechnet.** `client_price` im Log ist bereits der **Gesamtpreis** — wir haben ihn fälschlich nochmal mit der Menge multipliziert (4 Attrition-5 → 4,4 Mio statt 1,05 Mio). Betraf jeden Kauf/Verkauf mit Menge > 1. Danke an **Saturin** für den Report! (DB wird beim Start einmalig neu aufgebaut → korrigiert rückwirkend.)
-### Hinzugefügt
-- **Bauplan-Nachschlagen** öffnet jetzt direkt die **CitizenHQ-Bauplan-DB** (citizenhq.space/blueprints) statt Google.
-- **Missions-Nachschlagen** öffnet die **CitizenHQ-Missions-DB** (citizenhq.space/missions) — zeigt dort Reward, Fraktion, Bauplan-Quelle u.a.
-- **DE→EN-Übersetzung** fürs Nachschlagen: deutsche Missions-/Bauplan-Titel werden über die lokale `global.ini` ins Englische übersetzt, bevor die (englische) CitizenHQ-DB aufgerufen wird.
-
-## [1.1.12] - 2026-07-03
-### Hinzugefügt
-- Grünes **„✓ Gespeichert"-Signal** direkt am Kontostand-Setzen-Button (Rückmeldung, dass gespeichert wurde).
-- **Bußgelder** (`Strafe gezahlt`) werden erfasst — echtes aUEC raus, fließt in Saldo & Geld-Stats.
-- **Straftaten** (`Begangene Straftat`, Crimestat-Verlauf) als Event im „Sonst"-Filter.
-- **Veredelungs-Aufträge** (Refinery abgeschlossen) als Event.
-- **Verletzungen** (Schweregrad · Körperteil · Behandlungsstufe) als Med-Event.
-
-## [1.1.11] - 2026-07-01
-### Hinzugefügt
-- **Versions-Badge in der Kopfzeile ist klickbar** → öffnet Changelog/Releases.
-- Releases sind jetzt **digital signiert** (Certum Open Source Code Signing) → weniger SmartScreen-Warnung, sichtbarer Herausgeber.
-### Geändert
-- Redundante **Baupläne-Leiste** entfernt — der Baupläne-Filter in der Tabelle zeigt jetzt (seit „alle Events laden") alle Baupläne mit Datum.
-
-## [1.1.10] - 2026-07-01
-### Hinzugefügt
-- Event-Tabelle lädt jetzt **alle** Events (virtualisiert) → alle Filter über die komplette Historie vollständig, nicht mehr nur die letzten ~4000 Zeilen.
-- Vollständige, deduplizierte **Bauplan-Anzeige** (über alle Sessions, direkt aus der DB).
-
-## [1.1.9] - 2026-06-30
-### Hinzugefügt
-- **Handel je Ware**: Gesamt-SCU, Ø Preis/SCU und Erlös je Commodity im Geld-Stats-Tab.
-
-## [1.1.8] - 2026-06-30
-### Hinzugefügt
-- Zähler für **abgeschlossene Aufträge** (`MissionEnded`) mit Hinweis, dass die Belohnung serverseitig läuft und nicht im Log steht.
-
-## [1.1.7] - 2026-06-29
-### Hinzugefügt
-- **Datum** bei den größten Geld-Posten und neue Liste **„Letzte Geld-Bewegungen"** (neueste zuerst).
-
-## [1.1.6] - 2026-06-29
-### Behoben
-- „Online nachschlagen" nutzt jetzt eine breite Suche (zu enge `site:`-Filter entfernt).
-
-## [1.1.5] - 2026-06-29
-### Hinzugefügt
-- ~750 **Commodity-Namen offline** aus scunpacked (kein „Fracht [guid]" mehr).
-- **Online nachschlagen** per Rechtsklick/Doppelklick.
-
-## [1.1.4] - 2026-06-28
-### Hinzugefügt
-- **Versions-Badge** in der Kopfzeile.
-
-## [1.1.3] - 2026-06-28
-### Behoben
-- „Alle Sessions" tailt die laufende `Game.log` jetzt **live** (Standort/Schiff/Geld aktualisieren in Echtzeit).
-
-## [1.1.2] - 2026-06-28
-### Hinzugefügt
-- App-/Fenster-/**Tray-Icon** und **Single-Instance**-Schutz.
-
-## [1.1.1] - 2026-06-28
-### Behoben
-- „Alle Sessions" lädt jetzt blitzschnell über **SQL-Summen** statt jedes Event abzuspielen.
+- Loot item tracking and name resolution via localized `global.ini`.
 
 ## [1.1.0] - 2026-06-28
-### Hinzugefügt
-- **SQLite-Index** der Sessions + **Roh-Log-Archiv** (überlebt SC-Backup-Löschung).
-- **Debug-Log** neben der .exe mit Liste unbekannter Event-Typen.
-
-## [1.0.1] - 2026-06-28
-### Hinzugefügt
-- Update-Prüfung alle 6 Stunden (zusätzlich zum Start).
+- SQLite index for sessions and raw log archiving.
 
 ## [1.0.0] - 2026-06-28
-### Hinzugefügt
-- Erste öffentliche Version: Geld/Handel/Käufe, Aufträge mit Namen+Rang, Baupläne, Schiffe/Flotte, Crew, Tode, Ausrüstung, Quantum, Orte; Filter, Geld-Stats, Saldo, JSON/CSV-Export, Auto-Updater, Single-`.exe`.
-
-
-
-
-
-
-
-
-
-
+- Initial public release of SCLogReader by miwidot.

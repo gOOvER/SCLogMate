@@ -1,0 +1,94 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:m="using:SCLogReader.Models"
+        xmlns:v="using:SCLogReader.Views"
+        mc:Ignorable="d"
+        x:Class="SCLogReader.Views.AchievementToastWindow"
+        x:DataType="v:AchievementToastWindow"
+        Title="SCLogMate Achievement"
+        Width="460"
+        SizeToContent="Height"
+        SystemDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        WindowStartupLocation="Manual">
+
+  <ItemsControl ItemsSource="{Binding ActiveToasts}" Margin="4">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Vertical" Spacing="6" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="m:AchievementToastData">
+        <Border Margin="2"
+                Opacity="{Binding Opacity}"
+                Background="#F20D1117"
+                BorderBrush="{Binding GlowBorderColor}"
+                BorderThickness="1.5"
+                CornerRadius="10"
+                BoxShadow="0 6 20 0 #90000000"
+                Cursor="Hand"
+                PointerPressed="OnItemPointerPressed">
+
+          <Grid Margin="12,8" ColumnDefinitions="Auto,*,Auto">
+
+            <!-- 1. Linkes Wappen-Schild -->
+            <Border Grid.Column="0"
+                    Width="42" Height="42"
+                    Background="{Binding BadgeBg}"
+                    BorderBrush="{Binding BadgeBorder}"
+                    BorderThickness="1.5"
+                    CornerRadius="8"
+                    VerticalAlignment="Center"
+                    Margin="0,0,12,0">
+              <TextBlock Text="{Binding IconText}"
+                         FontSize="20"
+                         FontWeight="Bold"
+                         Foreground="{Binding BadgeColor}"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+            </Border>
+
+            <!-- 2. Text-Inhalt -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="{Binding HeaderText}"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         LetterSpacing="1.2"
+                         Foreground="{Binding SubtitleColor}" />
+
+              <TextBlock Text="{Binding Title}"
+                         FontSize="13.5"
+                         FontWeight="Bold"
+                         Foreground="{Binding TextColor}"
+                         TextTrimming="CharacterEllipsis" />
+
+              <TextBlock Text="{Binding Subtitle}"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Foreground="{Binding SubtitleColor}"
+                         TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <!-- 3. Schließen & Drag-Symbol -->
+            <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center" Margin="6,0,0,0" Spacing="4">
+              <Button Classes="ghost" Padding="4,2" CornerRadius="4" Background="#161B22"
+                      Tag="{Binding}"
+                      Click="OnCloseItemClicked" ToolTip.Tip="Diese Meldung schließen">
+                <TextBlock Text="✕" FontSize="10" Foreground="#8B949E" />
+              </Button>
+              <TextBlock Text="⋮⋮" FontSize="10" Foreground="#484F58" HorizontalAlignment="Center" ToolTip.Tip="Gedrückt halten &amp; ziehen zum Verschieben" />
+            </StackPanel>
+
+          </Grid>
+        </Border>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</Window>

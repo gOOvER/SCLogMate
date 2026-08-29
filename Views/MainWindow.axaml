@@ -2,137 +2,317 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SCLogReader.ViewModels"
         xmlns:m="using:SCLogReader.Models"
+        xmlns:core="using:SCLogReader.Core"
         xmlns:conv="using:SCLogReader.Converters"
+        xmlns:views="using:SCLogReader.Views"
         x:Class="SCLogReader.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Width="1040" Height="720"
-        MinWidth="820" MinHeight="520"
+        Width="1260" Height="780"
+        MinWidth="980" MinHeight="560"
         Background="#0D1117"
         Icon="/SCLogReader.ico"
-        Title="SC Log Reader">
+        Title="SCLogMate">
 
   <Window.Resources>
     <conv:AmountToBrushConverter x:Key="AmountBrush" />
     <conv:KindToBrushConverter x:Key="KindBrush" />
     <conv:FilterActiveConverter x:Key="FilterBg" />
+    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
+    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
+    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
   </Window.Resources>
 
-  <DockPanel Margin="20">
+  <Grid>
+  <DockPanel Margin="18">
 
-    <!-- Kopfzeile -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,0,0,16">
+    <!-- Kopfzeile: Super Clean (Pfad-Einstellung ist im Tab '⚙ Einstellungen') -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,14">
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-        <Border Background="#1F6FEB" CornerRadius="9" Width="36" Height="36">
-          <TextBlock Text="✦" Foreground="White" FontSize="20"
+        <Border Background="#1F6FEB" CornerRadius="8" Width="34" Height="34">
+          <TextBlock Text="✦" Foreground="White" FontSize="18"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="SC Log Reader" Foreground="#F0F6FC" FontSize="18" FontWeight="Bold" />
-            <Button Background="#21262D" CornerRadius="6" Padding="7,2" BorderThickness="0"
+            <TextBlock Text="SCLogMate" Foreground="#F0F6FC" FontSize="17" FontWeight="Bold" />
+            <Button Background="#21262D" CornerRadius="5" Padding="6,2" BorderThickness="0"
                     VerticalAlignment="Center" Cursor="Hand"
                     Command="{Binding OpenChangelogCommand}"
-                    ToolTip.Tip="Changelog / Releases öffnen">
-              <TextBlock Text="{Binding VersionText}" Foreground="#8B949E" FontSize="11" FontWeight="SemiBold" />
+                    ToolTip.Tip="Changelog &amp; Releases">
+              <TextBlock Text="{Binding VersionText}" Foreground="#58A6FF" FontSize="11" FontWeight="Bold" />
             </Button>
           </StackPanel>
-          <TextBlock Text="{Binding MetaSummary}" Foreground="#8B949E" FontSize="11" />
         </StackPanel>
       </StackPanel>
 
-      <TextBox Grid.Column="1" Classes="path" Margin="20,0,10,0"
-               VerticalAlignment="Center" Text="{Binding LogPath}" Watermark="Pfad zur Game.log" />
-      <Button Grid.Column="2" Classes="ghost" Margin="0,0,8,0" VerticalAlignment="Center"
-              Command="{Binding BrowseCommand}" Content="📁  Durchsuchen"
-              ToolTip.Tip="Game.log manuell wählen (andere Platte / Pfad)" />
-      <Button Grid.Column="3" Classes="ghost" Margin="0,0,8,0" VerticalAlignment="Center"
-              Command="{Binding DetectCommand}" Content="Auto"
-              ToolTip.Tip="Game.log automatisch finden (alle Laufwerke, LIVE/PTU/…)" />
-      <Button Grid.Column="4" Classes="accent" MinWidth="92" VerticalAlignment="Center"
+      <!-- Rechts: Star Citizen Status, Mini-HUD, Update-Button (falls verfügbar) & Start/Stop -->
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,8,0">
+        <!-- Star Citizen Prozess-Status Badge -->
+        <Border Background="{Binding GameStatusBadgeBg}" BorderBrush="{Binding GameStatusColor}" BorderThickness="1"
+                CornerRadius="6" Height="32" Padding="10,0" ToolTip.Tip="{Binding GameStatusTooltip}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Ellipse Width="7" Height="7" Fill="{Binding GameStatusColor}" />
+            <TextBlock Text="{Binding GameStatusText}" FontSize="11" FontWeight="Bold" Foreground="{Binding GameStatusColor}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+
+        <Button Classes="ghost" Height="32" Padding="10,0" CornerRadius="6" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                Command="{Binding ToggleOverlayCommand}" ToolTip.Tip="Frei verschiebbares In-Game Mini-HUD Overlay ein-/ausblenden">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="🗔" FontSize="11" Foreground="#38BDF8" />
+            <TextBlock Text="Mini-HUD" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+          </StackPanel>
+        </Button>
+
+        <Button Classes="accent" Height="32" VerticalAlignment="Center"
+                Background="#238636" IsVisible="{Binding UpdateAvailable}"
+                Command="{Binding UpdateCommand}" Content="{Binding UpdateText}"
+                ToolTip.Tip="Neue Version herunterladen und installieren" />
+      </StackPanel>
+
+      <Button Grid.Column="3" Classes="accent" MinWidth="95" Height="32" VerticalAlignment="Center"
               HorizontalContentAlignment="Center"
-              Command="{Binding ToggleCommand}" Content="{Binding ToggleText}" />
-      <Button Grid.Column="5" Classes="accent" Margin="8,0,0,0" VerticalAlignment="Center"
-              Background="#238636" IsVisible="{Binding UpdateAvailable}"
-              Command="{Binding UpdateCommand}" Content="{Binding UpdateText}"
-              ToolTip.Tip="Neue Version herunterladen und installieren" />
+              Command="{Binding ToggleCommand}" Content="{Binding ToggleText}"
+              ToolTip.Tip="Live-Überwachung starten oder stoppen" />
     </Grid>
 
-    <!-- Session-Auswahl -->
+    <!-- Session-Auswahl Bar -->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
       <TextBlock Grid.Column="0" Text="Session" Foreground="#8B949E" FontWeight="SemiBold"
-                 VerticalAlignment="Center" Margin="0,0,10,0" />
-      <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                 VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12" />
+      <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" Height="30"
                 ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" />
-      <TextBlock Grid.Column="2" Text="{Binding SessionSpanText}" Foreground="#22D3EE"
-                 FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
-    </Grid>
-
-    <!-- Karten -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="2*,*,2*,*" Margin="0,0,0,8">
-      <Border Grid.Column="0" Classes="card" Margin="0,0,6,0">
-        <StackPanel>
-          <TextBlock Classes="label" Text="◉  STANDORT" />
-          <TextBlock Classes="value" Text="{Binding CurrentLocation}" />
-        </StackPanel>
-      </Border>
-      <Border Grid.Column="1" Classes="card" Margin="6,0,6,0">
-        <StackPanel>
-          <TextBlock Classes="label" Text="✈  SCHIFF" />
-          <TextBlock Classes="value" Text="{Binding CurrentShip}" />
-          <TextBlock Text="{Binding FleetText}" Foreground="#8B949E" FontSize="12" Margin="0,2,0,0"
-                     ToolTip.Tip="{Binding ShipsSeenText}" />
-        </StackPanel>
-      </Border>
-      <Border Grid.Column="2" Classes="card" Margin="6,0,6,0">
-        <StackPanel>
-          <TextBlock Classes="label" Text="◆  KONTOSTAND (echt)" />
-          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-            <TextBox Width="120" Padding="8,5" CornerRadius="6" Background="#0D1117" BorderBrush="#30363D"
-                     FontFamily="Cascadia Code, Consolas, monospace" FontWeight="Bold" FontSize="14"
-                     Text="{Binding ManualBalance}" Watermark="aUEC"
-                     ToolTip.Tip="Deinen AKTUELLEN aUEC-Kontostand eintragen, dann ✓ Setzen.&#10;Ab dann werden nur neue Bewegungen angerechnet (die alte Historie ist lückenhaft)." />
-            <Button Classes="accent" Padding="10,5" VerticalAlignment="Stretch"
-                    Command="{Binding SetBalanceCommand}" Content="✓ Setzen"
-                    ToolTip.Tip="Speichern und Saldo neu berechnen" />
-            <TextBlock Text="✓ Gespeichert" Foreground="#3FB950" FontWeight="Bold" FontSize="12"
-                       VerticalAlignment="Center" IsVisible="{Binding BalanceSaved}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
-            <TextBlock Text="Erwartet:" Foreground="#8B949E" FontSize="13" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding ExpectedText}" Foreground="#F0F6FC" FontSize="15" FontWeight="Bold" />
-          </StackPanel>
-          <TextBlock Text="{Binding NetBalanceText}" FontSize="11" Margin="0,3,0,0"
-                     Foreground="{Binding NetSign, Converter={StaticResource AmountBrush}}" />
-          <TextBlock Text="{Binding TradeText}" Foreground="#22D3EE" FontSize="11" Margin="0,2,0,0" />
-        </StackPanel>
-      </Border>
-      <Border Grid.Column="3" Classes="card" Margin="6,0,0,0">
-        <StackPanel>
-          <TextBlock Classes="label" Text="▣  LAGER" />
-          <TextBlock Classes="value" Text="{Binding LastInventory}" FontSize="14" />
-        </StackPanel>
+      <Border Grid.Column="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+              CornerRadius="6" Padding="10,4" Margin="10,0,0,0">
+        <TextBlock Text="{Binding SessionSpanText}" Foreground="#22D3EE"
+                   FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" />
       </Border>
     </Grid>
 
-    <!-- Aktionsleiste -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,12">
-      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-        <Button Classes="ghost" Command="{Binding ExportCsvCommand}" Content="⬓  CSV" />
-        <Button Classes="ghost" Command="{Binding ExportJsonCommand}" Content="⬓  JSON" />
-      </StackPanel>
-      <TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="#8B949E"
-                 FontSize="12" VerticalAlignment="Center" />
-    </Grid>
+    <!-- Dashboard: 2 übersichtliche, aufgeräumte Zeilen -->
+    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+      
+      <!-- Zeile 1: Server, Standort & Schiff (3 Karten, jede hat viel Platz) -->
+      <Grid ColumnDefinitions="*,*,*">
+        <!-- Karte 1: PILOT & SERVER (mit echter Flagge, Shard-Nummer & SC-Version) -->
+        <Border Grid.Column="0" Classes="card" Margin="0,0,4,0" Padding="12,10"
+                ToolTip.Tip="{Binding ServerTooltipText}">
+          <Grid RowDefinitions="Auto,*,Auto">
+            
+            <!-- Header: Label + Region-Badge mit echter Flagge -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="label" Text="👤  PILOT &amp; SERVER" VerticalAlignment="Center" />
+              
+              <!-- Badge mit Flagge & Kanal -->
+              <Border Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                  
+                  <!-- EU Flagge -->
+                  <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#003399" IsVisible="{Binding IsRegionEu}" VerticalAlignment="Center">
+                    <Canvas Width="16" Height="11">
+                      <Ellipse Canvas.Left="7.1" Canvas.Top="1" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="10.5" Canvas.Top="2.2" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="12" Canvas.Top="4.6" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="10.5" Canvas.Top="7" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="7.1" Canvas.Top="8.2" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="3.7" Canvas.Top="7" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="2.2" Canvas.Top="4.6" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                      <Ellipse Canvas.Left="3.7" Canvas.Top="2.2" Width="1.8" Height="1.8" Fill="#FFCC00" />
+                    </Canvas>
+                  </Border>
 
-    <!-- Tabs: Ereignisse + Geld-Stats -->
-    <TabControl Padding="0">
+                  <!-- US Flagge -->
+                  <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#B22234" IsVisible="{Binding IsRegionUs}" VerticalAlignment="Center">
+                    <Canvas Width="16" Height="11">
+                      <Rectangle Canvas.Left="0" Canvas.Top="1.8" Width="16" Height="1.8" Fill="#FFFFFF" />
+                      <Rectangle Canvas.Left="0" Canvas.Top="5.4" Width="16" Height="1.8" Fill="#FFFFFF" />
+                      <Rectangle Canvas.Left="0" Canvas.Top="9" Width="16" Height="1.8" Fill="#FFFFFF" />
+                      <Rectangle Canvas.Left="0" Canvas.Top="0" Width="7" Height="6" Fill="#3C3B6E" />
+                    </Canvas>
+                  </Border>
+
+                  <!-- AUS Flagge -->
+                  <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#00008B" IsVisible="{Binding IsRegionAus}" VerticalAlignment="Center">
+                    <Canvas Width="16" Height="11">
+                      <Rectangle Canvas.Left="0" Canvas.Top="0" Width="7" Height="5.5" Fill="#00247D" />
+                      <Path Data="M 0,0 L 7,5.5 M 7,0 L 0,5.5" Stroke="#FFFFFF" StrokeThickness="0.8" />
+                      <Rectangle Canvas.Left="2.5" Canvas.Top="0" Width="1.8" Height="5.5" Fill="#FFFFFF" />
+                      <Rectangle Canvas.Left="0" Canvas.Top="2" Width="7" Height="1.8" Fill="#FFFFFF" />
+                    </Canvas>
+                  </Border>
+
+                  <!-- Global / Sonstige -->
+                  <TextBlock Text="🌐" FontSize="10" IsVisible="{Binding IsRegionOther}" VerticalAlignment="Center" />
+
+                  <!-- Text: EU · LIVE -->
+                  <TextBlock Text="{Binding ServerBadgeText}" FontSize="10" Foreground="#F59E0B" FontWeight="Bold" VerticalAlignment="Center" />
+
+                  <!-- Trenner -->
+                  <TextBlock Text="·" Foreground="#484F58" FontSize="10" VerticalAlignment="Center" />
+
+                  <!-- Ping Latenz -->
+                  <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Text="📶" FontSize="9" VerticalAlignment="Center" Foreground="{Binding ServerPingColor}" />
+                    <TextBlock Text="{Binding ServerPingText}" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{Binding ServerPingColor}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <!-- Hauptwert: Spieler / Account Name -->
+            <TextBlock Grid.Row="1" Classes="value" Text="{Binding ServerMainText}" FontSize="15" FontWeight="Bold"
+                       Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ServerTooltipText}" />
+
+            <!-- Subline: SC Version · Shard Nummer -->
+            <TextBlock Grid.Row="2" Text="{Binding ServerSublineText}" Foreground="#8B949E" FontSize="11"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ServerTooltipText}" />
+          </Grid>
+        </Border>
+
+        <!-- Karte 2: STANDORT -->
+        <Border Grid.Column="1" Classes="card" Margin="4,0,4,0" Padding="12,10">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="label" Text="●  STANDORT" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                      Command="{Binding OpenStarmapForCurrentLocationCommand}" ToolTip.Tip="🗺 Auf der Sternenkarte anzeigen">
+                <TextBlock Text="🗺 Karte" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+              </Button>
+            </Grid>
+            <TextBlock Grid.Row="1" Classes="value" Text="{Binding LocationMainText}" FontSize="14" FontWeight="Bold"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding LocationMainText}" />
+            <TextBlock Grid.Row="2" Text="{Binding LocationStatusSubline}" Foreground="#8B949E" FontSize="11"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ResolvedLocation.FullBreadcrumb}" />
+          </Grid>
+        </Border>
+
+        <!-- Karte 3: SCHIFF -->
+        <Border Grid.Column="2" Classes="card" Margin="4,0,0,0" Padding="12,10">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="label" Text="✈  SCHIFF &amp; FLOTTE" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                      Command="{Binding ShowShipWikiCommand}" ToolTip.Tip="📖 Star Citizen Wiki Datenblatt öffnen">
+                <TextBlock Text="📖 Wiki" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
+              </Button>
+            </Grid>
+            <TextBlock Grid.Row="1" Classes="value" Text="{Binding CurrentShip}" FontSize="14" FontWeight="Bold"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding CurrentShip}" />
+            <TextBlock Grid.Row="2" Text="{Binding FleetText}" Foreground="#8B949E" FontSize="11"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ShipsSeenText}" />
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- Zeile 2: Kontostand & Auftragsmanager (2 breite Karten, jede hat ~600px Platz) -->
+      <Grid ColumnDefinitions="*,*">
+        <!-- Karte 4: KONTOSTAND -->
+        <Border Grid.Column="0" Classes="card" Margin="0,0,4,0" Padding="14,10">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="label" Text="◆  KONTOSTAND (aUEC)" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <!-- Auto-Sync Toggle -->
+                <Button Classes="ghost" Padding="6,2" CornerRadius="4"
+                        Background="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBg}}"
+                        BorderBrush="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}"
+                        BorderThickness="1"
+                        Command="{Binding ToggleAutoOcrCommand}"
+                        ToolTip.Tip="⚡ Auto-Sync mobiGlas Kontostand">
+                  <TextBlock Text="⚡ Auto" FontSize="10" FontWeight="Bold" Foreground="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}" />
+                </Button>
+                <!-- Bereich -->
+                <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding SelectWalletRegionCommand}" ToolTip.Tip="⊕ Kontostand-Bereich kalibrieren">
+                  <TextBlock Text="⊕ Bereich" FontSize="10" Foreground="#8B949E" />
+                </Button>
+                <!-- Scan -->
+                <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#1F6FEB" BorderThickness="1"
+                        Command="{Binding TriggerOcrCommand}" ToolTip.Tip="▶ Test-Scan starten">
+                  <TextBlock Text="▶ Scan" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
+                </Button>
+              </StackPanel>
+            </Grid>
+
+            <!-- Haupt-Betrag & Status -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <TextBlock Grid.Column="0" Text="{Binding LiveBalanceText}" Foreground="#F0F6FC" FontSize="18" FontWeight="Bold"
+                         FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding OcrStatusText}" Foreground="#8B949E" FontSize="11"
+                         VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis" />
+            </Grid>
+
+            <!-- Subline: Einnahmen · Ausgaben · Netto -->
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+              <TextBlock Grid.Column="0" Foreground="#4ADE80" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace"
+                         Text="{Binding SessionIncomeText, StringFormat='▲ Einnahmen: {0}'}" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Einnahmen" />
+              <TextBlock Grid.Column="1" Foreground="#F87171" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace"
+                         Text="{Binding SessionSpendText, StringFormat='▼ Ausgaben: {0}'}" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Ausgaben" />
+              <TextBlock Grid.Column="2" Foreground="{Binding SessionNetSign, Converter={StaticResource AmountBrush}}" FontSize="11"
+                         FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold"
+                         Text="{Binding SessionNetText, StringFormat='◆ Saldo: {0}'}" ToolTip.Tip="Sitzungs-Bilanz (Netto)" />
+            </Grid>
+          </Grid>
+        </Border>
+
+        <!-- Karte 5: AUFTRÄGE -->
+        <Border Grid.Column="1" Classes="card" Margin="4,0,0,0" Padding="14,10">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Classes="label" Text="❖  AUFTRAGSMANAGER" />
+                <Border Background="#1F6FEB" CornerRadius="4" Padding="5,1" IsVisible="{Binding HasActiveContracts}">
+                  <TextBlock Text="{Binding ActiveContracts.Count}" Foreground="White" FontSize="9" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <!-- Link zum Missionen Tab -->
+                <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding OpenMissionsTabCommand}" ToolTip.Tip="Missions-Übersicht &amp; Datenbank öffnen">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="❖" FontSize="9" Foreground="#A371F7" />
+                    <TextBlock Text="Missionen" FontSize="10" Foreground="#C9B3F7" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+                <!-- Auto-Badge -->
+                <Border Background="#0D2D20" BorderBrush="#238636" BorderThickness="1" CornerRadius="4" Padding="6,2"
+                        ToolTip.Tip="Missions-Erkennung läuft 100% automatisch über Game.log &amp; Master-Datenbank">
+                  <TextBlock Text="⚡ Auto-Log" FontSize="10" Foreground="#3FB950" FontWeight="Bold" />
+                </Border>
+                <!-- Clear -->
+                <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding ClearContractsCommand}" ToolTip.Tip="Auftragsliste leeren" IsVisible="{Binding HasActiveContracts}">
+                  <TextBlock Text="✕" FontSize="10" Foreground="#F87171" FontWeight="Bold" />
+                </Button>
+              </StackPanel>
+            </Grid>
+
+            <!-- Aktiver Auftrag Name -->
+            <TextBlock Grid.Row="1" Classes="value" Text="{Binding ActiveContractTitle}" FontSize="14" FontWeight="Bold"
+                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ActiveContractTitle}" />
+
+            <!-- Belohnung / Status -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <TextBlock Grid.Column="0" Text="{Binding ActiveContractRewardText}" Foreground="#22D3EE" FontSize="11"
+                         FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ActiveContractOrg}" />
+              <TextBlock Grid.Column="1" Text="{Binding ContractStatusText}" Foreground="#8B949E" FontSize="10"
+                         VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis" />
+            </Grid>
+          </Grid>
+        </Border>
+      </Grid>
+
+    </StackPanel>
+
+    <!-- Haupt-Tabs -->
+    <TabControl Padding="0" SelectedIndex="{Binding SelectedTabIndex}">
     <TabItem Header="📜  Ereignisse" FontSize="13">
     <DockPanel Margin="0,8,0,0">
 
-    <!-- Filter-Chips -->
-    <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto"
-                  VerticalScrollBarVisibility="Disabled" Margin="0,0,0,10">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+    <!-- Filter-Chips (Schlank & Aufgeräumt) -->
+    <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,10">
+      <StackPanel Orientation="Horizontal" Spacing="6">
         <Button Classes="chip" Content="Alle" Command="{Binding SetFilterCommand}" CommandParameter="Alle"
                 Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
         <Button Classes="chip" Content="💰 Geld" Command="{Binding SetFilterCommand}" CommandParameter="Geld"
@@ -161,7 +341,8 @@
                 CanUserResizeColumns="True" CanUserSortColumns="True" HeadersVisibility="Column">
         <DataGrid.ContextMenu>
           <ContextMenu>
-            <MenuItem Header="🔎  Online nachschlagen" Command="{Binding LookupCommand}" />
+            <MenuItem Header="📖  Star Citizen Wiki Info" Command="{Binding LookupWikiForEntryCommand}" CommandParameter="{Binding SelectedEntry}" />
+            <MenuItem Header="🔎  Web-Suche / UEX" Command="{Binding LookupCommand}" />
           </ContextMenu>
         </DataGrid.ContextMenu>
         <DataGrid.Columns>
@@ -398,15 +579,54 @@
       <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14">
 
-          <Border Background="#1F2A2140" BorderBrush="#A371F7" BorderThickness="1"
-                  CornerRadius="8" Padding="12,9">
-            <TextBlock Foreground="#C9B3F7" FontSize="12" TextWrapping="Wrap"
-                       Text="Ruf-Proxy: Star Citizen loggt keine Ruf-Werte, aber die Anzahl gespielter Missionen je Auftraggeber zeigt, wo du am aktivsten bist. Aus den Missions-Markern deiner Logs (je Mission einmal gezählt)." />
+          <Border Background="#161B22" BorderBrush="#238636" BorderThickness="1"
+                  CornerRadius="8" Padding="14,10">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Text="⚡" FontSize="18" Foreground="#3FB950" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Text="Automatische Missions-Erfassung aktiv" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                <TextBlock Foreground="#8B949E" FontSize="11" TextWrapping="Wrap"
+                           Text="Sobald du im Spiel einen Auftrag annimmst oder abschließt, gleicht SCLogMate diesen in Echtzeit mit der integrierten SC 4.x Missionsdatenbank ab. Belohnungen, Fraktionen, Ruf-XP und Baupläne werden vollautomatisch verbucht." />
+              </StackPanel>
+            </Grid>
           </Border>
 
+          <!-- Liste aller aktiven/erfassten Aufträge (Accepted) -->
+          <Border Classes="card" IsVisible="{Binding HasActiveContracts}">
+            <StackPanel Spacing="6">
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Classes="label" Text="AKTIV ANGENOMMENE AUFTRÄGE (ACCEPTED)" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding ActiveContractsCountText}" Foreground="#8B949E" FontSize="11" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <Button Grid.Column="2" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                        Command="{Binding ClearContractsCommand}"
+                        ToolTip.Tip="Aktive Auftragsliste manuell leeren">
+                  <TextBlock Text="✕ Liste leeren" FontSize="10" Foreground="#F87171" />
+                </Button>
+              </Grid>
+              <ItemsControl ItemsSource="{Binding ActiveContracts}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="m:ContractDetails">
+                    <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,2">
+                      <Grid ColumnDefinitions="*,Auto,Auto">
+                        <StackPanel Grid.Column="0">
+                          <TextBlock Text="{Binding Title}" Foreground="#F0F6FC" FontWeight="SemiBold" FontSize="12" />
+                          <TextBlock Text="{Binding ContractedBy}" Foreground="#8B949E" FontSize="10" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding TimeText}" Foreground="#8B949E" FontSize="10" VerticalAlignment="Center" Margin="10,0" />
+                        <TextBlock Grid.Column="2" Text="{Binding RewardText}" Foreground="#4ADE80" FontWeight="Bold"
+                                   FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" VerticalAlignment="Center" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <!-- Missions-Statistik je Auftraggeber -->
           <Border Classes="card" IsVisible="{Binding HasMissionFactions}">
             <StackPanel>
-              <TextBlock Classes="label" Text="MISSIONEN JE AUFTRAGGEBER" Margin="0,0,0,2" />
+              <TextBlock Classes="label" Text="ABGESCHLOSSENE MISSIONEN JE AUFTRAGGEBER" Margin="0,0,0,2" />
               <TextBlock Text="{Binding MissionsTotalText}" Foreground="#8B949E" FontSize="11" Margin="0,0,0,8" />
               <ItemsControl ItemsSource="{Binding MissionFactions}">
                 <ItemsControl.ItemTemplate>
@@ -428,10 +648,900 @@
             </StackPanel>
           </Border>
 
+          <!-- Master Missions-Datenbank & In-Game Wiki (scunpacked-data) -->
+          <StackPanel Spacing="8">
+            <Border Classes="card" Padding="14,10">
+              <Grid ColumnDefinitions="Auto,*,Auto,280">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock Text="❖  MISSIONS-DATENBANK (SCUNPACKED)" Classes="label" VerticalAlignment="Center" />
+                  <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalMissionsCount, StringFormat='{}{0:N0} Missionen'}" Foreground="#A371F7" FontSize="10" FontWeight="Bold" />
+                  </Border>
+                </StackPanel>
+
+                <TextBox Grid.Column="3" Classes="path" Height="30" Text="{Binding MissionSearchText}"
+                         Watermark="🔍 Mission, Auftraggeber, Typ, Bauplan..." VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+
+            <!-- Filter-Chips -->
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Classes="chip" Content="Alle" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Alle"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
+                <Button Classes="chip" Content="🎯 Kopfgeldjagd" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Kopfgeldjagd"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Kopfgeldjagd}" />
+                <Button Classes="chip" Content="⚔ Söldner" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Söldner"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Söldner}" />
+                <Button Classes="chip" Content="📦 Fracht &amp; Transport" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Fracht &amp; Transport"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Fracht &amp; Transport}" />
+                <Button Classes="chip" Content="🔍 Ermittlung" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Ermittlung"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Ermittlung}" />
+                <Button Classes="chip" Content="🧲 Bergung &amp; Salvage" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Bergung &amp; Salvage"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Bergung &amp; Salvage}" />
+                <Button Classes="chip" Content="🔧 Wartung" Command="{Binding SelectMissionTypeCommand}" CommandParameter="Wartung"
+                        Background="{Binding SelectedMissionType, Converter={StaticResource FilterBg}, ConverterParameter=Wartung}" />
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Missions DataGrid -->
+            <Border Classes="card" Padding="0" MinHeight="350">
+              <DataGrid ItemsSource="{Binding MissionsView}"
+                        AutoGenerateColumns="False" IsReadOnly="True"
+                        CanUserSortColumns="True" GridLinesVisibility="Horizontal"
+                        HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                  <DataGridTemplateColumn Header="SYSTEM" Width="90" SortMemberPath="StarSystems">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
+                          <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="4,2">
+                            <TextBlock Text="{Binding StarSystems}" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
+                          </Border>
+                        </StackPanel>
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="MISSION" Width="200" SortMemberPath="Title">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="AUFTRAGGEBER" Width="150" SortMemberPath="Contractor">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding Contractor}" Foreground="#C9D1D9" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="FRAKTION" Width="150" SortMemberPath="Faction">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding Faction}" Foreground="#8B949E" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="KATEGORIE" Width="130" SortMemberPath="MissionType">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding MissionType}" Foreground="#A371F7" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="BELOHNUNG" Width="120" SortMemberPath="BaseReward">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding RewardText}" Foreground="#4ADE80" FontWeight="Bold" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="RUF" Width="80" SortMemberPath="ReputationGain">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding ReputationText}" Foreground="#C9B3F7" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" Margin="8,0" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="BAUPLAN-DROPS" Width="180">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding BlueprintsText}" Foreground="#FBBF24" VerticalAlignment="Center" Margin="8,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding BlueprintsText}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+
+                  <DataGridTemplateColumn Header="BESCHREIBUNG" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="core:MissionInfo">
+                        <TextBlock Text="{Binding Description}" Foreground="#8B949E" VerticalAlignment="Center" Margin="8,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Description}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Border>
+          </StackPanel>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- Tab 3: Sternenkarte (Starmap & Standorte) -->
+    <TabItem Header="🗺  Karte" FontSize="13">
+      <Grid ColumnDefinitions="*,330" Margin="0,10,0,0">
+        
+        <!-- Linker Bereich: System-Toolbar + Starmap Canvas -->
+        <Border Grid.Column="0" Classes="card" Padding="0" Margin="0,0,8,0">
+          <DockPanel>
+            
+            <!-- Toolbar über der Karte: System-Buttons & Layer Toggles -->
+            <Border DockPanel.Dock="Top" Background="#0D1117" BorderBrush="#21262D" BorderThickness="0,0,0,1" Padding="10,8">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                
+                <!-- System-Umschalter -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                  <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Stanton"
+                          Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Stanton}">
+                    <TextBlock Text="★ Stanton" FontWeight="Bold" Foreground="#F0F6FC" />
+                  </Button>
+                  <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Pyro"
+                          Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Pyro}">
+                    <TextBlock Text="🔥 Pyro" FontWeight="Bold" Foreground="#F0F6FC" />
+                  </Button>
+                  <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Nyx"
+                          Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Nyx}">
+                    <TextBlock Text="❄ Nyx" FontWeight="Bold" Foreground="#F0F6FC" />
+                  </Button>
+                </StackPanel>
+
+                <!-- Filter / Toggles & Mein Standort -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                  <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapStations}" Content="🛰 Stationen" FontSize="11" />
+                  <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapMoons}" Content="🌙 Monde" FontSize="11" />
+                  <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapLandingZones}" Content="🏙 Städte" FontSize="11" />
+                  <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapJumpPoints}" Content="⇄ Sprungtore" FontSize="11" />
+                  <Button Classes="accent" Padding="8,3" Command="{Binding OpenStarmapForCurrentLocationCommand}" ToolTip.Tip="Kamera auf deinen aktuellen Standort zentrieren">
+                    <TextBlock Text="📍 Mein Standort" FontSize="11" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- Vector Canvas -->
+            <views:StarmapCanvas SystemName="{Binding SelectedStarmapSystem}"
+                                 PlayerLocationName="{Binding ResolvedLocation.DisplayName}"
+                                 SelectedObject="{Binding SelectedStarmapObject, Mode=TwoWay}"
+                                 ShowStations="{Binding ShowStarmapStations}"
+                                 ShowMoons="{Binding ShowStarmapMoons}"
+                                 ShowLandingZones="{Binding ShowStarmapLandingZones}"
+                                 ShowJumpPoints="{Binding ShowStarmapJumpPoints}" />
+          </DockPanel>
+        </Border>
+
+        <!-- Rechter Bereich: Info-Panel & Ortssuche -->
+        <Border Grid.Column="1" Classes="card" Padding="12">
+          <DockPanel>
+            
+            <!-- Suchfeld -->
+            <TextBox DockPanel.Dock="Top" Classes="path" Text="{Binding StarmapSearchText}" Watermark="🔎 Ort / Station suchen..." Margin="0,0,0,10" />
+
+            <!-- Selektiertes Objekt oder Suchliste -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="10">
+
+                <!-- 1. Dein Standort Zusammenfassung -->
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="📍 DEIN AKTUELLER STANDORT" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+                    <TextBlock Text="{Binding LocationMainText}" FontSize="14" FontWeight="Bold" Foreground="#F0F6FC" />
+                    <TextBlock Text="{Binding ResolvedLocation.FullBreadcrumb}" FontSize="11" Foreground="#8B949E" />
+                    <Border Background="#0D1117" CornerRadius="4" Padding="6,3" Margin="0,4,0,0" HorizontalAlignment="Left">
+                      <TextBlock Text="{Binding ResolvedLocation.ArmisticeStatusText}" FontSize="11" FontWeight="SemiBold" Foreground="#4ADE80" />
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <!-- 2. Detailkarte des angeklickten Objekts -->
+                <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10"
+                        IsVisible="{Binding SelectedStarmapObject, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding SelectedStarmapObject.Name}" FontSize="14" FontWeight="Bold" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
+                      <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
+                        <TextBlock Text="{Binding SelectedStarmapObject.Type}" FontSize="10" Foreground="#58A6FF" FontWeight="SemiBold" />
+                      </Border>
+                    </Grid>
+
+                    <TextBlock Text="{Binding SelectedStarmapObject.Description}" Foreground="#C9D1D9" FontSize="11" TextWrapping="Wrap" />
+
+                    <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                      <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="System" FontSize="10" Foreground="#8B949E" />
+                        <TextBlock Text="{Binding SelectedStarmapObject.System}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="Jurisdiktion" FontSize="10" Foreground="#8B949E" />
+                        <TextBlock Text="{Binding SelectedStarmapObject.Jurisdiction}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+                      </StackPanel>
+                    </Grid>
+
+                    <!-- UEX Live Services & Ausstattung -->
+                    <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,4,0,0"
+                            IsVisible="{Binding SelectedStarmapUexInfo.HasAnyServices}">
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="DIENSTE &amp; AUSSTATTUNG (UEX)" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                        <WrapPanel Orientation="Horizontal">
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasRefuel}">
+                            <TextBlock Text="⛽ Betankung" FontSize="10" Foreground="#4ADE80" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasRepair}">
+                            <TextBlock Text="🔧 Reparatur" FontSize="10" Foreground="#4ADE80" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasClinic}">
+                            <TextBlock Text="🏥 Klinik / ICU" FontSize="10" Foreground="#38BDF8" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasCargoCenter}">
+                            <TextBlock Text="📦 Frachtzentrum" FontSize="10" Foreground="#FBBF24" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasRefinery}">
+                            <TextBlock Text="⬡ Raffinerie" FontSize="10" Foreground="#F97316" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasFreightElevator}">
+                            <TextBlock Text="🛗 Frachtaufzug" FontSize="10" Foreground="#A78BFA" FontWeight="SemiBold" />
+                          </Border>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="5,2" Margin="0,0,4,4"
+                                  IsVisible="{Binding SelectedStarmapUexInfo.HasTradeTerminal}">
+                            <TextBlock Text="🛒 Handelsterminal" FontSize="10" Foreground="#60A5FA" FontWeight="SemiBold" />
+                          </Border>
+                        </WrapPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                            Command="{Binding LookupStarmapOnUexCommand}" Content="🌐  UEX / Handelsdaten öffnen" />
+                  </StackPanel>
+                </Border>
+
+                <!-- 3. Liste der Orte im System -->
+                <TextBlock Text="ORTE IM SYSTEM" Classes="label" Margin="0,6,0,0" />
+                <ItemsControl ItemsSource="{Binding SearchStarmapResults}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,6" Margin="0,0,0,4"
+                              Command="{Binding ((vm:MainViewModel)DataContext).SelectStarmapObjectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <TextBlock Grid.Column="0" Text="◉" Foreground="{Binding ColorHex}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                          <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#8B949E" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="2" Text="{Binding Type}" FontSize="10" Foreground="#58A6FF" VerticalAlignment="Center" Margin="6,0,0,0" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+              </StackPanel>
+            </ScrollViewer>
+
+          </DockPanel>
+        </Border>
+
+      </Grid>
+    </TabItem>
+
+    <!-- Tab 4: Bauplan-Datenbank -->
+    <TabItem Header="🛠  Baupläne" FontSize="13">
+      <DockPanel Margin="0,8,0,0">
+
+        <!-- Header: Statistik, Filter-Chips & Suche -->
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,10">
+          
+          <!-- Banner mit Fortschritt & Suche -->
+          <Border Classes="card" Padding="14,10">
+            <Grid ColumnDefinitions="Auto,*,Auto,240">
+              
+              <!-- Titel & Gesamt -->
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="🛠  CRAFTING-BAUPLÄNE" Classes="label" VerticalAlignment="Center" />
+                <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding TotalBlueprintsCount, StringFormat='{}{0:N0} Gesamt'}" Foreground="#58A6FF" FontSize="10" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+
+              <!-- Fortschritts-Pills -->
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0">
+                <!-- Erlernt Pill -->
+                <Border Background="#0F2818" BorderBrush="#238636" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <Ellipse Width="6" Height="6" Fill="#3FB950" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding LearnedBlueprintsCount, StringFormat='{}{0:N0} Erlernt'}" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Fehlt Pill -->
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <Ellipse Width="6" Height="6" Fill="#8B949E" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding MissingBlueprintsCount, StringFormat='{}{0:N0} Fehlen'}" Foreground="#8B949E" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Prozent Badge -->
+                <Border Background="#1F6FEB" CornerRadius="4" Padding="6,2.5" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding BlueprintProgressPercent, StringFormat='{}{0:F1}%'}" Foreground="White" FontSize="10" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+
+              <!-- Schnellsuche -->
+              <TextBox Grid.Column="3" Classes="path" Height="30" Text="{Binding BlueprintSearchText}"
+                       Watermark="🔍 Bauplan, Ressource, Typ..." VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+
+          <!-- Filter-Chips -->
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Classes="chip" Content="Alle" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Alle"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
+              <Button Classes="chip" Content="✓ Erlernt" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Erlernt"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Erlernt}" />
+              <Button Classes="chip" Content="✕ Fehlt" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Fehlend"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Fehlend}" />
+              <Button Classes="chip" Content="⚔ Waffen" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Waffen"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Waffen}" />
+              <Button Classes="chip" Content="🛡 Rüstung" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Rüstung"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Rüstung}" />
+              <Button Classes="chip" Content="⚙ Komponenten" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Komponenten"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Komponenten}" />
+              <Button Classes="chip" Content="🔋 Munition" Command="{Binding SelectBlueprintCategoryCommand}" CommandParameter="Munition"
+                      Background="{Binding SelectedBlueprintCategory, Converter={StaticResource FilterBg}, ConverterParameter=Munition}" />
+            </StackPanel>
+          </ScrollViewer>
+        </StackPanel>
+
+        <!-- Aufgeräumte Tabelle der Baupläne -->
+        <Border Classes="card" Padding="0">
+          <DataGrid ItemsSource="{Binding BlueprintsView}" IsReadOnly="True"
+                    CanUserResizeColumns="True" CanUserSortColumns="True" HeadersVisibility="Column">
+            <DataGrid.Columns>
+              
+              <!-- 1. Status Pill & Datum -->
+              <DataGridTemplateColumn Header="STATUS" Width="110" SortMemberPath="IsLearned">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="core:BlueprintItem">
+                    <StackPanel Margin="8,4,0,4" VerticalAlignment="Center" Spacing="2">
+                      <Border Background="{Binding StatusBgColor}" BorderBrush="{Binding StatusBorderColor}" BorderThickness="1"
+                              CornerRadius="10" Padding="7,2" HorizontalAlignment="Left" ToolTip.Tip="{Binding LearnedDateText}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <Ellipse Width="5.5" Height="5.5" Fill="{Binding StatusColor}" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding StatusTextShort}" Foreground="{Binding StatusColor}" FontWeight="Bold" FontSize="10.5" />
+                        </StackPanel>
+                      </Border>
+                      <TextBlock Text="{Binding LearnedDateShort}" Foreground="#8B949E" FontSize="9" IsVisible="{Binding IsLearned}" Margin="2,0,0,0" />
+                    </StackPanel>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+              <!-- 2. Bauplan & Kategorie -->
+              <DataGridTemplateColumn Header="BAUPLAN &amp; KATEGORIE" Width="280" SortMemberPath="Name">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="core:BlueprintItem">
+                    <StackPanel Spacing="1" Margin="8,4,0,4" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#F0F6FC" FontSize="12" />
+                      <TextBlock Text="{Binding CategoryBadge}" Foreground="#8B949E" FontSize="10.5" />
+                    </StackPanel>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+              <!-- 3. Benötigte Ressourcen -->
+              <DataGridTemplateColumn Header="BENÖTIGTE RESSOURCEN" Width="*" SortMemberPath="RequiredMaterials">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="core:BlueprintItem">
+                    <TextBlock Text="{Binding RequiredMaterials}" Foreground="#22D3EE" Margin="8,0,0,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="11" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+              <!-- 4. Herkunft / Freischaltung -->
+              <DataGridTemplateColumn Header="HERKUNFT / FREISCHALTUNG" Width="230" SortMemberPath="UnlockInfo">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="core:BlueprintItem">
+                    <TextBlock Text="{Binding UnlockInfo}" Foreground="#C9D1D9" Margin="8,0,0,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="11" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+              <!-- 5. Wiki Info Button -->
+              <DataGridTemplateColumn Header="WIKI" Width="85">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="core:BlueprintItem">
+                    <Button Classes="ghost" Padding="6,2" CornerRadius="4" VerticalAlignment="Center" Margin="4,0,4,0"
+                            Command="{Binding ((vm:MainViewModel)DataContext).OpenWikiCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding Name}">
+                      <TextBlock Text="📖 Info" FontSize="10.5" Foreground="#58A6FF" />
+                    </Button>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+            </DataGrid.Columns>
+          </DataGrid>
+        </Border>
+
+      </DockPanel>
+    </TabItem>
+
+    <!-- Tab 5: Einstellungen -->
+    <TabItem Header="⚙  Einstellungen" FontSize="13">
+      <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14">
+
+          <!-- 1. Star Citizen & Logdatei -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="📁  STAR CITIZEN &amp; LOGDATEI" />
+              
+              <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,4,0,0">
+                <TextBox Grid.Column="0" Classes="path" VerticalAlignment="Center" Text="{Binding LogPath}" Watermark="Pfad zur Game.log" />
+                <Button Grid.Column="1" Classes="ghost" Margin="8,0,0,0" VerticalAlignment="Center"
+                        Command="{Binding BrowseCommand}" Content="📁  Durchsuchen"
+                        ToolTip.Tip="Game.log manuell auswählen" />
+                <Button Grid.Column="2" Classes="ghost" Margin="6,0,0,0" VerticalAlignment="Center"
+                        Command="{Binding DetectCommand}" Content="⚡ Auto-Erkennung"
+                        ToolTip.Tip="Game.log automatisch auf allen Laufwerken suchen" />
+              </Grid>
+
+              <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <TextBlock Text="{Binding DatabaseSummaryText}" Foreground="#C9D1D9" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Text="Sessions &amp; Log-Ereignisse werden im SQLite-Index dauerhaft archiviert." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4"
+                        Command="{Binding OpenAppDataFolderCommand}" Content="📂 AppData-Ordner"
+                        ToolTip.Tip="AppData-Ordner (%AppData%\SCLogMate) im Explorer öffnen" />
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 2. UEX Corp API 2.0 Integration -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="🌐  UEX CORP API 2.0 INTEGRATION" />
+                  <TextBlock Text="Verknüpfe deinen persönlichen UEX-Account &amp; API-Key für Live-Handelsdaten, Terminals und Preise." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4" Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://uexcorp.space/api/documentation">
+                  <TextBlock Text="📖 UEX Doku" FontSize="11" Foreground="#58A6FF" />
+                </Button>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <TextBox Grid.Column="0" Classes="path" Text="{Binding UexApiKeyInput}" Watermark="UEX Access Token / API Key (z.B. Bearer Token)..." />
+                <Button Grid.Column="1" Classes="accent" Margin="8,0,0,0" Command="{Binding SaveAndTestUexApiKeyCommand}" Content="💾 Speichern &amp; Testen" />
+              </Grid>
+
+              <TextBlock Text="{Binding UexStatusMessage}" Foreground="{Binding UexStatusColor}" FontSize="11" FontWeight="SemiBold"
+                         IsVisible="{Binding UexStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </Border>
+
+          <!-- 3. In-Game Floating Mini-HUD Overlay -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="🗔  IN-GAME FLOATING MINI-HUD OVERLAY" />
+                  <TextBlock Text="Zeigt deinen Kontostand, aktuellen Standort, aktiven Auftrag und Server-Ping in einem verschiebbaren Overlay." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Background="{Binding IsOverlayActive, Converter={StaticResource GreenRedBg}}"
+                        BorderBrush="{Binding IsOverlayActive, Converter={StaticResource GreenRedBrush}}"
+                        BorderThickness="1"
+                        Command="{Binding ToggleOverlayCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="🗔" FontSize="11" Foreground="{Binding IsOverlayActive, Converter={StaticResource GreenRedBrush}}" />
+                    <TextBlock Text="Mini-HUD aktiv" FontSize="11" FontWeight="Bold" Foreground="{Binding IsOverlayActive, Converter={StaticResource GreenRedBrush}}" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Deckkraft / Transparenz" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <Slider Minimum="0.3" Maximum="1.0" Value="{Binding OverlayOpacity}" Height="28" />
+                    <TextBlock Text="{Binding OverlayOpacity, StringFormat='{}Deckkraft: {0:P0}'}" Foreground="#8B949E" FontSize="11" />
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Position &amp; Bedienung" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Klicke auf die linke Griffleiste (⋮⋮) des Overlays und ziehe es an eine beliebige Stelle auf dem Bildschirm." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 4. WoW-Style In-Game Achievement & Reward Toast Overlay -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="✦  ACHIEVEMENT &amp; REWARD TOAST OVERLAY (WOW-STYLE)" />
+                  <TextBlock Text="Blendet bei neuen Bauplänen und abgeschlossenen Missionsbelohnungen ein Gaming-Erfolgs-Banner im Spiel ein. Läuft völlig unabhängig vom Mini-HUD." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Background="{Binding ToastOverlayEnabled, Converter={StaticResource GreenRedBg}}"
+                        BorderBrush="{Binding ToastOverlayEnabled, Converter={StaticResource GreenRedBrush}}"
+                        BorderThickness="1"
+                        Command="{Binding ToggleToastOverlayCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="✦" FontSize="11" Foreground="{Binding ToastOverlayEnabled, Converter={StaticResource GreenRedBrush}}" />
+                    <TextBlock Text="Banner aktiv" FontSize="11" FontWeight="Bold" Foreground="{Binding ToastOverlayEnabled, Converter={StaticResource GreenRedBrush}}" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Banner testen &amp; positionieren" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Löst ein Test-Banner aus. Klicke und ziehe das Banner auf dem Bildschirm an deine Wunschposition." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding TestAchievementToastCommand}" Content="⚡ Test-Banner einblenden" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Funktionsweise &amp; Features" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="• Erscheint autonom nur beim Erhalt von Bauplänen oder Missionsbelohnungen&#x0a;• Fadet nach ~5 Sekunden automatisch wieder aus&#x0a;• Position wird dauerhaft gespeichert" Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 4. mobiGlas Screenreader (aUEC Live-Kontostand) -->
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="👁  MOBIGLAS SCREENREADER (aUEC KONTOSTAND)" />
+                  <TextBlock Text="Liest beim Öffnen des mobiGlas (F1) deinen echten Kontostand vollautomatisch per Windows OCR ab." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Background="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBg}}"
+                        BorderBrush="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}"
+                        BorderThickness="1"
+                        Command="{Binding ToggleAutoOcrCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="⚡" FontSize="11" Foreground="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}" />
+                    <TextBlock Text="Auto-Sync" FontSize="11" FontWeight="Bold" Foreground="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*,*" Margin="0,2,0,0">
+                <!-- Bereich kalibrieren -->
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Kontostand-Bereich" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding WalletRegionSummaryText}" Foreground="#8B949E" FontSize="11" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding SelectWalletRegionCommand}" Content="⊕ Bereich kalibrieren" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Ingame Scan-Box -->
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Ingame Scan-Box" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Live-Rahmen im Spiel (blinkt grün)" Foreground="#8B949E" FontSize="11" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding ToggleScanBoxCommand}" Margin="0,4,0,0">
+                      <TextBlock Text="▣ Scan-Box umschalten" Foreground="{Binding ShowScanBox, Converter={StaticResource ActiveBrush}}" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+
+                <!-- Test-Scan -->
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Manueller Test-Scan" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding OcrStatusText}" Foreground="#8B949E" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding TriggerOcrCommand}" Content="▶ Test-Scan starten" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 5. Automatische Missions-Verwaltung -->
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="❖  AKTIVE AUFTRÄGE &amp; MISSIONS-TRACKING" />
+                  <TextBlock Text="Missionsdaten, Belohnungen und Baupläne werden 100% automatisch aus dem Game.log und der SQLite-Master-Datenbank abgeglichen." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4"
+                        Command="{Binding ClearContractsCommand}"
+                        ToolTip.Tip="Aktive Auftragsliste leeren">
+                  <TextBlock Text="✕ Aufträge leeren" FontSize="11" Foreground="#F87171" FontWeight="SemiBold" />
+                </Button>
+              </Grid>
+
+              <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="{Binding ActiveContractsCountText}" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ActiveContractTitle, StringFormat='Aktueller Fokus: {0}'}" Foreground="#8B949E" FontSize="11" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <Border Grid.Column="1" Background="#0D2D20" BorderBrush="#238636" BorderThickness="1" CornerRadius="5" Padding="8,4" VerticalAlignment="Center">
+                    <TextBlock Text="⚡ Auto-Sync aktiv" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                  </Border>
+                </Grid>
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <!-- 6. Datenbank, Re-Scan & Exporte -->
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Classes="label" Text="💾  DATENBANK-VERWALTUNG, RE-SCAN &amp; EXPORTE" />
+                  <TextBlock Text="Verwalte das lokale SQLite-Archiv, starte einen vollständigen Re-Scan aller Logs oder exportiere deine Daten." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="5" Padding="8,3" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding DatabaseSummaryText}" Foreground="#58A6FF" FontSize="11" FontWeight="SemiBold" />
+                </Border>
+              </Grid>
+
+              <!-- Progress / Status Bar bei aktiver Operation -->
+              <Border Background="#0D1117" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="10,8"
+                      IsVisible="{Binding IsDatabaseBusy}">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding DatabaseStatusMessage}" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding DatabaseProgressPercent, StringFormat='{}{0:F0}%'}" Foreground="#58A6FF" FontSize="11" FontWeight="Bold" />
+                  </Grid>
+                  <ProgressBar Height="5" Maximum="100" Value="{Binding DatabaseProgressPercent}" Foreground="#388BFD" Background="#21262D" CornerRadius="3" />
+                </StackPanel>
+              </Border>
+
+              <!-- Statusmeldung nach Operation (wenn nicht busy) -->
+              <Border Background="#0D1117" BorderBrush="#238636" BorderThickness="1" CornerRadius="6" Padding="10,6"
+                      IsVisible="{Binding DatabaseStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding DatabaseStatusMessage}" Foreground="#4ADE80" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              </Border>
+
+              <!-- Wartung & Re-Scan -->
+              <Grid ColumnDefinitions="*,*,*" Margin="0,2,0,0">
+                <!-- Re-Scan -->
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Kompletter Re-Scan" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Liest alle Logs (Game.log &amp; Backups) frisch mit neuen Parser-Regeln ein." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                            Command="{Binding RescanAllLogsCommand}" IsEnabled="{Binding !IsDatabaseBusy}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="🔄" FontSize="11" />
+                        <TextBlock Text="Alle Logs neu einlesen" FontWeight="Bold" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
+
+                <!-- Cleanup & Vacuum -->
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Datenbank-Bereinigung" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Entfernt verwaiste Datensätze, optimiert Indizes und führt SQLite VACUUM aus." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                            Command="{Binding CleanupDatabaseCommand}" IsEnabled="{Binding !IsDatabaseBusy}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="🧹" FontSize="11" />
+                        <TextBlock Text="DB bereinigen &amp; VACUUM" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
+
+                <!-- Reset Database -->
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Datenbank leeren" Foreground="#F87171" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Setzt alle indexierten Sessions und Ereignisse komplett auf 0 zurück." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                            Command="{Binding ResetDatabaseCommand}" IsEnabled="{Binding !IsDatabaseBusy}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="✕" FontSize="11" Foreground="#F87171" />
+                        <TextBlock Text="Datenbank zurücksetzen" Foreground="#F87171" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </Grid>
+
+              <!-- Exporte & Diagnose -->
+              <Grid ColumnDefinitions="*,*,*" Margin="0,4,0,0">
+                <!-- CSV Export -->
+                <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="CSV-Export" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Tabelle für Excel / Calc" Foreground="#8B949E" FontSize="11" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding ExportCsvCommand}" Content="⬓  CSV exportieren" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+
+                <!-- JSON Export -->
+                <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="3,0,3,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="JSON-Export" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="Vollständiger Datenbericht" Foreground="#8B949E" FontSize="11" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Command="{Binding ExportJsonCommand}" Content="⬓  JSON exportieren" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+
+                <!-- AppData & Debug-Log -->
+                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Speicherort &amp; Diagnose" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="AppData (%AppData%\SCLogMate)" Foreground="#8B949E" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                      <Button Grid.Column="0" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,3,0"
+                              Command="{Binding OpenAppDataFolderCommand}" Content="📂 Ordner" />
+                      <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="3,0,0,0"
+                              Command="{Binding OpenDebugLogCommand}" Content="📄 Log" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </Grid>
+
+            </StackPanel>
+          </Border>
+
+          <!-- 7. Über SCLogMate -->
+          <Border Classes="card">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Classes="label" Text="ℹ  ÜBER SCLOGMATE" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding VersionText}" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                  <TextBlock Text="·" Foreground="#8B949E" />
+                  <TextBlock Text="{Binding RuntimeInfoText}" Foreground="#8B949E" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
+              <Button Grid.Column="1" Classes="ghost" Padding="10,5" VerticalAlignment="Center"
+                      Command="{Binding OpenChangelogCommand}" Content="📜  Changelog &amp; Releases" />
+            </Grid>
+          </Border>
+
         </StackPanel>
       </ScrollViewer>
     </TabItem>
     </TabControl>
 
   </DockPanel>
+
+  <!-- Star Citizen Wiki Modal Overlay mit HD-Schiff-/Fahrzeugbild -->
+  <Border IsVisible="{Binding IsWikiOverlayOpen}"
+          Background="#B3080B10"
+          HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+            CornerRadius="10" Padding="20" Width="720" MaxHeight="660"
+            HorizontalAlignment="Center" VerticalAlignment="Center"
+            BoxShadow="0 8 32 #80000000">
+      <DockPanel>
+        <!-- Header -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+          <StackPanel Grid.Column="0" Spacing="2">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding SelectedWikiInfo.Name}" FontSize="18" FontWeight="Bold" Foreground="#F0F6FC" />
+              <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SelectedWikiInfo.Category}" FontSize="10" Foreground="#58A6FF" FontWeight="SemiBold" />
+              </Border>
+            </StackPanel>
+            <TextBlock Text="{Binding SelectedWikiInfo.Manufacturer}" Foreground="#8B949E" FontSize="12" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="ghost" Padding="8,4" Command="{Binding CloseWikiOverlayCommand}">
+            <TextBlock Text="✕" FontSize="14" Foreground="#8B949E" />
+          </Button>
+        </Grid>
+
+        <!-- Footer Buttons -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+          <Button Grid.Column="0" Classes="accent" Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="{Binding SelectedWikiInfo.WebUrl}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="🌐" />
+              <TextBlock Text="Im Star Citizen Wiki öffnen (starcitizen.tools)" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseWikiOverlayCommand}" Content="Schließen" Margin="8,0,0,0" />
+        </Grid>
+
+        <!-- Loading State or Content -->
+        <Panel>
+          <ProgressBar IsIndeterminate="True" Width="200" Height="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding IsWikiLoading}" />
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding !IsWikiLoading}">
+            <StackPanel Spacing="12">
+              
+              <!-- HD-Schiffsfoto / Render -->
+              <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="8" ClipToBounds="True" Height="220"
+                      IsVisible="{Binding WikiImageBitmap, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Image Source="{Binding WikiImageBitmap}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+
+              <!-- Schnell-Attribute / Badges -->
+              <WrapPanel Orientation="Horizontal">
+                <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="8,4" Margin="0,0,6,6"
+                        IsVisible="{Binding SelectedWikiInfo.Role, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Rolle:" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="{Binding SelectedWikiInfo.Role}" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Border>
+                <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="8,4" Margin="0,0,6,6"
+                        IsVisible="{Binding SelectedWikiInfo.Type, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Fokus:" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="{Binding SelectedWikiInfo.Type}" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Border>
+                <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="8,4" Margin="0,0,6,6"
+                        IsVisible="{Binding SelectedWikiInfo.ProductionStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Status:" Foreground="#8B949E" FontSize="11" />
+                    <TextBlock Text="{Binding SelectedWikiInfo.ProductionStatus}" Foreground="#4ADE80" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Border>
+              </WrapPanel>
+
+              <!-- Deutsche / Englische Beschreibung -->
+              <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding SelectedWikiInfo.DescriptionHeader}" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                  <TextBlock Text="{Binding SelectedWikiInfo.BestDescription}" FontSize="12" LineHeight="19" Foreground="#C9D1D9" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+            </StackPanel>
+          </ScrollViewer>
+        </Panel>
+      </DockPanel>
+    </Border>
+  </Border>
+  </Grid>
 </Window>

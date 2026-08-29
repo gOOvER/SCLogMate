@@ -7,14 +7,17 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCLogReader.Core;
+using SCLogReader.Core.Ocr;
 using SCLogReader.Models;
 using SCLogReader.Services;
+using SCLogReader.Views;
 
 namespace SCLogReader.ViewModels;
 
@@ -22,24 +25,126 @@ public partial class MainViewModel : ObservableObject
 {
     LogTailer? _tailer;
     LogParser _parser = new();
-    bool _initializing;
+    readonly OcrEngineService _ocrEngine = new();
+    readonly WalletCapture _walletCapture;
+    readonly ContractScanner _contractScanner;
+    readonly ScanIndicatorWindow _scanIndicator = new();
+    bool _initializing = true;
     bool _ready;          // Persistenz erst nach Konstruktor
     bool _suppressSave;   // Session-Wechsel nicht als Default speichern
     DateTime? _sessionStart, _sessionEnd;
-    AppSettings _settings = new();
+    AppSettings _settings = Settings.Load();
 
     [ObservableProperty] private string logPath = "";
     [ObservableProperty] private string status = "bereit";
     [ObservableProperty] private string manualBalance = "";   // echter Kontostand (Eingabe)
     [ObservableProperty] private bool balanceSaved;            // kurzes „✓ Gespeichert"-Signal
+    [ObservableProperty] private bool isEditingManualBalance;  // manuelle Eingabezeile einblenden
+    [ObservableProperty] private bool autoOcrEnabled;          // automatischer mobiGlas-Scan (Standard: aus)
+    [ObservableProperty] private bool showScanBox;            // Scan-Rahmen im Spiel anzeigen
+    [ObservableProperty] private bool ocrAvailable;
+    [ObservableProperty] private string ocrStatusText = "OCR bereit";
+    [ObservableProperty] private string ocrRegionText = "Standard (Auto)";
+    [ObservableProperty] private string contractRegionText = "Nicht kalibriert";
+    [ObservableProperty] private string activeContractTitle = "— Kein aktiver Auftrag —";
+    [ObservableProperty] private string activeContractRewardText = "—";
+    [ObservableProperty] private string activeContractOrg = "";
+    [ObservableProperty] private bool hasActiveContract;
+    [ObservableProperty] private string contractStatusText = "Wartet auf mobiGlas Accepted-Tab…";
+    public string ContractRegionTooltip => _settings.ContractRegion is { } r
+        ? $"Auftrags-Bereich: {r.Width}x{r.Height} @ ({r.X},{r.Y})"
+        : "Auftrags-Bereich nicht kalibriert (⊕ Bereich klicken)";
+
+    [ObservableProperty] private bool isGameRunning;
+    [ObservableProperty] private string gameStatusText = "⚪ SC STANDBY";
+    [ObservableProperty] private string gameStatusColor = "#8B949E";
+    [ObservableProperty] private string gameStatusBadgeBg = "#161B22";
+    [ObservableProperty] private string gameStatusTooltip = "Star Citizen ist derzeit nicht gestartet · Parser wartet auf Spielstart";
+
+    public ObservableCollection<ContractDetails> ActiveContracts { get; } = new();
+    public bool HasActiveContracts => ActiveContracts.Count > 0;
+    public string ActiveContractsCountText => ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
     [ObservableProperty] private bool updateAvailable;
     [ObservableProperty] private string updateText = "";
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _knownContracts = new(StringComparer.OrdinalIgnoreCase);
     Updater.Info? _update;
     Avalonia.Threading.DispatcherTimer? _updateTimer;
+    Avalonia.Threading.DispatcherTimer? _pingTimer;
+    Avalonia.Threading.DispatcherTimer? _processTimer;
     [ObservableProperty] private SessionInfo? selectedSession;
     [ObservableProperty] private string currentLocation = "—";
     [ObservableProperty] private string currentShip = "—";
     [ObservableProperty] private string lastInventory = "—";
+
+    [ObservableProperty] private ResolvedLocation resolvedLocation = new();
+    public string LocationSystemBadge => ResolvedLocation.SystemName.ToUpperInvariant();
+    public string LocationBadgeColor => ResolvedLocation.SystemBadgeColor;
+    public string LocationMainText => ResolvedLocation.DisplayName == "—" ? "—" : 
+        string.IsNullOrEmpty(ResolvedLocation.ParentBody) || ResolvedLocation.ParentBody == "—" || ResolvedLocation.ParentBody == ResolvedLocation.DisplayName
+            ? ResolvedLocation.DisplayName 
+            : $"{ResolvedLocation.DisplayName} · {ResolvedLocation.ParentBody}";
+    public string LocationStatusSubline => ResolvedLocation.DisplayName == "—" 
+        ? "Warte auf Log-Daten..." 
+        : $"{ResolvedLocation.ArmisticeStatusText} · {ResolvedLocation.SystemName}";
+
+    // Starmap-Properties
+    [ObservableProperty] private string selectedStarmapSystem = "Stanton";
+    [ObservableProperty] private StarmapObject? selectedStarmapObject;
+    [ObservableProperty] private string starmapSearchText = "";
+    [ObservableProperty] private bool showStarmapStations = true;
+    [ObservableProperty] private bool showStarmapMoons = true;
+    [ObservableProperty] private bool showStarmapLandingZones = true;
+    [ObservableProperty] private bool showStarmapJumpPoints = true;
+    [ObservableProperty] private int selectedTabIndex = 0;
+
+    // Star Citizen Wiki API Integration
+    [ObservableProperty] private WikiInfo? currentShipWiki;
+    [ObservableProperty] private WikiInfo? selectedWikiInfo;
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? wikiImageBitmap;
+    [ObservableProperty] private bool isWikiOverlayOpen;
+    [ObservableProperty] private bool isWikiLoading;
+
+    // UEX API 2.0 Integration
+    [ObservableProperty] private UexLocationInfo? selectedStarmapUexInfo;
+    [ObservableProperty] private string uexApiKeyInput = "";
+    [ObservableProperty] private string uexStatusMessage = "";
+    [ObservableProperty] private string uexStatusColor = "#4ADE80";
+
+    // In-Game Floating HUD Overlay
+    [ObservableProperty] private bool isOverlayActive;
+    [ObservableProperty] private double overlayOpacity = 0.92;
+    private Views.FloatingOverlayWindow? _overlayWindow;
+
+    // WoW-Style In-Game Achievement & Reward Toast Banner (Völlig unabhängig vom Mini-HUD)
+    [ObservableProperty] private bool toastOverlayEnabled = true;
+    private Views.AchievementToastWindow? _toastWindow;
+
+    // Bauplan-Datenbank (Crafting Blueprints)
+    public ObservableCollection<BlueprintItem> BlueprintCatalogList { get; } = new();
+    public DataGridCollectionView BlueprintsView { get; }
+    [ObservableProperty] private string blueprintSearchText = "";
+    [ObservableProperty] private string selectedBlueprintCategory = "Alle";
+
+    public int LearnedBlueprintsCount => BlueprintCatalogList.Count(b => b.IsLearned);
+    public int MissingBlueprintsCount => BlueprintCatalogList.Count(b => !b.IsLearned);
+    public int TotalBlueprintsCount => BlueprintCatalogList.Count;
+    public double BlueprintProgressPercent => TotalBlueprintsCount > 0 ? (double)LearnedBlueprintsCount / TotalBlueprintsCount * 100.0 : 0;
+    public string BlueprintProgressText => $"{LearnedBlueprintsCount:N0} von {TotalBlueprintsCount:N0} Bauplänen erlernt ({BlueprintProgressPercent:F1}%)";
+
+    // Missions-Datenbank (Master Catalog & In-Game Wiki)
+    public ObservableCollection<MissionInfo> MissionCatalogList { get; } = new();
+    public DataGridCollectionView MissionsView { get; }
+    [ObservableProperty] private string missionSearchText = "";
+    [ObservableProperty] private string selectedMissionType = "Alle";
+    [ObservableProperty] private MissionInfo? selectedMission;
+    public int TotalMissionsCount => MissionCatalogList.Count;
+
+    public IReadOnlyList<StarmapObject> CurrentSystemObjects => StarmapData.GetSystemObjects(SelectedStarmapSystem);
+    public IReadOnlyList<StarmapObject> SearchStarmapResults => string.IsNullOrWhiteSpace(StarmapSearchText)
+        ? CurrentSystemObjects.Where(o => o.Type != StarmapObjectType.Star).Take(14).ToList()
+        : StarmapData.GetSystemObjects(SelectedStarmapSystem)
+            .Where(o => o.Name.Contains(StarmapSearchText, StringComparison.OrdinalIgnoreCase) || o.Description.Contains(StarmapSearchText, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
     [ObservableProperty] private long totalIn;        // Transfers rein
     [ObservableProperty] private long totalReward;    // Missions-Belohnungen
@@ -50,6 +155,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int missionsDone;    // abgeschlossene Aufträge (Belohnung nicht im Log)
 
     [ObservableProperty] private bool running;
+    [ObservableProperty] private bool isDatabaseBusy;
+    [ObservableProperty] private string databaseStatusMessage = "";
+    [ObservableProperty] private double databaseProgressPercent;
+    [ObservableProperty] private long? serverPingMs;
+    [ObservableProperty] private bool isPingingServer;
 
     public Core.BulkObservableCollection<LogEntry> Events { get; } = new();
     public ObservableCollection<SessionInfo> Sessions { get; } = new();
@@ -73,7 +183,7 @@ public partial class MainViewModel : ObservableObject
         ["Loot"] = new() { EventKind.Loot },
         ["Sonst"] = new() { EventKind.MedBed, EventKind.Death, EventKind.Impound,
                             EventKind.Loadout, EventKind.Entitlement, EventKind.Inventory, EventKind.Gear, EventKind.Kill,
-                            EventKind.Crime, EventKind.Refinery, EventKind.Injury },
+                            EventKind.Crime, EventKind.Refinery, EventKind.Injury, EventKind.Crash, EventKind.SessionChange },
     };
 
     [ObservableProperty] private LogEntry? selectedEntry;
@@ -165,7 +275,21 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenChangelog() => OpenUrl("https://github.com/miwidot/SCLogReader/releases");
+    private void OpenChangelog()
+    {
+        try
+        {
+            var exeDir = AppContext.BaseDirectory;
+            var localMd = Path.Combine(exeDir, "CHANGELOG.md");
+            if (File.Exists(localMd))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = localMd, UseShellExecute = true });
+                return;
+            }
+        }
+        catch { }
+        OpenUrl("https://github.com/gOOvER/SCLogMate/releases");
+    }
 
     // Grobe Heuristik: deutscher (nicht übersetzter) Missionsname? Dann taugt die englische DB nicht.
     static bool LooksGerman(string s)
@@ -185,6 +309,18 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void StartEditBalance()
+    {
+        IsEditingManualBalance = true;
+    }
+
+    [RelayCommand]
+    private void CancelEditBalance()
+    {
+        IsEditingManualBalance = false;
+    }
+
+    [RelayCommand]
     private void SetBalance()
     {
         var v = StartBalance();
@@ -195,10 +331,471 @@ public partial class MainViewModel : ObservableObject
         _settings.BalanceSetAt = v > 0 ? DateTime.UtcNow : null;
         Settings.Save(_settings);
         RecomputeBalances();
+        IsEditingManualBalance = false;
         OnPropertyChanged(nameof(AccountText));
+        OnPropertyChanged(nameof(LiveBalanceText));
         Status = v > 0 ? $"Kontostand gesetzt: {v:N0} aUEC (ab jetzt)" : "Kontostand geleert";
         BalanceSaved = true;   // grünes OK-Signal am Button, blendet nach 2s aus
         Avalonia.Threading.DispatcherTimer.RunOnce(() => BalanceSaved = false, System.TimeSpan.FromSeconds(2));
+    }
+
+    public string ManualBalanceTooltip => AutoOcrEnabled
+        ? "Deaktiviert, da ⚡ Auto-Sync aktiv ist (der Kontostand wird automatisch per mobiGlas gelesen).\nSchalte 'Auto' oben aus, um den Kontostand manuell einzutragen."
+        : "Kontostand manuell überschreiben / anpassen";
+
+    [RelayCommand]
+    private void ToggleAutoOcr()
+    {
+        AutoOcrEnabled = !AutoOcrEnabled;
+        _settings.AutoOcrEnabled = AutoOcrEnabled;
+        Settings.Save(_settings);
+        OnPropertyChanged(nameof(ManualBalanceTooltip));
+        Status = AutoOcrEnabled ? "⚡ Auto-Sync aktiviert (mobiGlas F1)" : "Auto-Sync deaktiviert (manuell)";
+
+        if (AutoOcrEnabled)
+        {
+            _contractScanner.Start();
+        }
+        else
+        {
+            _contractScanner.Stop();
+        }
+    }
+
+    [RelayCommand]
+    private void SelectWalletRegion()
+    {
+        var win = new RegionSelectorWindow();
+        win.RegionSelected += r =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _settings.WalletRegion = r;
+                Settings.Save(_settings);
+                UpdateOcrRegionText();
+                if (ShowScanBox) _scanIndicator.SetRegion(r);
+                Status = $"mobiGlas-Bereich gespeichert: {r.Width}x{r.Height} @ ({r.X},{r.Y})";
+            });
+        };
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void ToggleScanBox()
+    {
+        ShowScanBox = !ShowScanBox;
+        if (ShowScanBox)
+        {
+            var region = _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion();
+            _scanIndicator.SetRegion(region);
+            Status = "Scan-Rahmen im Spiel eingeblendet";
+        }
+        else
+        {
+            _scanIndicator.Hide();
+            Status = "Scan-Rahmen ausgeblendet";
+        }
+    }
+
+    [RelayCommand]
+    private void ResetWalletRegion()
+    {
+        _settings.WalletRegion = null;
+        Settings.Save(_settings);
+        UpdateOcrRegionText();
+        _scanIndicator.Hide();
+        Status = "mobiGlas-Bereich auf Standard (Auto-Erkennung) zurückgesetzt";
+    }
+
+    [RelayCommand]
+    private async Task TriggerOcr()
+    {
+        if (!OcrAvailable)
+        {
+            Status = "Windows OCR ist auf diesem System nicht verfügbar";
+            return;
+        }
+
+        Status = "Kontostand wird gescannt…";
+        var val = await _walletCapture.ScanDirectAsync();
+        if (val.HasValue)
+        {
+            OnBalanceCaptured(val.Value);
+            Status = $"Kontostand erkannt: {val.Value:N0} aUEC";
+        }
+        else
+        {
+            _walletCapture.Trigger();
+            Status = "OCR-Erfassung läuft… (mobiGlas F1 geöffnet halten)";
+        }
+    }
+
+    void UpdateOcrRegionText()
+    {
+        OcrRegionText = _settings.WalletRegion is { } r
+            ? $"Bereich: {r.Width}x{r.Height} @ ({r.X},{r.Y})"
+            : "Standard (Auto-Erkennung)";
+        OnPropertyChanged(nameof(WalletRegionSummaryText));
+        OnPropertyChanged(nameof(OcrRegionText));
+    }
+
+    [RelayCommand]
+    private void SelectContractRegion()
+    {
+        var win = new RegionSelectorWindow();
+        win.RegionSelected += r =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _settings.ContractRegion = r;
+                Settings.Save(_settings);
+                UpdateContractRegionText();
+                OnPropertyChanged(nameof(ContractRegionTooltip));
+                Status = $"Auftrags-Bereich gespeichert: {r.Width}x{r.Height} @ ({r.X},{r.Y})";
+            });
+        };
+        win.Show();
+    }
+
+    [RelayCommand]
+    public async Task ScanContract()
+    {
+        if (!OcrAvailable)
+        {
+            Status = "Windows OCR ist auf diesem System nicht verfügbar";
+            return;
+        }
+
+        var region = _settings.ContractRegion ?? ScreenCapture.GetDefaultContractRegion();
+        if (region == null || !region.IsValid)
+        {
+            region = ScreenCapture.GetDefaultContractRegion();
+        }
+
+        Status = "Auftragsmanager wird gescannt…";
+        var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+        if (raw == null)
+        {
+            ContractStatusText = "Bildschirm-Erfassung fehlgeschlagen";
+            return;
+        }
+
+        var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            ContractStatusText = "Kein Text im Auftrags-Bereich erkannt";
+            return;
+        }
+
+        // Streng prüfen: Nur Aufträge aus dem ACCEPTED-Tab übernehmen!
+        var details = ContractParser.Parse(text, requireAccepted: true);
+        if (details != null && details.Reward > 0 && details.Title.Length >= 3)
+        {
+            OnContractScanned(details);
+        }
+        else
+        {
+            if (ContractParser.IsAcceptedContract(text))
+            {
+                ContractStatusText = "Im Accepted-Tab, aber kein Betrag lesbar";
+            }
+            else
+            {
+                ContractStatusText = "Nicht im Accepted-Tab (nur angenommene Aufträge)";
+                Status = "Hinweis: Bitte im mobiGlas auf den Tab 'ACCEPTED' wechseln.";
+            }
+        }
+    }
+
+    void UpdateContractRegionText()
+    {
+        ContractRegionText = _settings.ContractRegion is { } r
+            ? $"Bereich: {r.Width}x{r.Height} @ ({r.X},{r.Y})"
+            : "Nicht kalibriert (⊕ Bereich klicken)";
+        OnPropertyChanged(nameof(ContractRegionSummaryText));
+    }
+
+    public string DebugLogPath => Path.Combine(Settings.Dir, "SCLogMate.debug.log");
+    public string DatabaseSummaryText => $"SQLite WAL · {Sessions.Count} Sessions · {Database.FormatBytes(Database.GetDatabaseSizeBytes())}";
+    public string RuntimeInfoText => $".NET 10.0 (Win-x64) · Avalonia UI · Windows.Media.Ocr";
+    public string WalletRegionSummaryText => _settings.WalletRegion is { } r ? $"{r.Width}x{r.Height} @ ({r.X}, {r.Y})" : "Standard (Auto-Erkennung)";
+    public string ContractRegionSummaryText => _settings.ContractRegion is { } r ? $"{r.Width}x{r.Height} @ ({r.X}, {r.Y})" : "Nicht kalibriert (⊕ Bereich wählen)";
+
+    [RelayCommand]
+    private async Task RescanAllLogs()
+    {
+        if (IsDatabaseBusy) return;
+        IsDatabaseBusy = true;
+        DatabaseStatusMessage = "Sammle Log-Dateien für kompletten Re-Scan...";
+        DatabaseProgressPercent = 0;
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // 0. SCLogReader eigenes Archiv (%APPDATA%\SCLogReader\archive)
+                if (Directory.Exists(LogArchive.Dir))
+                {
+                    foreach (var f in Directory.GetFiles(LogArchive.Dir, "*.log"))
+                        files.Add(f);
+                }
+
+                // 1. Aktuelle Game.log
+                if (!string.IsNullOrEmpty(LogPath) && File.Exists(LogPath))
+                {
+                    files.Add(LogPath);
+                    var dir = Path.GetDirectoryName(LogPath);
+                    if (!string.IsNullOrEmpty(dir))
+                    {
+                        var backups = Path.Combine(dir, "logbackups");
+                        if (Directory.Exists(backups))
+                        {
+                            foreach (var f in Directory.GetFiles(backups, "*.log"))
+                                files.Add(f);
+                        }
+                    }
+                }
+
+                // 2. Automatische Suche über alle Star Citizen Kanäle
+                foreach (var log in PathFinder.FindAll())
+                {
+                    files.Add(log);
+                    var dir = Path.GetDirectoryName(log);
+                    if (!string.IsNullOrEmpty(dir))
+                    {
+                        var backups = Path.Combine(dir, "logbackups");
+                        if (Directory.Exists(backups))
+                        {
+                            foreach (var f in Directory.GetFiles(backups, "*.log"))
+                                files.Add(f);
+                        }
+                    }
+                }
+
+                // 3. Re-Scan ausführen
+                var result = Database.RescanAll(files, (curr, total, name) =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        DatabaseProgressPercent = (double)curr / total * 100.0;
+                        DatabaseStatusMessage = $"Scanne ({curr}/{total}): {name}";
+                    });
+                });
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    DatabaseStatusMessage = $"✓ Re-Scan abgeschlossen: {result.indexedSessions} Sessions, {result.totalEvents:N0} Ereignisse neu indexiert.";
+                    Status = $"✓ Re-Scan abgeschlossen ({result.indexedSessions} Sessions / {result.totalEvents:N0} Events)";
+                });
+            });
+
+            // UI-Daten neu laden
+            if (!string.IsNullOrEmpty(LogPath) && File.Exists(LogPath))
+            {
+                RefreshSessions(selectCurrent: true);
+                LoadSession();
+            }
+            else
+            {
+                OnPropertyChanged(nameof(DatabaseSummaryText));
+            }
+            SyncBlueprints();
+        }
+        catch (Exception ex)
+        {
+            DatabaseStatusMessage = $"Fehler beim Re-Scan: {ex.Message}";
+            Logger.Error("RescanAllLogs", ex);
+        }
+        finally
+        {
+            IsDatabaseBusy = false;
+            OnPropertyChanged(nameof(DatabaseSummaryText));
+        }
+    }
+
+    [RelayCommand]
+    private async Task CleanupDatabase()
+    {
+        if (IsDatabaseBusy) return;
+        IsDatabaseBusy = true;
+        DatabaseStatusMessage = "Optimiere und bereinige SQLite-Datenbank...";
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                var result = Database.Cleanup();
+                Dispatcher.UIThread.Post(() =>
+                {
+                    DatabaseStatusMessage = $"✓ Bereinigung fertig! {result.cleanedEvents} leere Events / {result.cleanedSessions} verwaiste Sessions bereinigt. Größe: {Database.FormatBytes(result.sizeAfter)}.";
+                    Status = $"✓ Datenbank bereinigt ({Database.FormatBytes(result.sizeAfter)})";
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            DatabaseStatusMessage = $"Fehler beim Cleanup: {ex.Message}";
+            Logger.Error("CleanupDatabase", ex);
+        }
+        finally
+        {
+            IsDatabaseBusy = false;
+            OnPropertyChanged(nameof(DatabaseSummaryText));
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResetDatabase()
+    {
+        if (IsDatabaseBusy) return;
+        IsDatabaseBusy = true;
+        DatabaseStatusMessage = "Leere SQLite-Datenbank...";
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                Database.ClearAll();
+            });
+
+            Events.Clear();
+            ShipsSeen.Clear();
+            _shipSet.Clear();
+            _liveMoney.Clear();
+            TotalIn = TotalReward = TotalOut = TotalPurchases = TotalSales = TotalTrade = 0;
+            MissionsDone = 0;
+            CurrentLocation = CurrentShip = LastInventory = "—";
+            RefreshSessions(selectCurrent: true);
+            LoadSession();
+            DatabaseStatusMessage = "✓ Datenbank wurde vollständig geleert.";
+            Status = "✓ Datenbank geleert (0 Sessions, 0 Events)";
+        }
+        catch (Exception ex)
+        {
+            DatabaseStatusMessage = $"Fehler beim Zurücksetzen: {ex.Message}";
+            Logger.Error("ResetDatabase", ex);
+        }
+        finally
+        {
+            IsDatabaseBusy = false;
+            OnPropertyChanged(nameof(DatabaseSummaryText));
+        }
+    }
+
+    [RelayCommand]
+    private void OpenDebugLog()
+    {
+        try
+        {
+            if (File.Exists(DebugLogPath))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = DebugLogPath, UseShellExecute = true });
+            }
+            else
+            {
+                Status = "Debug-Log noch nicht vorhanden: " + DebugLogPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = "Fehler beim Öffnen des Debug-Logs: " + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenAppDataFolder()
+    {
+        try
+        {
+            var dir = Settings.Dir;
+            Directory.CreateDirectory(dir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dir, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Status = "Fehler beim Öffnen des AppData-Ordners: " + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    public void ClearContracts()
+    {
+        ActiveContracts.Clear();
+        _knownContracts.Clear();
+        HasActiveContract = false;
+        ActiveContractTitle = "— Kein aktiver Auftrag —";
+        ActiveContractRewardText = "—";
+        ActiveContractOrg = "";
+        ContractStatusText = "Keine aktiven Aufträge";
+        OnPropertyChanged(nameof(HasActiveContracts));
+        OnPropertyChanged(nameof(ActiveContractsCountText));
+        Database.ClearActiveContracts();
+        Status = "Auftragsliste geleert.";
+    }
+
+    void OnContractScanned(ContractDetails d)
+    {
+        if (d == null || d.Reward <= 0 || string.IsNullOrWhiteSpace(d.Title)) return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            var title = d.Title.Trim();
+            var norm = ContractParser.NormalizeTitle(title);
+            if (norm.Length < 3) return;
+
+            // Robuste Deduplizierung: Erkennt denselben Auftrag (Titel, Betrag, Kernwörter, Organisation)
+            var existing = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, d));
+
+            if (existing != null)
+            {
+                // Nur bestehenden Auftrag im Speicher aktualisieren
+                if (title.Length > existing.Title.Length || string.IsNullOrEmpty(existing.ContractedBy))
+                {
+                    existing.Title = title;
+                    existing.ContractedBy = !string.IsNullOrEmpty(d.ContractedBy) ? d.ContractedBy : existing.ContractedBy;
+                    existing.Reward = d.Reward;
+                    existing.ScannedAt = d.ScannedAt;
+                    Database.SaveContract(existing);
+                }
+                return;
+            }
+
+            ActiveContracts.Insert(0, d);
+            if (ActiveContracts.Count > 15) ActiveContracts.RemoveAt(ActiveContracts.Count - 1);
+
+            // In SQLite-Datenbank persistieren
+            Database.SaveContract(d);
+
+            _knownContracts[norm] = d.Reward;
+            HasActiveContract = true;
+            ActiveContractTitle = title;
+            ActiveContractRewardText = d.RewardText;
+            ActiveContractOrg = d.ContractedBy;
+            ContractStatusText = $"✓ {ActiveContracts.Count} Auftrag/Aufträge ({DateTime.Now:HH:mm:ss})";
+
+            OnPropertyChanged(nameof(HasActiveContracts));
+            OnPropertyChanged(nameof(ActiveContractsCountText));
+            Status = $"★ Aktiver Auftrag erfasst: {title} · {d.RewardText}";
+        });
+    }
+
+    void OnBalanceCaptured(long balance)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _settings.Balance = balance;
+            _settings.BalanceSetAt = DateTime.UtcNow;
+            Settings.Save(_settings);
+
+            ManualBalance = balance.ToString("N0");
+            OnPropertyChanged(nameof(LiveBalanceText));
+            OnPropertyChanged(nameof(AccountText));
+            _scanIndicator.FlashGreen();
+            Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC";
+            OcrStatusText = $"✓ Zuletzt: {balance:N0} aUEC ({DateTime.Now:HH:mm:ss})";
+        });
     }
 
     [RelayCommand]
@@ -242,6 +839,22 @@ public partial class MainViewModel : ObservableObject
     public long IncomeAll => TotalIn + TotalReward + TotalSales + TotalTrade;
     public long SpendAll => TotalOut + TotalPurchases;
     public long NetAll => IncomeAll - SpendAll;
+
+    public long LiveSessionIncome => _allMode
+        ? _liveMoney.Where(e => IsMoney(e.Kind) && e.Amount > 0).Sum(e => e.Amount)
+        : Events.Where(e => IsMoney(e.Kind) && e.Amount > 0).Sum(e => e.Amount);
+
+    public long LiveSessionSpend => _allMode
+        ? _liveMoney.Where(e => IsMoney(e.Kind) && e.Amount < 0).Sum(e => -e.Amount)
+        : Events.Where(e => IsMoney(e.Kind) && e.Amount < 0).Sum(e => -e.Amount);
+
+    public long LiveSessionNet => LiveSessionIncome - LiveSessionSpend;
+
+    public string SessionIncomeText => $"+{LiveSessionIncome:N0} aUEC";
+    public string SessionSpendText => $"-{LiveSessionSpend:N0} aUEC";
+    public string SessionNetText => $"{(LiveSessionNet >= 0 ? "+" : "")}{LiveSessionNet:N0} aUEC";
+    public long SessionNetSign => LiveSessionNet;
+    public string LiveBalanceText => StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
 
     // Geld-Statistik (eigener Tab)
     public ObservableCollection<StatItem> IncomeStats { get; } = new();
@@ -341,8 +954,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SpendTotalText));
     }
 
-    static readonly System.Text.RegularExpressions.Regex TradeDetail =
-        new(@"^(?<ware>.+?) ×(?<scu>\d+) SCU", System.Text.RegularExpressions.RegexOptions.Compiled);
+    [GeneratedRegex(@"^(?<ware>.+?) ×(?<scu>\d+) SCU")]
+    private static partial Regex TradeDetailRegex();
 
     // „Handel je Ware": SCU + Ø Preis/SCU + Erlös, pro Commodity zusammengefasst.
     void RebuildCommodityTrades(System.Collections.Generic.IEnumerable<LogEntry> trades)
@@ -351,7 +964,7 @@ public partial class MainViewModel : ObservableObject
         foreach (var e in trades)
         {
             if (e.Amount <= 0) continue;   // nur Verkäufe → Ø Preis/SCU sauber (Käufe verfälschen nicht)
-            var m = TradeDetail.Match(e.Detail ?? "");
+            var m = TradeDetailRegex().Match(e.Detail ?? "");
             if (!m.Success) continue;
             var ware = m.Groups["ware"].Value.Trim();
             long scu = long.TryParse(m.Groups["scu"].Value, out var s) ? s : 0;
@@ -378,9 +991,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasTrades));
     }
 
-    static readonly System.Text.RegularExpressions.Regex MarketDetail =
-        new(@"^(?<ware>.+?) ×(?<scu>\d+) SCU\s*·\s*(?<shop>.+?)(?<kauf>\s*\(Kauf\))?\s*$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    [GeneratedRegex(@"^(?<ware>.+?) ×(?<scu>\d+) SCU\s*·\s*(?<shop>.+?)(?<kauf>\s*\(Kauf\))?\s*$")]
+    private static partial Regex MarketDetailRegex();
 
     // „Marktpreise": pro Ware bester Verkaufs- und günstigster Kaufpreis (pro SCU) + Terminal + Marge.
     void RebuildMarketPrices(System.Collections.Generic.IEnumerable<LogEntry> trades)
@@ -389,7 +1001,7 @@ public partial class MainViewModel : ObservableObject
             (long sell, string sShop, long buy, string bShop)>();
         foreach (var e in trades)
         {
-            var mm = MarketDetail.Match(e.Detail ?? "");
+            var mm = MarketDetailRegex().Match(e.Detail ?? "");
             if (!mm.Success) continue;
             var ware = mm.Groups["ware"].Value.Trim();
             long scu = long.TryParse(mm.Groups["scu"].Value, out var s) ? s : 0;
@@ -466,14 +1078,128 @@ public partial class MainViewModel : ObservableObject
 
     public string VersionText => "v" + Updater.CurrentVersion;
 
+    public string ScPlayerName => _parser.Meta.TryGetValue("character", out var c) && !string.IsNullOrWhiteSpace(c) ? c : "—";
+
+    public string ScVersionText
+    {
+        get
+        {
+            if (_parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v))
+            {
+                var ver = v.Trim();
+                return ver.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? ver : "v" + ver;
+            }
+            return "—";
+        }
+    }
+
+    public string ScChannel => _parser.Meta.TryGetValue("env", out var e) && !string.IsNullOrWhiteSpace(e) ? e.ToUpperInvariant() : "LIVE";
+
+    public string ServerShardName => _parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s) ? s : "—";
+
+    public string ServerShardNumber
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ServerShardName) || ServerShardName == "—")
+                return "Kein Server";
+
+            var match = Regex.Match(ServerShardName, @"(?:_|\b)(\d+)$");
+            if (match.Success)
+            {
+                return $"Shard #{match.Groups[1].Value}";
+            }
+            return ServerShardName;
+        }
+    }
+
+    public (string flag, string code, string name) ServerRegionInfo
+    {
+        get
+        {
+            var shard = ServerShardName.ToLowerInvariant();
+            if (shard.Contains("euw") || shard.Contains("euc") || shard.Contains("eu") || shard.Contains("fra") || shard.Contains("lon"))
+                return ("🇪🇺", "EU", "Europa");
+            if (shard.Contains("use") || shard.Contains("usw") || shard.Contains("us") || shard.Contains("na") || shard.Contains("va"))
+                return ("🇺🇸", "US", "USA / Nordamerika");
+            if (shard.Contains("aus") || shard.Contains("oce") || shard.Contains("ap") || shard.Contains("syd"))
+                return ("🇦🇺", "AUS", "Australien / APAC");
+            if (shard.Contains("asia") || shard.Contains("jp") || shard.Contains("sg") || shard.Contains("tyo"))
+                return ("🌏", "ASIA", "Asien");
+            if (ServerShardName != "—")
+                return ("🌐", "PU", "Persistent Universe");
+            return ("🌐", "—", "Unbekannt");
+        }
+    }
+
+    public string ServerRegionFlag => ServerRegionInfo.flag;
+    public string ServerRegionCode => ServerRegionInfo.code;
+    public string ServerRegionName => ServerRegionInfo.name;
+    public bool IsRegionEu => ServerRegionCode == "EU";
+    public bool IsRegionUs => ServerRegionCode == "US";
+    public bool IsRegionAus => ServerRegionCode == "AUS";
+    public bool IsRegionAsia => ServerRegionCode == "ASIA";
+    public bool IsRegionOther => !IsRegionEu && !IsRegionUs && !IsRegionAus && !IsRegionAsia;
+
+    public string ServerBadgeText => ServerRegionCode == "—" ? ScChannel : $"{ServerRegionCode} · {ScChannel}";
+
+    public string ServerMainText => ScPlayerName != "—" ? ScPlayerName : "Kein Pilot erkannt";
+
+    public string ServerSublineText
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (ScVersionText != "—") parts.Add($"SC {ScVersionText}");
+            if (ServerShardNumber != "—" && ServerShardNumber != "Kein Server") parts.Add(ServerShardNumber);
+            return parts.Count > 0 ? string.Join("  ·  ", parts) : "Warte auf Server-Verbindung...";
+        }
+    }
+
+    public string ServerPingText => ServerPingMs is { } p ? $"{p} ms" : IsPingingServer ? "…" : "—";
+    public string ServerPingColor => ServerPingMs switch
+    {
+        null => "#8B949E",
+        <= 45 => "#4ADE80",   // Grün (ausgezeichnet)
+        <= 120 => "#FBBF24",  // Gelb (gut)
+        _ => "#F87171"        // Rot (hoch)
+    };
+
+    public string ServerTooltipText => ServerShardName == "—"
+        ? "Keine Serververbindung im aktuellen Log gefunden."
+        : $"Vollständiger Shard-Name:\n{ServerShardName}\n\nRegion: {ServerRegionName} ({ServerRegionCode})\nLatenz (RTT): {(ServerPingMs is { } p ? $"{p} ms" : "Wird gemessen...")}\nKanal: {ScChannel}\nSpieler: {ScPlayerName}\nStar Citizen Build: {ScVersionText}";
+
+    public async Task PingCurrentServerAsync()
+    {
+        if (IsPingingServer) return;
+        IsPingingServer = true;
+        try
+        {
+            var shard = ServerShardName;
+            var latency = await ServerPingService.MeasureLatencyAsync(shard);
+            Dispatcher.UIThread.Post(() =>
+            {
+                ServerPingMs = latency;
+                OnPropertyChanged(nameof(ServerPingText));
+                OnPropertyChanged(nameof(ServerPingColor));
+                OnPropertyChanged(nameof(ServerTooltipText));
+            });
+        }
+        catch { /* ignore */ }
+        finally
+        {
+            IsPingingServer = false;
+        }
+    }
+
     public string MetaSummary
     {
         get
         {
-            var parts = new System.Collections.Generic.List<string>();
-            if (_parser.Meta.TryGetValue("character", out var c)) parts.Add(c);
-            if (_parser.Meta.TryGetValue("version", out var v)) parts.Add("v" + v);
-            if (_parser.Meta.TryGetValue("shard", out var s)) parts.Add(s);
+            var parts = new List<string>();
+            if (ScPlayerName != "—") parts.Add(ScPlayerName);
+            if (ScVersionText != "—") parts.Add(ScVersionText);
+            if (ServerShardName != "—") parts.Add($"{ServerRegionFlag} {ServerShardNumber}");
             return parts.Count == 0 ? "Star Citizen · Live-Auswertung" : string.Join("  ·  ", parts);
         }
     }
@@ -517,8 +1243,9 @@ public partial class MainViewModel : ObservableObject
 
     long StartBalance()
     {
-        var digits = new string(ManualBalance.Where(char.IsDigit).ToArray());
-        return long.TryParse(digits, out var v) ? v : 0;
+        var digits = new string((ManualBalance ?? "").Where(char.IsDigit).ToArray());
+        if (long.TryParse(digits, out var v) && v > 0) return v;
+        return _settings.Balance;
     }
 
     /// <summary>Summe der Geld-Bewegungen NACH dem Kontostand-Eintrag. Nur die zählen —
@@ -565,26 +1292,155 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(NetSign));
         OnPropertyChanged(nameof(ExpectedText));
         OnPropertyChanged(nameof(ExpectedBalance));
+        OnPropertyChanged(nameof(LiveBalanceText));
     }
 
     partial void OnManualBalanceChanged(string value)
     {
         OnPropertyChanged(nameof(AccountText));
+        OnPropertyChanged(nameof(LiveBalanceText));
         RecomputeBalances();
         if (!_ready) return;
-        _settings.Balance = StartBalance();
-        Settings.Save(_settings);
+        var b = StartBalance();
+        if (b > 0)
+        {
+            _settings.Balance = b;
+            Settings.Save(_settings);
+        }
     }
 
     public MainViewModel()
     {
+        _initializing = true;
+        _settings = Settings.Load();
+
         EventsView = new DataGridCollectionView(Events)
         {
             Filter = o => _activeKinds == null || (o is LogEntry e && _activeKinds.Contains(e.Kind))
         };
 
-        // Gemerkte Einstellungen laden (Pfad + Kontostand), sonst automatisch suchen.
-        _settings = Settings.Load();
+        foreach (var bp in BlueprintCatalog.CreateFreshCatalog())
+        {
+            BlueprintCatalogList.Add(bp);
+        }
+
+        BlueprintsView = new DataGridCollectionView(BlueprintCatalogList)
+        {
+            Filter = o =>
+            {
+                if (o is not BlueprintItem bp) return true;
+                if (SelectedBlueprintCategory == "Erlernt" && !bp.IsLearned) return false;
+                if (SelectedBlueprintCategory == "Fehlend" && bp.IsLearned) return false;
+                if (SelectedBlueprintCategory != "Alle" && SelectedBlueprintCategory != "Erlernt" && SelectedBlueprintCategory != "Fehlend" && bp.Category != SelectedBlueprintCategory) return false;
+                if (!string.IsNullOrWhiteSpace(BlueprintSearchText) &&
+                    !bp.Name.Contains(BlueprintSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !bp.SubCategory.Contains(BlueprintSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !bp.UnlockInfo.Contains(BlueprintSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !bp.RequiredMaterials.Contains(BlueprintSearchText, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                return true;
+            }
+        };
+
+        foreach (var m in MissionCatalog.AllMissions)
+        {
+            MissionCatalogList.Add(m);
+        }
+
+        MissionsView = new DataGridCollectionView(MissionCatalogList)
+        {
+            Filter = o =>
+            {
+                if (o is not MissionInfo m) return true;
+                if (SelectedMissionType != "Alle" && m.MissionType != SelectedMissionType) return false;
+                if (!string.IsNullOrWhiteSpace(MissionSearchText) &&
+                    !m.Title.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !m.Contractor.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !m.Faction.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !m.StarSystems.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !m.Description.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !m.BlueprintsText.Contains(MissionSearchText, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+                return true;
+            }
+        };
+        AutoOcrEnabled = _settings.AutoOcrEnabled;
+        OcrAvailable = _ocrEngine.IsAvailable;
+        UpdateOcrRegionText();
+
+        UexApiKeyInput = _settings.UexApiKey ?? "";
+        if (!string.IsNullOrEmpty(_settings.UexApiKey))
+        {
+            UexApiClient.SetApiKey(_settings.UexApiKey);
+        }
+
+        OverlayOpacity = _settings.OverlayOpacity > 0 ? _settings.OverlayOpacity : 0.92;
+        if (_settings.OverlayEnabled)
+        {
+            IsOverlayActive = true;
+        }
+
+        _walletCapture = new WalletCapture(_ocrEngine, () => _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(), () => AutoOcrEnabled);
+        _walletCapture.BalanceCaptured += OnBalanceCaptured;
+
+        _contractScanner = new ContractScanner(
+            _ocrEngine,
+            () => _settings.ContractRegion ?? ScreenCapture.GetDefaultContractRegion(),
+            () => AutoOcrEnabled);
+        _contractScanner.ContractScanned += OnContractScanned;
+        _contractScanner.StageChanged += stage =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (stage == "not_accepted_tab" && HasActiveContract)
+                {
+                    // alter Auftrag bleibt stehen
+                }
+                else if (stage == "not_accepted_tab")
+                {
+                    ContractStatusText = "Wartet auf mobiGlas Accepted-Tab…";
+                }
+                else if (stage == "parsed")
+                {
+                    ContractStatusText = $"✓ {ActiveContracts.Count} Auftrag/Aufträge ({DateTime.Now:HH:mm:ss})";
+                }
+            });
+        };
+
+        if (AutoOcrEnabled)
+        {
+            _contractScanner.Start();
+        }
+
+        // Gespeicherte aktive Aufträge aus der SQLite-Datenbank laden
+        try
+        {
+            var savedContracts = Database.GetActiveContracts();
+            foreach (var c in savedContracts)
+            {
+                ActiveContracts.Add(c);
+                var norm = ContractParser.NormalizeTitle(c.Title);
+                if (norm.Length > 0) _knownContracts[norm] = c.Reward;
+            }
+            if (ActiveContracts.Count > 0)
+            {
+                var first = ActiveContracts[0];
+                HasActiveContract = true;
+                ActiveContractTitle = first.Title;
+                ActiveContractRewardText = first.RewardText;
+                ActiveContractOrg = first.ContractedBy;
+                ContractStatusText = $"✓ {ActiveContracts.Count} gespeicherte(r) Auftrag/Aufträge geladen";
+                OnPropertyChanged(nameof(HasActiveContracts));
+                OnPropertyChanged(nameof(ActiveContractsCountText));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("LoadActiveContracts", ex);
+        }
+
         var saved = _settings.LogPath;
         var start = !string.IsNullOrWhiteSpace(saved) && File.Exists(saved)
             ? saved!
@@ -593,11 +1449,23 @@ public partial class MainViewModel : ObservableObject
         LogPath = start;
         Localization.Hint(LogPath);   // Spiel-Wurzel für Item-/Text-Auflösung merken (vor DB-Aufbau)
         if (_settings.Balance > 0) ManualBalance = _settings.Balance.ToString("N0");
+
+        // UEX & Overlay Einstellungen initialisieren
+        UexApiKeyInput = _settings.UexApiKey ?? "";
+        if (!string.IsNullOrEmpty(_settings.UexApiKey))
+        {
+            UexApiClient.SetApiKey(_settings.UexApiKey);
+        }
+        OverlayOpacity = _settings.OverlayOpacity > 0 ? _settings.OverlayOpacity : 0.92;
+
         RefreshSessions(selectCurrent: true);
         Status = saved != null && start == saved
             ? "gemerkte Einstellungen geladen"
             : Sessions.Count > 0 ? $"{Sessions.Count} Sessions gefunden" : "keine Game.log gefunden";
+        _initializing = false;
         _ready = true;
+        OnPropertyChanged(nameof(LiveBalanceText));
+        OnPropertyChanged(nameof(AccountText));
 
         _settings.LogPath = LogPath;
         Settings.Save(_settings);
@@ -610,6 +1478,55 @@ public partial class MainViewModel : ObservableObject
         _updateTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(6) };
         _updateTimer.Tick += (_, _) => CheckForUpdate();
         _updateTimer.Start();
+
+        // Server-Latenz (Ping): Einmal sofort + alle 12 Sekunden im Hintergrund
+        _ = PingCurrentServerAsync();
+        _pingTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
+        _pingTimer.Tick += (_, _) => _ = PingCurrentServerAsync();
+        _pingTimer.Start();
+
+        // Star Citizen Prozess-Erkennung & Auto-Resume
+        CheckGameProcess();
+        _processTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _processTimer.Tick += (_, _) => CheckGameProcess();
+        _processTimer.Start();
+    }
+
+    void CheckGameProcess()
+    {
+        try
+        {
+            var procs = System.Diagnostics.Process.GetProcessesByName("StarCitizen");
+            bool running = procs.Length > 0;
+            if (running != IsGameRunning)
+            {
+                IsGameRunning = running;
+                if (running)
+                {
+                    GameStatusText = "🟢 SC LÄUFT";
+                    GameStatusColor = "#3FB950";
+                    GameStatusBadgeBg = "#0E2818";
+                    GameStatusTooltip = "Star Citizen (StarCitizen.exe) ist aktiv · Live-Logparser läuft";
+                    Status = "★ Star Citizen gestartet – Live-Erfassung aktiv";
+                    if (!Running)
+                    {
+                        LoadSession();
+                    }
+                }
+                else
+                {
+                    GameStatusText = "⚪ SC STANDBY";
+                    GameStatusColor = "#8B949E";
+                    GameStatusBadgeBg = "#161B22";
+                    GameStatusTooltip = "Star Citizen ist derzeit nicht gestartet · Parser wartet auf Spielstart";
+                }
+                OnPropertyChanged(nameof(GameStatusText));
+                OnPropertyChanged(nameof(GameStatusColor));
+                OnPropertyChanged(nameof(GameStatusBadgeBg));
+                OnPropertyChanged(nameof(GameStatusTooltip));
+            }
+        }
+        catch { /* ignore process lookup errors */ }
     }
 
     async void CheckForUpdate()
@@ -740,6 +1657,7 @@ public partial class MainViewModel : ObservableObject
         _tailer.Status += s => Dispatcher.UIThread.Post(() => Status = s);
         _tailer.Start(fromStart: true);
         Running = true;
+        SyncBlueprints();
     }
 
     // Alle Sessions: fertige aus der DB (einmal indexiert), laufende live dazu.
@@ -778,7 +1696,7 @@ public partial class MainViewModel : ObservableObject
             catch (System.Exception ex)
             {
                 Logger.Error("LoadAllSessions", ex);
-                Dispatcher.UIThread.Post(() => Status = "Fehler beim Laden – siehe SCLogReader.debug.log");
+                Dispatcher.UIThread.Post(() => Status = "Fehler beim Laden – siehe SCLogMate.debug.log");
             }
         });
     }
@@ -829,6 +1747,8 @@ public partial class MainViewModel : ObservableObject
                  nameof(NetSign), nameof(FlowText), nameof(TradeText), nameof(ExpectedText), nameof(ExpectedBalance),
                  nameof(SessionSpanText), nameof(FleetText), nameof(ShipsSeenText), nameof(MissionsText) })
             OnPropertyChanged(n);
+
+        SyncBlueprints();
 
         Status = $"alle Sessions (DB: {agg.Sessions}) – laufende live…";
 
@@ -969,6 +1889,7 @@ public partial class MainViewModel : ObservableObject
 
     void OnLine(string line)
     {
+        _walletCapture.ProcessLine(line);
         var e = _parser.Feed(line);
         if (e == null) return;
         Dispatcher.UIThread.Post(() => Apply(e));
@@ -991,6 +1912,11 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.MissionReward:
                     TotalReward += e.Amount;
+                    HandleMissionCompleted(e.Detail);
+                    if (!_initializing && e.Amount > 0)
+                    {
+                        TriggerAchievementToast(AchievementToastData.ForMissionReward(e.Detail, e.Amount));
+                    }
                     break;
                 case EventKind.TransferOut:
                     TotalOut += -e.Amount;       // Amount ist negativ
@@ -1011,6 +1937,22 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.Location:
                     CurrentLocation = e.Detail;
+                    ResolvedLocation = StarmapData.Resolve(e.Detail);
+                    OnPropertyChanged(nameof(LocationSystemBadge));
+                    OnPropertyChanged(nameof(LocationBadgeColor));
+                    OnPropertyChanged(nameof(LocationMainText));
+                    OnPropertyChanged(nameof(LocationStatusSubline));
+                    break;
+                case EventKind.Jurisdiction:
+                    if (e.Detail.Contains("🟢") || e.Detail.Contains("Schutzzone aktiv"))
+                    {
+                        ResolvedLocation.IsArmistice = true;
+                    }
+                    else if (e.Detail.Contains("🔴") || e.Detail.Contains("Schutzzone verlassen"))
+                    {
+                        ResolvedLocation.IsArmistice = false;
+                    }
+                    OnPropertyChanged(nameof(LocationStatusSubline));
                     break;
                 case EventKind.Vehicle:
                     CurrentShip = e.Detail;
@@ -1018,15 +1960,54 @@ public partial class MainViewModel : ObservableObject
                 case EventKind.Inventory:
                     LastInventory = e.Detail;
                     break;
+                case EventKind.Mission:
+                    // Wenn eine Notification wie "Contract Complete: ..." oder "Auftrag abgeschlossen: ..." reinkommt
+                    if (e.Detail.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
+                        e.Detail.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
+                        e.Detail.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HandleMissionCompleted(e.Detail);
+                    }
+                    else if (e.Detail.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HandleMissionCancelled(e.Detail);
+                    }
+                    else if (e.Detail.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
+                             e.Detail.Contains("geteilt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HandleMissionAccepted(e.Detail, e.Amount);
+                    }
+                    break;
                 case EventKind.MissionDone:
-                    MissionsDone++;
-                    OnPropertyChanged(nameof(MissionsText));
+                    HandleMissionCompleted(e.Detail);
                     break;
                 case EventKind.Blueprint:
                     AddBlueprint(e.Detail);
+                    SyncBlueprints();
+                    if (!_initializing)
+                    {
+                        TriggerAchievementToast(AchievementToastData.ForBlueprint(e.Detail));
+                    }
                     break;
                 case EventKind.MissionTaken:
                     RebuildMissions(Events.Where(x => x.Kind == EventKind.MissionTaken));
+                    break;
+                case EventKind.Crash:
+                    ClearContracts();
+                    ContractStatusText = "⚠ Spiel abgestürzt – Aufträge zurückgesetzt";
+                    Status = "⚠ Star Citizen Absturz erkannt! Aktive Aufträge wurden zurückgesetzt.";
+                    break;
+                case EventKind.SessionChange:
+                    Status = e.Detail ?? "Server-/Session-Wechsel";
                     break;
             }
 
@@ -1036,6 +2017,18 @@ public partial class MainViewModel : ObservableObject
                 _running += e.Amount;
                 e.BalanceAfter = _running;
                 e.HasBalance = true;
+
+                // Live-Kontostand direkt mitführen, wenn ein Betrag gesetzt ist
+                if (!_initializing && StartBalance() > 0)
+                {
+                    long current = StartBalance();
+                    long newBal = Math.Max(0, current + e.Amount);
+                    ManualBalance = newBal.ToString("N0");
+                    _settings.Balance = newBal;
+                    _settings.BalanceSetAt = e.Time;
+                    Settings.Save(_settings);
+                }
+
                 if (_allMode)
                 {
                     _liveMoney.Add(e);
@@ -1044,8 +2037,10 @@ public partial class MainViewModel : ObservableObject
                         .OrderByDescending(x => System.Math.Abs(x.Amount)).Take(8)
                         .OrderBy(x => System.Math.Abs(x.Amount)));
                     if (e.Kind == EventKind.Trade)
+                    {
                         RebuildCommodityTrades(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
                         RebuildMarketPrices(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
+                    }
                 }
                 else RebuildStats();
             }
@@ -1062,11 +2057,260 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(NetSign));
             OnPropertyChanged(nameof(FlowText));
             OnPropertyChanged(nameof(TradeText));
+            OnPropertyChanged(nameof(SessionIncomeText));
+            OnPropertyChanged(nameof(SessionSpendText));
+            OnPropertyChanged(nameof(SessionNetText));
+            OnPropertyChanged(nameof(SessionNetSign));
+            OnPropertyChanged(nameof(LiveBalanceText));
             OnPropertyChanged(nameof(ExpectedText));
             OnPropertyChanged(nameof(ExpectedBalance));
             OnPropertyChanged(nameof(SessionSpanText));
+            OnPropertyChanged(nameof(ServerShardName));
+            OnPropertyChanged(nameof(ServerShardNumber));
+            OnPropertyChanged(nameof(ServerRegionFlag));
+            OnPropertyChanged(nameof(ServerRegionName));
+            OnPropertyChanged(nameof(ServerRegionCode));
+            OnPropertyChanged(nameof(IsRegionEu));
+            OnPropertyChanged(nameof(IsRegionUs));
+            OnPropertyChanged(nameof(IsRegionAus));
+            OnPropertyChanged(nameof(IsRegionAsia));
+            OnPropertyChanged(nameof(IsRegionOther));
+            OnPropertyChanged(nameof(ScVersionText));
+            OnPropertyChanged(nameof(ScPlayerName));
+            OnPropertyChanged(nameof(ServerBadgeText));
+            OnPropertyChanged(nameof(ServerMainText));
+            OnPropertyChanged(nameof(ServerSublineText));
+            OnPropertyChanged(nameof(ServerTooltipText));
             OnPropertyChanged(nameof(MetaSummary));
         }
+    }
+
+    private void HandleMissionCompleted(string? detail)
+    {
+        MissionsDone++;
+        OnPropertyChanged(nameof(MissionsText));
+
+        // Titel aus Notification extrahieren (z. B. "Contract Complete: Ship In Distress" -> "Ship In Distress")
+        var missionTitle = detail ?? "";
+        foreach (var prefix in new[] { "Contract Complete: ", "Contract Complete:", "Contract Completed: ", "Mission Complete: ", "Mission Completed: ", "Auftrag abgeschlossen: ", "Auftrag abgeschlossen", "Mission completed: ", "Mission completed", "Belohnung: ", "Belohnung:" })
+        {
+            if (missionTitle.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                missionTitle = missionTitle[prefix.Length..].Trim();
+                break;
+            }
+        }
+
+        ContractDetails? matchContract = null;
+        if (!string.IsNullOrWhiteSpace(missionTitle) && !missionTitle.StartsWith("(Belohnung", StringComparison.OrdinalIgnoreCase))
+        {
+            var dummy = new ContractDetails { Title = missionTitle };
+            matchContract = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, dummy));
+            if (matchContract == null)
+            {
+                var norm = ContractParser.NormalizeTitle(missionTitle);
+                if (norm.Length >= 4)
+                {
+                    matchContract = ActiveContracts.FirstOrDefault(c =>
+                    {
+                        var cNorm = ContractParser.NormalizeTitle(c.Title);
+                        return cNorm.Contains(norm) || norm.Contains(cNorm);
+                    });
+                }
+            }
+        }
+
+        // NUR entfernen, wenn tatsächlich ein passender aktiver Auftrag gefunden wurde!
+        if (matchContract != null)
+        {
+            var reward = matchContract.Reward;
+            var completedTitle = matchContract.Title;
+
+            ActiveContracts.Remove(matchContract);
+            Database.RemoveContract(matchContract.Title, matchContract.Reward);
+            OnPropertyChanged(nameof(HasActiveContracts));
+            OnPropertyChanged(nameof(ActiveContractsCountText));
+
+            if (ActiveContracts.Count > 0)
+            {
+                var next = ActiveContracts[0];
+                ActiveContractTitle = next.Title;
+                ActiveContractRewardText = next.RewardText;
+                ActiveContractOrg = next.ContractedBy;
+                HasActiveContract = true;
+                ContractStatusText = $"✓ {ActiveContracts.Count} Auftrag/Aufträge";
+            }
+            else
+            {
+                HasActiveContract = false;
+                ActiveContractTitle = "— Kein aktiver Auftrag —";
+                ActiveContractRewardText = "—";
+                ActiveContractOrg = "";
+                ContractStatusText = "Alle Aufträge abgeschlossen";
+            }
+
+            if (reward > 0)
+            {
+                Status = $"★ Auftrag abgeschlossen & Belohnung verbucht: {completedTitle} · +{reward:N0} aUEC";
+            }
+            else
+            {
+                Status = $"★ Auftrag abgeschlossen: {completedTitle}";
+            }
+        }
+    }
+
+    private void HandleMissionCancelled(string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail)) return;
+
+        var missionTitle = detail;
+        foreach (var prefix in new[]
+        {
+            "Contract Abandoned: ", "Contract Abandoned:",
+            "Contract Failed: ", "Contract Failed:",
+            "Contract Withdrawn: ", "Contract Withdrawn:",
+            "Contract Cancelled: ", "Contract Cancelled:",
+            "Auftrag abgebrochen: ", "Auftrag abgebrochen",
+            "Auftrag aufgegeben: ", "Auftrag aufgegeben",
+            "Auftrag fehlgeschlagen: ", "Auftrag fehlgeschlagen",
+            "Auftrag zurückgezogen: ", "Auftrag zurückgezogen"
+        })
+        {
+            if (missionTitle.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                missionTitle = missionTitle[prefix.Length..].Trim();
+                break;
+            }
+        }
+
+        ContractDetails? matchContract = null;
+        if (!string.IsNullOrWhiteSpace(missionTitle))
+        {
+            var dummy = new ContractDetails { Title = missionTitle };
+            matchContract = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, dummy));
+            if (matchContract == null)
+            {
+                var norm = ContractParser.NormalizeTitle(missionTitle);
+                if (norm.Length >= 4)
+                {
+                    matchContract = ActiveContracts.FirstOrDefault(c =>
+                    {
+                        var cNorm = ContractParser.NormalizeTitle(c.Title);
+                        return cNorm.Contains(norm) || norm.Contains(cNorm);
+                    });
+                }
+            }
+        }
+
+        if (matchContract != null)
+        {
+            var title = matchContract.Title;
+            ActiveContracts.Remove(matchContract);
+            Database.RemoveContract(matchContract.Title, matchContract.Reward);
+            OnPropertyChanged(nameof(HasActiveContracts));
+            OnPropertyChanged(nameof(ActiveContractsCountText));
+
+            if (ActiveContracts.Count > 0)
+            {
+                var next = ActiveContracts[0];
+                ActiveContractTitle = next.Title;
+                ActiveContractRewardText = next.RewardText;
+                ActiveContractOrg = next.ContractedBy;
+                HasActiveContract = true;
+                ContractStatusText = $"✓ {ActiveContracts.Count} Auftrag/Aufträge";
+            }
+            else
+            {
+                HasActiveContract = false;
+                ActiveContractTitle = "— Kein aktiver Auftrag —";
+                ActiveContractRewardText = "—";
+                ActiveContractOrg = "";
+                ContractStatusText = "Keine aktiven Aufträge";
+            }
+
+            Status = $"✕ Auftrag abgebrochen/aufgegeben: {title}";
+        }
+        else
+        {
+            Status = $"✕ {detail}";
+        }
+    }
+
+    private void HandleMissionAccepted(string? detail, long reward = 0)
+    {
+        if (string.IsNullOrWhiteSpace(detail)) return;
+
+        var prefixes = new[] {
+            "Contract Accepted: ", "Contract Accepted:",
+            "Contract Shared: ", "Contract Shared:",
+            "Auftrag angenommen: ", "Auftrag angenommen",
+            "Auftrag geteilt: ", "Auftrag geteilt"
+        };
+
+        string? matchedPrefix = null;
+        foreach (var prefix in prefixes)
+        {
+            if (detail.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                matchedPrefix = prefix;
+                break;
+            }
+        }
+
+        // NUR Meldungen mit explizitem Contract-Prefix verarbeiten (z. B. "Contract Accepted: ...")
+        if (matchedPrefix == null) return;
+
+        var missionTitle = detail[matchedPrefix.Length..].Trim();
+        var norm = ContractParser.NormalizeTitle(missionTitle);
+        if (norm.Length < 3) return;
+
+        // Aus Missionskatalog Details & Belohnung nachschlagen
+        var cat = MissionCatalog.FuzzyLookup(missionTitle);
+        int finalReward = (int)(reward > 0 ? reward : (cat?.BaseReward ?? 0));
+        string org = cat != null && !string.IsNullOrEmpty(cat.Contractor) ? cat.Contractor : (cat?.Faction ?? "Recco Battaglia");
+
+        var contract = new ContractDetails
+        {
+            Title = cat?.Title ?? missionTitle,
+            Reward = finalReward,
+            ContractedBy = org,
+            ScannedAt = DateTime.UtcNow
+        };
+
+        // Deduplizierung: Gibt es den Auftrag schon in der aktiven Liste?
+        var existing = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, contract));
+        if (existing != null)
+        {
+            if (finalReward > 0 && existing.Reward <= 0)
+            {
+                existing.Reward = finalReward;
+                Database.SaveContract(existing);
+            }
+            return;
+        }
+
+        ActiveContracts.Insert(0, contract);
+        if (ActiveContracts.Count > 25) ActiveContracts.RemoveAt(ActiveContracts.Count - 1);
+
+        Database.SaveContract(contract);
+        _knownContracts[norm] = finalReward;
+
+        HasActiveContract = true;
+        ActiveContractTitle = contract.Title;
+        ActiveContractRewardText = contract.RewardText;
+        ActiveContractOrg = contract.ContractedBy;
+        ContractStatusText = ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
+
+        OnPropertyChanged(nameof(HasActiveContracts));
+        OnPropertyChanged(nameof(ActiveContractsCountText));
+        Status = $"★ Auftrag angenommen: {contract.Title} · {contract.RewardText}";
+    }
+
+    [RelayCommand]
+    public void OpenMissionsTab()
+    {
+        SelectedTabIndex = 2; // Tab '❖ Missionen'
     }
 
     // Item-Namen live über UEX nachladen und den Eintrag aktualisieren.
@@ -1104,5 +2348,286 @@ public partial class MainViewModel : ObservableObject
     {
         var dir = Path.GetDirectoryName(path);
         return dir is null ? path : Path.GetFileName(dir);
+    }
+
+    partial void OnCurrentLocationChanged(string value)
+    {
+        ResolvedLocation = StarmapData.Resolve(value);
+        if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
+        {
+            SelectedStarmapSystem = ResolvedLocation.SystemName;
+        }
+        OnPropertyChanged(nameof(LocationSystemBadge));
+        OnPropertyChanged(nameof(LocationBadgeColor));
+        OnPropertyChanged(nameof(LocationMainText));
+        OnPropertyChanged(nameof(LocationStatusSubline));
+        OnPropertyChanged(nameof(SearchStarmapResults));
+    }
+
+    partial void OnSelectedStarmapSystemChanged(string value)
+    {
+        SelectedStarmapObject = null;
+        OnPropertyChanged(nameof(CurrentSystemObjects));
+        OnPropertyChanged(nameof(SearchStarmapResults));
+    }
+
+    partial void OnStarmapSearchTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(SearchStarmapResults));
+    }
+
+    async partial void OnSelectedStarmapObjectChanged(StarmapObject? value)
+    {
+        if (value == null)
+        {
+            SelectedStarmapUexInfo = null;
+            return;
+        }
+        SelectedStarmapUexInfo = await UexApiClient.LookupLocationAsync(value.Name);
+    }
+
+    [RelayCommand]
+    private void SelectStarmapSystem(string system)
+    {
+        SelectedStarmapSystem = system;
+    }
+
+    [RelayCommand]
+    private void SelectStarmapObject(StarmapObject? obj)
+    {
+        SelectedStarmapObject = obj;
+    }
+
+    [RelayCommand]
+    private void OpenStarmapForCurrentLocation()
+    {
+        if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
+        {
+            SelectedStarmapSystem = ResolvedLocation.SystemName;
+        }
+        SelectedStarmapObject = StarmapData.FindObject(ResolvedLocation.DisplayName) ?? StarmapData.FindObject(ResolvedLocation.ParentBody);
+        SelectedTabIndex = 3; // Neuer Tab '🗺 Karte'
+    }
+
+    [RelayCommand]
+    private void LookupStarmapOnUex()
+    {
+        var target = SelectedStarmapObject?.Name ?? ResolvedLocation.DisplayName;
+        if (string.IsNullOrWhiteSpace(target) || target == "—") return;
+        var url = "https://uexcorp.space/trade/price_finder?location=" + Uri.EscapeDataString(target);
+        OpenUrl(url);
+    }
+
+    async partial void OnCurrentShipChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "—")
+        {
+            CurrentShipWiki = null;
+            return;
+        }
+        CurrentShipWiki = await WikiApiClient.LookupAsync(value);
+    }
+
+    [RelayCommand]
+    public async Task OpenWiki(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query == "—") return;
+        IsWikiLoading = true;
+        IsWikiOverlayOpen = true;
+        WikiImageBitmap = null;
+        try
+        {
+            SelectedWikiInfo = await WikiApiClient.LookupAsync(query);
+            if (SelectedWikiInfo != null)
+            {
+                var imgUrl = !string.IsNullOrEmpty(SelectedWikiInfo.ImageUrl) ? SelectedWikiInfo.ImageUrl : SelectedWikiInfo.ThumbnailUrl;
+                if (!string.IsNullOrEmpty(imgUrl))
+                {
+                    WikiImageBitmap = await ImageLoaderService.LoadBitmapAsync(imgUrl);
+                }
+            }
+        }
+        catch { /* ignore */ }
+        finally
+        {
+            IsWikiLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ShowShipWiki()
+    {
+        var target = CurrentShip != "—" ? CurrentShip : SelectedWikiInfo?.Name ?? "";
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            await OpenWiki(target);
+        }
+    }
+
+    [RelayCommand]
+    private async Task LookupWikiForEntry(LogEntry? entry)
+    {
+        var target = entry?.Detail ?? SelectedEntry?.Detail;
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            await OpenWiki(target);
+        }
+    }
+
+    [RelayCommand]
+    private void CloseWikiOverlay()
+    {
+        IsWikiOverlayOpen = false;
+        WikiImageBitmap = null;
+    }
+
+    [RelayCommand]
+    private void OpenWikiWebUrl(string? url)
+    {
+        var target = url ?? SelectedWikiInfo?.WebUrl;
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            OpenUrl(target);
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleOverlay()
+    {
+        IsOverlayActive = !IsOverlayActive;
+    }
+
+    partial void OnIsOverlayActiveChanged(bool value)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (value)
+            {
+                if (_overlayWindow == null)
+                {
+                    _overlayWindow = new Views.FloatingOverlayWindow { DataContext = this };
+                    _overlayWindow.InitSettings(_settings);
+                }
+                _overlayWindow.Show();
+                _settings.OverlayEnabled = true;
+                Settings.Save(_settings);
+            }
+            else
+            {
+                _overlayWindow?.Hide();
+                _settings.OverlayEnabled = false;
+                Settings.Save(_settings);
+            }
+        });
+    }
+
+    partial void OnOverlayOpacityChanged(double value)
+    {
+        if (_overlayWindow != null)
+        {
+            _overlayWindow.Opacity = Math.Clamp(value, 0.3, 1.0);
+            _settings.OverlayOpacity = value;
+            Settings.Save(_settings);
+        }
+    }
+
+    public void TriggerAchievementToast(AchievementToastData toast)
+    {
+        if (!ToastOverlayEnabled) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_toastWindow == null)
+            {
+                _toastWindow = new Views.AchievementToastWindow();
+                _toastWindow.InitSettings(_settings);
+            }
+            _toastWindow.ShowToast(toast, _settings.ToastDurationSeconds);
+        });
+    }
+
+    private int _testToastCounter;
+
+    [RelayCommand]
+    public void TestAchievementToast()
+    {
+        _testToastCounter++;
+        switch (_testToastCounter % 3)
+        {
+            case 1:
+                TriggerAchievementToast(AchievementToastData.ForBlueprint("Strata Helmet Levski Edition"));
+                break;
+            case 2:
+                TriggerAchievementToast(AchievementToastData.ForMissionReward("Missing Mining Team", 26750));
+                break;
+            case 0:
+                TriggerAchievementToast(AchievementToastData.ForLoot("Pyro RYT Multi-Tool (Ghost Edition)"));
+                break;
+        }
+        Status = "✦ Achievement-Banner Test ausgelöst – klicke und ziehe das Banner zum Verschieben!";
+    }
+
+    [RelayCommand]
+    public void ToggleToastOverlay()
+    {
+        ToastOverlayEnabled = !ToastOverlayEnabled;
+        _settings.ToastEnabled = ToastOverlayEnabled;
+        Settings.Save(_settings);
+        Status = ToastOverlayEnabled ? "✦ Achievement-Banner aktiviert" : "Achievement-Banner deaktiviert";
+    }
+
+    [RelayCommand]
+    public async Task SaveAndTestUexApiKey()
+    {
+        _settings.UexApiKey = UexApiKeyInput?.Trim();
+        Settings.Save(_settings);
+        UexApiClient.SetApiKey(_settings.UexApiKey);
+        UexStatusMessage = "Prüfe Verbindung zu UEX API…";
+        UexStatusColor = "#38BDF8";
+        var (ok, msg) = await UexApiClient.TestConnectionAsync();
+        UexStatusMessage = msg;
+        UexStatusColor = ok ? "#4ADE80" : "#F87171";
+    }
+
+    partial void OnBlueprintSearchTextChanged(string value) => RefreshBlueprintFilter();
+    partial void OnSelectedBlueprintCategoryChanged(string value) => RefreshBlueprintFilter();
+
+    public void RefreshBlueprintFilter()
+    {
+        BlueprintsView?.Refresh();
+    }
+
+    [RelayCommand]
+    public void SelectBlueprintCategory(string category)
+    {
+        SelectedBlueprintCategory = category;
+    }
+
+    public void SyncBlueprints()
+    {
+        var dbBps = Database.AllBlueprintEvents();
+        var liveBps = Events.Where(e => e.Kind == EventKind.Blueprint);
+        var allBps = dbBps.Concat(liveBps).ToList();
+
+        BlueprintCatalog.Sync(BlueprintCatalogList, allBps);
+        OnPropertyChanged(nameof(LearnedBlueprintsCount));
+        OnPropertyChanged(nameof(MissingBlueprintsCount));
+        OnPropertyChanged(nameof(TotalBlueprintsCount));
+        OnPropertyChanged(nameof(BlueprintProgressPercent));
+        OnPropertyChanged(nameof(BlueprintProgressText));
+        BlueprintsView?.Refresh();
+    }
+
+    partial void OnMissionSearchTextChanged(string value) => RefreshMissionFilter();
+    partial void OnSelectedMissionTypeChanged(string value) => RefreshMissionFilter();
+
+    public void RefreshMissionFilter()
+    {
+        MissionsView?.Refresh();
+    }
+
+    [RelayCommand]
+    public void SelectMissionType(string type)
+    {
+        SelectedMissionType = type;
     }
 }

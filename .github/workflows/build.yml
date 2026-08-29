@@ -1,0 +1,46 @@
+name: CI Build & Test
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          10.0.x
+          9.0.x
+        dotnet-quality: 'preview'
+
+    - name: Restore dependencies
+      run: dotnet restore SCLogReader.csproj
+
+    - name: Build Project (Release)
+      run: dotnet build SCLogReader.csproj -c Release --no-restore
+
+    - name: Publish Single-File Executable
+      run: |
+        dotnet publish SCLogReader.csproj -c Release -r win-x64 --self-contained true `
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
+          -o ./publish
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SCLogMate-win-x64
+        path: ./publish/SCLogMate.exe
+        if-no-files-found: error

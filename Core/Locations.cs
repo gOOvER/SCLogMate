@@ -40,15 +40,35 @@ public static class Locations
         ["RR_ARC_LEO"] = "Baijini Point · ArcCorp",
         ["RR_MIC_LEO"] = "Port Tressler · microTech",
         ["RR_CRU_LEO"] = "Seraphim Station · Crusader",
-        // Planeten / Städte
+        // Planeten / Städte / Landing Zones
         ["Stanton1_Lorville"] = "Lorville · Hurston",
+        ["Lorville"] = "Lorville · Hurston",
+        ["EverusHarbor"] = "Everus Harbor · Hurston",
         ["Stanton2_Orison"] = "Orison · Crusader",
+        ["Orison"] = "Orison · Crusader",
+        ["SeraphimStation"] = "Seraphim Station · Crusader",
+        ["Stanton2b_GrimHEX"] = "Grim HEX · Yela",
+        ["GrimHEX"] = "Grim HEX · Yela",
+        ["Stanton3_Area18"] = "Area 18 · ArcCorp",
+        ["Area18"] = "Area 18 · ArcCorp",
+        ["BaijiniPoint"] = "Baijini Point · ArcCorp",
+        ["Stanton4_NewBabbage"] = "New Babbage · microTech",
+        ["NewBabbage"] = "New Babbage · microTech",
+        ["PortTressler"] = "Port Tressler · microTech",
         ["Stanton1_HurdynMining_HDMSOparei"] = "HDMS-Oparei · Hurston",
         ["Stanton1_DistributionCentre_Hurston_Cassillo"] = "Verteilzentrum Cassillo · Hurston",
         ["Stanton2c_RayariHydro_DeakinsResearch"] = "Rayari Deakins Research · Yela",
         ["Stanton4a_RayariHydro_Anvik"] = "Rayari Anvik Research · Calliope",
         ["Stanton4a_RayariHydro_Kaltag"] = "Rayari Kaltag Research · Calliope",
-        ["AsteroidClusterBase_Nyx_Social_Keeger_002"] = "Asteroidenbasis Keeger · Nyx",
+        // Nyx & Pyro
+        ["Nyx_Levski"] = "Levski · Delamar",
+        ["Delamar_Levski"] = "Levski · Delamar",
+        ["Levski"] = "Levski · Delamar",
+        ["AsteroidClusterBase_Nyx_Social_Keeger_001"] = "Keeger Depot · Nyx",
+        ["AsteroidClusterBase_Nyx_Social_Keeger_002"] = "Keeger Depot · Nyx",
+        ["Pyro2_Checkmate"] = "Checkmate Station · Monox",
+        ["Pyro3_Orbituary"] = "Orbituary · Bloom",
+        ["Pyro6_RuinStation"] = "Ruin Station · Terminus",
     };
 
     static readonly Regex Lagrange = new(@"^RR_(?<sys>[A-Z]{3})_L(?<n>\d)$", RegexOptions.Compiled);
@@ -57,7 +77,38 @@ public static class Locations
 
     public static string Resolve(string code)
     {
+        if (string.IsNullOrWhiteSpace(code)) return "—";
         if (Map.TryGetValue(code, out var name)) return name;
+
+        // Keeger & Nyx Asteroid Clusters
+        if (code.Contains("Keeger", System.StringComparison.OrdinalIgnoreCase))
+            return "Keeger Depot · Nyx";
+
+        // Wikelo Emporium / Sammler
+        if (code.Contains("TheCollectorsAsteriod_Stanton1", System.StringComparison.OrdinalIgnoreCase))
+            return "Wikelo Emporium (Dasi) · Hurston";
+        if (code.Contains("TheCollectorsAsteriod_Stanton2", System.StringComparison.OrdinalIgnoreCase))
+            return "Wikelo Emporium (Selo) · Crusader";
+        if (code.Contains("TheCollectorsAsteriod_Stanton4", System.StringComparison.OrdinalIgnoreCase))
+            return "Wikelo Emporium (Kinga) · microTech";
+        if (code.Contains("TheCollectorsAsteriod", System.StringComparison.OrdinalIgnoreCase))
+            return "Wikelo Emporium · Asteroid";
+
+        // Contested Zones (Pyro)
+        if (code.Contains("contestedzone", System.StringComparison.OrdinalIgnoreCase))
+            return "Umkämpfte Zone (Contested Zone) · Pyro";
+
+        // Höhlen & Untergrund
+        if (code.Contains("Cave_Unoccupied_Stanton1d", System.StringComparison.OrdinalIgnoreCase))
+            return "Höhle · Ita (Hurston)";
+        if (code.Contains("Cave_", System.StringComparison.OrdinalIgnoreCase))
+            return "Höhlensystem";
+
+        // Hangars
+        if (code.Contains("HangarMedium_Nyx", System.StringComparison.OrdinalIgnoreCase) || code.Contains("HangarLarge_Nyx", System.StringComparison.OrdinalIgnoreCase))
+            return "Hangar · Nyx";
+        if (code.Contains("Hangar", System.StringComparison.OrdinalIgnoreCase) && code.Contains("Nyx", System.StringComparison.OrdinalIgnoreCase))
+            return "Hangar · Nyx";
 
         var jp = Jump.Match(code);
         if (jp.Success)

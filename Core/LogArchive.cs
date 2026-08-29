@@ -12,8 +12,7 @@ namespace SCLogReader.Core;
 /// </summary>
 public static class LogArchive
 {
-    public static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogReader", "archive");
+    public static string Dir => Path.Combine(Settings.Dir, "archive");
 
     /// <summary>Kopiert neue Backups ins Archiv. Gibt ALLE Archiv-Logpfade zurück.</summary>
     public static List<string> Sync(IEnumerable<string> backupFiles)

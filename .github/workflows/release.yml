@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          10.0.x
+          9.0.x
+        dotnet-quality: 'preview'
+
+    - name: Restore dependencies
+      run: dotnet restore SCLogReader.csproj
+
+    - name: Publish Single-File Executable
+      run: |
+        dotnet publish SCLogReader.csproj -c Release -r win-x64 --self-contained true `
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
+          -o ./publish
+
+    - name: Prepare Release Assets & Checksums
+      shell: pwsh
+      run: |
+        $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "${{ github.event.inputs.tag_name }}" }
+        $exe = "./publish/SCLogMate.exe"
+        
+        # Create Zip bundle
+        Compress-Archive -Path $exe -DestinationPath "./publish/SCLogMate-$tag-win-x64.zip" -Force
+
+        # Generate SHA256 Checksums
+        $exeHash = (Get-FileHash $exe -Algorithm SHA256).Hash
+        $zipHash = (Get-FileHash "./publish/SCLogMate-$tag-win-x64.zip" -Algorithm SHA256).Hash
+
+        $checksums = @"
+        $exeHash  SCLogMate.exe
+        $zipHash  SCLogMate-$tag-win-x64.zip
+        "@
+
+        Set-Content -Path "./publish/SHA256SUMS.txt" -Value $checksums -Encoding UTF8
+
+    - name: Extract Release Notes from CHANGELOG
+      id: extract_notes
+      shell: pwsh
+      run: |
+        $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "${{ github.event.inputs.tag_name }}" }
+        $ver = $tag.TrimStart('v')
+        $cl = Get-Content CHANGELOG.md -Raw
+        $verPat = "(?ms)^## \[$([regex]::Escape($ver))\][^\r\n]*\r?\n(.*?)(?=^## \[|^# Archive:|\z)"
+        if ($cl -match $verPat) {
+            $notes = $Matches[1].Trim()
+        } else {
+            $notes = "Release $tag of SCLogMate."
+        }
+        $notes += "`r`n`r`n---`r`n📋 Full Changelog: https://github.com/gOOvER/SCLogMate/blob/main/CHANGELOG.md"
+        Set-Content -Path "./publish/RELEASE_NOTES.md" -Value $notes -Encoding UTF8
+
+    - name: Publish GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: ${{ github.ref_name || github.event.inputs.tag_name }}
+        tag_name: ${{ github.ref_name || github.event.inputs.tag_name }}
+        body_path: ./publish/RELEASE_NOTES.md
+        draft: false
+        prerelease: false
+        files: |
+          ./publish/SCLogMate.exe
+          ./publish/SCLogMate-*.zip
+          ./publish/SHA256SUMS.txt

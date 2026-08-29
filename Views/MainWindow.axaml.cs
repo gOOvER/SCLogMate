@@ -17,4 +17,13 @@ public partial class MainWindow : Window
         if (DataContext is ViewModels.MainViewModel vm && vm.LookupCommand.CanExecute(null))
             vm.LookupCommand.Execute(null);
     }
+
+    void OnBalanceKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Enter && DataContext is ViewModels.MainViewModel vm)
+        {
+            if (vm.SetBalanceCommand.CanExecute(null))
+                vm.SetBalanceCommand.Execute(null);
+        }
+    }
 }

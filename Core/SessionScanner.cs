@@ -22,9 +22,10 @@ public class SessionInfo
 /// Findet alle Sessions: die aktuelle Game.log + alle logbackups daneben.
 /// Startzeit wird aus dem Datei-Header gelesen (erster Zeitstempel).
 /// </summary>
-public static class SessionScanner
+public static partial class SessionScanner
 {
-    static readonly Regex Ts = new(@"<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>", RegexOptions.Compiled);
+    [GeneratedRegex(@"<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>")]
+    private static partial Regex TsRegex();
 
     public static List<SessionInfo> Scan(string gameLogPath)
     {
@@ -72,7 +73,7 @@ public static class SessionScanner
             {
                 var line = sr.ReadLine();
                 if (line == null) break;
-                var m = Ts.Match(line);
+                var m = TsRegex().Match(line);
                 if (m.Success && DateTime.TryParse(m.Groups["ts"].Value, CultureInfo.InvariantCulture,
                         DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt))
                     return dt;

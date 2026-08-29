@@ -15,7 +15,7 @@ namespace SCLogReader.Core;
 /// </summary>
 public static class Updater
 {
-    const string Repo = "miwidot/SCLogReader";
+    const string Repo = "gOOvER/SCLogMate";
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
@@ -31,7 +31,7 @@ public static class Updater
         {
             using var req = new HttpRequestMessage(HttpMethod.Get,
                 $"https://api.github.com/repos/{Repo}/releases/latest");
-            req.Headers.UserAgent.ParseAdd("SCLogReader");
+            req.Headers.UserAgent.ParseAdd("SCLogMate");
             req.Headers.Accept.ParseAdd("application/vnd.github+json");
 
             using var resp = await Http.SendAsync(req);

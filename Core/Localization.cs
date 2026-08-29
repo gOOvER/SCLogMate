@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace SCLogReader.Core;
@@ -49,7 +50,7 @@ public static class Localization
     static string ItemBase(string cls)
     {
         var segs = new List<string>(cls.ToLowerInvariant().Split('_', StringSplitOptions.RemoveEmptyEntries));
-        while (segs.Count > 2 && Regex.IsMatch(segs[^1], @"\d")) segs.RemoveAt(segs.Count - 1);
+        while (segs.Count > 2 && segs[^1].Any(char.IsDigit)) segs.RemoveAt(segs.Count - 1);
         return string.Join('_', segs);
     }
 
@@ -88,9 +89,19 @@ public static class Localization
         {
             var root = FindGameRoot(logPath);
             if (root == null) return null;
-            var deFile = Path.Combine(root, "data", "Localization", "german_(germany)", "global.ini");
+
+            string[] possibleDePaths = new[]
+            {
+                Path.Combine(root, "data", "Localization", "german_(germany)", "global.ini"),
+                Path.Combine(root, "data", "Localization", "german", "global.ini"),
+                Path.Combine(root, "data", "Localization", "deutsch", "global.ini"),
+                Path.Combine(root, "data", "Localization", "de_DE", "global.ini"),
+                Path.Combine(root, "data", "Localization", "de", "global.ini")
+            };
+
+            var deFile = possibleDePaths.FirstOrDefault(File.Exists);
             var enFile = Path.Combine(root, "data", "Localization", "english", "global.ini");
-            if (!File.Exists(deFile) || !File.Exists(enFile)) return null;
+            if (deFile == null || !File.Exists(enFile)) return null;
 
             var enByKey = ReadIni(enFile);                              // Key → englischer Wert
             var deToEn = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -98,7 +109,7 @@ public static class Localization
                 if (!deToEn.ContainsKey(deVal) && enByKey.TryGetValue(key, out var enVal) && enVal != deVal)
                     deToEn[deVal] = enVal;
             _deToEn = deToEn;
-            Logger.Log($"Localization: {deToEn.Count} DE→EN Einträge geladen.");
+            Logger.Log($"Localization: {deToEn.Count} DE→EN Einträge aus '{Path.GetFileName(Path.GetDirectoryName(deFile))}' geladen.");
         }
         catch (Exception ex) { Logger.Error("Localization", ex); }
         return _deToEn;

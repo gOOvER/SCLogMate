@@ -9,7 +9,7 @@ namespace SCLogReader.Core;
 /// Macht aus internen Schiffs-Codes (CRUS_Starlifter_A2_Unmanned_Salvage)
 /// lesbare Namen ("Starlifter A2 Salvage · Crusader").
 /// </summary>
-public static class Ships
+public static partial class Ships
 {
     static readonly Dictionary<string, string> Brands = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -42,13 +42,14 @@ public static class Ships
         "Unmanned", "PU", "AI", "S42", "Template", "Modified"
     };
 
-    static readonly Regex TrailingId = new(@"_\d{4,}$", RegexOptions.Compiled);
+    [GeneratedRegex(@"_\d{4,}$")]
+    private static partial Regex TrailingIdRegex();
 
     public static string Prettify(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return raw;
 
-        var name = TrailingId.Replace(raw, "");
+        var name = TrailingIdRegex().Replace(raw, "");
         var parts = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0) return raw;
 

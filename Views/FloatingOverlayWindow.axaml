@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:SCLogReader.ViewModels"
+        xmlns:conv="using:SCLogReader.Converters"
+        mc:Ignorable="d"
+        x:Class="SCLogReader.Views.FloatingOverlayWindow"
+        x:DataType="vm:MainViewModel"
+        Title="SCLogMate Live HUD"
+        Width="310" Height="136"
+        SystemDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        WindowStartupLocation="Manual">
+
+  <Window.Resources>
+    <conv:AmountToBrushConverter x:Key="AmountBrush" />
+  </Window.Resources>
+
+  <Border Margin="4"
+          Background="#E60D1117"
+          BorderBrush="#38BDF8"
+          BorderThickness="1.2"
+          CornerRadius="7"
+          BoxShadow="0 4 16 #80000000"
+          PointerPressed="OnBorderPointerPressed">
+    <Grid Margin="10,8" RowDefinitions="Auto,*,Auto">
+
+      <!-- Header: Drag-Griff, Server, Ping & Schließen -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="⋮⋮" FontSize="11" Foreground="#484F58" VerticalAlignment="Center" ToolTip.Tip="Gedrückt halten &amp; ziehen zum Verschieben" />
+          <TextBlock Text="{Binding ServerSublineText}" FontSize="10" Foreground="#8B949E" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Ping & Schließen -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+            <TextBlock Text="📶" FontSize="8" VerticalAlignment="Center" Foreground="{Binding ServerPingColor}" />
+            <TextBlock Text="{Binding ServerPingText}" FontSize="10" FontWeight="Bold" Foreground="{Binding ServerPingColor}" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Classes="ghost" Padding="4,1" CornerRadius="3" Background="#21262D" Click="OnCloseClicked" ToolTip.Tip="Overlay ausblenden">
+            <TextBlock Text="✕" FontSize="9" Foreground="#8B949E" />
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <!-- Mitte: Live-Kontostand (aUEC) & Session-Verdienst -->
+      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="0,4,0,4">
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LiveBalanceText}" FontSize="17" FontWeight="Bold" Foreground="#F0F6FC" FontFamily="Cascadia Code, Consolas, monospace" />
+          <TextBlock Text="{Binding SessionNetText, StringFormat='Saldo: {0}'}" FontSize="10.5" FontWeight="SemiBold" Foreground="{Binding SessionNetSign, Converter={StaticResource AmountBrush}}" FontFamily="Cascadia Code, Consolas, monospace" />
+        </StackPanel>
+
+        <!-- Status-Badge -->
+        <Border Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,3" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LocationSystemBadge}" FontSize="10" FontWeight="Bold" Foreground="{Binding LocationBadgeColor}" />
+        </Border>
+      </Grid>
+
+      <!-- Footer: Standort & Aktiver Auftrag -->
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding LocationMainText}" FontSize="10.5" Foreground="#E2E8F0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding ActiveContractsCountText}" FontSize="9.5" Foreground="#F59E0B" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center" />
+      </Grid>
+
+    </Grid>
+  </Border>
+</Window>
