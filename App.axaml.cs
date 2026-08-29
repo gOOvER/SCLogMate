@@ -13,7 +13,16 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow { DataContext = new MainViewModel() };
+        {
+            var mainWin = new MainWindow { DataContext = new MainViewModel() };
+            desktop.MainWindow = mainWin;
+
+            bool startMinimized = desktop.Args != null && System.Linq.Enumerable.Contains(desktop.Args, "--minimized", System.StringComparer.OrdinalIgnoreCase);
+            if (startMinimized)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => mainWin.Hide(), Avalonia.Threading.DispatcherPriority.Loaded);
+            }
+        }
 
         base.OnFrameworkInitializationCompleted();
     }

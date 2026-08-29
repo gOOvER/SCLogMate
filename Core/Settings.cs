@@ -53,6 +53,9 @@ public class AppSettings
 
     /// <summary>Beim Klick auf das Schließen-Kreuz (X) ins Tray minimieren (sonst App direkt beenden).</summary>
     public bool MinimizeToTrayOnClose { get; set; } = true;
+
+    /// <summary>Mit Windows automatisch starten (minimiert ins System-Tray).</summary>
+    public bool AutostartEnabled { get; set; } = false;
 }
 
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>

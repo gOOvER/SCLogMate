@@ -119,8 +119,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool toastOverlayEnabled = true;
     private Views.AchievementToastWindow? _toastWindow;
 
-    // Fenster-Verhalten
+    // Fenster- & System-Verhalten
     [ObservableProperty] private bool minimizeToTrayOnClose = true;
+    [ObservableProperty] private bool autostartEnabled = false;
+
+    // Ereignis-Volltextsuche
+    [ObservableProperty] private string eventSearchText = "";
 
     // Bauplan-Datenbank (Crafting Blueprints)
     public ObservableCollection<BlueprintItem> BlueprintCatalogList { get; } = new();
@@ -1320,7 +1324,23 @@ public partial class MainViewModel : ObservableObject
 
         EventsView = new DataGridCollectionView(Events)
         {
-            Filter = o => _activeKinds == null || (o is LogEntry e && _activeKinds.Contains(e.Kind))
+            Filter = o =>
+            {
+                if (o is not LogEntry e) return true;
+                if (_activeKinds != null && !_activeKinds.Contains(e.Kind)) return false;
+                if (!string.IsNullOrWhiteSpace(EventSearchText))
+                {
+                    if (!e.Detail.Contains(EventSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !e.KindText.Contains(EventSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !e.TimeText.Contains(EventSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !e.AmountText.Contains(EventSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !(e.Ship?.Contains(EventSearchText, StringComparison.OrdinalIgnoreCase) == true))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
         };
 
         foreach (var bp in BlueprintCatalog.CreateFreshCatalog())
@@ -1386,6 +1406,7 @@ public partial class MainViewModel : ObservableObject
             IsOverlayActive = true;
         }
         MinimizeToTrayOnClose = _settings.MinimizeToTrayOnClose;
+        AutostartEnabled = AutostartHelper.IsAutostartEnabled();
 
         _walletCapture = new WalletCapture(_ocrEngine, () => _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(), () => AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
@@ -2455,6 +2476,26 @@ public partial class MainViewModel : ObservableObject
         if (_initializing || !_ready) return;
         _settings.MinimizeToTrayOnClose = value;
         Settings.Save(_settings);
+    }
+
+    partial void OnAutostartEnabledChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        AutostartHelper.SetAutostart(value);
+        _settings.AutostartEnabled = value;
+        Settings.Save(_settings);
+        Status = value ? "✓ Windows-Autostart aktiviert (minimiert ins Tray)" : "Windows-Autostart deaktiviert";
+    }
+
+    partial void OnEventSearchTextChanged(string value)
+    {
+        EventsView?.Refresh();
+    }
+
+    [RelayCommand]
+    public void ClearEventSearch()
+    {
+        EventSearchText = "";
     }
 
     [RelayCommand]

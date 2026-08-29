@@ -305,29 +305,44 @@
     <TabItem Header="📜  Ereignisse" FontSize="13">
     <DockPanel Margin="0,8,0,0">
 
-    <!-- Filter-Chips (Schlank & Aufgeräumt) -->
-    <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,10">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <Button Classes="chip" Content="Alle" Command="{Binding SetFilterCommand}" CommandParameter="Alle"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
-        <Button Classes="chip" Content="💰 Geld" Command="{Binding SetFilterCommand}" CommandParameter="Geld"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Geld}" />
-        <Button Classes="chip" Content="📋 Aufträge" Command="{Binding SetFilterCommand}" CommandParameter="Aufträge"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Aufträge}" />
-        <Button Classes="chip" Content="⬡ Baupläne" Command="{Binding SetFilterCommand}" CommandParameter="Baupläne"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Baupläne}" />
-        <Button Classes="chip" Content="✈ Schiffe" Command="{Binding SetFilterCommand}" CommandParameter="Schiffe"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Schiffe}" />
-        <Button Classes="chip" Content="◉ Orte" Command="{Binding SetFilterCommand}" CommandParameter="Orte"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
-        <Button Classes="chip" Content="♟ Crew" Command="{Binding SetFilterCommand}" CommandParameter="Crew"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Crew}" />
-        <Button Classes="chip" Content="◈ Loot" Command="{Binding SetFilterCommand}" CommandParameter="Loot"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Loot}" />
-        <Button Classes="chip" Content="⋯ Sonst" Command="{Binding SetFilterCommand}" CommandParameter="Sonst"
-                Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Sonst}" />
-      </StackPanel>
-    </ScrollViewer>
+    <!-- Filter-Chips & Volltext-Suche -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+      <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="chip" Content="Alle" Command="{Binding SetFilterCommand}" CommandParameter="Alle"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
+          <Button Classes="chip" Content="💰 Geld" Command="{Binding SetFilterCommand}" CommandParameter="Geld"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Geld}" />
+          <Button Classes="chip" Content="📋 Aufträge" Command="{Binding SetFilterCommand}" CommandParameter="Aufträge"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Aufträge}" />
+          <Button Classes="chip" Content="⬡ Baupläne" Command="{Binding SetFilterCommand}" CommandParameter="Baupläne"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Baupläne}" />
+          <Button Classes="chip" Content="✈ Schiffe" Command="{Binding SetFilterCommand}" CommandParameter="Schiffe"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Schiffe}" />
+          <Button Classes="chip" Content="◉ Orte" Command="{Binding SetFilterCommand}" CommandParameter="Orte"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
+          <Button Classes="chip" Content="♟ Crew" Command="{Binding SetFilterCommand}" CommandParameter="Crew"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Crew}" />
+          <Button Classes="chip" Content="◈ Loot" Command="{Binding SetFilterCommand}" CommandParameter="Loot"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Loot}" />
+          <Button Classes="chip" Content="⋯ Sonst" Command="{Binding SetFilterCommand}" CommandParameter="Sonst"
+                  Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Sonst}" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Schnellsuche mit Clear-Button -->
+      <Border Grid.Column="1" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6"
+              Padding="6,2" Height="30" Margin="8,0,0,0">
+        <Grid ColumnDefinitions="Auto,170,Auto">
+          <TextBlock Grid.Column="0" Text="🔎" FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" Margin="2,0,6,0" />
+          <TextBox Grid.Column="1" Classes="path" Text="{Binding EventSearchText}" Watermark="Ereignisse filtern…"
+                   Background="Transparent" BorderThickness="0" Padding="0" FontSize="11" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Classes="ghost" Padding="4,1" Margin="2,0,0,0" CornerRadius="4"
+                  Command="{Binding ClearEventSearchCommand}" IsVisible="{Binding EventSearchText.Length}"
+                  Content="✕" FontSize="10" Foreground="#8B949E" />
+        </Grid>
+      </Border>
+    </Grid>
 
     <!-- Event-Tabelle -->
     <Border Classes="card" Padding="0">
@@ -1428,12 +1443,19 @@
 
           <!-- 6. Fenster- & Schließverhalten -->
           <Border Classes="card">
-            <StackPanel Spacing="8">
-              <TextBlock Classes="label" Text="🗔  FENSTER- &amp; SCHLIESSVERHALTEN" />
+            <StackPanel Spacing="12">
+              <TextBlock Classes="label" Text="🗔  FENSTER-, TRAY- &amp; SYSTEM-VERHALTEN" />
               <CheckBox IsChecked="{Binding MinimizeToTrayOnClose}">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Beim Klick auf das Schließen-Kreuz (X) ins System-Tray minimieren" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
                   <TextBlock Text="Die App läuft im Hintergrund im Infobereich weiter (Tracking, OCR &amp; Overlays bleiben aktiv). Wenn deaktiviert, wird die App bei 'X' vollständig beendet." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+              </CheckBox>
+
+              <CheckBox IsChecked="{Binding AutostartEnabled}">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Mit Windows automatisch im Hintergrund starten (System-Tray)" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Text="Startet SCLogMate bei der Windows-Anmeldung minimiert in den Infobereich. Erkennt Star Citizen bei Spielstart sofort vollautomatisch." Foreground="#8B949E" FontSize="11" />
                 </StackPanel>
               </CheckBox>
             </StackPanel>
