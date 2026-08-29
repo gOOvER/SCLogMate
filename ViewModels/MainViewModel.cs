@@ -855,7 +855,7 @@ public partial class MainViewModel : ObservableObject
     public string SessionSpendText => $"-{LiveSessionSpend:N0} aUEC";
     public string SessionNetText => $"{(LiveSessionNet >= 0 ? "+" : "")}{LiveSessionNet:N0} aUEC";
     public long SessionNetSign => LiveSessionNet;
-    public string LiveBalanceText => StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
+    public string LiveBalanceText => ExpectedBalance > 0 ? $"{ExpectedBalance:N0} aUEC" : StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
 
     // Geld-Statistik (eigener Tab)
     public ObservableCollection<StatItem> IncomeStats { get; } = new();
