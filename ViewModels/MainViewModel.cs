@@ -116,7 +116,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double overlayOpacity = 0.92;
     private Views.FloatingOverlayWindow? _overlayWindow;
 
-    // WoW-Style In-Game Achievement & Reward Toast Banner (Völlig unabhängig vom Mini-HUD)
+    // In-Game Achievement & Reward Toast Banner (Völlig unabhängig vom Mini-HUD)
     [ObservableProperty] private bool toastOverlayEnabled = true;
     private Views.AchievementToastWindow? _toastWindow;
 

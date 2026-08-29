@@ -39,7 +39,7 @@ public class AppSettings
     /// <summary>Deckkraft des Mini-HUD Overlays (0.3 bis 1.0).</summary>
     public double OverlayOpacity { get; set; } = 0.92;
 
-    /// <summary>WoW-Style Achievement & Reward Toast Banner aktivieren.</summary>
+    /// <summary>In-Game Achievement & Reward Toast Banner aktivieren.</summary>
     public bool ToastEnabled { get; set; } = true;
 
     /// <summary>X-Position des Achievement Toast Banners (-1 = zentriert).</summary>

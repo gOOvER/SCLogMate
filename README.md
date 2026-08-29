@@ -9,7 +9,7 @@
 
 **The modern, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
 
-SCLogMate analyzes your Star Citizen `Game.log` in real-time: Finances, contracts, fleet, cargo trading, crafting blueprints, party/crew, combat kills, locations, and more. Features an In-Game Mini-HUD, WoW-style achievement toast banners, native Windows mobiGlas OCR, and persistent SQLite archiving.
+SCLogMate analyzes your Star Citizen `Game.log` in real-time: Finances, contracts, fleet, cargo trading, crafting blueprints, party/crew, combat kills, locations, and more. Features an In-Game Mini-HUD, animated achievement toast banners, native Windows mobiGlas OCR, and persistent SQLite archiving.
 
 Single standalone Windows `.exe`, no installation required, no .NET runtime setup needed.
 
@@ -28,7 +28,7 @@ Single standalone Windows `.exe`, no installation required, no .NET runtime setu
 ## ✨ Features & Highlights (English)
 
 ### ✦ In-Game Overlays (Gaming-Style)
-- **WoW-Style Achievement & Reward Toast Banner**:
+- **Achievement & Reward Toast Banner**:
   - Pops up on newly learned blueprints (`⬡ BLUEPRINT LEARNED`) and mission completions (`★ MISSION COMPLETE: +aUEC`).
   - Dynamic stacked list: Multiple sequential rewards queue neatly underneath rather than overwriting each other.
   - Operates completely autonomously and independently from the Mini-HUD, smoothly fades out after ~5.5 seconds.
@@ -100,7 +100,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 **Der moderne, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
 
-SCLogMate wertet deine Star Citizen `Game.log` in Echtzeit aus: Finanzen, Aufträge, Flotte, Frachthandel, Crafting-Baupläne, Crew, Kills, Standorte und vieles mehr. Mit In-Game Mini-HUD, Gaming-Achievement-Banner (WoW-Style), nativer mobiGlas-OCR und persistentem SQLite-Archiv.
+SCLogMate wertet deine Star Citizen `Game.log` in Echtzeit aus: Finanzen, Aufträge, Flotte, Frachthandel, Crafting-Baupläne, Crew, Kills, Standorte und vieles mehr. Mit In-Game Mini-HUD, animierten Achievement-Toast-Bannern, nativer mobiGlas-OCR und persistentem SQLite-Archiv.
 
 Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforderlich.
 
@@ -119,7 +119,7 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
 ## ✨ Features & Highlights (Deutsch)
 
 ### ✦ In-Game Overlays (Gaming-Style)
-- **WoW-Style Achievement & Reward Toast Banner**:
+- **Achievement & Reward Toast Banner**:
   - Plopt bei neuen Bauplänen (`⬡ BAUPLAN ERLERNT`) und Missionsbelohnungen (`★ AUFTRAG ABGESCHLOSSEN: +aUEC`) auf.
   - Dynamisch gestapelte Liste: Mehrere aufeinanderfolgende Erfolge überschreiben sich nicht, sondern reihen sich sauber untereinander ein.
   - Läuft völlig autonom und unabhängig vom Mini-HUD, fadet nach ~5,5 Sekunden sanft aus.

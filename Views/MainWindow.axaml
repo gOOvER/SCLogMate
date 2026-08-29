@@ -1208,12 +1208,12 @@
             </StackPanel>
           </Border>
 
-          <!-- 4. WoW-Style In-Game Achievement & Reward Toast Overlay -->
+          <!-- 4. In-Game Achievement & Reward Toast Overlay -->
           <Border Classes="card">
             <StackPanel Spacing="10">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Grid.Column="0">
-                  <TextBlock Classes="label" Text="✦  ACHIEVEMENT &amp; REWARD TOAST OVERLAY (WOW-STYLE)" />
+                  <TextBlock Classes="label" Text="✦  ACHIEVEMENT &amp; REWARD TOAST OVERLAY" />
                   <TextBlock Text="Blendet bei neuen Bauplänen und abgeschlossenen Missionsbelohnungen ein Gaming-Erfolgs-Banner im Spiel ein. Läuft völlig unabhängig vom Mini-HUD." Foreground="#8B949E" FontSize="11" Margin="0,2,0,0" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="5"
@@ -1684,7 +1684,7 @@
                 <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,8,0">
                   <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10">
                     <StackPanel Spacing="3">
-                      <TextBlock Text="✦ WoW-Style Achievement &amp; Reward Toasts" Foreground="#FBBF24" FontSize="12" FontWeight="Bold" />
+                      <TextBlock Text="✦ Achievement &amp; Reward Toast Overlay" Foreground="#FBBF24" FontSize="12" FontWeight="Bold" />
                       <TextBlock Text="Echtzeit-Banner für neu erlernte Baupläne und Missionsbelohnungen. Gestapelte Liste, frei verschiebbar, kein Fokusverlust." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
                     </StackPanel>
                   </Border>

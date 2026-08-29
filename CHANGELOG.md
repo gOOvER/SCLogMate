@@ -14,7 +14,7 @@ All notable changes to this project are documented in this file. Format based on
 - **.NET 10 & High-Performance Core**: Zero-allocation compiled Source Generator regular expressions (`[GeneratedRegex]`), SQLite WAL mode, and optimized DataGrid render pipelines.
 
 ### Gaming & HUD Overlays
-- **WoW-Style In-Game Achievement & Reward Toast Overlay**:
+- **In-Game Achievement & Reward Toast Overlay**:
   - Gaming-style achievement banners for new blueprints (`⬡ BLUEPRINT LEARNED`) and mission completions (`★ MISSION COMPLETE: +aUEC`).
   - Stacked list support: Multiple simultaneous or sequential rewards queue neatly underneath rather than overwriting each other.
   - Operates completely autonomously and independently from the Mini-HUD, smoothly fades out after ~5.5s, never steals game focus (`WS_EX_NOACTIVATE`), and can be freely repositioned anywhere on screen.
