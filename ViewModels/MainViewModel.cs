@@ -790,6 +790,7 @@ public partial class MainViewModel : ObservableObject
             Settings.Save(_settings);
 
             ManualBalance = balance.ToString("N0");
+            RecomputeBalances();
             OnPropertyChanged(nameof(LiveBalanceText));
             OnPropertyChanged(nameof(AccountText));
             _scanIndicator.FlashGreen();
