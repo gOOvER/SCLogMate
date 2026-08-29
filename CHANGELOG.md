@@ -31,25 +31,37 @@ All notable changes to this project are documented in this file. Format based on
   - **Comprehensive Status Tracking**: Detects `Accepted`, `Complete`, `Abandoned`, and `Failed` mission states in real-time.
   - **Automatic Mission Sync**: Completed, abandoned, or failed missions are immediately cleared from active contract tracking and the SQLite database.
 
-### Blueprint Database (Crafting Blueprints)
-- **New Tab: ⬡ Blueprints**:
-  - Complete master database of all SC 4.x crafting blueprints (armor, weapons, multi-tools, ammunition, ship components, medical).
-  - Learning progress tracker (`X of Y learned`, percentage display), filter chips, and acquisition timestamp history.
+### UI & Usability Innovations
+- **Visual Blueprint Progress Bar**:
+  - Emerald glowing progress bar in the ⬡ Blueprints tab reflecting crafting progression (`X of Y learned (%)`).
+- **Live Event Full-Text Search**:
+  - Instant search filter in the Events tab to filter events by ship, item, location, amount, or time, with a 1-click clear button.
+- **Glowing Pill Badges in Event Log**:
+  - High-contrast categorized pill badges with icons for every event type (Gold for Rewards, Emerald for Blueprints, Cyan for Ships, Crimson for Combat/Kills, Purple for Locations).
+- **Clipboard Copy Context Menu**:
+  - Right-click any event entry to copy detail text, amount, or the entire tab-separated row to clipboard.
+- **Dedicated "ℹ Über" Tab**:
+  - Complete brand overview, update checking center, diagnostics, and external API attributions.
 
-### mobiGlas Screenreader (Windows Native OCR)
-- **Automated aUEC Balance Capture**:
-  - Reads your genuine live balance whenever opening mobiGlas (`F1`) via native Windows OCR.
-  - **Robust Multi-Monitor Synchronization**: Pixel-perfect calibration (`⊕ Area`) and a non-intrusive in-game indicator box (`▣ Scan-Box`) with hardware DPI scaling.
+### System Integration & Window Management
+- **Windows Autostart (Minimized to Tray)**:
+  - Option in Settings to launch SCLogMate automatically on Windows login directly into the System Tray.
+- **Minimize-to-Tray on Close (X)**:
+  - Toggle in Settings to keep background tracking, OCR, and overlays running in the Tray when clicking close, or exit completely.
+- **Dynamic Armistice HUD Danger Glow**:
+  - In-Game Mini-HUD border dynamically glows Cyan in Armistice Safe Zones and warning Red in unprotected danger space.
+- **Crash Prevention & Tray Lifecycle**:
+  - Intercepted Avalonia window disposal on close to prevent `ObjectDisposedException` on Tray restore.
+- **Streamlined Header Bar**:
+  - Removed redundant manual Start/Stop button; monitoring runs 100% automatically.
 
-### Locations, Starmap & Economy
-- **Starmap & Armistice Resolver**:
-  - Location resolution for Stanton, Pyro, and Nyx (including *Keeger Depot*, *Wikelo Emporium*, hangars, caves, and contested zones).
-  - Real-time armistice zone detection (🟢 Safe Zone / 🔴 Unprotected).
-- **UEX Corp API 2.0 Integration & Star Citizen Wiki**:
-  - Personal UEX Bearer Token configuration with 1-click connection testing.
-  - In-game wiki modal with HD vehicle artwork, manufacturer specs, and lore.
-- **Economy & Cargo Tracking**:
-  - Real-time accounting for cargo buy/sell orders, shop purchases, player transfers, refinery jobs, and fines.
+### OCR & Data Synchronization Fixes
+- **OCR Leading Digit Truncation Fix**:
+  - Added token and symbol pre-processing to eliminate truncated leading digits on high balance amounts (`aUEC`, `¤`, `|`).
+  - Widened default capture scan bounds (500x80) with safety margins.
+  - Live session balance and saldo recomputation immediately synced on mobiGlas scan.
+- **UEX Corp API Key Persistence**:
+  - Full two-way data-binding and verified storage in `%APPDATA%\SCLogMate\settings.json`.
 
 ---
 
