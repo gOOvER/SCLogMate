@@ -54,10 +54,15 @@ public sealed class WalletCapture : IDisposable
         var region = _regionProvider() ?? ScreenCapture.GetDefaultWalletRegion();
         if (!region.IsValid) return null;
 
-        var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+        int capX = Math.Max(0, region.X - 25);
+        int capY = Math.Max(0, region.Y - 5);
+        int capW = region.Width + 50;
+        int capH = region.Height + 10;
+
+        var raw = ScreenCapture.Capture(capX, capY, capW, capH);
         if (raw == null) return null;
 
-        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 2, padding: 6).ConfigureAwait(false);
+        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 2, padding: 8).ConfigureAwait(false);
         var bestText = WalletOcrTrigger.BestRead(invText, plainText);
         var balance = WalletOcrTrigger.ExtractBalance(bestText);
 
@@ -113,14 +118,19 @@ public sealed class WalletCapture : IDisposable
                     return;
                 }
 
-                var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+                int capX = Math.Max(0, region.X - 25);
+                int capY = Math.Max(0, region.Y - 5);
+                int capW = region.Width + 50;
+                int capH = region.Height + 10;
+
+                var raw = ScreenCapture.Capture(capX, capY, capW, capH);
                 if (raw == null)
                 {
                     await Task.Delay(RetrySpacing, ct).ConfigureAwait(false);
                     continue;
                 }
 
-                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 2, padding: 6).ConfigureAwait(false);
+                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 2, padding: 8).ConfigureAwait(false);
                 var bestText = WalletOcrTrigger.BestRead(invText, plainText);
                 var balance = WalletOcrTrigger.ExtractBalance(bestText);
 

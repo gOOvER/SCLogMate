@@ -114,10 +114,10 @@ public static class ScreenCapture
         double scaleX = screenW / 1920.0;
         double scaleY = screenH / 1080.0;
 
-        int w = (int)Math.Round(320 * scaleX);
-        int h = (int)Math.Round(60 * scaleY);
-        int x = (int)Math.Round(1480 * scaleX);
-        int y = (int)Math.Round(430 * scaleY);
+        int w = (int)Math.Round(500 * scaleX);
+        int h = (int)Math.Round(80 * scaleY);
+        int x = (int)Math.Round(1300 * scaleX);
+        int y = (int)Math.Round(415 * scaleY);
 
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }

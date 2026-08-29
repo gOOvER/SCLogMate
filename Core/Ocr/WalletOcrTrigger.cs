@@ -12,11 +12,11 @@ public static partial class WalletOcrTrigger
     public const long MaxPlausibleBalance = 99_999_999_999;
     public const long MinPlausibleBalance = 0;
 
-    // Unterstützt alle Tausendertrennzeichen (Komma, Punkt, Leerzeichen wie "2 463 039" oder "2,463,039" oder "2.463.039" oder "2463039")
-    [GeneratedRegex(@"(?<![A-Za-z0-9:])(?>[0-9]{1,3}(?:[.,\s][0-9]{3})+|[0-9]{3,11})(?![A-Za-z0-9:])")]
+    // Unterstützt alle Tausendertrennzeichen (Komma, Punkt, Leerzeichen wie "2 463 039", "12.714.118", "2,463,039" oder "2463039")
+    [GeneratedRegex(@"(?:\b|(?<=\s|[^\w.]))(?>[0-9]{1,3}(?:[.,\s][0-9]{3})+|[0-9]{3,11})(?:\b|(?=\s|[^\w.]))")]
     private static partial Regex StrictBalanceRegex();
 
-    [GeneratedRegex(@"(?<![A-Za-z0-9:])(?>[0-9]+)(?![A-Za-z0-9:])")]
+    [GeneratedRegex(@"[0-9]{3,12}")]
     private static partial Regex FallbackDigitsRegex();
 
     /// <summary>Prüft, ob die Logzeile das Öffnen des mobiGlas oder Inventorys signalisiert.</summary>
@@ -52,11 +52,18 @@ public static partial class WalletOcrTrigger
     {
         if (string.IsNullOrWhiteSpace(ocrText)) return null;
 
+        // Vorverarbeitung: Trennt Buchstaben/Präfixe sauber von Ziffern (z.B. "aUEC12.714.118" -> "aUEC 12.714.118")
+        var normalized = ocrText;
+        normalized = Regex.Replace(normalized, @"([a-zA-Z\u00A4\u00A7\u00A9\u00AE\$€£¥])([0-9])", "$1 $2");
+        normalized = Regex.Replace(normalized, @"([0-9])([a-zA-Z\u00A4\u00A7\u00A9\u00AE\$€£¥])", "$1 $2");
+        // Ersetzt führende OCR-Artefakte wie '|' vor Zahlen
+        normalized = Regex.Replace(normalized, @"[\|\/\(\)\[\]\{\}]", " ");
+
         // 1. Strikte Suche nach Tausender-Gruppierungen oder >= 3-stelligen Zahlen
         string? best = null;
         var bestDigits = 0;
 
-        foreach (Match m in StrictBalanceRegex().Matches(ocrText))
+        foreach (Match m in StrictBalanceRegex().Matches(normalized))
         {
             var digits = 0;
             foreach (var c in m.Value)
@@ -72,9 +79,9 @@ public static partial class WalletOcrTrigger
         }
 
         // 2. Fallback nur wenn aUEC im Text steht
-        if (best is null && (ocrText.Contains("aUEC", StringComparison.OrdinalIgnoreCase) || ocrText.Contains("UEC", StringComparison.OrdinalIgnoreCase)))
+        if (best is null && (normalized.Contains("aUEC", StringComparison.OrdinalIgnoreCase) || normalized.Contains("UEC", StringComparison.OrdinalIgnoreCase)))
         {
-            foreach (Match m in FallbackDigitsRegex().Matches(ocrText))
+            foreach (Match m in FallbackDigitsRegex().Matches(normalized))
             {
                 var digits = m.Value.Length;
                 if (digits > bestDigits)
