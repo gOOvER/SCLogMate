@@ -79,6 +79,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private ResolvedLocation resolvedLocation = new();
     public string LocationSystemBadge => ResolvedLocation.SystemName.ToUpperInvariant();
     public string LocationBadgeColor => ResolvedLocation.SystemBadgeColor;
+    public string ArmisticeBorderColor => ResolvedLocation.IsArmistice == false ? "#EF4444" : "#38BDF8";
     public string LocationMainText => ResolvedLocation.DisplayName == "—" ? "—" : 
         string.IsNullOrEmpty(ResolvedLocation.ParentBody) || ResolvedLocation.ParentBody == "—" || ResolvedLocation.ParentBody == ResolvedLocation.DisplayName
             ? ResolvedLocation.DisplayName 
@@ -2496,6 +2497,61 @@ public partial class MainViewModel : ObservableObject
     public void ClearEventSearch()
     {
         EventSearchText = "";
+    }
+
+    [RelayCommand]
+    private async Task CopyEntryDetail(LogEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e == null || string.IsNullOrWhiteSpace(e.Detail)) return;
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            await clip.SetTextAsync(e.Detail);
+            Status = $"📋 Text in Zwischenablage kopiert: \"{e.Detail}\"";
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopyEntryAmount(LogEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e == null || e.Amount == 0) return;
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            await clip.SetTextAsync(e.Amount.ToString());
+            Status = $"💰 Betrag kopiert: {e.Amount:N0} aUEC";
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopyEntryLine(LogEntry? entry)
+    {
+        var e = entry ?? SelectedEntry;
+        if (e == null) return;
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            var line = $"{e.TimeText}\t{e.KindText}\t{e.AmountText}\t{e.BalanceAfterText}\t{e.Detail}";
+            await clip.SetTextAsync(line);
+            Status = "📋 Tabellenzeile in Zwischenablage kopiert";
+        }
+    }
+
+    [RelayCommand]
+    public void JumpToMissionsTab()
+    {
+        SelectedTabIndex = 2; // ❖ Missionen
+    }
+
+    [RelayCommand]
+    public void JumpToStarmapTab()
+    {
+        SelectedTabIndex = 3; // 🗺 Karte
+    }
+
+    [RelayCommand]
+    public void JumpToBlueprintsTab()
+    {
+        SelectedTabIndex = 4; // 🛠 Baupläne
     }
 
     [RelayCommand]

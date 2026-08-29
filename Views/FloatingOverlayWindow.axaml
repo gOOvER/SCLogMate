@@ -22,7 +22,7 @@
 
   <Border Margin="4"
           Background="#E60D1117"
-          BorderBrush="#38BDF8"
+          BorderBrush="{Binding ArmisticeBorderColor}"
           BorderThickness="1.2"
           CornerRadius="7"
           BoxShadow="0 4 16 #80000000"

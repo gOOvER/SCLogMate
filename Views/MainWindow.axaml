@@ -353,6 +353,10 @@
           <ContextMenu>
             <MenuItem Header="📖  Star Citizen Wiki Info" Command="{Binding LookupWikiForEntryCommand}" CommandParameter="{Binding SelectedEntry}" />
             <MenuItem Header="🔎  Web-Suche / UEX" Command="{Binding LookupCommand}" />
+            <Separator />
+            <MenuItem Header="📋  Text / Detail kopieren" Command="{Binding CopyEntryDetailCommand}" CommandParameter="{Binding SelectedEntry}" />
+            <MenuItem Header="💰  Betrag kopieren" Command="{Binding CopyEntryAmountCommand}" CommandParameter="{Binding SelectedEntry}" />
+            <MenuItem Header="📄  Gesamte Zeile kopieren" Command="{Binding CopyEntryLineCommand}" CommandParameter="{Binding SelectedEntry}" />
           </ContextMenu>
         </DataGrid.ContextMenu>
         <DataGrid.Columns>
@@ -365,14 +369,15 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <DataGridTemplateColumn Header="TYP" Width="150" SortMemberPath="KindText">
+          <DataGridTemplateColumn Header="TYP" Width="145" SortMemberPath="KindText">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="m:LogEntry">
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Icon}" FontSize="13"
-                             Foreground="{Binding Kind, Converter={StaticResource KindBrush}}" />
-                  <TextBlock Text="{Binding KindText}" Foreground="#C9D1D9" />
-                </StackPanel>
+                <Border Background="{Binding KindBadgeBg}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding Icon}" FontSize="11" Foreground="{Binding KindBadgeFg}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold" Foreground="{Binding KindBadgeFg}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Border>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -966,44 +971,50 @@
           
           <!-- Banner mit Fortschritt & Suche -->
           <Border Classes="card" Padding="14,10">
-            <Grid ColumnDefinitions="Auto,*,Auto,240">
-              
-              <!-- Titel & Gesamt -->
-              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock Text="🛠  CRAFTING-BAUPLÄNE" Classes="label" VerticalAlignment="Center" />
-                <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding TotalBlueprintsCount, StringFormat='{}{0:N0} Gesamt'}" Foreground="#58A6FF" FontSize="10" FontWeight="Bold" />
-                </Border>
-              </StackPanel>
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="Auto,*,Auto,240">
+                
+                <!-- Titel & Gesamt -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock Text="🛠  CRAFTING-BAUPLÄNE" Classes="label" VerticalAlignment="Center" />
+                  <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalBlueprintsCount, StringFormat='{}{0:N0} Gesamt'}" Foreground="#58A6FF" FontSize="10" FontWeight="Bold" />
+                  </Border>
+                </StackPanel>
 
-              <!-- Fortschritts-Pills -->
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0">
-                <!-- Erlernt Pill -->
-                <Border Background="#0F2818" BorderBrush="#238636" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
-                  <StackPanel Orientation="Horizontal" Spacing="5">
-                    <Ellipse Width="6" Height="6" Fill="#3FB950" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding LearnedBlueprintsCount, StringFormat='{}{0:N0} Erlernt'}" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
-                  </StackPanel>
-                </Border>
+                <!-- Fortschritts-Pills -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0">
+                  <!-- Erlernt Pill -->
+                  <Border Background="#0F2818" BorderBrush="#238636" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <Ellipse Width="6" Height="6" Fill="#3FB950" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding LearnedBlueprintsCount, StringFormat='{}{0:N0} Erlernt'}" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                    </StackPanel>
+                  </Border>
 
-                <!-- Fehlt Pill -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
-                  <StackPanel Orientation="Horizontal" Spacing="5">
-                    <Ellipse Width="6" Height="6" Fill="#8B949E" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding MissingBlueprintsCount, StringFormat='{}{0:N0} Fehlen'}" Foreground="#8B949E" FontSize="11" FontWeight="SemiBold" />
-                  </StackPanel>
-                </Border>
+                  <!-- Fehlt Pill -->
+                  <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <Ellipse Width="6" Height="6" Fill="#8B949E" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding MissingBlueprintsCount, StringFormat='{}{0:N0} Fehlen'}" Foreground="#8B949E" FontSize="11" FontWeight="SemiBold" />
+                    </StackPanel>
+                  </Border>
 
-                <!-- Prozent Badge -->
-                <Border Background="#1F6FEB" CornerRadius="4" Padding="6,2.5" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding BlueprintProgressPercent, StringFormat='{}{0:F1}%'}" Foreground="White" FontSize="10" FontWeight="Bold" />
-                </Border>
-              </StackPanel>
+                  <!-- Prozent Badge -->
+                  <Border Background="#1F6FEB" CornerRadius="4" Padding="6,2.5" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding BlueprintProgressPercent, StringFormat='{}{0:F1}%'}" Foreground="White" FontSize="10" FontWeight="Bold" />
+                  </Border>
+                </StackPanel>
 
-              <!-- Schnellsuche -->
-              <TextBox Grid.Column="3" Classes="path" Height="30" Text="{Binding BlueprintSearchText}"
-                       Watermark="🔍 Bauplan, Ressource, Typ..." VerticalAlignment="Center" />
-            </Grid>
+                <!-- Schnellsuche -->
+                <TextBox Grid.Column="3" Classes="path" Height="30" Text="{Binding BlueprintSearchText}"
+                         Watermark="🔍 Bauplan, Ressource, Typ..." VerticalAlignment="Center" />
+              </Grid>
+
+              <!-- Visuelle Fortschrittsleiste -->
+              <ProgressBar Value="{Binding BlueprintProgressPercent}" Maximum="100" Height="6" CornerRadius="3"
+                           Foreground="#34D399" Background="#0D1117" />
+            </StackPanel>
           </Border>
 
           <!-- Filter-Chips -->

@@ -177,4 +177,32 @@ public partial class LogEntry : ObservableObject
         EventKind.SessionChange => "⚡",
         _ => "·"
     };
+
+    public IBrush KindBadgeBg => Kind switch
+    {
+        EventKind.MissionReward => new SolidColorBrush(Color.Parse("#332608")),
+        EventKind.Blueprint => new SolidColorBrush(Color.Parse("#092918")),
+        EventKind.Sale or EventKind.Trade => new SolidColorBrush(Color.Parse("#0B2B1B")),
+        EventKind.Purchase or EventKind.Fine or EventKind.TransferOut => new SolidColorBrush(Color.Parse("#381317")),
+        EventKind.Vehicle or EventKind.Quantum => new SolidColorBrush(Color.Parse("#0B233F")),
+        EventKind.Location or EventKind.Jurisdiction => new SolidColorBrush(Color.Parse("#26143D")),
+        EventKind.Kill or EventKind.Death or EventKind.ShipLoss or EventKind.Crash => new SolidColorBrush(Color.Parse("#3D1016")),
+        EventKind.Loot or EventKind.Loadout => new SolidColorBrush(Color.Parse("#0F2836")),
+        EventKind.Mission or EventKind.MissionTaken or EventKind.MissionDone => new SolidColorBrush(Color.Parse("#1A202C")),
+        _ => new SolidColorBrush(Color.Parse("#161B22"))
+    };
+
+    public IBrush KindBadgeFg => Kind switch
+    {
+        EventKind.MissionReward => new SolidColorBrush(Color.Parse("#FBBF24")),
+        EventKind.Blueprint => new SolidColorBrush(Color.Parse("#34D399")),
+        EventKind.Sale or EventKind.Trade => new SolidColorBrush(Color.Parse("#4ADE80")),
+        EventKind.Purchase or EventKind.Fine or EventKind.TransferOut => new SolidColorBrush(Color.Parse("#F87171")),
+        EventKind.Vehicle or EventKind.Quantum => new SolidColorBrush(Color.Parse("#38BDF8")),
+        EventKind.Location or EventKind.Jurisdiction => new SolidColorBrush(Color.Parse("#C084FC")),
+        EventKind.Kill or EventKind.Death or EventKind.ShipLoss or EventKind.Crash => new SolidColorBrush(Color.Parse("#FB7185")),
+        EventKind.Loot or EventKind.Loadout => new SolidColorBrush(Color.Parse("#67E8F9")),
+        EventKind.Mission or EventKind.MissionTaken or EventKind.MissionDone => new SolidColorBrush(Color.Parse("#E2E8F0")),
+        _ => new SolidColorBrush(Color.Parse("#8B949E"))
+    };
 }
