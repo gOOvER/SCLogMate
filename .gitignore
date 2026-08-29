@@ -1,9 +1,27 @@
+# Build and binary outputs
 bin/
 obj/
 publish/
+
+# Visual Studio & IDE files
+.vs/
 *.user
 *.suo
-.vs/
+*.userosv
+*.sln.docstates
+
+# VS Code Workspace files
+*.code-workspace
+.vscode/
+
+# JetBrains Rider
+.idea/
+
+# Temporary / diagnostic files
 scan_out.txt
+*.log
 CLAUDE.md
-publish/
+
+# OS specific files
+.DS_Store
+Thumbs.db
