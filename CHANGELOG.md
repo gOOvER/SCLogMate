@@ -4,7 +4,9 @@ All notable changes to this project are documented in this file. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
 [SemVer](https://semver.org/).
 
-## [1.0.0-beta3] - Unreleased
+## [Unreleased]
+
+## [1.0.0-beta3] - 2026-08-30
 
 ### 🛰️ RS Signal Decoder & In-Game Scanner Overlay
 - **Radar-Signatur Decodierung für Mining & Salvage**:
