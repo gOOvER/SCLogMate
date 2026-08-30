@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
 [SemVer](https://semver.org/).
 
+## [1.0.0-beta2] - 2026-08-30 — *SCLogMate Pre-Release Beta 2*
+
+### 🚀 Auto-Updater & Start-Dialog
+- **Dediziertes Update-Fenster beim Anwendungsstart**:
+  - Erkennt automatisch neue Releases & Pre-Releases auf GitHub.
+  - Zeigt Versions-Badges (`Aktuell ➔ Neu`) und den vollständigen Markdown-Changelog in einer scrollbaren Box an.
+  - **1-Klick Aktualisierung**: Automatischer Download, Selbst-Ersetzung und sauberer Neustart der Anwendung.
+  - Optionen zum sofortigen Aktualisieren, Öffnen der GitHub Release-Seite oder Später-Erinnern.
+
+### ⚡ Datenbank-Fortschritt & UI-Reaktionsfähigkeit
+- **Sci-Fi Glassmorphism Fortschritts-Modal**:
+  - Zeigt bei Re-Scans, Schema-Updates und Hintergrund-Indexierungen ein modernes, animiertes Modal-Overlay.
+  - Live-Dateiname, Schritt-Zähler (`Scanne (14/48): Game_2026-08-30.log...`) und prozentuale Fortschrittsleiste.
+  - Vollständige Entkopplung aller Datenbank-Vorgänge in Hintergrund-Tasks — verhindert jegliches Einfrieren *(„Keine Rückmeldung“)*.
+
+### 🛸 Flotten-Sorties & Flug-Statistiken (QuantumWake-Heuristik)
+- **Korrektur überhöhter Flugzähler (`COUNT(DISTINCT session)`)**:
+  - Behebt das Problem, dass fortlaufende In-Flight Telemetriezeilen (z. B. Drake Clipper / Cutter) als Hunderte Einzelflüge gezählt wurden.
+  - Sorties und Flugeinsätze werden nun sauber anhand echter Flug-Sessions und Auslagerungen aggregiert.
+  - Live-Sortie-Entprellung im Parser verhindert Mehrfachzählungen während desselben Flugs.
+
+### 📜 Missions-Tracking & Deduplizierung
+- **Nahtlose Auftrags-Zusammenführung**:
+  - [`AreSameContract`](file:///x:/Github%20Workspace/SCLogReader/Core/Ocr/ContractParser.cs) führt Log-Meldungen (noch ohne Belohnung) und mobiGlas OCR-Scans (mit Belohnung) intelligent zusammen.
+  - Aktualisiert bestehende Aufträge in Speicher und Datenbank ohne Duplikateinträge.
+  - Falscher Fallback-Auftraggeber (`"Recco Battaglia"`) entfernt.
+
+### 🔍 Dynamische Spieler-Erkennung & Log-Parser Optimierungen
+- **Automatische Piloten-Erkennung**:
+  - Extrahiert den Spielernamen dynamisch aus `[Legacy login response]` (`handle: <name>`) und `[AccountLoginCharacterStatus_Character]`.
+  - Perfekte Zuordnung von Kills vs. eigenen Toden im Killfeed für den aktuell eingeloggten Piloten.
+  - Zusätzliche Erkennung von `CSessionManager::OnClientSpawned`, ASOP-Auslagerungen (`SetVehicleSpawningInformations`) und Cockpit-Sitzwechseln.
+
+### 🛡️ CI/CD & Security
+- **GitHub Actions Release-Workflow**:
+  - Checkbox `is_prerelease` bei manuellem Start (`workflow_dispatch`).
+  - Automatisierte SHA256 Prüfsummen-Generierung für `.exe` und `.zip`.
+  - Integrierter VirusTotal Sicherheits-Scan.
+
 ## [1.0.0-beta1] - 2026-08-30 — *SCLogMate Pre-Release Beta 1*
 
 ### 🗺 Starmap & Navigation (QuantumWake-Style)

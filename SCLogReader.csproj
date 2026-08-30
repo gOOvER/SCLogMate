@@ -13,7 +13,7 @@
     <Product>SCLogMate</Product>
     <Title>SCLogMate</Title>
     <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
-    <Version>1.0.0-beta1</Version>
+    <Version>1.0.0-beta2</Version>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
     <ApplicationIcon>SCLogReader.ico</ApplicationIcon>
