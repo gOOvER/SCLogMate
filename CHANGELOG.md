@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
 [SemVer](https://semver.org/).
 
+## [1.0.0-beta3] - Unreleased
+
+### 📍 Standort-Karte & UI-Modernisierung
+- **Modernisierte Standort- & Jurisdiktions-Karte**:
+  - Schnelle reaktive Aktualisierung via `OnCurrentLocationChanged` und `StarmapData.Resolve`.
+  - Dynamische Schutzzonen-Pille (`🟢 Schutzzone` vs `🔴 Waffen aktiv`) und System-Badges (`Stanton`, `Pyro`, `Nyx`).
+  - Standort-Typ Badges (`Landungszone`, `Raumstation`, `Raffinerie`, `Mond`, `Planet`, `Sprungtor`).
+  - Bereinigter und kompakter Hinweistext im Datenbank-Fortschrittsfenster ohne Zeilenüberlauf.
+
 ## [1.0.0-beta2] - 2026-08-30 — *SCLogMate Pre-Release Beta 2*
 
 ### 🚀 Auto-Updater & Start-Dialog
@@ -18,12 +27,6 @@ All notable changes to this project are documented in this file. Format based on
   - Zeigt bei Re-Scans, Schema-Updates und Hintergrund-Indexierungen ein modernes, animiertes Modal-Overlay.
   - Live-Dateiname, Schritt-Zähler (`Scanne (14/48): Game_2026-08-30.log...`) und prozentuale Fortschrittsleiste.
   - Vollständige Entkopplung aller Datenbank-Vorgänge in Hintergrund-Tasks — verhindert jegliches Einfrieren *(„Keine Rückmeldung“)*.
-
-### 📍 Standort-Karte Redesign & Dynamic Indicators
-- **Modernisierte Standort- & Jurisdiktions-Karte**:
-  - Schnelle reactive Aktualisierung via `OnCurrentLocationChanged` und `StarmapData.Resolve`.
-  - Dynamische Schutzzonen-Pille (`🟢 Schutzzone` vs `🔴 Waffen aktiv`) und System-Badges (`Stanton`, `Pyro`, `Nyx`).
-  - Standort-Typ Badges (`Landungszone`, `Raumstation`, `Raffinerie`, `Mond`, `Planet`, `Sprungtor`).
 
 ### 🛸 Flotten-Sorties & Flug-Statistiken
 - **Korrektur überhöhter Flugzähler (`COUNT(DISTINCT session)`)**:
