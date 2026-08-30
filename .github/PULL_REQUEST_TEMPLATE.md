@@ -1,29 +1,29 @@
-## 📋 Übersicht
+## 📋 Summary
 
-<!-- Beschreibe kurz, was dieser Pull Request ändert oder hinzufügt. -->
+<!-- Briefly describe the changes made in this pull request. -->
 
-### 🔗 Verknüpfte Issues
+### 🔗 Related Issues
 Fixes #(issue_number)
 
 ---
 
-## 🛠 Art der Änderung
-- [ ] 🐛 Bugfix (Fehlerbehebung)
-- [ ] ✨ Neues Feature (Funktionserweiterung)
-- [ ] 🎨 UI / Design-Verbesserung
-- [ ] ⚡ Performance-Optimierung
-- [ ] 📝 Dokumentation / Roadmap Update
-- [ ] 🔧 Refactoring / Code-Bereinigung
+## 🛠 Type of Change
+- [ ] 🐛 Bugfix (non-breaking change fixing an issue)
+- [ ] ✨ New Feature (non-breaking change adding functionality)
+- [ ] 🎨 UI / UX Improvement
+- [ ] ⚡ Performance Optimization
+- [ ] 📝 Documentation / Roadmap Update
+- [ ] 🔧 Refactoring / Code Cleanup
 
 ---
 
-## 🧪 Durchgeführte Tests & Validierung
-<!-- Beschreibe kurz, wie du die Änderungen getestet hast (z.B. mit echten Star Citizen Log-Dateien). -->
-- [ ] `dotnet build` läuft fehlerfrei durch
-- [ ] Getestet mit Star Citizen Live-Logs
-- [ ] Keine UI-Glitches oder Memory-Leaks
+## 🧪 Verification & Testing
+<!-- Describe how you verified and tested your changes (e.g. against Star Citizen Game.log sessions). -->
+- [ ] `dotnet build` succeeds without warnings or errors
+- [ ] Tested with live Star Citizen logs
+- [ ] Verified UI rendering and memory footprint
 
 ---
 
-## 📸 Screenshots / Vorschau (falls UI geändert wurde)
-<!-- Füge Screenshots oder GIFs ein, falls die Benutzeroberfläche angepasst wurde. -->
+## 📸 Screenshots / Preview (if UI was modified)
+<!-- Add screenshots or screen recordings demonstrating the visual changes. -->

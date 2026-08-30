@@ -1,17 +1,17 @@
-name: 🐛 Bug Report / Fehlerbericht
-description: Melde ein Problem oder unerwartetes Verhalten in SCLogMate.
+name: 🐛 Bug Report
+description: Report an issue, bug, or unexpected behavior in SCLogMate.
 title: "[BUG]: "
 labels: ["bug", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Vielen Dank für das Melden eines Fehlers! Bitte fülle die folgenden Felder so genau wie möglich aus.
+        Thank you for taking the time to report a bug! Please fill out the fields below as accurately as possible.
   - type: input
     id: version
     attributes:
       label: SCLogMate Version
-      description: Welche Version verwendest du? (z.B. v1.0.0-beta1)
+      description: Which version are you running? (e.g. v1.0.0-beta1)
       placeholder: v1.0.0-beta1
     validations:
       required: true
@@ -19,41 +19,41 @@ body:
     id: sc_version
     attributes:
       label: Star Citizen Version / Channel
-      description: Welcher Star Citizen Channel wird gespielt? (z.B. LIVE 4.0, EPTU 4.0.1, PTU)
+      description: Which Star Citizen game channel are you playing? (e.g. LIVE 4.0, EPTU 4.0.1, PTU)
       placeholder: LIVE 4.0.0-LIVE.1234567
     validations:
       required: true
   - type: textarea
     id: description
     attributes:
-      label: 📝 Beschreibung des Fehlers
-      description: Was ist passiert und was hast du stattdessen erwartet?
-      placeholder: Beschreibe das Verhalten möglichst detailliert...
+      label: 📝 Description of the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened versus what you expected...
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: 🔄 Schritte zur Reproduktion
-      description: Wie lässt sich der Fehler nachvollziehen?
+      label: 🔄 Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
       placeholder: |
-        1. SCLogMate starten
-        2. In Star Citizen Schiff spawnen
-        3. Beobachten, dass...
+        1. Launch SCLogMate
+        2. Spawn ship in Star Citizen
+        3. Observe that...
     validations:
       required: true
   - type: textarea
     id: log_snippet
     attributes:
-      label: 📜 Relevante Zeilen aus Game.log (falls zutreffend)
-      description: Relevante Zeilen aus deiner `%StarCitizen%\LIVE\Game.log` (bitte persönliche Token/Sensibles entfernen).
+      label: 📜 Relevant Game.log Snippet (if applicable)
+      description: Relevant lines from your `%StarCitizen%\LIVE\Game.log` (please strip any private player tokens or sensitive IDs).
       render: text
   - type: checkboxes
     id: checks
     attributes:
-      label: Checkliste
+      label: Checklist
       options:
-        - label: Ich habe geprüft, dass kein identisches Issue bereits existiert.
+        - label: I have searched existing issues to ensure this is not a duplicate.
           required: true
-        - label: Ich verwende die aktuellste Version von SCLogMate.
+        - label: I am running the latest release of SCLogMate.
           required: false
