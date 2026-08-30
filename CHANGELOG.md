@@ -4,11 +4,11 @@ All notable changes to this project are documented in this file. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
 [SemVer](https://semver.org/).
 
-## [1.0.0-beta2] - 2026-08-30 — *SCLogMate Pre-Release Beta 2*
+## [1.0.0] - 2026-08-30 — *SCLogMate Initial Release*
 
 ### 🚀 Auto-Updater & Start-Dialog
 - **Dediziertes Update-Fenster beim Anwendungsstart**:
-  - Erkennt automatisch neue Releases & Pre-Releases auf GitHub.
+  - Erkennt automatisch neue Releases auf GitHub.
   - Zeigt Versions-Badges (`Aktuell ➔ Neu`) und den vollständigen Markdown-Changelog in einer scrollbaren Box an.
   - **1-Klick Aktualisierung**: Automatischer Download, Selbst-Ersetzung und sauberer Neustart der Anwendung.
   - Optionen zum sofortigen Aktualisieren, Öffnen der GitHub Release-Seite oder Später-Erinnern.
@@ -21,7 +21,7 @@ All notable changes to this project are documented in this file. Format based on
 
 ### 🛸 Flotten-Sorties & Flug-Statistiken
 - **Korrektur überhöhter Flugzähler (`COUNT(DISTINCT session)`)**:
-  - Behebt das Problem, dass fortlaufende In-Flight Telemetriezeilen (z. B. Drake Clipper / Cutter) als Hunderte Einzelflüge gezählt wurden.
+  - Behebt das Problem, dass fortlaufende In-Flight Telemetriezeilen als Hunderte Einzelflüge gezählt wurden.
   - Sorties und Flugeinsätze werden nun sauber anhand echter Flug-Sessions und Auslagerungen aggregiert.
   - Live-Sortie-Entprellung im Parser verhindert Mehrfachzählungen während desselben Flugs.
 
@@ -39,11 +39,8 @@ All notable changes to this project are documented in this file. Format based on
 
 ### 🛡️ CI/CD & Security
 - **GitHub Actions Release-Workflow**:
-  - Checkbox `is_prerelease` bei manuellem Start (`workflow_dispatch`).
   - Automatisierte SHA256 Prüfsummen-Generierung für `.exe` und `.zip`.
   - Integrierter VirusTotal Sicherheits-Scan.
-
-## [1.0.0-beta1] - 2026-08-30 — *SCLogMate Pre-Release Beta 1*
 
 ### 🗺 Starmap & Navigation
 - **Vector Route & Flight Time Calculator**:
