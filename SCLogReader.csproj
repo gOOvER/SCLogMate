@@ -16,7 +16,12 @@
     <Version>1.0.0-beta3</Version>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
-    <ApplicationIcon>SCLogReader.ico</ApplicationIcon>
+    <!-- Single-File Publishing (alles in einer einzigen kompakten .exe) -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>

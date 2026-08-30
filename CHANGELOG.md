@@ -6,6 +6,50 @@ All notable changes to this project are documented in this file. Format based on
 
 ## [1.0.0-beta3] - Unreleased
 
+### 🛰️ RS Signal Decoder & In-Game Scanner Overlay
+- **Radar-Signatur Decodierung für Mining & Salvage**:
+  - Vollständige Entschlüsselung von Star Citizen RS-Werten (Radar Cross-Section / Resonanz) aus HUD-Pings (`TAB` / `V`).
+  - Erkennt Erztyp (Quantanium, Bexalite, Laranite, Gold, Taranite, Agricium etc.) und Anzahl der Gesteinsbrocken/Nodes.
+  - Automatische Salvage-Wrackteil-Erkennung (*2.000 RS pro Rumpfplatte*, z. B. 6.000 RS = 3x Salvage Panels).
+  - Zeigt Tier-Stufen (S, A, B, C), Seltenheit, geschätzten aUEC-Ertrag und die beste Raffinerie-Station mit Veredelungs-Bonus.
+- **Automatischer Windows OCR-Scan**:
+  - Kontinuierlicher Auto-Scan oder 1-Klick OCR-Erkennung direkt vom Bildschirm via nativer Windows Media OCR Engine.
+  - Einstellbarer Scan-Bereich (Kalibrierung über das visuelle Auswahlfenster) oder zentrierter HUD-Standard.
+  - Vorverarbeitung mit Kontrastverstärkung und 3x/6x Glyph-Skalierung für exakte Ziffernerkennung.
+- **Frei verschiebbares In-Game Live-HUD Overlay**:
+  - Kompaktes, rahmenloses und transparentes Always-On-Top Fenster für das Spiel oder Multi-Monitor-Setups.
+  - Kann per Drag & Drop mit der Maus an jede beliebige Stelle des Monitors verschoben werden (Position wird automatisch gespeichert).
+  - Schnelle Presets für gängige Erz- und Salvage-Signaturen (z. B. `3.170`, `6.340`, `7.200`, `14.400`, `6.000`, `8.000`).
+
+### ⏱️ Flugschreiber & Session-Timeline (Black Box)
+- **Interaktiver Sci-Fi Missions- & Reise-Zeitstrahl**:
+  - Vollständige chronologische Rekonstruktion jeder Spielsitzung aus Roh-Logs (`Game.log` und Backups).
+  - Visualisiert Hangar-Spawns, Quantum-Sprünge (mit Distanzberechnung in GM/km und Reisezeit), Kampfeinsätze, Handels- und Raffinerieaktivitäten sowie Landungen.
+  - Farbige Typ-Badges, relative & absolute Zeitstempel und direkte Verknüpfung zur Starmap (`1-Klick Fokus`).
+- **Missions- & Black-Box-KPIs**:
+  - Gesamte zurückgelegte Quantum-Flugdistanz (in GM und km).
+  - Reine Flugzeit im Cockpit vs. gesamte Sessiondauer.
+  - Netto-Finanzbilanz (Einnahmen vs. Ausgaben) und K/D-Gefechtsbilanz.
+  - Übersicht aller besuchten Himmelskörper und eingesetzten Schiffe.
+- **Flugbericht-Export & Filterung**:
+  - Export vollständiger, formatierter Markdown-Flugberichte für die Organisation oder das Logbuch.
+  - Schnellfilter nach Quantum-Reisen, Gefechten, Handel, Bergbau und Standorten.
+
+### 🗺️ Starmap & Vollständiges POI-/Lagrange-Netzwerk (Stanton, Pyro & Nyx)
+- **Vollständiges Pyro-System (Pyro I bis Pyro VI)**:
+  - Alle 6 Planeten und Monde (*Pyro I*, *Monox / Pyro II*, *Bloom / Pyro III*, *Pyro IV*, *Pyro V mit Ignis, Vatra, Adir, Fairo, FTransit, Vuur*, *Terminus / Pyro VI*).
+  - Berüchtigte Piratenstationen & Outposts: *Checkmate Station (Rough & Ready HQ)*, *Orbituary*, *Starlight Station*, *Ruin Station*, *Sunset Mesa*, *The Junkyard*, *Sacren's Reach*, *Rustville*.
+  - Legendäre Piraten-Raffinerie *P5-L2 Gaslight Station*, *Megiddo Station* & *The Rat's Nest*.
+  - Vollständiges Lagrange-Netzwerk (*P1-L1 bis P6-L5*) und Sprungtore nach Stanton, Nyx und Terra.
+- **Vollständiges Nyx-System (Delamar, Glaciem Ring & Keeger Belt)**:
+  - *Delamar & Levski* mit *Grand Barter*, *People's Service Station Theta*, *QV Breaker Station BRK-267*, *Bore Hole Site 4* und *Miner's Rest*.
+  - *Keeger Belt* mit *Moraine Base* (Gesetzlose Station) und *Keeger Asteroid Depot*.
+  - *Glaciem Ring* mit *Glaciem RockCracker 12* und *Frostfall Outpost*.
+  - *Nyx I* (Mine), *Nyx III* (Sensor Array) und Sprungtore nach Stanton, Pyro, Castra und Tohil.
+- **Erweiterte Stanton POIs & Outposts**:
+  - *Security Post Kareah (SPK)*, *Klescher Automated Rehabilitation*, *Brio's Breaker Yard*, *Reclamation & Disposal Orinth*, *Samson & Son Salvage*, *Devlin Scrap & Salvage*.
+  - Verteilzentren (*HDPC-Cassidy*, *Sakura Sun Goldenrod Work Center*, *Area 061*).
+
 ### 📍 Standort-Karte & UI-Modernisierung
 - **Modernisierte Standort- & Jurisdiktions-Karte**:
   - Schnelle reaktive Aktualisierung via `OnCurrentLocationChanged` und `StarmapData.Resolve`.

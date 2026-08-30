@@ -107,6 +107,21 @@ public class AppSettings
 
     /// <summary>Erlernte Baupläne ab Wipe-Datum filtern.</summary>
     public bool WipeFilterBlueprints { get; set; } = false;
+
+    /// <summary>RS Signal Scanner In-Game Overlay aktivieren.</summary>
+    public bool RsOverlayEnabled { get; set; } = false;
+
+    /// <summary>X-Position des RS Scanner Overlays.</summary>
+    public double RsOverlayPositionX { get; set; } = 400;
+
+    /// <summary>Y-Position des RS Scanner Overlays.</summary>
+    public double RsOverlayPositionY { get; set; } = 50;
+
+    /// <summary>Automatischer RS Scanner OCR-Scan aktiv.</summary>
+    public bool RsAutoScanEnabled { get; set; } = false;
+
+    /// <summary>Vom Nutzer ausgewählter RS Scan-Bereich auf dem Bildschirm.</summary>
+    public ScanRegion? RsScanRegion { get; set; }
 }
 
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>

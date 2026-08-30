@@ -2,12 +2,22 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SCLogReader.ViewModels"
         xmlns:core="using:SCLogReader.Core"
+        xmlns:conv="using:SCLogReader.Converters"
         xmlns:views="using:SCLogReader.Views"
         x:Class="SCLogReader.Views.StarmapWindow"
         x:DataType="vm:MainViewModel"
         Title="Star Citizen Starmap &amp; Navigation — SCLogMate"
         Width="1280" Height="820" MinWidth="900" MinHeight="600"
         Background="#040711" Foreground="#E6EDF3">
+
+  <Window.Resources>
+    <conv:FilterActiveConverter x:Key="FilterBg" />
+    <conv:AmountToBrushConverter x:Key="AmountBrush" />
+    <conv:KindToBrushConverter x:Key="KindBrush" />
+    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
+    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
+    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
+  </Window.Resources>
 
   <DockPanel>
     <!-- Header Toolbar -->

@@ -142,4 +142,24 @@ public static class ScreenCapture
 
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }
+
+    /// <summary>Liefert die aktuelle primäre Bildschirmauflösung.</summary>
+    public static (int Width, int Height) GetPrimaryScreenSize()
+    {
+        int sw = GetSystemMetrics(SM_CXSCREEN);
+        int sh = GetSystemMetrics(SM_CYSCREEN);
+        return (sw > 0 ? sw : 1920, sh > 0 ? sh : 1080);
+    }
+
+    /// <summary>Liefert die Standard-Region für die Star Citizen HUD Scanner RS-Signatur.</summary>
+    public static ScanRegion GetDefaultRsRegion()
+    {
+        var (sw, sh) = GetPrimaryScreenSize();
+        int w = Math.Min(600, (int)(sw * 0.35));
+        int h = Math.Min(360, (int)(sh * 0.35));
+        int x = (sw - w) / 2;
+        int y = (sh - h) / 2;
+        return new ScanRegion { X = x, Y = y, Width = w, Height = h };
+    }
 }
+

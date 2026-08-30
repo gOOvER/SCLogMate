@@ -28,7 +28,9 @@ public partial class MainViewModel : ObservableObject
     readonly OcrEngineService _ocrEngine = new();
     readonly WalletCapture _walletCapture;
     readonly ContractScanner _contractScanner;
+    readonly RsOcrScanner _rsScanner;
     readonly ScanIndicatorWindow _scanIndicator = new();
+    private Views.RsScanOverlayWindow? _rsOverlayWindow;
     bool _initializing = true;
     bool _ready;          // Persistenz erst nach Konstruktor
     bool _suppressSave;   // Session-Wechsel nicht als Default speichern
@@ -208,6 +210,25 @@ public partial class MainViewModel : ObservableObject
     // Raffinerie-Tracking & Handelsrouten
     public ObservableCollection<RefineryJob> RefineryJobs { get; } = new();
     public ObservableCollection<TradeRouteItem> TradeRoutes { get; } = new();
+
+    // RS Signal Scanner & Mining/Salvage Decoder
+    [ObservableProperty] private string rsInputText = "";
+    [ObservableProperty] private int? currentRsValue;
+    [ObservableProperty] private RsMatch? bestRsMatch;
+    [ObservableProperty] private bool isRsOverlayActive;
+    [ObservableProperty] private bool isRsAutoScanEnabled;
+    [ObservableProperty] private string rsOcrStatusText = "OCR bereit";
+    public ObservableCollection<RsMatch> CurrentRsMatches { get; } = new();
+
+    public string CurrentRsDisplayValue => CurrentRsValue.HasValue ? $"RS {CurrentRsValue.Value:N0}" : "—";
+    public string RsAutoScanStatusText => IsRsAutoScanEnabled ? "⚡ AUTO" : "MANUELL";
+    public string RsAutoScanBadgeBg => IsRsAutoScanEnabled ? "#064E3B" : "#1E293B";
+    public string RsAutoScanBadgeBorder => IsRsAutoScanEnabled ? "#34D399" : "#475569";
+    public string RsAutoScanBadgeFg => IsRsAutoScanEnabled ? "#34D399" : "#94A3B8";
+    public string SecondaryRsMatchesText => CurrentRsMatches.Count > 1 
+        ? string.Join(" · ", CurrentRsMatches.Skip(1).Take(2).Select(m => $"{m.Nodes}x {m.Resource.Name}")) 
+        : "Keine weiteren Übereinstimmungen";
+
     public List<string> AvailableRefineryStations => RefineryCatalog.Stations;
     public List<string> AvailableRefineryMaterials => RefineryCatalog.Materials;
     public List<string> AvailableRefineryMethods => RefineryCatalog.Methods;
@@ -270,6 +291,14 @@ public partial class MainViewModel : ObservableObject
 
     // Piloten-Ausrüstung (Visual Loadout Slots)
     public ObservableCollection<LoadoutItem> PilotLoadoutSlots { get; } = new();
+
+    // Flugschreiber & Session-Timeline (Black Box)
+    public ObservableCollection<FlightTimelineItem> SessionTimeline { get; } = new();
+    public DataGridCollectionView TimelineView { get; }
+    [ObservableProperty] private FlightSummary flightSummary = new();
+    [ObservableProperty] private FlightTimelineItem? selectedTimelineItem;
+    [ObservableProperty] private string timelineSearchText = "";
+    [ObservableProperty] private string selectedTimelineFilter = "Alle";
 
     // Starmap Custom POIs (Persönliche Wegpunkte & Notizen)
     public ObservableCollection<UserPoi> UserPois { get; } = new();
@@ -522,16 +551,7 @@ public partial class MainViewModel : ObservableObject
         _settings.AutoOcrEnabled = AutoOcrEnabled;
         Settings.Save(_settings);
         OnPropertyChanged(nameof(ManualBalanceTooltip));
-        Status = AutoOcrEnabled ? "⚡ Auto-Sync aktiviert (mobiGlas F1)" : "Auto-Sync deaktiviert (manuell)";
-
-        if (AutoOcrEnabled)
-        {
-            _contractScanner.Start();
-        }
-        else
-        {
-            _contractScanner.Stop();
-        }
+        Status = AutoOcrEnabled ? "⚡ mobiGlas Kontostand Auto-Sync aktiviert (F1)" : "Kontostand Auto-Sync deaktiviert";
     }
 
     [RelayCommand]
@@ -1319,7 +1339,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnFleetSearchTextChanged(string value) => FleetView?.Refresh();
 
     [RelayCommand]
-    private void SwitchToFleetTab() => SelectedTabIndex = 5;
+    private void SwitchToFleetTab() => SelectedTabIndex = 7;
 
     [RelayCommand]
     private void SelectFleetViewMode(string mode)
@@ -1598,6 +1618,7 @@ public partial class MainViewModel : ObservableObject
         RebuildCommodityTrades(Events.Where(e => e.Kind == EventKind.Trade));
         RebuildMarketPrices(Events.Where(e => e.Kind == EventKind.Trade));
         RebuildMissions(Events.Where(e => e.Kind == EventKind.MissionTaken));
+        RebuildTimeline();
     }
 
     void SetTopTransactions(System.Collections.Generic.IEnumerable<LogEntry> events)
@@ -1938,8 +1959,8 @@ public partial class MainViewModel : ObservableObject
     {
         get
         {
-            var digits = new string(ManualBalance.Where(char.IsDigit).ToArray());
-            return long.TryParse(digits, out var v) && v > 0 ? $"{v:N0} aUEC" : "— eintragen —";
+            var b = StartBalance();
+            return b > 0 ? $"{b:N0} aUEC" : "— eintragen —";
         }
     }
 
@@ -1971,7 +1992,10 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public long ExpectedBalance => StartBalance() + NetSinceBalance;
+    public long ExpectedBalance => StartBalance() > 0 
+        ? (_settings.BalanceSetAt.HasValue ? StartBalance() + NetSinceBalance : StartBalance())
+        : 0;
+
     public string ExpectedText =>
         StartBalance() <= 0 ? "Kontostand eintragen"
         : _settings.BalanceSetAt is null ? "≈ " + StartBalance().ToString("N0") + " aUEC (neu setzen für Verlauf)"
@@ -2022,6 +2046,10 @@ public partial class MainViewModel : ObservableObject
     {
         _initializing = true;
         _settings = Settings.Load();
+        if (_settings.Balance > 0)
+        {
+            manualBalance = _settings.Balance.ToString("N0");
+        }
 
         EventsView = new DataGridCollectionView(Events)
         {
@@ -2134,6 +2162,30 @@ public partial class MainViewModel : ObservableObject
                 return true;
             }
         };
+
+        TimelineView = new DataGridCollectionView(SessionTimeline)
+        {
+            Filter = o =>
+            {
+                if (o is not FlightTimelineItem item) return true;
+                if (SelectedTimelineFilter == "Quantum" && item.Type != TimelineItemType.QuantumTravel) return false;
+                if (SelectedTimelineFilter == "Kampf" && item.Type != TimelineItemType.CombatKill && item.Type != TimelineItemType.CombatDeath) return false;
+                if (SelectedTimelineFilter == "Handel" && item.Type != TimelineItemType.Trade) return false;
+                if (SelectedTimelineFilter == "Mining" && item.Type != TimelineItemType.Mining && item.Type != TimelineItemType.Refinery) return false;
+                if (SelectedTimelineFilter == "Orte" && item.Type != TimelineItemType.Arrival && item.Type != TimelineItemType.Departure && item.Type != TimelineItemType.Spawn) return false;
+                if (!string.IsNullOrWhiteSpace(TimelineSearchText))
+                {
+                    if (!item.Title.Contains(TimelineSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !item.Subtitle.Contains(TimelineSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !item.LocationName.Contains(TimelineSearchText, StringComparison.OrdinalIgnoreCase) &&
+                        !item.ShipName.Contains(TimelineSearchText, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        };
         AutoOcrEnabled = _settings.AutoOcrEnabled;
         OcrAvailable = _ocrEngine.IsAvailable;
         UpdateOcrRegionText();
@@ -2158,40 +2210,41 @@ public partial class MainViewModel : ObservableObject
         _contractScanner = new ContractScanner(
             _ocrEngine,
             () => _settings.ContractRegion ?? ScreenCapture.GetDefaultContractRegion(),
-            () => AutoOcrEnabled);
-        _contractScanner.ContractScanned += OnContractScanned;
-        _contractScanner.StageChanged += stage =>
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (stage == "not_accepted_tab" && HasActiveContract)
-                {
-                    // alter Auftrag bleibt stehen
-                }
-                else if (stage == "not_accepted_tab")
-                {
-                    ContractStatusText = "Wartet auf mobiGlas Accepted-Tab…";
-                }
-                else if (stage == "parsed")
-                {
-                    ContractStatusText = $"✓ {ActiveContracts.Count} Auftrag/Aufträge ({DateTime.Now:HH:mm:ss})";
-                }
-            });
-        };
+            () => false); // Mission OCR dauerhaft deaktiviert (Log-basiertes Tracking ist aktiv)
 
-        if (AutoOcrEnabled)
+        _rsScanner = new RsOcrScanner(_ocrEngine, () => _settings.RsScanRegion, () => IsRsAutoScanEnabled);
+        _rsScanner.RsValueDetected += val => Dispatcher.UIThread.Post(() => OnRsDetected(val));
+        _rsScanner.StatusChanged += s => Dispatcher.UIThread.Post(() => RsOcrStatusText = s);
+
+        IsRsAutoScanEnabled = _settings.RsAutoScanEnabled;
+        if (IsRsAutoScanEnabled)
         {
-            _contractScanner.Start();
+            _rsScanner.Start();
         }
 
-        // Gespeicherte aktive Aufträge aus der SQLite-Datenbank laden
+        if (_settings.RsOverlayEnabled)
+        {
+            IsRsOverlayActive = true;
+        }
+
+        // Gespeicherte aktive Aufträge aus der SQLite-Datenbank laden (Bereinigung von evtl. OCR-Fehlern)
         try
         {
             var savedContracts = Database.GetActiveContracts();
             foreach (var c in savedContracts)
             {
+                var cleanTitle = c.Title?.Trim() ?? "";
+                if (cleanTitle.Length < 3 || 
+                    cleanTitle.Equals("Reward", StringComparison.OrdinalIgnoreCase) ||
+                    cleanTitle.Contains("OCR", StringComparison.OrdinalIgnoreCase) ||
+                    cleanTitle.StartsWith("ch SQn", StringComparison.OrdinalIgnoreCase))
+                {
+                    Database.RemoveContract(cleanTitle, c.Reward);
+                    continue;
+                }
+
                 ActiveContracts.Add(c);
-                var norm = ContractParser.NormalizeTitle(c.Title);
+                var norm = ContractParser.NormalizeTitle(cleanTitle);
                 if (norm.Length > 0) _knownContracts[norm] = c.Reward;
             }
             if (ActiveContracts.Count > 0)
@@ -2201,7 +2254,7 @@ public partial class MainViewModel : ObservableObject
                 ActiveContractTitle = first.Title;
                 ActiveContractRewardText = first.RewardText;
                 ActiveContractOrg = first.ContractedBy;
-                ContractStatusText = $"✓ {ActiveContracts.Count} gespeicherte(r) Auftrag/Aufträge geladen";
+                ContractStatusText = $"✓ {ActiveContracts.Count} aktive(r) Auftrag/Aufträge";
                 OnPropertyChanged(nameof(HasActiveContracts));
                 OnPropertyChanged(nameof(ActiveContractsCountText));
             }
@@ -2666,6 +2719,7 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(n);
 
         SyncBlueprints();
+        RebuildTimeline();
 
         Status = $"alle Sessions (DB: {agg.Sessions}) – laufende live…";
 
@@ -2701,6 +2755,8 @@ public partial class MainViewModel : ObservableObject
     {
         _parser = new LogParser();
         Events.Clear();
+        SessionTimeline.Clear();
+        FlightSummary = new();
         ShipsSeen.Clear();
         FleetItems.Clear();
         _shipSet.Clear();
@@ -2960,19 +3016,16 @@ public partial class MainViewModel : ObservableObject
             // Mitlaufender Kontostand bei Geld-Ereignissen
             if (IsMoney(e.Kind))
             {
-                _running += e.Amount;
-                e.BalanceAfter = _running;
-                e.HasBalance = true;
-
-                // Live-Kontostand direkt mitführen, wenn ein Betrag gesetzt ist
-                if (!_initializing && StartBalance() > 0)
+                var since = _settings.BalanceSetAt;
+                if (since.HasValue && e.Time > since.Value)
                 {
-                    long current = StartBalance();
-                    long newBal = Math.Max(0, current + e.Amount);
-                    ManualBalance = newBal.ToString("N0");
-                    _settings.Balance = newBal;
-                    _settings.BalanceSetAt = e.Time;
-                    Settings.Save(_settings);
+                    _running += e.Amount;
+                    e.BalanceAfter = _running;
+                    e.HasBalance = true;
+                }
+                else
+                {
+                    e.HasBalance = false;
                 }
 
                 if (_allMode)
@@ -3289,6 +3342,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveContractsCountText));
     }
 
+
+
     [RelayCommand]
     public void SetMissionAsActiveContract(MissionInfo mission)
     {
@@ -3563,16 +3618,36 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void JumpToReputationTab()
+    {
+        SelectedTabIndex = 3; // 🎖 Ruf
+    }
+
+    [RelayCommand]
     public void JumpToStarmapTab()
     {
-        SelectedTabIndex = 3; // 🗺 Karte
+        SelectedTabIndex = 4; // 🗺 Karte
+    }
+
+    [RelayCommand]
+    public void JumpToTimelineTab()
+    {
+        SelectedTabIndex = 5; // ⏱ Flugschreiber
+    }
+
+    [RelayCommand]
+    public void JumpToRsScannerTab()
+    {
+        SelectedTabIndex = 6; // 🛰 Erz-Scanner
     }
 
     [RelayCommand]
     public void JumpToBlueprintsTab()
     {
-        SelectedTabIndex = 4; // 🛠 Baupläne
+        SelectedTabIndex = 8; // 🛠 Baupläne
     }
+
+    public IReadOnlyList<RsResource> AllCatalogResources => RsDecoderCatalog.AllResources;
 
     [RelayCommand]
     public async Task SaveAndTestUexApiKey()
@@ -3683,29 +3758,40 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void ToggleOverlay()
     {
-        IsOverlayActive = !IsOverlayActive;
-    }
-
-    partial void OnIsOverlayActiveChanged(bool value)
-    {
         Dispatcher.UIThread.Post(() =>
         {
-            if (value)
+            try
             {
                 if (_overlayWindow == null)
                 {
                     _overlayWindow = new Views.FloatingOverlayWindow { DataContext = this };
                     _overlayWindow.InitSettings(_settings);
                 }
-                _overlayWindow.Show();
-                _settings.OverlayEnabled = true;
-                Settings.Save(_settings);
+
+                if (!_overlayWindow.IsVisible)
+                {
+                    _overlayWindow.Show();
+                    _overlayWindow.Activate();
+                    IsOverlayActive = true;
+                    _settings.OverlayEnabled = true;
+                    Settings.Save(_settings);
+                    Status = "🖥 In-Game Mini-HUD Overlay eingeblendet";
+                }
+                else
+                {
+                    _overlayWindow.Hide();
+                    IsOverlayActive = false;
+                    _settings.OverlayEnabled = false;
+                    Settings.Save(_settings);
+                    Status = "In-Game Mini-HUD Overlay ausgeblendet";
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _overlayWindow?.Hide();
-                _settings.OverlayEnabled = false;
-                Settings.Save(_settings);
+                Logger.Error("ToggleOverlay", ex);
+                Status = "Fehler beim Öffnen des Mini-HUD: " + ex.Message;
+                _overlayWindow = null;
+                IsOverlayActive = false;
             }
         });
     }
@@ -4202,4 +4288,217 @@ public partial class MainViewModel : ObservableObject
         }
         OnPropertyChanged(nameof(SessionSpanText));
     }
+
+    #region Flight Recorder & Session Timeline
+
+    partial void OnTimelineSearchTextChanged(string value) => TimelineView?.Refresh();
+    partial void OnSelectedTimelineFilterChanged(string value) => TimelineView?.Refresh();
+
+    [RelayCommand]
+    public void SelectTimelineFilter(string filter)
+    {
+        SelectedTimelineFilter = filter;
+        TimelineView?.Refresh();
+    }
+
+    [RelayCommand]
+    public void RebuildTimeline()
+    {
+        var (items, summary) = FlightRecorderService.BuildTimeline(Events);
+        SessionTimeline.Clear();
+        foreach (var item in items) SessionTimeline.Add(item);
+        FlightSummary = summary;
+        TimelineView?.Refresh();
+        OnPropertyChanged(nameof(FlightSummary));
+    }
+
+    [RelayCommand]
+    public void JumpToTimelineLocation(FlightTimelineItem? item)
+    {
+        var target = item ?? SelectedTimelineItem;
+        if (target == null || string.IsNullOrWhiteSpace(target.LocationName) || target.LocationName == "—") return;
+        var sys = target.SystemName;
+        if (!string.IsNullOrEmpty(sys) && StarmapData.SystemNames.Contains(sys))
+        {
+            SelectedStarmapSystem = sys;
+        }
+        var obj = StarmapData.FindObject(target.LocationName);
+        if (obj != null)
+        {
+            SelectedStarmapObject = obj;
+        }
+        SelectedTabIndex = 4; // Tab '🗺 Karte'
+        Status = $"🗺 Starmap fokussiert: {target.LocationName} ({target.SystemName})";
+    }
+
+    [RelayCommand]
+    public async Task ExportFlightLog()
+    {
+        var defaultFileName = $"Flugbericht_{DateTime.Now:yyyy-MM-dd_HHmm}.md";
+        var path = await PickSaveAsync(defaultFileName, "Markdown Dokument", "md");
+        if (path == null) return;
+
+        var label = SelectedSession?.Label ?? "Aktuelle Session";
+        var md = FlightRecorderService.ExportToMarkdown(label, SessionTimeline.ToList(), FlightSummary);
+        await File.WriteAllTextAsync(path, md, new UTF8Encoding(false));
+        Status = "✓ Flugbericht gespeichert: " + path;
+    }
+
+    #endregion
+
+    #region RS Signal Scanner & Mining/Salvage Decoder
+
+    public void OnRsDetected(int rs)
+    {
+        CurrentRsValue = rs;
+        RsInputText = rs.ToString();
+        var matches = RsDecoderCatalog.Decode(rs);
+        CurrentRsMatches.Clear();
+        foreach (var m in matches) CurrentRsMatches.Add(m);
+        BestRsMatch = matches.FirstOrDefault();
+
+        OnPropertyChanged(nameof(CurrentRsDisplayValue));
+        OnPropertyChanged(nameof(SecondaryRsMatchesText));
+        Status = BestRsMatch != null
+            ? $"🛰 RS Signal {rs:N0} erkannt: {BestRsMatch.DisplayTitle} ({BestRsMatch.Subtitle})"
+            : $"🛰 RS Signal {rs:N0} erkannt (Keine bekannte Signatur)";
+    }
+
+    [RelayCommand]
+    public void DecodeRs(string? input = null)
+    {
+        var raw = input ?? RsInputText;
+        if (string.IsNullOrWhiteSpace(raw)) return;
+
+        var val = RsOcrScanner.ExtractRsValue(raw);
+        if (val.HasValue)
+        {
+            OnRsDetected(val.Value);
+        }
+        else if (int.TryParse(raw.Replace(".", "").Replace(",", "").Trim(), out int num) && num >= 1000)
+        {
+            OnRsDetected(num);
+        }
+        else
+        {
+            Status = "Ungültiger RS-Wert (z.B. 7200, 14400, 3170 eingeben)";
+        }
+    }
+
+    [RelayCommand]
+    public void SetRsPreset(int value)
+    {
+        OnRsDetected(value);
+    }
+
+    [RelayCommand]
+    public void ToggleRsOverlay()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                if (_rsOverlayWindow == null)
+                {
+                    _rsOverlayWindow = new Views.RsScanOverlayWindow { DataContext = this };
+                    _rsOverlayWindow.InitSettings(_settings);
+                }
+
+                if (!_rsOverlayWindow.IsVisible)
+                {
+                    _rsOverlayWindow.Show();
+                    _rsOverlayWindow.Activate();
+                    IsRsOverlayActive = true;
+                    _settings.RsOverlayEnabled = true;
+                    Settings.Save(_settings);
+                    Status = "🛰 RS Signal Scanner Overlay eingeblendet";
+                }
+                else
+                {
+                    _rsOverlayWindow.Hide();
+                    IsRsOverlayActive = false;
+                    _settings.RsOverlayEnabled = false;
+                    Settings.Save(_settings);
+                    Status = "RS Signal Scanner Overlay ausgeblendet";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ToggleRsOverlay", ex);
+                Status = "Fehler beim Öffnen des RS-Overlays: " + ex.Message;
+                _rsOverlayWindow = null;
+                IsRsOverlayActive = false;
+            }
+        });
+    }
+
+    [RelayCommand]
+    public void ToggleRsAutoScan()
+    {
+        IsRsAutoScanEnabled = !IsRsAutoScanEnabled;
+        _settings.RsAutoScanEnabled = IsRsAutoScanEnabled;
+        Settings.Save(_settings);
+
+        if (IsRsAutoScanEnabled)
+        {
+            _rsScanner.Start();
+        }
+        else
+        {
+            _rsScanner.Stop();
+        }
+        OnPropertyChanged(nameof(RsAutoScanStatusText));
+        OnPropertyChanged(nameof(RsAutoScanBadgeBg));
+        OnPropertyChanged(nameof(RsAutoScanBadgeBorder));
+        OnPropertyChanged(nameof(RsAutoScanBadgeFg));
+    }
+
+    [RelayCommand]
+    public async Task TriggerRsOcrScan()
+    {
+        if (!_ocrEngine.IsAvailable)
+        {
+            Status = "Windows OCR ist auf diesem System nicht verfügbar";
+            return;
+        }
+
+        Status = "Scanne RS-Signal vom Bildschirm…";
+        var val = await _rsScanner.ScanOnceAsync();
+        if (val.HasValue)
+        {
+            OnRsDetected(val.Value);
+            RsOcrStatusText = $"✓ Erkannt: {val.Value:N0} RS ({DateTime.Now:HH:mm:ss})";
+        }
+        else
+        {
+            Status = "Kein RS-Signal auf dem Bildschirm erkannt";
+            RsOcrStatusText = "Kein Signal gefunden";
+        }
+    }
+
+    [RelayCommand]
+    public void CalibrateRsScanRegion()
+    {
+        var win = new Views.RegionSelectorWindow();
+        win.RegionSelected += r =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _settings.RsScanRegion = r;
+                Settings.Save(_settings);
+                Status = $"RS Scan-Bereich kalibriert: {r.Width}x{r.Height} @ ({r.X},{r.Y})";
+            });
+        };
+        win.Show();
+    }
+
+    [RelayCommand]
+    public void ResetRsScanRegion()
+    {
+        _settings.RsScanRegion = null;
+        Settings.Save(_settings);
+        Status = "RS Scan-Bereich auf Standard (Mitte) zurückgesetzt";
+    }
+
+    #endregion
 }

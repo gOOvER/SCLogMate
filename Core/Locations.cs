@@ -112,9 +112,33 @@ public static partial class Locations
     public static readonly IReadOnlyDictionary<string, (string Name, string System, string? Body, StarmapObjectType Type, bool IsArmistice)> WellKnown =
         new Dictionary<string, (string, string, string?, StarmapObjectType, bool)>(StringComparer.OrdinalIgnoreCase)
         {
+            // Nyx
             ["Nyx_Levski"] = ("Levski", "Nyx", "Delamar", StarmapObjectType.LandingZone, true),
             ["Delamar_Levski"] = ("Levski", "Nyx", "Delamar", StarmapObjectType.LandingZone, true),
             ["Levski"] = ("Levski", "Nyx", "Delamar", StarmapObjectType.LandingZone, true),
+            ["Nyx_SocialStation_003"] = ("People's Service Station Theta", "Nyx", "Delamar", StarmapObjectType.SpaceStation, true),
+            ["ThetaStation"] = ("People's Service Station Theta", "Nyx", "Delamar", StarmapObjectType.SpaceStation, true),
+            ["Nyx_RockCracker_007"] = ("QV Breaker Station BRK-267", "Nyx", "Delamar", StarmapObjectType.SpaceStation, false),
+            ["BRK267"] = ("QV Breaker Station BRK-267", "Nyx", "Delamar", StarmapObjectType.SpaceStation, false),
+            ["Nyx_OutlawStation_Keeger"] = ("Moraine Base (Keeger Belt)", "Nyx", "Keeger Belt", StarmapObjectType.SpaceStation, false),
+            ["MoraineBase"] = ("Moraine Base (Keeger Belt)", "Nyx", "Keeger Belt", StarmapObjectType.SpaceStation, false),
+
+            // Pyro
+            ["Checkmate"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
+            ["CheckmateStation"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
+            ["Orbituary"] = ("Orbituary", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
+            ["Starlight"] = ("Starlight Station", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
+            ["StarlightStation"] = ("Starlight Station", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
+            ["RuinStation"] = ("Ruin Station", "Pyro", "Terminus", StarmapObjectType.SpaceStation, false),
+            ["Ruin Station"] = ("Ruin Station", "Pyro", "Terminus", StarmapObjectType.SpaceStation, false),
+            ["Gaslight"] = ("P5-L2 Gaslight Station", "Pyro", "Pyro V", StarmapObjectType.LagrangeStation, false),
+            ["Megiddo"] = ("Megiddo Station", "Pyro", "Pyro V", StarmapObjectType.SpaceStation, false),
+            ["MegiddoStation"] = ("Megiddo Station", "Pyro", "Pyro V", StarmapObjectType.SpaceStation, false),
+            ["RatsNest"] = ("The Rat's Nest", "Pyro", "Pyro V", StarmapObjectType.SpaceStation, false),
+            ["SunsetMesa"] = ("Sunset Mesa", "Pyro", "Monox", StarmapObjectType.Outpost, false),
+            ["SacrensReach"] = ("Sacren's Reach", "Pyro", "Bloom", StarmapObjectType.Outpost, false),
+
+            // Stanton
             ["GrimHEX"] = ("Grim HEX", "Stanton", "Yela", StarmapObjectType.SpaceStation, false),
             ["Grim HEX"] = ("Grim HEX", "Stanton", "Yela", StarmapObjectType.SpaceStation, false),
             ["Stanton2b_GrimHEX"] = ("Grim HEX", "Stanton", "Yela", StarmapObjectType.SpaceStation, false),
@@ -127,12 +151,13 @@ public static partial class Locations
             ["Baijini_Point"] = ("Baijini Point", "Stanton", "ArcCorp", StarmapObjectType.SpaceStation, true),
             ["Baijini Point"] = ("Baijini Point", "Stanton", "ArcCorp", StarmapObjectType.SpaceStation, true),
             ["Klescher"] = ("Klescher Automated Rehabilitation", "Stanton", "Aberdeen", StarmapObjectType.Outpost, false),
-            ["Checkmate"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
-            ["Orbituary"] = ("Orbituary", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
-            ["RuinStation"] = ("Ruin Station", "Pyro", "Terminus", StarmapObjectType.SpaceStation, false),
-            ["Ruin Station"] = ("Ruin Station", "Pyro", "Terminus", StarmapObjectType.SpaceStation, false),
             ["SPK"] = ("Security Post Kareah", "Stanton", "Cellin", StarmapObjectType.SpaceStation, false),
-            ["SecurityPostKareah"] = ("Security Post Kareah", "Stanton", "Cellin", StarmapObjectType.SpaceStation, false)
+            ["SecurityPostKareah"] = ("Security Post Kareah", "Stanton", "Cellin", StarmapObjectType.SpaceStation, false),
+            ["Brios"] = ("Brio's Breaker Yard", "Stanton", "Daymar", StarmapObjectType.Outpost, false),
+            ["BriosBreakerYard"] = ("Brio's Breaker Yard", "Stanton", "Daymar", StarmapObjectType.Outpost, false),
+            ["Orinth"] = ("Reclamation & Disposal Orinth", "Stanton", "Hurston", StarmapObjectType.Outpost, false),
+            ["Samson"] = ("Samson & Son Salvage", "Stanton", "Wala", StarmapObjectType.Outpost, false),
+            ["Devlin"] = ("Devlin Scrap & Salvage", "Stanton", "Euterpe", StarmapObjectType.Outpost, false)
         };
 
     public static readonly IReadOnlyList<(string Token, StarmapObjectType Kind)> SiteKinds =

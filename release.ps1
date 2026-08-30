@@ -51,5 +51,5 @@ Write-Host ("   gebaut: {0:N1} MB" -f ((Get-Item $exe).Length/1MB)) -ForegroundC
 # Tag + Release
 git tag $tag 2>$null
 git push origin $tag
-gh release create $tag $exe --title $tag --notes-file $notesFile
+gh release create $tag $exe --title $tag --notes-file $notesFile --prerelease
 Write-Host "==> Release $tag erstellt: https://github.com/gOOvER/SCLogMate/releases/tag/$tag" -ForegroundColor Cyan

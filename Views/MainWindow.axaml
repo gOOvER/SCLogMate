@@ -65,6 +65,14 @@
           </StackPanel>
         </Button>
 
+        <Button Classes="ghost" Height="30" Padding="8,0" CornerRadius="5" Background="#0A1422" BorderBrush="#1C324A" BorderThickness="1"
+                Command="{Binding ToggleRsOverlayCommand}" ToolTip.Tip="Frei verschiebbares RS Signal Decoder HUD Overlay ein-/ausblenden">
+          <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+            <TextBlock Text="🛰" FontSize="11" Foreground="#F59E0B" />
+            <TextBlock Text="RS-Overlay" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+          </StackPanel>
+        </Button>
+
         <Button Classes="accent" Height="30" VerticalAlignment="Center"
                 Background="#238636" IsVisible="{Binding UpdateAvailable}"
                 Command="{Binding OpenUpdateModalCommand}" Content="{Binding UpdateText}"
@@ -682,6 +690,124 @@
                   <DataGridTextColumn Header="EMPFOHLENES SCHIFF" Binding="{Binding RecommendedShip}" Width="*" />
                 </DataGrid.Columns>
               </DataGrid>
+            </StackPanel>
+          </Border>
+
+          <!-- ══ RS Signal Decoder & Mining/Salvage Scanner ══ -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              
+              <!-- Header: Titel, Subtitel & Actions (Overlay Toggle + Auto-Scan Toggle) -->
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="label" Text="🛰  RS SIGNAL DECODER &amp; MINING/SALVAGE SCANNER" />
+                    <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                      <TextBlock Text="SC 4.x SIGNATUREN" FontSize="9" FontWeight="Bold" Foreground="#38BDF8" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Text="Entschlüsselt Radar-Resonanz-Signaturen (RS-Werte) von Asteroiden und Wrackteilen noch vor dem Nahbereichsscan." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+
+                <!-- Action Controls -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <Button Classes="accent" Padding="8,4" Command="{Binding TriggerRsOcrScanCommand}" ToolTip.Tip="Jetzt Ziffern auf dem Bildschirm scannen">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="⚡" />
+                      <TextBlock Text="OCR Scan" FontSize="11" FontWeight="Bold" />
+                    </StackPanel>
+                  </Button>
+                  <ToggleButton Classes="ghost" Padding="8,4" IsChecked="{Binding IsRsAutoScanEnabled}" Command="{Binding ToggleRsAutoScanCommand}" ToolTip.Tip="Automatischer kontinuierlicher Scan der RS-Signatur">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="👁" />
+                      <TextBlock Text="Auto-Scan" FontSize="11" />
+                    </StackPanel>
+                  </ToggleButton>
+                  <ToggleButton Classes="ghost" Padding="8,4" IsChecked="{Binding IsRsOverlayActive}" Command="{Binding ToggleRsOverlayCommand}" ToolTip.Tip="Verschiebbares In-Game HUD Overlay ein-/ausblenden">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="🗔" Foreground="#38BDF8" />
+                      <TextBlock Text="Overlay" FontSize="11" Foreground="#38BDF8" FontWeight="Bold" />
+                    </StackPanel>
+                  </ToggleButton>
+                </StackPanel>
+              </Grid>
+
+              <!-- Eingabezeile & Preset-Buttons -->
+              <Grid ColumnDefinitions="200,Auto,*" Margin="0,4,0,0">
+                <TextBox Grid.Column="0" Classes="path" Text="{Binding RsInputText}" Watermark="RS-Wert (z.B. 7200, 3170)" Height="30" FontSize="12" />
+                <Button Grid.Column="1" Classes="accent" Content="Entschlüsseln" Command="{Binding DecodeRsCommand}" CommandParameter="{Binding RsInputText}" Margin="8,0,0,0" Height="30" Padding="12,4" />
+
+                <!-- Quick Presets -->
+                <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="12,0,0,0">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="Presets:" FontSize="10.5" Foreground="#64748B" VerticalAlignment="Center" />
+                    <Button Classes="chip" Content="3.170 (1x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="3170" />
+                    <Button Classes="chip" Content="6.340 (2x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="6340" />
+                    <Button Classes="chip" Content="7.200 (2x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="7200" />
+                    <Button Classes="chip" Content="14.400 (4x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="14400" />
+                    <Button Classes="chip" Content="6.000 (3x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="6000" />
+                    <Button Classes="chip" Content="8.000 (4x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="8000" />
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+
+              <!-- Treffer-Ergebnis Karten -->
+              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0" IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+                
+                <!-- Bester Treffer Hero Card -->
+                <Border Grid.Column="0" Background="#0C1A30" BorderBrush="#1E40AF" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,6,0">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="HAUPT-ERGEBNIS" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.5" />
+                        <Border Background="{Binding BestRsMatch.BadgeColor}" CornerRadius="3" Padding="5,1">
+                          <TextBlock Text="{Binding BestRsMatch.Resource.Tier, StringFormat='Tier {0}'}" FontSize="9" FontWeight="Bold" Foreground="#FFFFFF" />
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding CurrentRsDisplayValue}" FontSize="13" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding BestRsMatch.DisplayTitle}" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
+                    <TextBlock Text="{Binding BestRsMatch.Subtitle}" FontSize="11" Foreground="#94A3B8" />
+
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="🏭" FontSize="11" />
+                        <TextBlock Text="{Binding BestRsMatch.BestRefineryText, StringFormat='Beste Raffinerie: {0}'}" FontSize="11" Foreground="#4ADE80" FontWeight="SemiBold" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding BestRsMatch.EstimatedValueText}" FontSize="12" FontWeight="Bold" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+                <!-- Alle passenden Alternativen / Multi-Node Liste -->
+                <Border Grid.Column="1" Background="#08101C" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,0,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="ALLE MÖGLICHEN RESSOURCEN" FontSize="9.5" FontWeight="Bold" Foreground="#8B949E" LetterSpacing="0.5" />
+                    
+                    <ItemsControl ItemsSource="{Binding CurrentRsMatches}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:RsMatch">
+                          <Border Background="#0E1726" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                              <Border Grid.Column="0" Background="{Binding BadgeColor}" CornerRadius="3" Padding="4,1" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Resource.Tier}" FontSize="8.5" FontWeight="Bold" Foreground="#FFFFFF" />
+                              </Border>
+                              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DisplayTitle}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="#64748B" TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="2" Text="{Binding BestRefineryText}" FontSize="10" Foreground="#4ADE80" VerticalAlignment="Center" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+
+              </Grid>
+
             </StackPanel>
           </Border>
 
@@ -1338,7 +1464,511 @@
       </Grid>
     </TabItem>
 
-    <!-- Tab 5: Flotten- & Hangar-Verzeichnis -->
+    <!-- Tab 5: Flugschreiber & Session-Timeline (Black Box) -->
+    <TabItem Header="⏱ Flugschreiber">
+      <Grid RowDefinitions="Auto,*" Margin="0,10,0,0">
+        
+        <!-- 1. Obere Missions- & Black-Box-Header Leiste -->
+        <Border Grid.Row="0" Classes="card" Padding="12,10" Margin="0,0,0,10">
+          <Grid ColumnDefinitions="*,*,*,*,Auto">
+            
+            <!-- KPI 1: Flugdistanz -->
+            <Border Grid.Column="0" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="🚀" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="FLUGDISTANZ (QUANTUM)" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.TotalDistanceText}" FontSize="13.5" FontWeight="Bold" Foreground="#38BDF8" />
+                  <TextBlock Text="{Binding FlightSummary.QuantumJumps, StringFormat='{}{0} Quantum-Sprünge'}" FontSize="10.5" Foreground="#8B949E" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- KPI 2: Flugzeit / Cockpit -->
+            <Border Grid.Column="1" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="⏱" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="FLUGZEIT / COCKPIT" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.TotalFlightDuration, StringFormat='{}{0:hh\\:mm} Std. aktiv'}" FontSize="13.5" FontWeight="Bold" Foreground="#60A5FA" />
+                  <TextBlock Text="{Binding FlightSummary.TotalSessionDuration, StringFormat='{}von {0:hh\\:mm} Std. Gesamt'}" FontSize="10.5" Foreground="#8B949E" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- KPI 3: Netto-Finanzbilanz -->
+            <Border Grid.Column="2" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="💰" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="FINANZEN (NETTO-PROFIT)" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.NetAuecText}" FontSize="13.5" FontWeight="Bold" Foreground="{Binding FlightSummary.NetAuecColor}" />
+                  <TextBlock Text="Einnahmen minus Ausgaben" FontSize="10.5" Foreground="#8B949E" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- KPI 4: Gefechts-Bilanz -->
+            <Border Grid.Column="3" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="⚔️" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="KAMPFREKORD" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.CombatKdRatio}" FontSize="13.5" FontWeight="Bold" Foreground="#34D399" />
+                  <TextBlock Text="{Binding FlightSummary.Kills, StringFormat='{}{0} Kills · {1} Verluste', FallbackValue='0 Kills', TargetNullValue='0 Kills'}" FontSize="10.5" Foreground="#8B949E" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- Aktionen: Export & Aktualisieren -->
+            <StackPanel Grid.Column="4" Orientation="Vertical" Spacing="6" VerticalAlignment="Center">
+              <Button Classes="accent" Command="{Binding RebuildTimelineCommand}" Padding="10,5" ToolTip.Tip="Flugschreiber für die aktuelle Session neu berechnen">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Text="🔄" />
+                  <TextBlock Text="Neu analysieren" FontSize="11" FontWeight="Bold" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost" Command="{Binding ExportFlightLogCommand}" Padding="10,4" ToolTip.Tip="Flugbericht als Markdown-Datei exportieren">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Text="📄" />
+                  <TextBlock Text="Bericht exportieren" FontSize="11" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+
+          </Grid>
+        </Border>
+
+        <!-- 2. Hauptbereich: Links Timeline / Rechts Insights -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,360">
+          
+          <!-- Linke Spalte: Filter-Toolbar + Chronologischer Zeitstrahl -->
+          <Border Grid.Column="0" Classes="card" Padding="12" Margin="0,0,8,0">
+            <DockPanel>
+              
+              <!-- Filter-Leiste & Volltextsuche -->
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Classes="chip" Content="Alle Ereignisse" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Alle"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
+                    <Button Classes="chip" Content="🌀 Quantum" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Quantum"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Quantum}" />
+                    <Button Classes="chip" Content="⚔️ Kampf" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Kampf"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Kampf}" />
+                    <Button Classes="chip" Content="💰 Handel" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Handel"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Handel}" />
+                    <Button Classes="chip" Content="⛏️ Mining" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Mining"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Mining}" />
+                    <Button Classes="chip" Content="📍 Orte &amp; Landung" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Orte"
+                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
+                  </StackPanel>
+                </ScrollViewer>
+
+                <TextBox Grid.Column="1" Classes="search" Text="{Binding TimelineSearchText}" Watermark="Timeline durchsuchen…" Width="200" Height="28" Margin="8,0,0,0" />
+              </Grid>
+
+              <!-- Timeline Items Liste -->
+              <ListBox ItemsSource="{Binding TimelineView}"
+                       SelectedItem="{Binding SelectedTimelineItem}"
+                       Background="Transparent" BorderThickness="0" Padding="0">
+                <ListBox.Styles>
+                  <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="4,3" />
+                    <Setter Property="Margin" Value="0,0,0,4" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="CornerRadius" Value="6" />
+                  </Style>
+                  <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                    <Setter Property="Background" Value="#0F253E" />
+                  </Style>
+                </ListBox.Styles>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="m:FlightTimelineItem">
+                    <Border Background="{Binding BadgeBackground}" BorderBrush="{Binding BadgeBorder}" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                      <Grid ColumnDefinitions="65,Auto,*,Auto">
+                        
+                        <!-- Spalte 0: Zeit & Relativzeit -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding FormattedTime}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" />
+                          <TextBlock Text="{Binding RelativeTimeText}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="9.5" Foreground="#7E97AD" />
+                        </StackPanel>
+
+                        <!-- Spalte 1: Icon & Typ-Badge -->
+                        <Border Grid.Column="1" Background="#08101C" BorderBrush="{Binding BadgeBorder}" BorderThickness="1" CornerRadius="6" Width="36" Height="36" Margin="8,0,12,0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding IconGlyph}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <!-- Spalte 2: Titel, Subtitel & Details -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="Bold" Foreground="#F0F6FC" />
+                            <Border Background="#0D1B2A" BorderBrush="#1B3855" BorderThickness="1" CornerRadius="3" Padding="4,1" IsVisible="{Binding ShipName.Length}">
+                              <TextBlock Text="{Binding ShipName}" FontSize="9.5" Foreground="#38BDF8" FontWeight="SemiBold" />
+                            </Border>
+                          </StackPanel>
+                          <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="#64748B" TextTrimming="CharacterEllipsis" IsVisible="{Binding Detail.Length}" />
+                        </StackPanel>
+
+                        <!-- Spalte 3: Distanz / Delta / Map Button -->
+                        <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
+                          <TextBlock Text="{Binding DeltaAuecText}" Foreground="{Binding DeltaAuecColor}" FontWeight="Bold" FontSize="11.5" HorizontalAlignment="Right" IsVisible="{Binding DeltaAuecText.Length}" />
+                          <TextBlock Text="{Binding DistanceText}" Foreground="#818CF8" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding DistanceText.Length}" />
+                          <Button Classes="ghost" Padding="6,2" CornerRadius="4" HorizontalAlignment="Right"
+                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).JumpToTimelineLocationCommand}"
+                                  CommandParameter="{Binding}"
+                                  ToolTip.Tip="Diesen Wegpunkt auf der Starmap anzeigen"
+                                  IsVisible="{Binding LocationName.Length}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <TextBlock Text="🗺" FontSize="10" />
+                              <TextBlock Text="{Binding LocationName}" FontSize="10" Foreground="#38BDF8" />
+                            </StackPanel>
+                          </Button>
+                        </StackPanel>
+
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+            </DockPanel>
+          </Border>
+
+          <!-- Rechte Spalte: Detail-Inspektor & Session-Analysen -->
+          <Border Grid.Column="1" Classes="card" Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="10">
+                
+                <!-- 1. Header -->
+                <TextBlock Text="🛰  BLACK BOX DETAIL-INSPEKTOR" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.5" />
+
+                <!-- 2. Selektiertes Ereignis Detail -->
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="AUSGEWÄHLTER FLUGWEGPUNKT" FontSize="9.5" FontWeight="Bold" Foreground="#8B949E" />
+                    
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Text="Ereignis:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTimelineItem.TypeLabel, FallbackValue='Keine Auswahl'}" Foreground="#F0F6FC" FontWeight="Bold" FontSize="11" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Zeitstempel:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                      <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTimelineItem.FormattedTime, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Text="Standort:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedTimelineItem.LocationName, FallbackValue='—'}" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="11" />
+
+                      <TextBlock Grid.Row="3" Grid.Column="0" Text="Schiff:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                      <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedTimelineItem.ShipName, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
+                    </Grid>
+
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                            Command="{Binding JumpToTimelineLocationCommand}"
+                            CommandParameter="{Binding SelectedTimelineItem}"
+                            IsEnabled="{Binding SelectedTimelineItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="🗺" />
+                        <TextBlock Text="Ort auf Starmap fokussieren" FontWeight="Bold" FontSize="11" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
+
+                <!-- 3. Besuchte Himmelskörper -->
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="🪐  BESUCHTE HIMMELSKÖRPER" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
+                      <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
+                        <TextBlock Text="{Binding FlightSummary.VisitedBodies.Count, StringFormat='{}{0} Zonen'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+                      </Border>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding FlightSummary.VisitedBodies}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="🪐" Foreground="#F59E0B" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+
+                <!-- 4. Eingesetzte Schiffe -->
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="🛸  EINGESETZTE SCHIFFE" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
+                      <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
+                        <TextBlock Text="{Binding FlightSummary.UsedShips.Count, StringFormat='{}{0} Schiffe'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+                      </Border>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding FlightSummary.UsedShips}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="✈" Foreground="#38BDF8" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+
+        </Grid>
+      </Grid>
+    </TabItem>
+
+    <!-- Tab 6: RS Signal Decoder & Mining/Salvage Scanner -->
+    <TabItem Header="🛰 Erz-Scanner">
+      <ScrollViewer Margin="0,10,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14">
+
+          <!-- 1. Top HUD Control Strip: Große Signalanzeige + OCR & Overlay Actions -->
+          <Border Classes="card" Padding="14,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              
+              <!-- Links: Große Signal-Anzeige & Zifferneingabe -->
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <Border Background="#0C1829" BorderBrush="#1E3A8A" BorderThickness="1.5" CornerRadius="8" Padding="14,8" VerticalAlignment="Center">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="AKTIVES RADAR-SIGNAL" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" LetterSpacing="0.5" />
+                    <TextBlock Text="{Binding CurrentRsDisplayValue}" FontSize="22" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Eingabefeld -->
+                <StackPanel VerticalAlignment="Center" Spacing="4">
+                  <TextBlock Text="RS-Ziffer manuell eingeben:" Foreground="#8B949E" FontSize="11" />
+                  <Grid ColumnDefinitions="180,Auto">
+                    <TextBox Grid.Column="0" Classes="path" Text="{Binding RsInputText}" Watermark="z.B. 7200, 14400, 3170" Height="32" FontSize="12" />
+                    <Button Grid.Column="1" Classes="accent" Content="Entschlüsseln" Command="{Binding DecodeRsCommand}" CommandParameter="{Binding RsInputText}" Margin="8,0,0,0" Height="32" Padding="12,4" />
+                  </Grid>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Mitte: Schnellauswahl Presets -->
+              <Border Grid.Column="1" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="14,0" VerticalAlignment="Center">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Schnellauswahl gängiger Star Citizen 4.x Signaturen:" FontSize="10" Foreground="#64748B" />
+                  <WrapPanel Orientation="Horizontal">
+                    <Button Classes="chip" Content="3.170 (1x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="3170" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="6.340 (2x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="6340" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="7.200 (2x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="7200" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="10.800 (3x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="10800" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="14.400 (4x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="14400" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="6.000 (3x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="6000" Margin="0,0,4,4" />
+                    <Button Classes="chip" Content="8.000 (4x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="8000" Margin="0,0,4,4" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+
+              <!-- Rechts: OCR & In-Game Overlay Actions -->
+              <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="accent" Padding="10,6" Command="{Binding TriggerRsOcrScanCommand}" ToolTip.Tip="Jetzt Ziffern auf dem Bildschirm via OCR scannen">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="⚡" FontSize="12" />
+                      <TextBlock Text="OCR Scan" FontSize="11.5" FontWeight="Bold" />
+                    </StackPanel>
+                  </Button>
+                  <ToggleButton Classes="ghost" Padding="10,6" IsChecked="{Binding IsRsAutoScanEnabled}" Command="{Binding ToggleRsAutoScanCommand}" ToolTip.Tip="Automatischer kontinuierlicher Scan der RS-Signatur">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="👁" FontSize="12" />
+                      <TextBlock Text="Auto-Scan" FontSize="11.5" />
+                    </StackPanel>
+                  </ToggleButton>
+                  <ToggleButton Classes="ghost" Padding="10,6" IsChecked="{Binding IsRsOverlayActive}" Command="{Binding ToggleRsOverlayCommand}" ToolTip.Tip="Verschiebbares In-Game HUD Overlay ein-/ausblenden">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="🗔" FontSize="12" Foreground="#38BDF8" />
+                      <TextBlock Text="Overlay" FontSize="11.5" Foreground="#38BDF8" FontWeight="Bold" />
+                    </StackPanel>
+                  </ToggleButton>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding RsOcrStatusText}" FontSize="10.5" Foreground="#7E97AD" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <Button Grid.Column="1" Classes="ghost" Padding="6,2" Command="{Binding CalibrateRsScanRegionCommand}" ToolTip.Tip="Bildschirmbereich für Ziffern auswählen">
+                    <TextBlock Text="⛶ Bereich kalibrieren" FontSize="10" Foreground="#38BDF8" />
+                  </Button>
+                </Grid>
+              </StackPanel>
+
+            </Grid>
+          </Border>
+
+          <!-- 2. Scan-Ergebnis Details (2 Spalten: Bester Treffer Hero Card vs. Alle Alternativen) -->
+          <Grid ColumnDefinitions="*,*">
+            
+            <!-- Linke Spalte: Bester Treffer Hero Card -->
+            <Border Grid.Column="0" Classes="card" Margin="0,0,6,0">
+              <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Classes="label" Text="🛰  HAUPT-ERKENNUNGSERGEBNIS" />
+                    <TextBlock Text="Das wahrscheinlichste Erz bzw. Vorkommen basierend auf Signalstärke &amp; Clusterlimits." Foreground="#8B949E" FontSize="11" />
+                  </StackPanel>
+                  <Border Grid.Column="1" Background="{Binding BestRsMatch.BadgeColor, FallbackValue='#334155'}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <TextBlock Text="{Binding BestRsMatch.Resource.Tier, StringFormat='Tier {0}'}" FontSize="10" FontWeight="Bold" Foreground="#FFFFFF" />
+                  </Border>
+                </Grid>
+
+                <!-- Wenn noch nichts gescannt wurde -->
+                <Border Background="#0D1422" BorderBrush="#1C2F47" BorderThickness="1" CornerRadius="8" Padding="24" IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNull}}">
+                  <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <TextBlock Text="🛰" FontSize="32" HorizontalAlignment="Center" />
+                    <TextBlock Text="Warte auf Radar-Resonanzsignal…" FontSize="14" FontWeight="Bold" Foreground="#F0F6FC" HorizontalAlignment="Center" />
+                    <TextBlock Text="Scanne im Schiff mit TAB (Ping) oder V (Scanner), tippe eine Zahl ein oder klicke auf ein Preset." Foreground="#8B949E" FontSize="11.5" HorizontalAlignment="Center" TextAlignment="Center" />
+                  </StackPanel>
+                </Border>
+
+                <!-- Bester Treffer Details -->
+                <Border Background="#0C1B30" BorderBrush="#1E40AF" BorderThickness="1.5" CornerRadius="8" Padding="14" IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding BestRsMatch.DisplayTitle}" FontSize="20" FontWeight="Bold" Foreground="#38BDF8" />
+                        <TextBlock Text="{Binding BestRsMatch.Subtitle}" FontSize="12" Foreground="#94A3B8" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding CurrentRsDisplayValue}" FontSize="16" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" Margin="0,6,0,0">
+                      <!-- Beste Raffinerie -->
+                      <Border Grid.Column="0" Background="#08101E" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,4,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="BESTE RAFFINERIE" FontSize="9" FontWeight="Bold" Foreground="#64748B" />
+                          <TextBlock Text="{Binding BestRsMatch.BestRefineryText}" FontSize="12" FontWeight="Bold" Foreground="#4ADE80" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </Border>
+
+                      <!-- Ertrag / Wert -->
+                      <Border Grid.Column="1" Background="#08101E" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="4,0,0,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="GESCHÄTZTER WERT" FontSize="9" FontWeight="Bold" Foreground="#64748B" />
+                          <TextBlock Text="{Binding BestRsMatch.EstimatedValueText}" FontSize="12" FontWeight="Bold" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" />
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+
+                    <!-- Base-RS & Nodes Information -->
+                    <Border Background="#08101E" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                      <Grid ColumnDefinitions="*,*,*">
+                        <StackPanel Grid.Column="0">
+                          <TextBlock Text="Basis-RS:" FontSize="10" Foreground="#64748B" />
+                          <TextBlock Text="{Binding BestRsMatch.Resource.BaseRs, StringFormat='{}{0:N0}'}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="Node-Anzahl:" FontSize="10" Foreground="#64748B" />
+                          <TextBlock Text="{Binding BestRsMatch.Nodes, StringFormat='{}{0} Stück'}" FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                          <TextBlock Text="Genauigkeit:" FontSize="10" Foreground="#64748B" />
+                          <TextBlock Text="{Binding BestRsMatch.IsExact, Converter={StaticResource ActiveBrush}}" FontSize="11" FontWeight="SemiBold" Foreground="#34D399" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+              </StackPanel>
+            </Border>
+
+            <!-- Rechte Spalte: Alle Treffer & Alternativen -->
+            <Border Grid.Column="1" Classes="card" Margin="6,0,0,0">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="label" Text="📋  ALLE PASSENDEN RESSOURCEN / ALTERNATIVEN" />
+                <TextBlock Text="Liste aller Erze oder Materialien, deren Signatur-Multiplikator zum aktuellen Signal passt." Foreground="#8B949E" FontSize="11" />
+
+                <!-- Treffer-Liste -->
+                <ItemsControl ItemsSource="{Binding CurrentRsMatches}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="m:RsMatch">
+                      <Border Background="#0A1220" BorderBrush="#1C2D44" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                          <Border Grid.Column="0" Background="{Binding BadgeColor}" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Resource.Tier}" FontSize="9" FontWeight="Bold" Foreground="#FFFFFF" />
+                          </Border>
+                          
+                          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DisplayTitle}" FontSize="12" FontWeight="Bold" Foreground="#F0F6FC" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#7E97AD" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+
+                          <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding BestRefineryText}" FontSize="10.5" Foreground="#4ADE80" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding EstimatedValueText}" FontSize="10" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" HorizontalAlignment="Right" />
+                          </StackPanel>
+
+                          <Border Grid.Column="3" Background="#162338" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="6,0,0,0">
+                            <TextBlock Text="{Binding Resource.BaseRs, StringFormat='Base {0}'}" FontSize="9.5" Foreground="#38BDF8" />
+                          </Border>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Keine alternativen Signaturen gefunden." Foreground="#64748B" FontSize="11" FontStyle="Italic"
+                           IsVisible="{Binding CurrentRsMatches.Count, Converter={x:Static ObjectConverters.IsNull}}" />
+
+              </StackPanel>
+            </Border>
+
+          </Grid>
+
+          <!-- 3. Vollständige Star Citizen 4.x Signatur-Referenztabelle -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="📖  VOLLSTÄNDIGER STAR CITIZEN 4.x ERZ- &amp; SIGNATUR-KATALOG" />
+              <TextBlock Text="Referenztabelle aller bekannten Schiffserze, Edelsteine und Salvage-Materialien mit ihren exakten Radar-Basissignaturen und Veredelungsempfehlungen." Foreground="#8B949E" FontSize="11" />
+
+              <DataGrid ItemsSource="{Binding AllCatalogResources}" AutoGenerateColumns="False" IsReadOnly="True"
+                        CanUserSortColumns="True" HeadersVisibility="Column" MinHeight="260">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="MATERIAL / ERZ" Binding="{Binding Name}" Width="180" />
+                  <DataGridTextColumn Header="TIER" Binding="{Binding Tier}" Width="80" />
+                  <DataGridTextColumn Header="SELTENHEIT" Binding="{Binding Rarity}" Width="120" />
+                  <DataGridTemplateColumn Header="BASIS-RS" Width="130" SortMemberPath="BaseRs">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="m:RsResource">
+                        <TextBlock Text="{Binding BaseRs, StringFormat='{}{0:N0} RS'}" Foreground="#F59E0B" FontWeight="Bold" FontFamily="Cascadia Code, Consolas, monospace" Margin="8,0" VerticalAlignment="Center" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTextColumn Header="METHODE" Binding="{Binding Method}" Width="100" />
+                  <DataGridTemplateColumn Header="Ø MARKTWERT / SCU" Width="160" SortMemberPath="EstimatedPricePerScu">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate x:DataType="m:RsResource">
+                        <TextBlock Text="{Binding EstimatedPricePerScu, StringFormat='ca. {0:N0} aUEC'}" Foreground="#34D399" FontWeight="SemiBold" FontFamily="Cascadia Code, Consolas, monospace" Margin="8,0" VerticalAlignment="Center" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- Tab 7: Flotten- & Hangar-Verzeichnis -->
     <TabItem Header="🛸 Flotte">
       <DockPanel Margin="0,8,0,0">
 
@@ -1979,7 +2609,7 @@
 
           <!-- Sub-Tab 1: 📁 Allgemein -->
           <TabItem Header="📁 Allgemein">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <!-- 1. Star Citizen & Logdatei -->
@@ -2043,7 +2673,7 @@
 
           <!-- Sub-Tab 2: ⏳ Wipe & Filter -->
           <TabItem Header="⏳ Wipe &amp; Filter">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <Border Classes="card">
@@ -2101,7 +2731,7 @@
 
           <!-- Sub-Tab 3: 🖥 Overlays & HUD -->
           <TabItem Header="🖥 Overlays">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <!-- 1. Mini-HUD Overlay -->
@@ -2151,7 +2781,55 @@
                   </StackPanel>
                 </Border>
 
-                <!-- 2. Achievement Toast Banner & Modulare Kategorien -->
+                <!-- 2. RS Signal Scanner Overlay -->
+                <Border Classes="card">
+                  <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Classes="label" Text="🛰  RS SIGNAL SCANNER &amp; MINING HUD OVERLAY" />
+                        <TextBlock Text="Kompaktes, frei verschiebbares In-Game Overlay für Mining- &amp; Salvage-Signaturen mit Node-Count, Raffinerie-Bonus und aUEC-Schätzung." Foreground="#8B949E" FontSize="11" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="ghost" Padding="10,6" CornerRadius="5" VerticalAlignment="Center" Margin="12,0,0,0"
+                              Background="{Binding IsRsOverlayActive, Converter={StaticResource GreenRedBg}}"
+                              BorderBrush="{Binding IsRsOverlayActive, Converter={StaticResource GreenRedBrush}}"
+                              BorderThickness="1"
+                              Command="{Binding ToggleRsOverlayCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="🛰" FontSize="12" Foreground="{Binding IsRsOverlayActive, Converter={StaticResource GreenRedBrush}}" />
+                          <TextBlock Text="RS Overlay aktiv" FontSize="12" FontWeight="Bold" Foreground="{Binding IsRsOverlayActive, Converter={StaticResource GreenRedBrush}}" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                      <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,6,0">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="Automatischer Scan &amp; OCR" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                          <CheckBox IsChecked="{Binding IsRsAutoScanEnabled}" Command="{Binding ToggleRsAutoScanCommand}">
+                            <TextBlock Text="⚡ Kontinuierlicher Auto-Scan (350ms Intervall)" FontSize="11" Foreground="#34D399" FontWeight="SemiBold" />
+                          </CheckBox>
+                          <TextBlock Text="Liest die RS-Ziffern automatisch bei jedem HUD-Ping vom Bildschirm ab." Foreground="#8B949E" FontSize="11" />
+                        </StackPanel>
+                      </Border>
+
+                      <Border Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="6,0,0,0">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Scan-Bereich auf dem Bildschirm" Foreground="#F0F6FC" FontSize="12" FontWeight="SemiBold" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="ghost" Padding="8,4" Command="{Binding CalibrateRsScanRegionCommand}">
+                              <TextBlock Text="⛶ Bereich auswählen" FontSize="11" Foreground="#38BDF8" FontWeight="SemiBold" />
+                            </Button>
+                            <Button Classes="ghost" Padding="8,4" Command="{Binding ResetRsScanRegionCommand}">
+                              <TextBlock Text="↺ Zurücksetzen" FontSize="11" Foreground="#8B949E" />
+                            </Button>
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+                <!-- 3. Achievement Toast Banner & Modulare Kategorien -->
                 <Border Classes="card">
                   <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">
@@ -2228,7 +2906,7 @@
 
           <!-- Sub-Tab 4: 👁 mobiGlas & OCR -->
           <TabItem Header="👁 mobiGlas / OCR">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <!-- mobiGlas Screenreader -->
@@ -2322,7 +3000,7 @@
 
           <!-- Sub-Tab 5: 🌐 UEX Integration -->
           <TabItem Header="🌐 UEX Corp">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <Border Classes="card">
@@ -2361,7 +3039,7 @@
 
           <!-- Sub-Tab 6: 💾 Datenbank & Wartung -->
           <TabItem Header="💾 Datenbank">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,48" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
               <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <Border Classes="card">
