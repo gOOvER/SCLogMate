@@ -66,6 +66,12 @@ public partial class MainViewModel : ObservableObject
     public string ActiveContractsCountText => ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
     [ObservableProperty] private bool updateAvailable;
     [ObservableProperty] private string updateText = "";
+    [ObservableProperty] private bool isUpdateModalOpen;
+    [ObservableProperty] private string updateNewVersion = "";
+    [ObservableProperty] private string updateCurrentVersion = "";
+    [ObservableProperty] private string updateReleaseNotes = "";
+    [ObservableProperty] private string updateStatusText = "";
+    [ObservableProperty] private bool isInstallingUpdate;
     readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _knownContracts = new(StringComparer.OrdinalIgnoreCase);
     Updater.Info? _update;
     Avalonia.Threading.DispatcherTimer? _updateTimer;
@@ -2307,6 +2313,10 @@ public partial class MainViewModel : ObservableObject
             _update = info;
             UpdateAvailable = true;
             UpdateText = $"⬆ Update {info.Version}";
+            UpdateNewVersion = $"v{info.Version}";
+            UpdateCurrentVersion = $"v{Updater.CurrentVersion}";
+            UpdateReleaseNotes = !string.IsNullOrWhiteSpace(info.ReleaseNotes) ? info.ReleaseNotes : "Ein neues Update für SCLogMate ist auf GitHub verfügbar.";
+            IsUpdateModalOpen = true;
             Status = $"Update {info.Version} verfügbar!";
         }
         else
@@ -2315,7 +2325,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    async void CheckForUpdate()
+    async void CheckForUpdate(bool showModal = true)
     {
         var info = await Updater.CheckAsync();
         if (info is null) return;
@@ -2324,19 +2334,67 @@ public partial class MainViewModel : ObservableObject
             _update = info;
             UpdateAvailable = true;
             UpdateText = $"⬆ Update {info.Version}";
+            UpdateNewVersion = $"v{info.Version}";
+            UpdateCurrentVersion = $"v{Updater.CurrentVersion}";
+            UpdateReleaseNotes = !string.IsNullOrWhiteSpace(info.ReleaseNotes) ? info.ReleaseNotes : "Ein neues Update für SCLogMate ist auf GitHub verfügbar.";
+            if (showModal)
+            {
+                IsUpdateModalOpen = true;
+            }
         });
+    }
+
+    [RelayCommand]
+    private void OpenUpdateModal()
+    {
+        if (_update != null)
+        {
+            IsUpdateModalOpen = true;
+        }
+        else
+        {
+            _ = CheckForUpdateManual();
+        }
+    }
+
+    [RelayCommand]
+    private void CloseUpdateModal()
+    {
+        IsUpdateModalOpen = false;
+    }
+
+    [RelayCommand]
+    private void OpenReleaseInBrowser()
+    {
+        try
+        {
+            var url = _update?.HtmlUrl ?? "https://github.com/gOOvER/SCLogMate/releases";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch { }
     }
 
     [RelayCommand]
     private async Task Update()
     {
-        if (_update is null) return;
-        Status = $"lade Update {_update.Version}…";
-        await Updater.ApplyAsync(_update);
-        Status = "Update wird installiert – Neustart…";
-        await Task.Delay(400);
-        (Avalonia.Application.Current?.ApplicationLifetime
-            as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+        if (_update is null || IsInstallingUpdate) return;
+        IsInstallingUpdate = true;
+        UpdateStatusText = $"Lade Update {_update.Version} herunter...";
+        Status = $"Lade Update {_update.Version}…";
+        try
+        {
+            await Updater.ApplyAsync(_update);
+            UpdateStatusText = "Update wird installiert – SCLogMate startet neu…";
+            Status = "Update wird installiert – Neustart…";
+            await Task.Delay(500);
+            (Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            IsInstallingUpdate = false;
+            UpdateStatusText = $"Fehler beim Aktualisieren: {ex.Message}";
+        }
     }
 
     partial void OnRunningChanged(bool value) => OnPropertyChanged(nameof(ToggleText));

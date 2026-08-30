@@ -67,8 +67,8 @@
 
         <Button Classes="accent" Height="30" VerticalAlignment="Center"
                 Background="#238636" IsVisible="{Binding UpdateAvailable}"
-                Command="{Binding UpdateCommand}" Content="{Binding UpdateText}"
-                ToolTip.Tip="Neue Version herunterladen und installieren" />
+                Command="{Binding OpenUpdateModalCommand}" Content="{Binding UpdateText}"
+                ToolTip.Tip="Update-Details ansehen und installieren" />
       </StackPanel>
     </Grid>
 
@@ -2890,6 +2890,89 @@
           </Border>
 
         </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- ══ DEDIZIERTES UPDATE-FENSTER MODAL ══ -->
+    <Border Background="#E6070D14" IsVisible="{Binding IsUpdateModalOpen}"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ZIndex="1000">
+      <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="580" MaxHeight="640"
+              Background="#0E1624" BorderBrush="#22C55E" BorderThickness="1.5" CornerRadius="12"
+              BoxShadow="0 20 60 #90000000" Padding="28,24">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="0">
+          
+          <!-- Header mit Icon, Titel, Versions-Badges & Schließen-Button -->
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,18">
+            <Border Grid.Column="0" Background="#0A2A1A" BorderBrush="#22C55E" BorderThickness="1"
+                    CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+              <TextBlock Text="🚀" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+              <TextBlock Text="Neues SCLogMate Update verfügbar!" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                  <TextBlock Text="{Binding UpdateCurrentVersion, StringFormat='Aktuell: {0}'}" FontSize="10" Foreground="#8B949E" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock Text="➔" FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" />
+                <Border Background="#0C341E" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                  <TextBlock Text="{Binding UpdateNewVersion, StringFormat='Neu: {0}'}" FontSize="10" Foreground="#4ADE80" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+            </StackPanel>
+
+            <Button Grid.Column="2" Classes="ghost" Width="32" Height="32" Padding="0" CornerRadius="6"
+                    VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding CloseUpdateModalCommand}" ToolTip.Tip="Schließen (Später erinnern)">
+              <TextBlock Text="✕" FontSize="14" Foreground="#8B949E" />
+            </Button>
+          </Grid>
+
+          <!-- Changelog & Release Notes -->
+          <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,18">
+            <TextBlock Text="CHANGELOG &amp; NEUERUNGEN:" FontSize="10.5" FontWeight="Bold" Foreground="#8B949E" LetterSpacing="0.5" />
+            <Border Background="#070D16" BorderBrush="#1C2B3E" BorderThickness="1" CornerRadius="8" Padding="14,12" MaxHeight="260">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBlock Text="{Binding UpdateReleaseNotes}" FontSize="12" LineHeight="19" Foreground="#C9D1D9" TextWrapping="Wrap" />
+              </ScrollViewer>
+            </Border>
+
+            <!-- Installations-Status & Spinner -->
+            <Border Background="#0A1F14" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="6" Padding="10,8"
+                    IsVisible="{Binding IsInstallingUpdate}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="⚡" FontSize="14" Foreground="#4ADE80" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding UpdateStatusText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#4ADE80" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Action Buttons -->
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto">
+            <Button Grid.Column="0" Classes="ghost" Height="36" Padding="14,0" CornerRadius="6"
+                    Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                    Command="{Binding OpenReleaseInBrowserCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="🌐" FontSize="12" />
+                <TextBlock Text="Auf GitHub ansehen" FontSize="11.5" Foreground="#F0F6FC" />
+              </StackPanel>
+            </Button>
+
+            <Button Grid.Column="2" Classes="ghost" Height="36" Padding="14,0" CornerRadius="6" Margin="0,0,10,0"
+                    Command="{Binding CloseUpdateModalCommand}" Content="Später erinnern" FontSize="11.5" Foreground="#8B949E" />
+
+            <Button Grid.Column="3" Classes="accent" Height="36" Padding="18,0" CornerRadius="6"
+                    Background="#238636" BorderThickness="0"
+                    IsEnabled="{Binding !IsInstallingUpdate}"
+                    Command="{Binding UpdateCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="🚀" FontSize="13" />
+                <TextBlock Text="Jetzt aktualisieren &amp; neu starten" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" />
+              </StackPanel>
+            </Button>
+          </Grid>
+
+        </Grid>
       </Border>
     </Border>
 

@@ -19,7 +19,7 @@ public static class Updater
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
-    public record Info(string Version, string Url);
+    public record Info(string Version, string Url, string? ReleaseNotes = null, string? HtmlUrl = null);
 
     public static string CurrentVersion =>
         Assembly.GetExecutingAssembly().GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";
@@ -30,7 +30,7 @@ public static class Updater
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get,
-                $"https://api.github.com/repos/{Repo}/releases/latest");
+                $"https://api.github.com/repos/{Repo}/releases?per_page=5");
             req.Headers.UserAgent.ParseAdd("SCLogMate");
             req.Headers.Accept.ParseAdd("application/vnd.github+json");
 
@@ -38,19 +38,29 @@ public static class Updater
             if (!resp.IsSuccessStatusCode) return null;
 
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            var tag = doc.RootElement.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
+            if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0) return null;
+
+            // Erstes Release (neuestes) prüfen
+            var rel = doc.RootElement[0];
+            var tag = rel.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
+            var body = rel.TryGetProperty("body", out var b) ? b.GetString() : null;
+            var htmlUrl = rel.TryGetProperty("html_url", out var h) ? h.GetString() : $"https://github.com/{Repo}/releases";
 
             string? url = null;
-            if (doc.RootElement.TryGetProperty("assets", out var assets))
+            if (rel.TryGetProperty("assets", out var assets))
+            {
                 foreach (var a in assets.EnumerateArray())
+                {
                     if ((a.GetProperty("name").GetString() ?? "").EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                     {
                         url = a.GetProperty("browser_download_url").GetString();
                         break;
                     }
+                }
+            }
 
             if (tag != null && url != null && IsNewer(tag, CurrentVersion))
-                return new Info(tag, url);
+                return new Info(tag, url, body, htmlUrl);
         }
         catch { /* offline / kein Release -> kein Update */ }
         return null;
