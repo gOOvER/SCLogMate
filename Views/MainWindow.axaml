@@ -2881,12 +2881,12 @@
           </StackPanel>
 
           <!-- Info-Hinweisbox -->
-          <Border Background="#091422" BorderBrush="#16283D" BorderThickness="1" CornerRadius="6" Padding="10,8">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Top" />
-              <TextBlock Text="SCLogMate liest deine Star Citizen Game-Logs im Hintergrund ein. Nach Abschluss stehen alle Daten sofort blitzschnell zur Verfügung."
-                         FontSize="10.5" LineHeight="15" Foreground="#7D8590" TextWrapping="Wrap" />
-            </StackPanel>
+          <Border Background="#091422" BorderBrush="#16283D" BorderThickness="1" CornerRadius="6" Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0" Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="1" Text="Logs werden im Hintergrund indexiert. Daten stehen gleich bereit."
+                         FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </Grid>
           </Border>
 
         </StackPanel>
