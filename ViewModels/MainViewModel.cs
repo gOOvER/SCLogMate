@@ -217,6 +217,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string newPoiCategory = "Mining";
     [ObservableProperty] private string newPoiColor = "#F59E0B";
 
+    // Flotten-Sorties Entprellung
+    private readonly HashSet<string> _sessionFlownShips = new(StringComparer.OrdinalIgnoreCase);
+
     // Ereignis-Volltextsuche
     [ObservableProperty] private string eventSearchText = "";
 
@@ -2746,7 +2749,8 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.Vehicle:
                     CurrentShip = e.Detail;
-                    RegisterOrUpdateShip(e.Detail, isFlight: true, isQt: false, isLoss: false, time: e.Time, location: CurrentLocation);
+                    bool isNewSortie = _sessionFlownShips.Add(e.Detail);
+                    RegisterOrUpdateShip(e.Detail, isFlight: isNewSortie, isQt: false, isLoss: false, time: e.Time, location: CurrentLocation);
                     break;
                 case EventKind.Quantum:
                     var qShip = !string.IsNullOrEmpty(e.Ship) ? e.Ship : CurrentShip;

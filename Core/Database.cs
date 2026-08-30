@@ -16,7 +16,7 @@ namespace SCLogReader.Core;
 public static class Database
 {
     public const int CurrentSchemaVersion = 6;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 22; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentParserVersion = 23; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
@@ -609,7 +609,7 @@ public static class Database
             c.CommandText = @"
                 SELECT 
                     ship,
-                    COUNT(CASE WHEN kind IN ('Vehicle', 'SessionChange') THEN 1 END) as flights,
+                    COUNT(DISTINCT session) as flights,
                     COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts,
                     COUNT(CASE WHEN kind = 'ShipLoss' THEN 1 END) as losses,
                     MAX(time) as last_time
@@ -624,7 +624,7 @@ public static class Database
             c.CommandText = @"
                 SELECT 
                     ship,
-                    COUNT(CASE WHEN kind IN ('Vehicle', 'SessionChange') THEN 1 END) as flights,
+                    COUNT(DISTINCT session) as flights,
                     COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts,
                     COUNT(CASE WHEN kind = 'ShipLoss' THEN 1 END) as losses,
                     MAX(time) as last_time
