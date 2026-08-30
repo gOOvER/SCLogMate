@@ -931,15 +931,16 @@ public partial class MainViewModel : ObservableObject
 
             if (existing != null)
             {
-                // Nur bestehenden Auftrag im Speicher aktualisieren
-                if (title.Length > existing.Title.Length || string.IsNullOrEmpty(existing.ContractedBy))
-                {
-                    existing.Title = title;
-                    existing.ContractedBy = !string.IsNullOrEmpty(d.ContractedBy) ? d.ContractedBy : existing.ContractedBy;
-                    existing.Reward = d.Reward;
-                    existing.ScannedAt = d.ScannedAt;
-                    Database.SaveContract(existing);
-                }
+                // Bestehenden Auftrag im Speicher & Datenbank aktualisieren (kein Duplikat anlegen!)
+                if (d.Reward > 0 && existing.Reward <= 0) existing.Reward = d.Reward;
+                if (!string.IsNullOrEmpty(d.ContractedBy) && string.IsNullOrEmpty(existing.ContractedBy)) existing.ContractedBy = d.ContractedBy;
+                if (title.Length > existing.Title.Length) existing.Title = title;
+                existing.ScannedAt = d.ScannedAt;
+                Database.SaveContract(existing);
+
+                ActiveContractRewardText = existing.RewardText;
+                ActiveContractOrg = existing.ContractedBy;
+                ActiveContractTitle = existing.Title;
                 return;
             }
 
@@ -3095,7 +3096,7 @@ public partial class MainViewModel : ObservableObject
         // Aus Missionskatalog Details & Belohnung nachschlagen
         var cat = MissionCatalog.FuzzyLookup(missionTitle);
         int finalReward = (int)(reward > 0 ? reward : (cat?.BaseReward ?? 0));
-        string org = cat != null && !string.IsNullOrEmpty(cat.Contractor) ? cat.Contractor : (cat?.Faction ?? "Recco Battaglia");
+        string org = cat != null && !string.IsNullOrEmpty(cat.Contractor) ? cat.Contractor : (cat?.Faction ?? "");
 
         var contract = new ContractDetails
         {
@@ -3109,11 +3110,15 @@ public partial class MainViewModel : ObservableObject
         var existing = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, contract));
         if (existing != null)
         {
-            if (finalReward > 0 && existing.Reward <= 0)
-            {
-                existing.Reward = finalReward;
-                Database.SaveContract(existing);
-            }
+            if (finalReward > 0 && existing.Reward <= 0) existing.Reward = finalReward;
+            if (!string.IsNullOrEmpty(org) && string.IsNullOrEmpty(existing.ContractedBy)) existing.ContractedBy = org;
+            if (contract.Title.Length > existing.Title.Length) existing.Title = contract.Title;
+            existing.ScannedAt = DateTime.UtcNow;
+            Database.SaveContract(existing);
+
+            ActiveContractRewardText = existing.RewardText;
+            ActiveContractOrg = existing.ContractedBy;
+            ActiveContractTitle = existing.Title;
             return;
         }
 

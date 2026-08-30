@@ -168,12 +168,31 @@ public partial class LogParser
     [GeneratedRegex(@"Fatal Collision occured for vehicle (?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+")]
     private static partial Regex CollisionRegex();
 
+    // Login & Spieler-Identifikation (aus Quantumwake)
+    [GeneratedRegex(@"\[Legacy login response\].*?handle:\s*(?<handle>[A-Za-z0-9_\-]+)")]
+    private static partial Regex LoginHandleRegex();
+
+    [GeneratedRegex(@"\[AccountLoginCharacterStatus_Character\].*?name:\s*(?<name>[A-Za-z0-9_\-]+)")]
+    private static partial Regex CharacterStatusRegex();
+
+    [GeneratedRegex(@"\[CSessionManager::OnClientSpawned\]\s*Spawned!")]
+    private static partial Regex ClientSpawnedRegex();
+
+    // Fahrzeug-Kontrolle & Cockpit-Sitzwechsel (aus Quantumwake)
+    [GeneratedRegex(@"<Vehicle Control Flow>.*?(?<method>EnterDriver|ClearDriver).*?vehicleId=(?<veh>[^ ]+)")]
+    private static partial Regex VehicleControlFlowRegex();
+
+    // ASOP Terminal Fahrzeugbereitstellung
+    [GeneratedRegex(@"\[CEntityComponentShipListProvider::SetVehicleSpawn(?:ing|ed)Informations\].*?entityName\s*=\s*(?<ship>[^,\]]+)")]
+    private static partial Regex AsopShipSpawnRegex();
+
     // Comm-Kanal eines Schiffs: [ <Schiff> : <Besitzer> ]
     [GeneratedRegex(@"(?:Kanal|Channel) \[ (?<ship>.+?) : (?<owner>[^\]]+?) \]")]
     private static partial Regex ChannelRegex();
 
-    static readonly HashSet<string> OwnNames =
+    private readonly HashSet<string> _ownNames =
         new(StringComparer.OrdinalIgnoreCase) { "MiwiDot", "miwi", "miwitv" };
+    public string? LocalHandle { get; private set; }
 
     // Loot: Item ins Inventar gestaut. Nur „Runtime-spawned" = von der Welt gespawnt
     // (echter Loot aus Kisten/Gegnern), nicht Kauf/Umräumen.
@@ -462,6 +481,58 @@ public partial class LogParser
             };
         }
 
+        // Spieler-Login & Handle Erkennung (aus Quantumwake)
+        var logH = LoginHandleRegex().Match(line);
+        if (logH.Success)
+        {
+            var h = logH.Groups["handle"].Value.Trim();
+            if (!string.IsNullOrEmpty(h))
+            {
+                LocalHandle = h;
+                _ownNames.Add(h);
+            }
+        }
+
+        var charH = CharacterStatusRegex().Match(line);
+        if (charH.Success)
+        {
+            var n = charH.Groups["name"].Value.Trim();
+            if (!string.IsNullOrEmpty(n))
+            {
+                _ownNames.Add(n);
+            }
+        }
+
+        // Spawn ins Spiel (aus Quantumwake)
+        if (ClientSpawnedRegex().IsMatch(line))
+        {
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = "Im Spiel gespawnt (Station / Hangar)" };
+        }
+
+        // ASOP Terminal Fahrzeugbereitstellung
+        var asop = AsopShipSpawnRegex().Match(line);
+        if (asop.Success)
+        {
+            var rawShip = asop.Groups["ship"].Value.Trim();
+            var ship = Ships.Prettify(rawShip);
+            _lastShip = ship;
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
+        }
+
+        // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel (aus Quantumwake)
+        var vcf = VehicleControlFlowRegex().Match(line);
+        if (vcf.Success)
+        {
+            var method = vcf.Groups["method"].Value;
+            var vehRaw = vcf.Groups["veh"].Value;
+            var ship = Ships.Prettify(vehRaw);
+            if (method.Contains("Enter", StringComparison.OrdinalIgnoreCase))
+            {
+                _lastShip = ship;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"{ship} (Pilotensitz eingenommen)", Ship = ship };
+            }
+        }
+
         var gn = GenericNotificationRegex().Match(line);
         if (gn.Success)
         {
@@ -502,11 +573,14 @@ public partial class LogParser
         if (reqInv.Success)
         {
             var raw = reqInv.Groups["loc"].Value;
-            var locRes = Locations.ResolveLocation(raw);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
             {
-                _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                var locRes = Locations.ResolveLocation(raw);
+                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+                {
+                    _lastLoc = locRes.DisplayName;
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                }
             }
         }
 
@@ -514,11 +588,14 @@ public partial class LogParser
         if (lo.Success)
         {
             var raw = lo.Groups["loc"].Value;
-            var locRes = Locations.ResolveLocation(raw);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
             {
-                _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                var locRes = Locations.ResolveLocation(raw);
+                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+                {
+                    _lastLoc = locRes.DisplayName;
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                }
             }
         }
 
@@ -661,8 +738,8 @@ public partial class LogParser
             var killer = kl.Groups["killer"].Value;
             var weapon = ItemNames.CleanFallback(kl.Groups["weapon"].Value);
             string detail =
-                OwnNames.Contains(victim) ? $"☠ getötet von {killer} ({weapon})" :
-                OwnNames.Contains(killer) ? $"Kill: {victim} ({weapon})" :
+                _ownNames.Contains(victim) ? $"☠ getötet von {killer} ({weapon})" :
+                _ownNames.Contains(killer) ? $"Kill: {victim} ({weapon})" :
                 $"{killer} ✟ {victim} ({weapon})";
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = detail };
         }
@@ -718,7 +795,7 @@ public partial class LogParser
         {
             var shipName = ch.Groups["ship"].Value.Trim();
             var owner = ch.Groups["owner"].Value.Trim();
-            if (OwnNames.Contains(owner))
+            if (_ownNames.Contains(owner))
             {
                 if (_channelSeen.Add("me|" + shipName))
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = shipName, Ship = shipName };

@@ -303,22 +303,32 @@ public static partial class ContractParser
     }
 
     /// <summary>
-    /// Prüft, ob zwei Aufträge denselben realen Auftrag darstellen (exakte Übereinstimmung von Betrag und normalisiertem Titel).
+    /// Prüft, ob zwei Aufträge denselben realen Auftrag darstellen.
+    /// Unterstützt auch Vergleiche zwischen Log-Events (noch ohne Belohnung) und mobiGlas OCR (mit Belohnung).
     /// </summary>
     public static bool AreSameContract(ContractDetails a, ContractDetails b)
     {
         if (a == null || b == null) return false;
 
-        // Gleicher Betrag ist zwingend erforderlich
-        if (a.Reward != b.Reward) return false;
-
         var aNorm = NormalizeTitle(a.Title);
         var bNorm = NormalizeTitle(b.Title);
 
-        if (aNorm == bNorm && aNorm.Length >= 3) return true;
-        if (aNorm.Length >= 6 && bNorm.Length >= 6 && (aNorm.Contains(bNorm) || bNorm.Contains(aNorm))) return true;
+        // Exakte oder weitgehende Titelübereinstimmung
+        bool titlesMatch = (aNorm == bNorm && aNorm.Length >= 3) ||
+                           (aNorm.Length >= 5 && bNorm.Length >= 5 && (aNorm.Contains(bNorm) || bNorm.Contains(aNorm)));
 
-        return false;
+        if (!titlesMatch)
+            return false;
+
+        // Wenn beide Aufträge unterschiedliche, explizite Beträge (> 0) haben, prüfen wir, ob die Titel exakt identisch sind
+        if (a.Reward > 0 && b.Reward > 0 && Math.Abs(a.Reward - b.Reward) > 0)
+        {
+            // Wenn die Titel identisch sind (z.B. "Missing Persons"), ist es derselbe Auftrag (evtl. korrigierte Belohnung)
+            return aNorm == bNorm;
+        }
+
+        // Wenn einer von beiden Reward == 0 hat (z.B. aus "Contract Accepted"-Logzeile) und Titel passt -> Derselbe Auftrag!
+        return true;
     }
 
     private static string Collapse(string s) => WhitespaceRegex().Replace(s.Replace('\r', ' ').Replace('\n', ' '), " ").Trim();
