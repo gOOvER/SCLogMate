@@ -10,6 +10,11 @@ on:
         description: 'Tag name for the release (e.g. v1.0.0-beta1)'
         required: true
         default: 'v1.0.0-beta1'
+      is_prerelease:
+        description: 'Mark this release as a Pre-Release'
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
@@ -104,7 +109,7 @@ jobs:
         tag_name: ${{ github.ref_name || github.event.inputs.tag_name }}
         body_path: ./publish/RELEASE_NOTES.md
         draft: false
-        prerelease: ${{ contains(github.ref_name || github.event.inputs.tag_name, '-beta') || contains(github.ref_name || github.event.inputs.tag_name, '-rc') }}
+        prerelease: ${{ inputs.is_prerelease == true || github.event.inputs.is_prerelease == 'true' || contains(github.ref_name || github.event.inputs.tag_name, '-beta') || contains(github.ref_name || github.event.inputs.tag_name, '-rc') || contains(github.ref_name || github.event.inputs.tag_name, '-alpha') }}
         files: |
           ./publish/SCLogMate.exe
           ./publish/SCLogMate-*.zip
