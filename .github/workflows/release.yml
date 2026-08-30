@@ -65,7 +65,9 @@ jobs:
 
     - name: VirusTotal Analysis
       uses: crazy-max/ghaction-virustotal@v4
-      if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
+      if: ${{ env.VT_API_KEY != '' }}
+      env:
+        VT_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
       with:
         vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
         files: |
