@@ -186,7 +186,8 @@ public static class FleetCatalog
         ["Prowler"] = new("Prowler · Esperia", "Esperia", "ESPERIA", "#EF4444", "Gepanzerter Tevarin Dropship", 9_500_000, 440, "LTI (Lifetime)"),
         ["Blade"] = new("Blade · Esperia", "Esperia", "ESPERIA", "#EF4444", "Vanduul Leichter Jäger", 5_200_000, 275, "120 Monate (IAE)"),
         ["Glaive"] = new("Glaive · Esperia", "Esperia", "ESPERIA", "#EF4444", "Vanduul Mittlerer Jäger (Dual S5)", 7_500_000, 350, "120 Monate (IAE)"),
-        ["Scythe"] = new("Scythe · Esperia", "Esperia", "ESPERIA", "#EF4444", "Original Vanduul Abfangjäger", 8_500_000, 300, "LTI (Lifetime)")
+        ["Scythe"] = new("Scythe · Esperia", "Esperia", "ESPERIA", "#EF4444", "Original Vanduul Abfangjäger", 8_500_000, 300, "LTI (Lifetime)"),
+        ["M80"] = new("M80", "Aegis Dynamics", "AEGIS", "#F87171", "Elite-Schiff", 15_000_000, 300, "LTI (Lifetime)")
     };
 
     public static ShipCatalogEntry Lookup(string shipName)
