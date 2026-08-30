@@ -19,7 +19,7 @@ All notable changes to this project are documented in this file. Format based on
   - Live-Dateiname, Schritt-Zähler (`Scanne (14/48): Game_2026-08-30.log...`) und prozentuale Fortschrittsleiste.
   - Vollständige Entkopplung aller Datenbank-Vorgänge in Hintergrund-Tasks — verhindert jegliches Einfrieren *(„Keine Rückmeldung“)*.
 
-### 🛸 Flotten-Sorties & Flug-Statistiken (QuantumWake-Heuristik)
+### 🛸 Flotten-Sorties & Flug-Statistiken
 - **Korrektur überhöhter Flugzähler (`COUNT(DISTINCT session)`)**:
   - Behebt das Problem, dass fortlaufende In-Flight Telemetriezeilen (z. B. Drake Clipper / Cutter) als Hunderte Einzelflüge gezählt wurden.
   - Sorties und Flugeinsätze werden nun sauber anhand echter Flug-Sessions und Auslagerungen aggregiert.
@@ -45,7 +45,7 @@ All notable changes to this project are documented in this file. Format based on
 
 ## [1.0.0-beta1] - 2026-08-30 — *SCLogMate Pre-Release Beta 1*
 
-### 🗺 Starmap & Navigation (QuantumWake-Style)
+### 🗺 Starmap & Navigation
 - **Vector Route & Flight Time Calculator**:
   - Live cyan glowing flight vector line connecting player's current location (`YOU ARE HERE`) to any selected waypoint or destination.
   - Accurate distance calculation in Gigameters (GM) and kilometers (km).

@@ -168,7 +168,7 @@ public partial class LogParser
     [GeneratedRegex(@"Fatal Collision occured for vehicle (?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+")]
     private static partial Regex CollisionRegex();
 
-    // Login & Spieler-Identifikation (aus Quantumwake)
+    // Login & Spieler-Identifikation
     [GeneratedRegex(@"\[Legacy login response\].*?handle:\s*(?<handle>[A-Za-z0-9_\-]+)")]
     private static partial Regex LoginHandleRegex();
 
@@ -178,7 +178,7 @@ public partial class LogParser
     [GeneratedRegex(@"\[CSessionManager::OnClientSpawned\]\s*Spawned!")]
     private static partial Regex ClientSpawnedRegex();
 
-    // Fahrzeug-Kontrolle & Cockpit-Sitzwechsel (aus Quantumwake)
+    // Fahrzeug-Kontrolle & Cockpit-Sitzwechsel
     [GeneratedRegex(@"<Vehicle Control Flow>.*?(?<method>EnterDriver|ClearDriver).*?vehicleId=(?<veh>[^ ]+)")]
     private static partial Regex VehicleControlFlowRegex();
 
@@ -481,7 +481,7 @@ public partial class LogParser
             };
         }
 
-        // Spieler-Login & Handle Erkennung (aus Quantumwake)
+        // Spieler-Login & Handle Erkennung
         var logH = LoginHandleRegex().Match(line);
         if (logH.Success)
         {
@@ -503,7 +503,7 @@ public partial class LogParser
             }
         }
 
-        // Spawn ins Spiel (aus Quantumwake)
+        // Spawn ins Spiel
         if (ClientSpawnedRegex().IsMatch(line))
         {
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = "Im Spiel gespawnt (Station / Hangar)" };
@@ -519,7 +519,7 @@ public partial class LogParser
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
         }
 
-        // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel (aus Quantumwake)
+        // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel
         var vcf = VehicleControlFlowRegex().Match(line);
         if (vcf.Success)
         {

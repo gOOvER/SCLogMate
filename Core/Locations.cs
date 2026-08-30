@@ -6,14 +6,14 @@ using System.Text.RegularExpressions;
 namespace SCLogReader.Core;
 
 /// <summary>
-/// Vollständiger Location-Resolver nach Vorbild von QuantumWake.
+/// Vollständiger Location-Resolver für Star Citizen Standorte und Systeme.
 /// Übersetzt interne Star Citizen Location-IDs, SOCPak-Container, OOC-Objekte,
 /// Lagrange-Punkte (RR_*), Sprungtore (rs_ext_*) und Planeten-Outposts in saubere,
 /// displayfähige und kartografierbare Standorte mit System- und Himmelskörper-Zuordnung.
 /// </summary>
 public static partial class Locations
 {
-    #region Static Universe Dictionaries (QuantumWake Architecture)
+    #region Static Universe Dictionaries
 
     public static readonly IReadOnlyDictionary<string, string> StantonBodies =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
