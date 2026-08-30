@@ -83,6 +83,43 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string lastInventory = "—";
 
     [ObservableProperty] private ResolvedLocation resolvedLocation = new();
+
+    partial void OnCurrentLocationChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "—")
+        {
+            ResolvedLocation = new ResolvedLocation { DisplayName = "—", SystemName = "Stanton", ParentBody = "—" };
+        }
+        else
+        {
+            ResolvedLocation = StarmapData.Resolve(value);
+        }
+
+        if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
+        {
+            SelectedStarmapSystem = ResolvedLocation.SystemName;
+        }
+
+        OnPropertyChanged(nameof(SearchStarmapResults));
+    }
+
+    partial void OnResolvedLocationChanged(ResolvedLocation value)
+    {
+        OnPropertyChanged(nameof(LocationSystemBadge));
+        OnPropertyChanged(nameof(LocationBadgeColor));
+        OnPropertyChanged(nameof(LocationMainText));
+        OnPropertyChanged(nameof(LocationStatusSubline));
+        OnPropertyChanged(nameof(LocationTypeBadge));
+        OnPropertyChanged(nameof(LocationParentBadge));
+        OnPropertyChanged(nameof(LocationArmisticePillText));
+        OnPropertyChanged(nameof(LocationArmisticePillColor));
+        OnPropertyChanged(nameof(LocationArmisticePillBg));
+        OnPropertyChanged(nameof(LocationArmisticePillBorder));
+        OnPropertyChanged(nameof(ArmisticeBorderColor));
+        OnPropertyChanged(nameof(LocationIsKnown));
+    }
+
+    public bool LocationIsKnown => ResolvedLocation.DisplayName != "—" && ResolvedLocation.DisplayName != "Unbekannt";
     public string LocationSystemBadge => ResolvedLocation.SystemName.ToUpperInvariant();
     public string LocationBadgeColor => ResolvedLocation.SystemBadgeColor;
     public string ArmisticeBorderColor => ResolvedLocation.IsArmistice == false ? "#EF4444" : "#38BDF8";
@@ -93,6 +130,26 @@ public partial class MainViewModel : ObservableObject
     public string LocationStatusSubline => ResolvedLocation.DisplayName == "—" 
         ? "Warte auf Log-Daten..." 
         : $"{ResolvedLocation.ArmisticeStatusText} · {ResolvedLocation.SystemName}";
+
+    public string LocationTypeBadge => ResolvedLocation.Type switch
+    {
+        StarmapObjectType.LandingZone => "🏛 LANDUNGSZONE",
+        StarmapObjectType.SpaceStation => "🛸 RAUMSTATION",
+        StarmapObjectType.LagrangeStation => "⛏ RAFFINERIE / REST STOP",
+        StarmapObjectType.Moon => "🪐 MOND",
+        StarmapObjectType.Planet => "🌍 PLANET",
+        StarmapObjectType.JumpPoint => "🌀 SPRUNGTOR",
+        _ => "📍 STANDORT"
+    };
+
+    public string LocationParentBadge => !string.IsNullOrEmpty(ResolvedLocation.ParentBody) && ResolvedLocation.ParentBody != "—" && ResolvedLocation.ParentBody != ResolvedLocation.DisplayName
+        ? ResolvedLocation.ParentBody
+        : ResolvedLocation.SystemName;
+
+    public string LocationArmisticePillText => ResolvedLocation.IsArmistice ? "Schutzzone" : "Waffen aktiv";
+    public string LocationArmisticePillColor => ResolvedLocation.IsArmistice ? "#4ADE80" : "#F87171";
+    public string LocationArmisticePillBg => ResolvedLocation.IsArmistice ? "#0A2416" : "#240A0E";
+    public string LocationArmisticePillBorder => ResolvedLocation.IsArmistice ? "#1E5E3A" : "#5E1E28";
 
     // Starmap-Properties
     [ObservableProperty] private string selectedStarmapSystem = "Stanton";
@@ -3340,20 +3397,6 @@ public partial class MainViewModel : ObservableObject
     {
         var dir = Path.GetDirectoryName(path);
         return dir is null ? path : Path.GetFileName(dir);
-    }
-
-    partial void OnCurrentLocationChanged(string value)
-    {
-        ResolvedLocation = StarmapData.Resolve(value);
-        if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
-        {
-            SelectedStarmapSystem = ResolvedLocation.SystemName;
-        }
-        OnPropertyChanged(nameof(LocationSystemBadge));
-        OnPropertyChanged(nameof(LocationBadgeColor));
-        OnPropertyChanged(nameof(LocationMainText));
-        OnPropertyChanged(nameof(LocationStatusSubline));
-        OnPropertyChanged(nameof(SearchStarmapResults));
     }
 
     partial void OnSelectedStarmapSystemChanged(string value)

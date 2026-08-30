@@ -174,26 +174,47 @@
                 ToolTip.Tip="{Binding ResolvedLocation.FullBreadcrumb}">
           <Grid RowDefinitions="Auto,*,Auto">
             
-            <!-- Header: Label + System Badge + Starmap Button -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
-              <TextBlock Grid.Column="0" Classes="label" Text="📍  STANDORT" VerticalAlignment="Center" />
-              
-              <!-- System Pill (z.B. STANTON, PYRO oder NYX) -->
-              <Border Grid.Column="1" Background="#060C16" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="4" Padding="6,1.5" Margin="8,0,0,0"
-                      HorizontalAlignment="Left" VerticalAlignment="Center">
-                <TextBlock Text="{Binding LocationSystemBadge}" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
+            <!-- Header: Label + System Badge + Armistice Status + Starmap Button -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Classes="label" Text="📍 STANDORT" VerticalAlignment="Center" />
+                
+                <!-- System Pill (STANTON / PYRO / NYX) -->
+                <Border Background="#060C16" BorderBrush="{Binding LocationBadgeColor}" BorderThickness="1"
+                        CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding LocationSystemBadge}" Foreground="{Binding LocationBadgeColor}" FontSize="9.5" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+
+              <!-- Dynamic Armistice Pill (Schutzzone / Waffen aktiv) -->
+              <Border Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center"
+                      Background="{Binding LocationArmisticePillBg}" BorderBrush="{Binding LocationArmisticePillBorder}"
+                      BorderThickness="1" CornerRadius="4" Padding="5,1"
+                      IsVisible="{Binding LocationIsKnown}">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Ellipse Width="5" Height="5" Fill="{Binding LocationArmisticePillColor}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding LocationArmisticePillText}" Foreground="{Binding LocationArmisticePillColor}" FontSize="9.5" FontWeight="SemiBold" />
+                </StackPanel>
               </Border>
 
               <!-- Schnell-Link zur Sternenkarte -->
-              <Button Grid.Column="2" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1"
+              <Button Grid.Column="3" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1"
                       Command="{Binding OpenStarmapForCurrentLocationCommand}" ToolTip.Tip="🗺 Auf der Sternenkarte anzeigen">
                 <TextBlock Text="🗺 Karte" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
               </Button>
             </Grid>
 
-            <!-- Großer Standort-Name -->
-            <TextBlock Grid.Row="1" Classes="value" Text="{Binding LocationMainText}" FontSize="14" FontWeight="Bold"
-                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding LocationMainText}" />
+            <!-- Großer Standort-Name + Typ Badge -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <TextBlock Grid.Column="0" Classes="value" Text="{Binding LocationMainText}" FontSize="14" FontWeight="Bold"
+                         Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding LocationMainText}" VerticalAlignment="Center" />
+              <Border Grid.Column="1" Background="#0D1624" BorderBrush="#1C324A" BorderThickness="1" CornerRadius="3" Padding="4,1" Margin="6,0,0,0"
+                      VerticalAlignment="Center" IsVisible="{Binding LocationIsKnown}">
+                <TextBlock Text="{Binding LocationTypeBadge}" FontSize="8.5" FontWeight="Bold" Foreground="#8B949E" />
+              </Border>
+            </Grid>
+
+            <!-- Status-Subline: Breadcrumb & Rechtsgebiet -->
             <TextBlock Grid.Row="2" Text="{Binding LocationStatusSubline}" Foreground="#7E97AD" FontSize="11"
                        TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip.Tip="{Binding ResolvedLocation.FullBreadcrumb}" />
           </Grid>
