@@ -22,6 +22,9 @@ public sealed class StarmapCanvas : Control
     public static readonly StyledProperty<StarmapObject?> SelectedObjectProperty =
         AvaloniaProperty.Register<StarmapCanvas, StarmapObject?>(nameof(SelectedObject));
 
+    public static readonly StyledProperty<QuantumDriveProfile?> SelectedDriveProperty =
+        AvaloniaProperty.Register<StarmapCanvas, QuantumDriveProfile?>(nameof(SelectedDrive));
+
     public static readonly StyledProperty<bool> ShowStationsProperty =
         AvaloniaProperty.Register<StarmapCanvas, bool>(nameof(ShowStations), true);
 
@@ -34,10 +37,19 @@ public sealed class StarmapCanvas : Control
     public static readonly StyledProperty<bool> ShowJumpPointsProperty =
         AvaloniaProperty.Register<StarmapCanvas, bool>(nameof(ShowJumpPoints), true);
 
+    public static readonly StyledProperty<IEnumerable<Models.UserPoi>?> UserPoisProperty =
+        AvaloniaProperty.Register<StarmapCanvas, IEnumerable<Models.UserPoi>?>(nameof(UserPois));
+
     public string SystemName
     {
         get => GetValue(SystemNameProperty);
         set => SetValue(SystemNameProperty, value);
+    }
+
+    public IEnumerable<Models.UserPoi>? UserPois
+    {
+        get => GetValue(UserPoisProperty);
+        set => SetValue(UserPoisProperty, value);
     }
 
     public string PlayerLocationName
@@ -50,6 +62,12 @@ public sealed class StarmapCanvas : Control
     {
         get => GetValue(SelectedObjectProperty);
         set => SetValue(SelectedObjectProperty, value);
+    }
+
+    public QuantumDriveProfile? SelectedDrive
+    {
+        get => GetValue(SelectedDriveProperty);
+        set => SetValue(SelectedDriveProperty, value);
     }
 
     public bool ShowStations
@@ -77,6 +95,7 @@ public sealed class StarmapCanvas : Control
     }
 
     public event Action<StarmapObject>? ObjectSelected;
+    public event Action<string>? SystemJumpRequested;
 
     private double _zoom = 1.0;
     private Point _panOffset = new(0, 0);
@@ -93,14 +112,14 @@ public sealed class StarmapCanvas : Control
     private static (double X, double Y, double Size, byte Alpha)[] GenerateStarfield()
     {
         var rnd = new Random(42);
-        var stars = new (double X, double Y, double Size, byte Alpha)[160];
+        var stars = new (double X, double Y, double Size, byte Alpha)[180];
         for (int i = 0; i < stars.Length; i++)
         {
             stars[i] = (
-                rnd.NextDouble() * 2000 - 1000,
-                rnd.NextDouble() * 2000 - 1000,
-                rnd.NextDouble() * 1.6 + 0.6,
-                (byte)rnd.Next(40, 190)
+                rnd.NextDouble() * 2600 - 1300,
+                rnd.NextDouble() * 2600 - 1300,
+                rnd.NextDouble() * 1.8 + 0.5,
+                (byte)rnd.Next(35, 195)
             );
         }
         return stars;
@@ -112,11 +131,11 @@ public sealed class StarmapCanvas : Control
 
         _pulseTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(33) // ~30 FPS für flüssigen Radar-Puls
+            Interval = TimeSpan.FromMilliseconds(40)
         };
-        _pulseTimer.Tick += (_, _) =>
+        _pulseTimer.Tick += (s, e) =>
         {
-            _pulsePhase = (_pulsePhase + 0.06) % (2 * Math.PI);
+            _pulsePhase = (_pulsePhase + 0.08) % (Math.PI * 2);
             InvalidateVisual();
         };
         _pulseTimer.Start();
@@ -128,10 +147,13 @@ public sealed class StarmapCanvas : Control
             SystemNameProperty,
             PlayerLocationNameProperty,
             SelectedObjectProperty,
+            SelectedDriveProperty,
             ShowStationsProperty,
             ShowMoonsProperty,
             ShowLandingZonesProperty,
-            ShowJumpPointsProperty);
+            ShowJumpPointsProperty,
+            UserPoisProperty
+        );
     }
 
     public void ResetView()
@@ -143,57 +165,78 @@ public sealed class StarmapCanvas : Control
 
     public void FocusOnObject(StarmapObject obj)
     {
-        _zoom = 1.6;
-        _panOffset = new Point(-obj.RelX * _zoom, -obj.RelY * _zoom);
         SelectedObject = obj;
+        _panOffset = new Point(-obj.RelX * _zoom, -obj.RelY * _zoom);
         InvalidateVisual();
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        double delta = e.Delta.Y > 0 ? 1.15 : 0.85;
-        _zoom = Math.Clamp(_zoom * delta, 0.4, 3.5);
+        double delta = e.Delta.Y;
+        double oldZoom = _zoom;
+        _zoom = Math.Clamp(_zoom + delta * 0.15 * _zoom, 0.35, 6.0);
+
+        var mousePos = e.GetPosition(this);
+        var center = new Point(Bounds.Width / 2 + _panOffset.X, Bounds.Height / 2 + _panOffset.Y);
+        double zoomFactor = _zoom / oldZoom;
+        _panOffset = new Point(
+            mousePos.X - (mousePos.X - center.X) * zoomFactor - Bounds.Width / 2,
+            mousePos.Y - (mousePos.Y - center.Y) * zoomFactor - Bounds.Height / 2
+        );
+
         InvalidateVisual();
-        e.Handled = true;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        var p = e.GetCurrentPoint(this);
-        if (p.Properties.IsLeftButtonPressed)
-        {
-            _isPanning = true;
-            _panStart = p.Position;
+        var pt = e.GetCurrentPoint(this);
 
-            var hit = FindObjectAt(p.Position);
+        if (pt.Properties.IsLeftButtonPressed)
+        {
+            var hit = FindObjectAt(pt.Position);
             if (hit != null)
             {
                 SelectedObject = hit;
                 ObjectSelected?.Invoke(hit);
+
+                // Wenn auf ein Sprungtor geklickt wird -> Systemwechsel anbieten / ausführen
+                if (hit.Type == StarmapObjectType.JumpPoint && !string.IsNullOrEmpty(hit.TargetSystem))
+                {
+                    SystemJumpRequested?.Invoke(hit.TargetSystem);
+                }
+
+                InvalidateVisual();
+                return;
             }
+        }
+
+        if (pt.Properties.IsRightButtonPressed || pt.Properties.IsLeftButtonPressed)
+        {
+            _isPanning = true;
+            _panStart = pt.Position - _panOffset;
+            e.Pointer.Capture(this);
         }
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        var p = e.GetPosition(this);
+        var pt = e.GetPosition(this);
 
         if (_isPanning)
         {
-            _panOffset = new Point(_panOffset.X + (p.X - _panStart.X), _panOffset.Y + (p.Y - _panStart.Y));
-            _panStart = p;
+            _panOffset = pt - _panStart;
             InvalidateVisual();
         }
         else
         {
-            var hover = FindObjectAt(p);
+            var hover = FindObjectAt(pt);
             if (hover != _hoveredObject)
             {
                 _hoveredObject = hover;
-                Cursor = hover != null ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Cross);
+                Cursor = hover != null ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Arrow);
                 InvalidateVisual();
             }
         }
@@ -202,7 +245,11 @@ public sealed class StarmapCanvas : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        _isPanning = false;
+        if (_isPanning)
+        {
+            _isPanning = false;
+            e.Pointer.Capture(null);
+        }
     }
 
     private StarmapObject? FindObjectAt(Point screenPos)
@@ -211,16 +258,19 @@ public sealed class StarmapCanvas : Control
         var objects = StarmapData.GetSystemObjects(SystemName);
 
         StarmapObject? hit = null;
-        double bestDist = 24;
+        double minDist = 18.0;
 
         foreach (var obj in objects)
         {
             if (!IsObjectVisible(obj)) continue;
+
             var objPos = new Point(center.X + obj.RelX * _zoom, center.Y + obj.RelY * _zoom);
             double dist = Math.Sqrt(Math.Pow(screenPos.X - objPos.X, 2) + Math.Pow(screenPos.Y - objPos.Y, 2));
-            if (dist < Math.Max(obj.Size * _zoom, 16) && dist < bestDist)
+            double hitRadius = Math.Max(12.0, (obj.Size * _zoom) / 2 + 5.0);
+
+            if (dist <= hitRadius && dist < minDist)
             {
-                bestDist = dist;
+                minDist = dist;
                 hit = obj;
             }
         }
@@ -253,40 +303,31 @@ public sealed class StarmapCanvas : Control
 
         var center = new Point(w / 2 + _panOffset.X, h / 2 + _panOffset.Y);
 
-        // 1. Deep Space Nexus Background
-        var bgBrush = new SolidColorBrush(Color.Parse("#05070A"));
-        context.FillRectangle(bgBrush, new Rect(0, 0, w, h));
+        // 1. Tiefschwarzer Weltraum-Hintergrund (Cosmic Void)
+        context.FillRectangle(new SolidColorBrush(Color.Parse("#040711")), new Rect(0, 0, w, h));
 
-        // Sanftes radiales Nebel-Glühen im Zentrum
-        var nebulaGlow = new SolidColorBrush(Color.FromArgb(14, 127, 233, 224));
-        context.DrawEllipse(nebulaGlow, null, center, 450 * _zoom, 450 * _zoom);
-
-        // 2. Starfield
+        // 2. Sternenfeld
         foreach (var star in Starfield)
         {
-            double sx = center.X + star.X * _zoom * 0.7;
-            double sy = center.Y + star.Y * _zoom * 0.7;
+            double sx = center.X + star.X * (_zoom * 0.45);
+            double sy = center.Y + star.Y * (_zoom * 0.45);
+
             if (sx >= 0 && sx <= w && sy >= 0 && sy <= h)
             {
-                var sBrush = new SolidColorBrush(Color.FromArgb(star.Alpha, 220, 235, 255));
-                context.DrawEllipse(sBrush, null, new Point(sx, sy), star.Size, star.Size);
+                var starBrush = new SolidColorBrush(Color.FromArgb(star.Alpha, 190, 225, 255));
+                context.DrawEllipse(starBrush, null, new Point(sx, sy), star.Size, star.Size);
             }
         }
 
-        // 3. Sci-Fi Radar / Range Rings
-        var radarPen = new Pen(new SolidColorBrush(Color.FromArgb(18, 127, 233, 224)), 1, DashStyle.Dash);
-        var radarSolidPen = new Pen(new SolidColorBrush(Color.FromArgb(12, 127, 233, 224)), 1);
+        // 3. Sci-Fi Radar-Grid & Koordinatenringe
+        var radarPen = new Pen(new SolidColorBrush(Color.FromArgb(20, 56, 189, 248)), 1, DashStyle.Dash);
+        var radarSolidPen = new Pen(new SolidColorBrush(Color.FromArgb(32, 56, 189, 248)), 1);
 
-        double[] rangeRings = { 90, 160, 230, 300, 360 };
-        string[] rangeLabels = { "75 GM", "150 GM", "225 GM", "300 GM", "GATEWAYS" };
-
-        for (int i = 0; i < rangeRings.Length; i++)
+        double[] ringRadii = { 90, 170, 250, 330, 390 };
+        foreach (var r in ringRadii)
         {
-            double r = rangeRings[i] * _zoom;
-            context.DrawEllipse(null, radarPen, center, r, r);
-
-            // Kleine Distanzmarke auf dem Ring
-            DrawText(context, rangeLabels[i], new Point(center.X + r + 4, center.Y - 4), "#4B5563", 8, false, false);
+            double scaledR = r * _zoom;
+            context.DrawEllipse(null, radarPen, center, scaledR, scaledR);
         }
 
         // Fadenkreuz / Achsen
@@ -303,23 +344,23 @@ public sealed class StarmapCanvas : Control
             var starCol = Color.Parse(starObj.ColorHex);
 
             // Äußerer Flare-Glow
-            var flareBrush = new SolidColorBrush(Color.FromArgb(30, starCol.R, starCol.G, starCol.B));
-            context.DrawEllipse(flareBrush, null, center, starR * 3.2, starR * 3.2);
+            var flareBrush = new SolidColorBrush(Color.FromArgb(28, starCol.R, starCol.G, starCol.B));
+            context.DrawEllipse(flareBrush, null, center, starR * 3.5, starR * 3.5);
 
             // Mittlerer Glow
             var midGlow = new SolidColorBrush(Color.FromArgb(70, starCol.R, starCol.G, starCol.B));
-            context.DrawEllipse(midGlow, null, center, starR * 1.8, starR * 1.8);
+            context.DrawEllipse(midGlow, null, center, starR * 1.9, starR * 1.9);
 
             // Kern
             var coreBrush = new SolidColorBrush(starCol);
             context.DrawEllipse(coreBrush, null, center, starR, starR);
 
             // Name
-            DrawText(context, starObj.Name, new Point(center.X, center.Y + starR + 6), "#FFD089", 11, true, true);
+            DrawText(context, starObj.Name, new Point(center.X, center.Y + starR + 7), "#FFD089", 11, true, true);
         }
 
         // 5. Orbit-Tether-Linien (Mond / Station -> Planet)
-        var tetherPen = new Pen(new SolidColorBrush(Color.FromArgb(40, 127, 233, 224)), 1, DashStyle.Dot);
+        var tetherPen = new Pen(new SolidColorBrush(Color.FromArgb(35, 56, 189, 248)), 1, DashStyle.Dot);
         foreach (var obj in objects.Where(o => o.ParentId != null && o.ParentId != "stanton_star" && o.ParentId != "pyro_star" && o.ParentId != "nyx_star"))
         {
             if (!IsObjectVisible(obj)) continue;
@@ -332,7 +373,7 @@ public sealed class StarmapCanvas : Control
             }
         }
 
-        // 6. Objekte zeichnen
+        // 6. Spieler-Standort ermitteln
         StarmapObject? playerObj = objects.FirstOrDefault(obj =>
             !string.IsNullOrEmpty(PlayerLocationName) &&
             (obj.Name.Contains(PlayerLocationName, StringComparison.OrdinalIgnoreCase) ||
@@ -349,6 +390,28 @@ public sealed class StarmapCanvas : Control
             }
         }
 
+        // 7. Vektor-Fluglinie (Quantum Flight Route) zeichnen
+        if (playerObj != null && SelectedObject != null && SelectedObject.Id != playerObj.Id)
+        {
+            var pPos = new Point(center.X + playerObj.RelX * _zoom, center.Y + playerObj.RelY * _zoom);
+            var tPos = new Point(center.X + SelectedObject.RelX * _zoom, center.Y + SelectedObject.RelY * _zoom);
+
+            // Glowing Line
+            var glowPen = new Pen(new SolidColorBrush(Color.FromArgb(45, 56, 189, 248)), 5);
+            var routePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.8, DashStyle.Dash);
+            context.DrawLine(glowPen, pPos, tPos);
+            context.DrawLine(routePen, pPos, tPos);
+
+            // Flugdistanz & Dauer Badge in der Mitte der Linie
+            var drive = SelectedDrive ?? StarmapData.AvailableDrives[0];
+            var (distKm, distGm, flightTime) = StarmapData.CalculateRoute(playerObj, SelectedObject, drive);
+            var midPoint = new Point((pPos.X + tPos.X) / 2, (pPos.Y + tPos.Y) / 2);
+
+            string routeText = $"✈ {distGm:F1} GM ({distKm:N0} km) · {flightTime.Minutes}m {flightTime.Seconds:D2}s ({drive.Name})";
+            DrawRouteBadge(context, routeText, midPoint);
+        }
+
+        // 8. Objekte zeichnen
         foreach (var obj in objects.Where(o => o.Type != StarmapObjectType.Star))
         {
             if (!IsObjectVisible(obj)) continue;
@@ -360,14 +423,21 @@ public sealed class StarmapCanvas : Control
             bool isSelected = SelectedObject != null && SelectedObject.Id == obj.Id;
             bool isHovered = _hoveredObject != null && _hoveredObject.Id == obj.Id;
 
-            // Selektions-Klammern [ ◰ ◱ ◲ ◳ ] (Sci-Fi Target Reticle)
+            // Halo für Sicherheits- / Gefahrenzonen
+            if (obj.SecurityLevel == "Lawless" || !obj.HasArmistice)
+            {
+                var dangerBrush = new SolidColorBrush(Color.FromArgb(35, 239, 68, 68)); // Rotes Warn-Halo
+                context.DrawEllipse(dangerBrush, null, objPos, objR * 2.2, objR * 2.2);
+            }
+
+            // Selektions-Klammern (Target Reticle)
             if (isSelected)
             {
-                DrawTargetReticle(context, objPos, objR + 8, "#FFD089");
+                DrawTargetReticle(context, objPos, objR + 8, "#FFB23E");
             }
             else if (isHovered)
             {
-                DrawTargetReticle(context, objPos, objR + 6, "#7FE9E0");
+                DrawTargetReticle(context, objPos, objR + 6, "#38BDF8");
             }
 
             // Atmosphären-Ring für Planeten
@@ -380,10 +450,10 @@ public sealed class StarmapCanvas : Control
                 context.DrawEllipse(null, ringPen, objPos, objR + 3, objR + 3);
             }
 
-            // Stationen / Sprungtore als Diamant / Raute
-            if (obj.Type == StarmapObjectType.SpaceStation || obj.Type == StarmapObjectType.JumpPoint)
+            // Stationen / Lagrange / Sprungtore als Diamant / Raute / Vortex
+            if (obj.Type == StarmapObjectType.SpaceStation || obj.Type == StarmapObjectType.LagrangeStation || obj.Type == StarmapObjectType.JumpPoint)
             {
-                DrawDiamond(context, objPos, objR + 1, col);
+                DrawDiamond(context, objPos, objR + 1.5, col);
             }
             else
             {
@@ -392,20 +462,26 @@ public sealed class StarmapCanvas : Control
                 context.DrawEllipse(bodyBrush, null, objPos, objR, objR);
             }
 
-            // Beschriftung
-            string labelColor = isSelected ? "#FFD089" : isHovered ? "#7FE9E0" : "#EAF1F6";
+            // Beschriftung & Spezialisierungs-Icon
+            string labelColor = isSelected ? "#FFB23E" : isHovered ? "#38BDF8" : "#EAF1F6";
             double fontSize = obj.Type == StarmapObjectType.Planet ? 11.5 : 9.5;
             bool isBold = obj.Type == StarmapObjectType.Planet || obj.Type == StarmapObjectType.LandingZone;
 
-            DrawText(context, obj.Name, new Point(objPos.X, objPos.Y + objR + 3), labelColor, fontSize, isBold, true);
+            string label = obj.Name;
+            if (!string.IsNullOrEmpty(obj.Specialization) && _zoom > 1.2)
+            {
+                var icon = obj.Specialization.Split(' ')[0];
+                label = $"{icon} {obj.Name}";
+            }
+
+            DrawText(context, label, new Point(objPos.X, objPos.Y + objR + 3), labelColor, fontSize, isBold, true);
         }
 
-        // 7. Live Player Radar Beacon ("📍 DU BIST HIER")
+        // 9. Live Player Radar Beacon ("📍 DU BIST HIER")
         if (playerObj != null)
         {
             var pPos = new Point(center.X + playerObj.RelX * _zoom, center.Y + playerObj.RelY * _zoom);
 
-            // 3-fache pulsierende Radarwelle
             for (int i = 0; i < 3; i++)
             {
                 double phaseOffset = (_pulsePhase + i * (2 * Math.PI / 3)) % (2 * Math.PI);
@@ -416,11 +492,40 @@ public sealed class StarmapCanvas : Control
                 context.DrawEllipse(null, wavePen, pPos, waveR, waveR);
             }
 
-            // Amber "YOU" Pill Badge
             DrawPlayerBadge(context, $"📍 DU BIST HIER: {playerObj.Name}", new Point(pPos.X, pPos.Y - (playerObj.Size * _zoom) - 22));
         }
 
-        // 8. HUD Chrome (Breadcrumb oben links, Scalebar unten links)
+        // 10. Persönliche POIs / Notizen auf der Starmap
+        if (UserPois != null)
+        {
+            foreach (var poi in UserPois)
+            {
+                if (!string.Equals(poi.System, SystemName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var targetObj = objects.FirstOrDefault(o => o.Name.Equals(poi.Body, StringComparison.OrdinalIgnoreCase) ||
+                                                            o.Id.Equals(poi.Body, StringComparison.OrdinalIgnoreCase));
+                if (targetObj == null) continue;
+
+                var poiPos = new Point(center.X + (targetObj.RelX + 15) * _zoom, center.Y + (targetObj.RelY - 18) * _zoom);
+                Color poiCol;
+                try { poiCol = Color.Parse(poi.Color); } catch { poiCol = Color.Parse("#F59E0B"); }
+
+                DrawDiamond(context, poiPos, 5 * _zoom + 2, poiCol);
+                string catIcon = poi.Category switch
+                {
+                    "Mining" => "⛏️",
+                    "Salvage" => "🧲",
+                    "Secret" => "🔒",
+                    "Bunker" => "🛡️",
+                    "Trade" => "💰",
+                    _ => "📌"
+                };
+                DrawText(context, $"{catIcon} {poi.Name}", new Point(poiPos.X, poiPos.Y + 8), "#FBBF24", 9.0, true, true);
+            }
+        }
+
+        // 11. HUD Chrome (Breadcrumb & Scalebar)
         DrawHudChrome(context, w, h);
     }
 
@@ -446,21 +551,37 @@ public sealed class StarmapCanvas : Control
         var pen = new Pen(new SolidColorBrush(Color.Parse(colorHex)), 1.5);
         double len = Math.Max(4, r * 0.45);
 
-        // Oben Links
         context.DrawLine(pen, new Point(center.X - r, center.Y - r + len), new Point(center.X - r, center.Y - r));
         context.DrawLine(pen, new Point(center.X - r, center.Y - r), new Point(center.X - r + len, center.Y - r));
 
-        // Oben Rechts
         context.DrawLine(pen, new Point(center.X + r - len, center.Y - r), new Point(center.X + r, center.Y - r));
         context.DrawLine(pen, new Point(center.X + r, center.Y - r), new Point(center.X + r, center.Y - r + len));
 
-        // Unten Links
         context.DrawLine(pen, new Point(center.X - r, center.Y + r - len), new Point(center.X - r, center.Y + r));
         context.DrawLine(pen, new Point(center.X - r, center.Y + r), new Point(center.X - r + len, center.Y + r));
 
-        // Unten Rechts
         context.DrawLine(pen, new Point(center.X + r - len, center.Y + r), new Point(center.X + r, center.Y + r));
         context.DrawLine(pen, new Point(center.X + r, center.Y + r), new Point(center.X + r, center.Y + r - len));
+    }
+
+    private void DrawRouteBadge(DrawingContext context, string text, Point center)
+    {
+        var ft = new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Bold),
+            10.5,
+            new SolidColorBrush(Color.Parse("#38BDF8"))
+        );
+
+        double padX = 8;
+        double padY = 3;
+        var rect = new Rect(center.X - ft.Width / 2 - padX, center.Y - ft.Height / 2 - padY, ft.Width + padX * 2, ft.Height + padY * 2);
+
+        context.FillRectangle(new SolidColorBrush(Color.FromArgb(220, 6, 12, 22)), rect, 5);
+        context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#1A3857")), 1), rect, 5);
+        context.DrawText(ft, new Point(center.X - ft.Width / 2, center.Y - ft.Height / 2));
     }
 
     private void DrawPlayerBadge(DrawingContext context, string text, Point pos)
@@ -469,70 +590,76 @@ public sealed class StarmapCanvas : Control
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Rajdhani, Segoe UI, Arial", FontStyle.Normal, FontWeight.Bold),
-            11,
-            new SolidColorBrush(Color.Parse("#05070A")));
+            new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Bold),
+            10.5,
+            new SolidColorBrush(Color.Parse("#FFB23E"))
+        );
 
-        double padX = 9;
+        double padX = 8;
         double padY = 3;
-        var bgRect = new Rect(pos.X - ft.Width / 2 - padX, pos.Y - padY, ft.Width + padX * 2, ft.Height + padY * 2);
+        var rect = new Rect(pos.X - ft.Width / 2 - padX, pos.Y - ft.Height / 2 - padY, ft.Width + padX * 2, ft.Height + padY * 2);
 
-        var bgBrush = new SolidColorBrush(Color.Parse("#FFB23E"));
-        context.DrawRectangle(bgBrush, null, bgRect, 4, 4);
-
-        context.DrawText(ft, new Point(pos.X - ft.Width / 2, pos.Y));
-    }
-
-    private void DrawText(DrawingContext context, string text, Point centerPos, string colorHex, double size, bool bold, bool centerX)
-    {
-        var ft = new FormattedText(
-            text,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            new Typeface("Rajdhani, Segoe UI, Arial", FontStyle.Normal, bold ? FontWeight.Bold : FontWeight.SemiBold),
-            size,
-            new SolidColorBrush(Color.Parse(colorHex)));
-
-        double x = centerX ? centerPos.X - ft.Width / 2 : centerPos.X;
-        context.DrawText(ft, new Point(x, centerPos.Y));
+        context.FillRectangle(new SolidColorBrush(Color.FromArgb(220, 11, 19, 32)), rect, 5);
+        context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#FFB23E")), 1.2), rect, 5);
+        context.DrawText(ft, new Point(pos.X - ft.Width / 2, pos.Y - ft.Height / 2));
     }
 
     private void DrawHudChrome(DrawingContext context, double w, double h)
     {
         // 1. Breadcrumb oben links
-        string sys = SystemName.ToUpperInvariant();
-        string objName = SelectedObject != null ? $" > {SelectedObject.Name.ToUpperInvariant()}" : "";
-        string bc = $"VERSE > {sys}{objName}";
-
-        var ftBc = new FormattedText(
-            bc,
+        string sysTitle = $"✦ STARMAP // {SystemName.ToUpperInvariant()} SYSTEM";
+        var ftSys = new FormattedText(
+            sysTitle,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Rajdhani, Segoe UI, Arial", FontStyle.Normal, FontWeight.Bold),
+            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Bold),
             12,
-            new SolidColorBrush(Color.Parse("#7FE9E0")));
+            new SolidColorBrush(Color.Parse("#38BDF8"))
+        );
+        context.DrawText(ftSys, new Point(16, 16));
 
-        var bcBg = new SolidColorBrush(Color.FromArgb(210, 8, 12, 18));
-        var bcBorder = new Pen(new SolidColorBrush(Color.FromArgb(60, 127, 233, 224)), 1);
-        context.DrawRectangle(bcBg, bcBorder, new Rect(14, 14, ftBc.Width + 20, ftBc.Height + 10), 4, 4);
-        context.DrawText(ftBc, new Point(24, 19));
-
-        // 2. Scalebar unten links
-        double barWidth = 70 * _zoom;
-        string scaleText = $"{Math.Round(50 / _zoom)} GM";
-
+        // 2. Zoom & Maßstab unten links
+        double scaleKm = (100 / _zoom) * 150000.0;
+        string scaleText = scaleKm >= 1000000.0 ? $"{scaleKm / 1000000.0:F1} GM" : $"{scaleKm:N0} km";
         var ftScale = new FormattedText(
-            scaleText,
+            $"MAßSTAB: {scaleText}  ·  ZOOM: {_zoom * 100:F0}%",
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Normal),
+            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.SemiBold),
             9.5,
-            new SolidColorBrush(Color.Parse("#8693A0")));
+            new SolidColorBrush(Color.Parse("#7E97AD"))
+        );
+        context.DrawText(ftScale, new Point(16, h - 26));
 
-        var scalePen = new Pen(new SolidColorBrush(Color.Parse("#7FE9E0")), 2);
-        context.DrawLine(scalePen, new Point(16, h - 22), new Point(16 + barWidth, h - 22));
-        context.DrawLine(scalePen, new Point(16, h - 26), new Point(16, h - 22));
-        context.DrawLine(scalePen, new Point(16 + barWidth, h - 26), new Point(16 + barWidth, h - 22));
-        context.DrawText(ftScale, new Point(16, h - 18));
+        // Maßstabs-Linie
+        var scalePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 2);
+        context.DrawLine(scalePen, new Point(16, h - 30), new Point(116, h - 30));
+    }
+
+    private void DrawText(DrawingContext context, string text, Point pos, string colorHex, double size, bool isBold = false, bool center = false)
+    {
+        var ft = new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(FontFamily.Default, FontStyle.Normal, isBold ? FontWeight.Bold : FontWeight.Normal),
+            size,
+            new SolidColorBrush(Color.Parse(colorHex))
+        );
+
+        double x = center ? pos.X - ft.Width / 2 : pos.X;
+        double y = pos.Y;
+
+        // Subtiler Textschatten für maximale Lesbarkeit im Weltraum
+        var shadowFt = new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(FontFamily.Default, FontStyle.Normal, isBold ? FontWeight.Bold : FontWeight.Normal),
+            size,
+            new SolidColorBrush(Color.FromArgb(200, 4, 7, 17))
+        );
+        context.DrawText(shadowFt, new Point(x + 1, y + 1));
+        context.DrawText(ft, new Point(x, y));
     }
 }

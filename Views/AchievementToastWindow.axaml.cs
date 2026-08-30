@@ -22,6 +22,8 @@ public partial class AchievementToastWindow : Window
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hwnd, int idx, int val);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")]
+    private static extern bool MessageBeep(uint uType);
 
     public ObservableCollection<AchievementToastData> ActiveToasts { get; } = new();
 
@@ -97,6 +99,16 @@ public partial class AchievementToastWindow : Window
         }
 
         ActiveToasts.Add(toast);
+
+        // Sound-Effekt abspielen, falls in den Einstellungen aktiviert
+        if (_settings?.ToastSoundEnabled == true && OperatingSystem.IsWindows())
+        {
+            try
+            {
+                MessageBeep(0x00000040 /* MB_ICONASTERISK */);
+            }
+            catch { /* ignore */ }
+        }
 
         if (!IsVisible)
         {

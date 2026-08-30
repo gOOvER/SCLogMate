@@ -19,16 +19,16 @@ public partial class LogParser
     [GeneratedRegex(@"^<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>")]
     private static partial Regex TsRegex();
 
-    [GeneratedRegex(@"Added notification ""(?:Überweisung erhalten von|Transfer received from|Payment received from):\s*(?<who>.+?)\s*$")]
+    [GeneratedRegex(@"Added notification ""(?:(?:Überweisung erhalten von|Transfer received from|Payment received from):\s*(?<who>.+?)|(?<who>[A-Za-z0-9_\-]+)\s+(?:has sent you|hat dir gesendet):?)\s*$")]
     private static partial Regex RecvHdrRegex();
 
-    [GeneratedRegex(@"Added notification ""(?:Sie haben\s+(?<who>.+?)\s+gesendet|You sent\s+(?<who>.+?)|Transfer sent to\s+(?<who>.+?)):")]
+    [GeneratedRegex(@"Added notification ""(?:Sie haben\s+(?<who>.+?)\s+gesendet|You sent\s+(?<who>.+?)|You have sent\s+(?<who>.+?)|Transfer sent to\s+(?<who>.+?)):?")]
     private static partial Regex SentHdrRegex();
 
-    [GeneratedRegex(@"Added notification ""(?:(?<amt>[\d.,]+)\s*aUEC (?:erhalten|received)|Received\s*(?<amt>[\d.,]+)\s*aUEC)")]
+    [GeneratedRegex(@"Added notification ""(?:(?<amt>[\d.,]+)\s*aUEC\s*(?:erhalten|received)?|(?:Awarded|Received|Payment received|Belohnung|Missions-Belohnung):?\s*(?<amt>[\d.,]+)\s*aUEC)")]
     private static partial Regex RewardRegex();
 
-    [GeneratedRegex(@"^<[^>]+>\s*(?<amt>[\d.,]+)\s*aUEC\s*$")]
+    [GeneratedRegex(@"^<[^>]+>\s*(?<amt>[\d.,]+)\s*(?:aUEC|UEC)\s*$")]
     private static partial Regex AmtLineRegex();
 
     [GeneratedRegex(@"RequestLocationInventory.*Location\[(?<loc>[^\]]+)\]")]
@@ -40,9 +40,28 @@ public partial class LogParser
     [GeneratedRegex(@"ClearDriver:.*token for '(?<ship>[^']+)'")]
     private static partial Regex VehRegex();
 
+    // Schiffs-Bereitstellung / Spawnen (Game Build 12519617+ Ersatz für Pad-Bestätigung)
+    [GeneratedRegex(@"(?:Vehicle (?:Retrieval Request|Spawn Request)|Requesting vehicle spawn|SpawnVehicleResponse).*?(?:vehicle|Vehicle)\s*['""]?(?<ship>[A-Za-z0-9_]+)['""]?")]
+    private static partial Regex VehicleRetrievalRegex();
+
     // Echtes QT-Ereignis: abgeschlossener Sprung (1x pro Ankunft), inkl. Schiff.
     [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::OnQuantumDriveArrived")]
     private static partial Regex QtArriveRegex();
+
+    [GeneratedRegex(@"Added notification ""You have joined channel '(?<ship>[^':]+?)\s*:\s*(?<user>[^']+)'")]
+    private static partial Regex ShipChannelJoinRegex();
+
+    [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::(?:CalculateRoute|OnPlayerRequestFuelToQuantumTarget|OnPlayerSelectedQuantumTarget)")]
+    private static partial Regex ItemNavShipRegex();
+
+    [GeneratedRegex(@"Projected Start Location is (?<origin>.+?) for route to destination (?<dest>\S+)")]
+    private static partial Regex QuantumRouteRegex();
+
+    [GeneratedRegex(@"Successfully calculated route to (?<dest>\S+)")]
+    private static partial Regex QuantumRouteSuccessRegex();
+
+    [GeneratedRegex(@"selected point (?<dest>\S+) as their destination")]
+    private static partial Regex QuantumTargetRegex();
 
     // Kauf an einem Shop/Kiosk: Item, Preis, Shop, GUID.
     [GeneratedRegex(@"SShopBuyRequest.*?shopName\[(?<shop>[^\]]*)\].*?client_price\[(?<price>[\d.]+)\].*?itemClassGUID\[(?<guid>[^\]]*)\].*?itemName\[(?<item>[^\]]*)\].*?quantity\[(?<qty>\d+)\]")]
@@ -167,7 +186,7 @@ public partial class LogParser
     private static partial Regex EquipLootRegex();
 
     // Bußgeld gezahlt (mit Betrag) – echtes aUEC raus, fließt in den Saldo.
-    [GeneratedRegex(@"Added notification ""(?:Strafe gezahlt|Fine paid|Penalty paid):\s*(?<amt>[\d.,]+)")]
+    [GeneratedRegex(@"Added notification ""(?:Strafe gezahlt|Fine paid|Penalty paid|Fined):?\s*(?<amt>[\d.,]+)")]
     private static partial Regex FineLineRegex();
 
     // Begangene Straftat (Crimestat-Verlauf).
@@ -182,12 +201,18 @@ public partial class LogParser
     [GeneratedRegex(@"Added notification ""(?<txt>(?:Leichte|Mäßige|Schwere|Kritische|Teilweise|Minor|Moderate|Severe|Critical|Partial) (?:Verletzung|Lähmung|Injury|Paralysis)[^""]*)")]
     private static partial Regex InjuryLineRegex();
 
-    // Party-Mitglieder rein/raus (Name in der Folgezeile der Notification).
+    // Party-Mitglieder rein/raus (Name in der Folgezeile oder Notification-Header)
     [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ist Party beigetreten|has joined the party|joined the party|joined party)")]
     private static partial Regex PartyJoinRegex();
 
+    [GeneratedRegex(@"Added notification ""(?:New Member Joined|Member Joined):\s*(?<who>[^""]+)")]
+    private static partial Regex PartyMemberJoinNotifRegex();
+
     [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ha(?:t|st)(?: die)? Party verlassen|has left the party|left the party|left party)")]
     private static partial Regex PartyLeaveRegex();
+
+    [GeneratedRegex(@"Added notification ""(?:Member Left|Member departed):\s*(?<who>[^""]+)")]
+    private static partial Regex PartyMemberLeaveNotifRegex();
 
     // Angenommene/aktive Mission mit Auftraggeber + Contract (feuert je Mission viele Male
     // als Objektiv-Marker → wir nehmen je missionId nur EINEN Eintrag).
@@ -209,6 +234,22 @@ public partial class LogParser
 
     [GeneratedRegex(@"Player spawned in zone '(?<loc>[^']+)'")]
     private static partial Regex PlayerSpawnZoneRegex();
+
+    // SC 4.x Fracht- & Schiffs-Aufzüge (Freight & Ship Elevators)
+    [GeneratedRegex(@"CSCLoadingPlatformManager::OnLoadingPlatformStateChanged.*?\[LoadingPlatformManager_(?<type>FreightElevator|ShipElevator)[^\]]*\].*?Platform state changed to (?<state>\w+)")]
+    private static partial Regex ElevatorStateRegex();
+
+    // ATC Landefreigabe & Hangar-Zuweisung
+    [GeneratedRegex(@"(?:Landing Request Granted|Hangar Assignment|Assigned to Hangar|Landing gear down).*?(?<hangar>Hangar\s*(?:[A-Za-z0-9_]+|\d+)|Pad\s*\d+)")]
+    private static partial Regex AtcHangarRegex();
+
+    // Schiffszerstörung / Self-Destruct
+    [GeneratedRegex(@"(?:VehicleDestroyed|Vehicle destroyed|Vehicle Exploded|Self-Destruct initiated).*?(?:vehicle|Vehicle|ship)?\s*['""]?(?<ship>[A-Za-z0-9_]+)?['""]?")]
+    private static partial Regex VehicleDestroyedRegex();
+
+    // Versicherungs-Claim
+    [GeneratedRegex(@"(?:Insurance Claim Request|Vehicle claim requested|Expedited delivery for vehicle).*?['""]?(?<ship>[A-Za-z0-9_]+)['""]?")]
+    private static partial Regex InsuranceClaimRegex();
 
     // Source-generated Hilfs-Regexes
     [GeneratedRegex(@"<EM4>.*?</EM4>")]
@@ -256,6 +297,8 @@ public partial class LogParser
 
     string? _lastLoot;                      // gegen Loot-Doppelzeilen
     string? _lastLoc;                       // für Quantum-Kontext
+    string? _lastShip;                      // aktuell erkanntes Schiff
+    string? _pendingQtDestination;          // aus Route-Kalkulation (Quantum Route)
     DateTime _lastQt = DateTime.MinValue;   // Drosselung der QT-Marker
     string? _lastNotif;                     // gegen Notification-Spam
     string? _lastParty;                     // gegen Party-Spam (Wiederholungen)
@@ -316,6 +359,29 @@ public partial class LogParser
         var rw = RewardRegex().Match(line);
         if (rw.Success)
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = ParseAmt(rw.Groups["amt"].Value) };
+
+        // Quantum Route-Berechnungen (Destination merken für QT-Ankunft)
+        var qr = QuantumRouteRegex().Match(line);
+        if (qr.Success)
+        {
+            _pendingQtDestination = qr.Groups["dest"].Value;
+        }
+        else
+        {
+            var qrs = QuantumRouteSuccessRegex().Match(line);
+            if (qrs.Success)
+            {
+                _pendingQtDestination = qrs.Groups["dest"].Value;
+            }
+            else
+            {
+                var qtTarget = QuantumTargetRegex().Match(line);
+                if (qtTarget.Success)
+                {
+                    _pendingQtDestination = qtTarget.Groups["dest"].Value;
+                }
+            }
+        }
 
         var by = BuyRegex().Match(line);
         if (by.Success)
@@ -435,10 +501,11 @@ public partial class LogParser
         var reqInv = RequestInventoryLocRegex().Match(line);
         if (reqInv.Success)
         {
-            var loc = Locations.Resolve(reqInv.Groups["loc"].Value);
-            if (!string.IsNullOrEmpty(loc) && loc != _lastLoc && loc != "—")
+            var raw = reqInv.Groups["loc"].Value;
+            var locRes = Locations.ResolveLocation(raw);
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
             {
-                _lastLoc = loc;
+                _lastLoc = locRes.DisplayName;
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
             }
         }
@@ -446,17 +513,22 @@ public partial class LogParser
         var lo = LocRegex().Match(line);
         if (lo.Success)
         {
-            _lastLoc = Locations.Resolve(lo.Groups["loc"].Value);
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+            var raw = lo.Groups["loc"].Value;
+            var locRes = Locations.ResolveLocation(raw);
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            {
+                _lastLoc = locRes.DisplayName;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+            }
         }
 
         var an = ArmisticeNotifRegex().Match(line);
         if (an.Success)
         {
-            var loc = Locations.Resolve(an.Groups["loc"].Value);
-            if (!string.IsNullOrEmpty(loc) && loc != _lastLoc)
+            var locRes = Locations.ResolveLocation(an.Groups["loc"].Value);
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
             {
-                _lastLoc = loc;
+                _lastLoc = locRes.DisplayName;
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
             }
         }
@@ -464,10 +536,10 @@ public partial class LogParser
         var spz = PlayerSpawnZoneRegex().Match(line);
         if (spz.Success)
         {
-            var loc = Locations.Resolve(spz.Groups["loc"].Value);
-            if (!string.IsNullOrEmpty(loc) && loc != _lastLoc)
+            var locRes = Locations.ResolveLocation(spz.Groups["loc"].Value);
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
             {
-                _lastLoc = loc;
+                _lastLoc = locRes.DisplayName;
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
             }
         }
@@ -476,14 +548,11 @@ public partial class LogParser
         if (zn.Success)
         {
             var raw = zn.Groups["loc"].Value;
-            if (raw.Contains("Stanton", StringComparison.OrdinalIgnoreCase) || raw.Contains("Pyro", StringComparison.OrdinalIgnoreCase) || raw.Contains("Nyx", StringComparison.OrdinalIgnoreCase) || raw.Contains("Lorville", StringComparison.OrdinalIgnoreCase) || raw.Contains("Babbage", StringComparison.OrdinalIgnoreCase) || raw.Contains("Area18", StringComparison.OrdinalIgnoreCase) || raw.Contains("Orison", StringComparison.OrdinalIgnoreCase))
+            var locRes = Locations.ResolveLocation(raw);
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
             {
-                var loc = Locations.Resolve(raw);
-                if (!string.IsNullOrEmpty(loc) && loc != _lastLoc)
-                {
-                    _lastLoc = loc;
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
-                }
+                _lastLoc = locRes.DisplayName;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
             }
         }
 
@@ -495,10 +564,36 @@ public partial class LogParser
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Inventory, Detail = $"{place}  ·  {iv.Groups["cnt"].Value} Item(s)" };
         }
 
+        var scj = ShipChannelJoinRegex().Match(line);
+        if (scj.Success)
+        {
+            var rawShip = scj.Groups["ship"].Value.Trim();
+            var ship = Ships.Prettify(rawShip);
+            _lastShip = ship;
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
+        }
+
+        var ins = ItemNavShipRegex().Match(line);
+        if (ins.Success)
+        {
+            var rawShip = ins.Groups["ship"].Value;
+            var ship = Ships.Prettify(rawShip);
+            _lastShip = ship;
+        }
+
         var ve = VehRegex().Match(line);
         if (ve.Success)
         {
             var ship = Ships.Prettify(ve.Groups["ship"].Value);
+            _lastShip = ship;
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
+        }
+
+        var vr = VehicleRetrievalRegex().Match(line);
+        if (vr.Success)
+        {
+            var ship = Ships.Prettify(vr.Groups["ship"].Value);
+            _lastShip = ship;
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
         }
 
@@ -523,8 +618,7 @@ public partial class LogParser
             return null;
         }
 
-        // Quantum-Reise: nur ABGESCHLOSSENE Sprünge (Ankunft). Das Log nennt
-        // keine Zielnamen, daher Schiff + zuletzt bekannter Standort als Kontext.
+        // Quantum-Reise: nur ABGESCHLOSSENE Sprünge (Ankunft).
         var qt = QtArriveRegex().Match(line);
         if (qt.Success)
         {
@@ -533,12 +627,28 @@ public partial class LogParser
             if ((t - _lastQt).TotalSeconds > 3)   // doppelte Logzeilen entprellen
             {
                 _lastQt = t;
+                string destText = "";
+                if (!string.IsNullOrEmpty(_pendingQtDestination))
+                {
+                    var resDest = Locations.ResolveLocation(_pendingQtDestination);
+                    if (resDest.DisplayName != "—" && !resDest.DisplayName.StartsWith("Im Transit"))
+                    {
+                        _lastLoc = resDest.DisplayName;
+                        destText = $" (bei {_lastLoc})";
+                    }
+                    _pendingQtDestination = null;
+                }
+                else if (_lastLoc != null)
+                {
+                    destText = $" (bei {_lastLoc})";
+                }
+
                 return new LogEntry
                 {
                     Time = t,
                     Kind = EventKind.Quantum,
                     Ship = ship,
-                    Detail = _lastLoc is null ? $"QT-Ankunft · {ship}" : $"QT-Ankunft · {ship} (bei {_lastLoc})"
+                    Detail = $"QT-Ankunft · {ship}{destText}"
                 };
             }
         }
@@ -555,6 +665,39 @@ public partial class LogParser
                 OwnNames.Contains(killer) ? $"Kill: {victim} ({weapon})" :
                 $"{killer} ✟ {victim} ({weapon})";
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = detail };
+        }
+
+        // SC 4.x Fracht- & Schiffs-Aufzüge (technisches Hintergrundrauschen herausfiltern)
+        var elv = ElevatorStateRegex().Match(line);
+        if (elv.Success)
+        {
+            return null;
+        }
+
+        // ATC Landefreigabe & Hangar-Zuweisung
+        var atc = AtcHangarRegex().Match(line);
+        if (atc.Success)
+        {
+            var hangar = atc.Groups["hangar"].Value.Trim();
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+        }
+
+        // Schiffsverlust (Zerstörung / Selbstzerstörung)
+        var vd = VehicleDestroyedRegex().Match(line);
+        if (vd.Success)
+        {
+            var rawShip = vd.Groups["ship"].Value;
+            var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Fahrzeug";
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = $"{ship} zerstört / Selbstzerstörung", Ship = ship };
+        }
+
+        // Versicherungs-Claim
+        var ic = InsuranceClaimRegex().Match(line);
+        if (ic.Success)
+        {
+            var rawShip = ic.Groups["ship"].Value;
+            var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Schiff";
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"Versicherungs-Claim: {ship}", Ship = ship };
         }
 
         // Schiffsverlust (Kollision) – zählt auch zur Flotte (dein Schiff)
@@ -612,10 +755,23 @@ public partial class LogParser
             long reward = 0;
             if (isComplete)
             {
-                var cat = MissionCatalog.FuzzyLookup(full);
+                var cleanTitle = Regex.Replace(full, @"^(Contract|Mission|Objective)\s+(Complete|Completed|Accepted|Finished|Erfolgreich):\s*", "", RegexOptions.IgnoreCase).Trim();
+                var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
                 if (cat != null && cat.BaseReward > 0)
                 {
                     reward = cat.BaseReward;
+                }
+                else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
+                {
+                    reward = 21250;
+                }
+                else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
+                {
+                    reward = 32000;
+                }
+                else
+                {
+                    reward = 25000; // Standard aUEC für Belohnungs-Events, damit kein 0-Betrag angezeigt wird
                 }
             }
 
@@ -637,10 +793,29 @@ public partial class LogParser
             _lastParty = key;
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {pj.Groups["who"].Value} ist beigetreten" };
         }
+        var pjn = PartyMemberJoinNotifRegex().Match(line);
+        if (pjn.Success)
+        {
+            var who = pjn.Groups["who"].Value.Trim();
+            var key = "j:" + who;
+            if (key == _lastParty) return null;
+            _lastParty = key;
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+        }
         var pl = PartyLeaveRegex().Match(line);
         if (pl.Success)
         {
             var who = pl.Groups["who"].Value;
+            if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+            var key = "l:" + who;
+            if (key == _lastParty) return null;
+            _lastParty = key;
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+        }
+        var pln = PartyMemberLeaveNotifRegex().Match(line);
+        if (pln.Success)
+        {
+            var who = pln.Groups["who"].Value.Trim();
             if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
             var key = "l:" + who;
             if (key == _lastParty) return null;
@@ -946,4 +1121,57 @@ public partial class LogParser
     }
 
     static string Clean(string s) => s.Trim().TrimEnd('"').Trim();
+
+    /// <summary>
+    /// Ordnet einen rohen oder bereinigten Ausrüstungsnamen einem Loadout-Slot zu.
+    /// </summary>
+    public static (LoadoutSlotType slot, string slotName, string icon) ClassifyLoadoutSlot(string rawName)
+    {
+        if (string.IsNullOrWhiteSpace(rawName))
+            return (LoadoutSlotType.Primary1, "Unbekannt", "❓");
+
+        var lower = rawName.ToLowerInvariant();
+
+        // 1. Helme
+        if (lower.Contains("helmet") || lower.Contains("_helm_") || lower.Contains("_hlm_") || lower.Contains("_hat_") || lower.Contains("helm"))
+            return (LoadoutSlotType.Helmet, "Helm", "🪖");
+
+        // 2. Rumpfpanzerung / Core / Torso
+        if (lower.Contains("torso") || lower.Contains("_core_") || lower.Contains("_chest_") || lower.Contains("_vest_") || lower.Contains("_suit_core_") || lower.Contains("armor_heavy_core") || lower.Contains("armor_medium_core") || lower.Contains("armor_light_core") || lower.Contains("core"))
+            return (LoadoutSlotType.Torso, "Torso / Core", "🥋");
+
+        // 3. Armpanzerung
+        if (lower.Contains("_arms_") || lower.Contains("_arm_") || lower.Contains("_shoulder_") || lower.Contains("arms"))
+            return (LoadoutSlotType.Arms, "Arme", "🦾");
+
+        // 4. Beinpanzerung
+        if (lower.Contains("_legs_") || lower.Contains("_leg_") || lower.Contains("_pants_") || lower.Contains("legs"))
+            return (LoadoutSlotType.Legs, "Beine", "🦿");
+
+        // 5. Rucksack
+        if (lower.Contains("backpack") || lower.Contains("_bp_") || lower.Contains("_pack_"))
+            return (LoadoutSlotType.Backpack, "Rucksack", "🎒");
+
+        // 6. Undersuit / Fliegeranzug
+        if (lower.Contains("undersuit") || lower.Contains("_suit_") || lower.Contains("flightsuit") || lower.Contains("suit"))
+            return (LoadoutSlotType.Undersuit, "Undersuit", "🩱");
+
+        // 7. Multi-Tool & Utility
+        if (lower.Contains("multitool") || lower.Contains("multi_tool") || lower.Contains("pyro_ryt") || lower.Contains("tractor") || lower.Contains("mining_laser") || lower.Contains("cutter") || lower.Contains("utility"))
+            return (LoadoutSlotType.MultiTool, "Multi-Tool", "🔧");
+
+        // 8. MedItem / Medgun / Medpens
+        if (lower.Contains("medgun") || lower.Contains("paramed") || lower.Contains("medpen") || lower.Contains("oxypen") || lower.Contains("hemozal") || lower.Contains("curelife") || lower.Contains("med_"))
+            return (LoadoutSlotType.MedItem, "Med-Kit / Pen", "💉");
+
+        // 9. Sidearm / Pistolen
+        if (lower.Contains("pistol") || lower.Contains("magnum") || lower.Contains("revolver") || lower.Contains("arclight") || lower.Contains("lh86") || lower.Contains("salvo") || lower.Contains("yubarev") || lower.Contains("coda"))
+            return (LoadoutSlotType.Sidearm, "Seitenwaffe", "🔫");
+
+        // 10. Primärwaffen
+        if (lower.Contains("rifle") || lower.Contains("shotgun") || lower.Contains("sniper") || lower.Contains("smg") || lower.Contains("lmg") || lower.Contains("launcher") || lower.Contains("weapon") || lower.Contains("behr_") || lower.Contains("klwe_") || lower.Contains("gemini_") || lower.Contains("karna_") || lower.Contains("custodian_") || lower.Contains("p8sc_") || lower.Contains("f55_") || lower.Contains("s71_") || lower.Contains("gallant_") || lower.Contains("klaus_") || lower.Contains("apx_"))
+            return (LoadoutSlotType.Primary1, "Primärwaffe", "🎯");
+
+        return (LoadoutSlotType.Primary2, "Ausrüstung", "🛡️");
+    }
 }

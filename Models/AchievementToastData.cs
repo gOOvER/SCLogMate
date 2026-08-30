@@ -8,6 +8,10 @@ public enum AchievementToastType
 {
     Blueprint,
     MissionReward,
+    ReputationPromotion,
+    RefineryCompleted,
+    ElevatorReady,
+    ShipDestroyed,
     Loot,
     Milestone
 }
@@ -62,6 +66,78 @@ public partial class AchievementToastData : ObservableObject
             TextColor = "#ECFDF5",
             SubtitleColor = "#34D399",
             GlowBorderColor = "#10B981"
+        };
+    }
+
+    public static AchievementToastData ForReputationPromotion(string factionName, string rankTitle, int tier)
+    {
+        return new AchievementToastData
+        {
+            Type = AchievementToastType.ReputationPromotion,
+            HeaderText = $"RANG-AUFSTIEG · TIER {tier}",
+            Title = $"{factionName} — {rankTitle}",
+            Subtitle = "Neuer Fraktionsrang freigeschaltet & verbesserte Verträge",
+            IconText = "⭐",
+            BadgeBg = "#1E1035",
+            BadgeBorder = "#8B5CF6",
+            BadgeColor = "#C084FC",
+            TextColor = "#F5F3FF",
+            SubtitleColor = "#C084FC",
+            GlowBorderColor = "#8B5CF6"
+        };
+    }
+
+    public static AchievementToastData ForRefineryCompleted(string material, int scu, string station)
+    {
+        return new AchievementToastData
+        {
+            Type = AchievementToastType.RefineryCompleted,
+            HeaderText = "VEREDELUNG ABGESCHLOSSEN",
+            Title = $"{scu} SCU {material}",
+            Subtitle = $"Abholbereit auf {station}",
+            IconText = "🏭",
+            BadgeBg = "#2D1804",
+            BadgeBorder = "#F97316",
+            BadgeColor = "#FB923C",
+            TextColor = "#FFF7ED",
+            SubtitleColor = "#FB923C",
+            GlowBorderColor = "#EA580C"
+        };
+    }
+
+    public static AchievementToastData ForElevatorReady(string elevatorType, string location)
+    {
+        return new AchievementToastData
+        {
+            Type = AchievementToastType.ElevatorReady,
+            HeaderText = "AUFZUG BEREIT",
+            Title = elevatorType,
+            Subtitle = $"Bereit zur Be-/Entladung auf {location}",
+            IconText = "📦",
+            BadgeBg = "#082032",
+            BadgeBorder = "#0284C7",
+            BadgeColor = "#38BDF8",
+            TextColor = "#F0F9FF",
+            SubtitleColor = "#38BDF8",
+            GlowBorderColor = "#0284C7"
+        };
+    }
+
+    public static AchievementToastData ForShipDestroyed(string shipName, bool claimAvailable = true)
+    {
+        return new AchievementToastData
+        {
+            Type = AchievementToastType.ShipDestroyed,
+            HeaderText = "SCHIFF ZERSTÖRT",
+            Title = shipName,
+            Subtitle = claimAvailable ? "Versicherungs-Claim am Terminal verfügbar" : "Schiff verloren",
+            IconText = "💥",
+            BadgeBg = "#300808",
+            BadgeBorder = "#EF4444",
+            BadgeColor = "#F87171",
+            TextColor = "#FEF2F2",
+            SubtitleColor = "#F87171",
+            GlowBorderColor = "#DC2626"
         };
     }
 

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for the release (e.g. v1.0.0)'
+        description: 'Tag name for the release (e.g. v1.0.0-beta1)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.0.0-beta1'
 
 permissions:
   contents: write
@@ -20,12 +20,12 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v7
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v6
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: |
           10.0.x
@@ -61,6 +61,18 @@ jobs:
         "@
 
         Set-Content -Path "./publish/SHA256SUMS.txt" -Value $checksums -Encoding UTF8
+        echo "EXE_HASH=$exeHash" >> $env:GITHUB_ENV
+
+    - name: VirusTotal Analysis
+      uses: crazy-max/ghaction-virustotal@v4
+      if: env.VIRUSTOTAL_API_KEY != ''
+      env:
+        VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+      with:
+        vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        files: |
+          ./publish/SCLogMate.exe
+      continue-on-error: true
 
     - name: Extract Release Notes from CHANGELOG
       id: extract_notes
@@ -75,17 +87,24 @@ jobs:
         } else {
             $notes = "Release $tag of SCLogMate."
         }
-        $notes += "`r`n`r`n---`r`n📋 Full Changelog: https://github.com/gOOvER/SCLogMate/blob/main/CHANGELOG.md"
+        
+        $exeHash = $env:EXE_HASH
+        $notes += "`r`n`r`n---`r`n### 🛡️ Security & Integrity`r`n"
+        $notes += "- **SHA-256 (SCLogMate.exe):** \`$exeHash\`"
+        if ($exeHash) {
+            $notes += "`r`n- **VirusTotal Report:** [Scan Results](https://www.virustotal.com/gui/file/$exeHash)"
+        }
+        $notes += "`r`n`r`n---`r`n📋 **Full Changelog:** https://github.com/gOOvER/SCLogMate/blob/main/CHANGELOG.md"
         Set-Content -Path "./publish/RELEASE_NOTES.md" -Value $notes -Encoding UTF8
 
     - name: Publish GitHub Release
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v2
       with:
         name: ${{ github.ref_name || github.event.inputs.tag_name }}
         tag_name: ${{ github.ref_name || github.event.inputs.tag_name }}
         body_path: ./publish/RELEASE_NOTES.md
         draft: false
-        prerelease: false
+        prerelease: ${{ contains(github.ref_name || github.event.inputs.tag_name, '-beta') || contains(github.ref_name || github.event.inputs.tag_name, '-rc') }}
         files: |
           ./publish/SCLogMate.exe
           ./publish/SCLogMate-*.zip

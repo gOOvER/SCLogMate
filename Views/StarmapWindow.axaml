@@ -1,0 +1,151 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SCLogReader.ViewModels"
+        xmlns:core="using:SCLogReader.Core"
+        xmlns:views="using:SCLogReader.Views"
+        x:Class="SCLogReader.Views.StarmapWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Star Citizen Starmap &amp; Navigation — SCLogMate"
+        Width="1280" Height="820" MinWidth="900" MinHeight="600"
+        Background="#040711" Foreground="#E6EDF3">
+
+  <DockPanel>
+    <!-- Header Toolbar -->
+    <Border DockPanel.Dock="Top" Background="#060C14" BorderBrush="#172B40" BorderThickness="0,0,0,1" Padding="14,10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        
+        <!-- System-Umschalter -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="✦ SYSTEM:" Classes="label" VerticalAlignment="Center" Margin="0,0,4,0" />
+          <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Stanton"
+                  Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Stanton}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="☀️" FontSize="11" />
+              <TextBlock Text="Stanton" FontWeight="Bold" />
+            </StackPanel>
+          </Button>
+          <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Pyro"
+                  Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Pyro}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="🔥" FontSize="11" />
+              <TextBlock Text="Pyro" FontWeight="Bold" />
+            </StackPanel>
+          </Button>
+          <Button Classes="chip" Command="{Binding SelectStarmapSystemCommand}" CommandParameter="Nyx"
+                  Background="{Binding SelectedStarmapSystem, Converter={StaticResource FilterBg}, ConverterParameter=Nyx}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="🌌" FontSize="11" />
+              <TextBlock Text="Nyx" FontWeight="Bold" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <!-- Layer-Filter Toggles & Quantum Drive Profil -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="14,0">
+          <TextBlock Text="QD:" Foreground="#7E97AD" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding AvailableQuantumDrives}"
+                    SelectedItem="{Binding SelectedQuantumDrive}"
+                    Width="190" Height="28" FontSize="11" Background="#0A1422" BorderBrush="#1C3857">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="core:QuantumDriveProfile">
+                <TextBlock Text="{Binding DisplayText}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapStations}" Content="🛰 Stationen" FontSize="11" />
+          <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapMoons}" Content="🌙 Monde" FontSize="11" />
+          <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapLandingZones}" Content="🏙 Landezonen" FontSize="11" />
+          <ToggleButton Classes="ghost" Padding="6,3" IsChecked="{Binding ShowStarmapJumpPoints}" Content="🌀 Sprungtore" FontSize="11" />
+        </StackPanel>
+
+        <!-- Schnell-Aktionen -->
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Classes="ghost" Padding="8,4" Command="{Binding ResetStarmapViewCommand}" ToolTip.Tip="Ansicht zentrieren">
+            <TextBlock Text="🎯 Reset" FontSize="11" />
+          </Button>
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- Content: Starmap Canvas + Floating Inspector Drawer -->
+    <Grid>
+      <!-- Vollbild Canvas -->
+      <views:StarmapCanvas x:Name="StarmapCanvasControl"
+                           SystemName="{Binding SelectedStarmapSystem}"
+                           PlayerLocationName="{Binding CurrentLocation}"
+                           SelectedObject="{Binding SelectedStarmapObject, Mode=TwoWay}"
+                           SelectedDrive="{Binding SelectedQuantumDrive}"
+                           ShowStations="{Binding ShowStarmapStations}"
+                           ShowMoons="{Binding ShowStarmapMoons}"
+                           ShowLandingZones="{Binding ShowStarmapLandingZones}"
+                           ShowJumpPoints="{Binding ShowStarmapJumpPoints}"
+                           UserPois="{Binding UserPois}" />
+
+      <!-- Floating Ziel-Inspektor Rechts -->
+      <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,16,16,0"
+              Width="320" Background="#E6070E18" BorderBrush="#1A3047" BorderThickness="1"
+              CornerRadius="10" Padding="14" BoxShadow="0 8 32 #B3000000"
+              IsVisible="{Binding SelectedStarmapObject, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Spacing="10">
+          <!-- Header -->
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="{Binding SelectedStarmapObject.Name}" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
+              <TextBlock Text="{Binding SelectedStarmapObject.Type}" FontSize="11" Foreground="#38BDF8" FontWeight="SemiBold" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="#1A3857" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+              <TextBlock Text="{Binding SelectedStarmapObject.Jurisdiction}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+            </Border>
+          </Grid>
+
+          <!-- Badges: Sicherheit & Schutzzone -->
+          <WrapPanel Orientation="Horizontal">
+            <Border Background="#061810" BorderBrush="#1D6A35" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,6,6"
+                    IsVisible="{Binding SelectedStarmapObject.HasArmistice}">
+              <TextBlock Text="🟢 Schutzzone (Armistice)" Foreground="#3FB950" FontSize="10" FontWeight="Bold" />
+            </Border>
+            <Border Background="#1A1806" BorderBrush="#8A6A1D" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,6,6"
+                    IsVisible="{Binding !SelectedStarmapObject.HasArmistice}">
+              <TextBlock Text="🔴 Keine Schutzzone (Waffen scharf)" Foreground="#F87171" FontSize="10" FontWeight="Bold" />
+            </Border>
+          </WrapPanel>
+
+          <!-- Spezialisierung -->
+          <Border Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,6"
+                  IsVisible="{Binding SelectedStarmapObject.Specialization, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="FUNKTION / DIENSTE" Foreground="#7E97AD" FontSize="9.5" FontWeight="Bold" />
+              <TextBlock Text="{Binding SelectedStarmapObject.Specialization}" Foreground="#F0F6FC" FontSize="11.5" FontWeight="SemiBold" />
+            </StackPanel>
+          </Border>
+
+          <!-- Rohstoff-Vorkommen -->
+          <Border Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,6"
+                  IsVisible="{Binding SelectedStarmapObject.Resources, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="MINING- &amp; BERGUNGS-VORKOMMEN" Foreground="#7E97AD" FontSize="9.5" FontWeight="Bold" />
+              <TextBlock Text="{Binding SelectedStarmapObject.Resources}" Foreground="#FFB23E" FontSize="11.5" FontWeight="Bold" />
+            </StackPanel>
+          </Border>
+
+          <!-- Beschreibung -->
+          <TextBlock Text="{Binding SelectedStarmapObject.Description}" Foreground="#C9D6E2" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+
+          <!-- Sprungtor-Aktion (falls Sprungtor) -->
+          <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  IsVisible="{Binding SelectedStarmapObject.TargetSystem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                  Command="{Binding JumpToTargetSystemCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="🌀" />
+              <TextBlock Text="{Binding SelectedStarmapObject.TargetSystem, StringFormat='Direkt nach {0} springen'}" FontWeight="Bold" />
+            </StackPanel>
+          </Button>
+
+        </StackPanel>
+      </Border>
+
+    </Grid>
+  </DockPanel>
+</Window>

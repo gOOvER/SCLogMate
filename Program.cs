@@ -37,6 +37,7 @@ internal static partial class Program
         Core.Logger.Log($"GUI-Start · {Environment.OSVersion}");
         try
         {
+            Database.Init();
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)

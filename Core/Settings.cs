@@ -42,6 +42,36 @@ public class AppSettings
     /// <summary>In-Game Achievement & Reward Toast Banner aktivieren.</summary>
     public bool ToastEnabled { get; set; } = true;
 
+    /// <summary>Toast bei erlernten Bauplänen anzeigen.</summary>
+    public bool ToastBlueprintEnabled { get; set; } = true;
+
+    /// <summary>Toast bei abgeschlossenen Missionen anzeigen.</summary>
+    public bool ToastMissionEnabled { get; set; } = true;
+
+    /// <summary>Toast bei Fraktions-Beförderungen (Rang-Aufstieg) anzeigen.</summary>
+    public bool ToastReputationEnabled { get; set; } = true;
+
+    /// <summary>Toast bei abgeschlossenen Veredelungsaufträgen anzeigen.</summary>
+    public bool ToastRefineryEnabled { get; set; } = true;
+
+    /// <summary>Toast bei Fracht- und Schiffsaufzug-Bereitstellung anzeigen.</summary>
+    public bool ToastElevatorEnabled { get; set; } = true;
+
+    /// <summary>Toast bei Schiffszerstörung oder Versicherungs-Claims anzeigen.</summary>
+    public bool ToastShipDestructionEnabled { get; set; } = true;
+
+    /// <summary>Subtiler Soundeffekt bei Benachrichtigungen abspielen.</summary>
+    public bool ToastSoundEnabled { get; set; } = false;
+
+    /// <summary>HUD-Position sperren (verhindert Verschieben im Spiel).</summary>
+    public bool OverlayLocked { get; set; } = false;
+
+    /// <summary>Klicks durch das Mini-HUD hindurch an das Spiel durchreichen (Click-Through).</summary>
+    public bool OverlayClickThrough { get; set; } = false;
+
+    /// <summary>Globaler Tastatur-Hotkey zum Ein-/Ausblenden des Mini-HUDs (z. B. Alt+H).</summary>
+    public bool GlobalHotkeyEnabled { get; set; } = true;
+
     /// <summary>X-Position des Achievement Toast Banners (-1 = zentriert).</summary>
     public double ToastPositionX { get; set; } = -1;
 
@@ -56,6 +86,27 @@ public class AppSettings
 
     /// <summary>Mit Windows automatisch starten (minimiert ins System-Tray).</summary>
     public bool AutostartEnabled { get; set; } = false;
+
+    /// <summary>Vom Nutzer gewählte UI-Schriftart.</summary>
+    public string SelectedFontFamily { get; set; } = "Inter";
+
+    /// <summary>Wipe-Filter aktivieren (ignoriert Events vor dem Stichtag bei Statistiken/Summen).</summary>
+    public bool WipeFilterEnabled { get; set; } = false;
+
+    /// <summary>Stichtag des letzten Wipes (Format: YYYY-MM-DD, z.B. 2026-05-15 für Alpha 4.8).</summary>
+    public string WipeDateString { get; set; } = "2026-05-15";
+
+    /// <summary>aUEC-Finanzsaldo ab Wipe-Datum filtern.</summary>
+    public bool WipeFilterMoney { get; set; } = true;
+
+    /// <summary>Auftrags- & Missionsstatistiken ab Wipe-Datum filtern.</summary>
+    public bool WipeFilterContracts { get; set; } = true;
+
+    /// <summary>Flotte & Schiffsaktivitäten ab Wipe-Datum filtern.</summary>
+    public bool WipeFilterFleet { get; set; } = false;
+
+    /// <summary>Erlernte Baupläne ab Wipe-Datum filtern.</summary>
+    public bool WipeFilterBlueprints { get; set; } = false;
 }
 
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>

@@ -49,7 +49,7 @@ public partial class LogEntry : ObservableObject
     public EventKind Kind { get; init; }
 
     /// <summary>aUEC, signed: positive = rein, negative = raus, 0 = kein Geldwert.</summary>
-    public long Amount { get; init; }
+    public long Amount { get; set; }
 
     /// <summary>itemClassGUID (nur bei Käufen) für die Namensauflösung über UEX.</summary>
     public string? ItemRef { get; init; }

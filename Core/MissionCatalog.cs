@@ -98,9 +98,9 @@ public static class MissionCatalog
         foreach (var ch in lower)
         {
             if (char.IsLetterOrDigit(ch)) sb.Append(ch);
-            else sb.Append(' ');
+            else if (char.IsWhiteSpace(ch) && (sb.Length == 0 || sb[^1] != ' ')) sb.Append(' ');
         }
-        return Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+        return sb.ToString().Trim();
     }
 
     private static void Add(MissionInfo info)
@@ -113,7 +113,455 @@ public static class MissionCatalog
 
     private static void InitializeCatalog()
     {
-        // ── RECCO BATTAGLIA (Levski / Delamar / Nyx) ──────────────────────────
+        // ── BOUNTY HUNTER GUILD & SICHERHEITSKRÄFTE (KOPFGELDJAGD) ──────────────────────────
+        Add(new MissionInfo
+        {
+            Id = "bhg_tracker_cert",
+            Title = "Tracker Training Permit Certification",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 4000,
+            ReputationGain = 100,
+            StarSystems = "Stanton",
+            Description = "Einstiegstest der Kopfgeldjäger-Gilde. Eliminiere das ausgewiesene Übungsziel zur Freischaltung regulärer Kopfgelder."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_vlrt_stanton",
+            Title = "Very Low Risk Target (VLRT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 7500,
+            ReputationGain = 150,
+            StarSystems = "Stanton",
+            Description = "Leichtes Kopfgeldziel (meist Aurora, Mustang, Buccaneer). Aufspüren und neutralisieren."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_lrt_stanton",
+            Title = "Low Risk Target (LRT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 11500,
+            ReputationGain = 250,
+            StarSystems = "Stanton",
+            Description = "Niedriges Risikoziel mit leichter Begleiteskorte (Cutlass Black, Gladius)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_mrt_stanton",
+            Title = "Medium Risk Target (MRT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 19500,
+            ReputationGain = 400,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Piecemeal Armor Core" },
+            Description = "Mittleres Risikoziel mit bewaffneter Eskorte (Vanguard, Freelancer MIS)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_hrt_stanton",
+            Title = "High Risk Target (HRT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 32000,
+            ReputationGain = 650,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Killshot Rifle", "Badami Helmet" },
+            Description = "Schweres Kopfgeldziel (Andromeda, Eclipse, Hurricane) in Asteroidenfeldern oder auf Mondoberflächen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_vhrt_stanton",
+            Title = "Very High Risk Target (VHRT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 48500,
+            ReputationGain = 950,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Helmet Supernova", "Killshot Rifle" },
+            Description = "Sehr gefährliche Zielperson mit schwerer Geleitschutzflotte (Retaliator, Eclipse, Starfarer)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "bhg_ert_stanton",
+            Title = "Extreme Risk Target (ERT)",
+            Contractor = "Bounty Hunters Guild",
+            Faction = "Bounty Hunters Guild",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 75000,
+            ReputationGain = 1500,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Core Supernova", "Overlord Arms Supernova", "Deadrig Shotgun" },
+            Description = "Höchste Gefahrenstufe: Großschiffe wie Hammerhead, Reclaimer und C2 Gunships mit voller Piratenbesatzung."
+        });
+
+        // ── NORTHROCK SERVICE GROUP (GRUPPEN-KOPFGELDER) ───────────────────
+        Add(new MissionInfo
+        {
+            Id = "northrock_group_mrt",
+            Title = "Group Medium Risk Target Warrant",
+            Contractor = "Northrock Service Group",
+            Faction = "Northrock Service Group",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 44000,
+            ReputationGain = 600,
+            StarSystems = "Stanton",
+            Description = "Neutralisiere drei koordinierte Piraten-Ziele in unterschiedlichen Bereichen von Stanton."
+        });
+        Add(new MissionInfo
+        {
+            Id = "northrock_group_hrt",
+            Title = "Group High Risk Target Warrant",
+            Contractor = "Northrock Service Group",
+            Faction = "Northrock Service Group",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 68000,
+            ReputationGain = 900,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Killshot Rifle", "Badami Arms" },
+            Description = "Drei schwere Ziele mit Eskorten über Crusader, Hurston und ArcCorp ausschalten."
+        });
+        Add(new MissionInfo
+        {
+            Id = "northrock_group_vhrt",
+            Title = "Group Very High Risk Target Warrant",
+            Contractor = "Northrock Service Group",
+            Faction = "Northrock Service Group",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 95000,
+            ReputationGain = 1400,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Helmet Supernova", "Overlord Core Supernova" },
+            Description = "Drei hochgradig bewaffnete Flottenverbände vor Ort neutralisieren."
+        });
+        Add(new MissionInfo
+        {
+            Id = "northrock_group_ert",
+            Title = "Group Extreme Risk Target Warrant",
+            Contractor = "Northrock Service Group",
+            Faction = "Northrock Service Group",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 135000,
+            ReputationGain = 2200,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Core Supernova", "Deadrig Shotgun", "Killshot Rifle Magazine" },
+            Description = "Drei feindliche Hammerhead-Großschiffe mit vollem Geleitschutz eliminieren."
+        });
+
+        // ── SÖLDNER & SICHERHEITSEINSÄTZE (BUNKER / VERTEIDIGUNG) ────────────
+        Add(new MissionInfo
+        {
+            Id = "merc_defend_occupants_t1",
+            Title = "Defend Occupants from Outlaws",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Söldner",
+            BaseReward = 20000,
+            ReputationGain = 250,
+            StarSystems = "Stanton",
+            Description = "Verteidige das lokale Untergrund-Sicherheitszentrum gegen drei Angriffswellen bewaffneter Gesetzloser."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_defend_occupants_t2",
+            Title = "Protect Civilian Research Facility",
+            Contractor = "microTech Protection",
+            Faction = "microTech",
+            MissionType = "Söldner",
+            BaseReward = 35000,
+            ReputationGain = 400,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Badami Helmet" },
+            Description = "Schütze das Personal einer abgelegenen Forschungskuppel vor Söldner-Infiltratoren."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_defend_occupants_t3",
+            Title = "Provide Backup at Distribution Center",
+            Contractor = "Hurston Security",
+            Faction = "Hurston Dynamics",
+            MissionType = "Söldner",
+            BaseReward = 55000,
+            ReputationGain = 600,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Killshot Rifle", "Piecemeal Armor Core" },
+            Description = "Unterstütze die Wachmannschaft im Verteilzentrum Cassillo/Covalex gegen schwer bewaffnete Piratentrupps."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_evict_illegal_occupants",
+            Title = "Evict Illegal Occupants",
+            Contractor = "Hurston Security",
+            Faction = "Hurston Dynamics",
+            MissionType = "Söldner",
+            BaseReward = 65000,
+            ReputationGain = 700,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Core Supernova", "Deadrig Shotgun" },
+            Description = "Dringe in die besetzte Untergrund-Anlage ein und schalte alle feindlichen Besatzer aus."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_890_jump_hijack",
+            Title = "Boarding Action in Progress",
+            Contractor = "microTech Protection",
+            Faction = "microTech",
+            MissionType = "Söldner",
+            BaseReward = 65000,
+            ReputationGain = 800,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Killshot Rifle", "Overlord Helmet Supernova" },
+            Description = "Eine 890 Jump Luxusyacht wurde von Outlaws gekapert. Docke an, rette die Besatzung und schalte alle Angreifer aus."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_seize_data",
+            Title = "Seize the Data",
+            Contractor = "BlacJac Security",
+            Faction = "BlacJac Security",
+            MissionType = "Söldner",
+            BaseReward = 45000,
+            ReputationGain = 450,
+            StarSystems = "Stanton",
+            Description = "Entermannschaft auf eine feindliche Drake Herald schicken und den Daten-Upload an kriminelle Hacker stoppen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_destroy_surveillance",
+            Title = "Unauthorized Surveillance Detected",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Söldner",
+            BaseReward = 25000,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Finde und zerstöre 3 illegale Überwachungssonden im Orbit des Comm Arrays innerhalb des Zeitlimits."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_spk_clearing",
+            Title = "Security Post Kareah Defense",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Söldner",
+            BaseReward = 70000,
+            ReputationGain = 850,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Overlord Arms Supernova", "Killshot Rifle" },
+            Description = "Verteidige Security Post Kareah vor Kriminellen, die ihre CrimeStat-Einträge hacken wollen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "merc_black_kite",
+            Title = "Black Kite Infiltration",
+            Contractor = "BlacJac Security",
+            Faction = "BlacJac Security",
+            MissionType = "Söldner",
+            BaseReward = 50000,
+            ReputationGain = 550,
+            StarSystems = "Stanton",
+            Description = "Infiltriere ein abgeriegeltes Daten-Versteck und vernichte den feindlichen Anführer."
+        });
+
+        // ── FRACHT, LIEFERUNG & LOGISTIK (COURIER & HAULING) ────────────────
+        Add(new MissionInfo
+        {
+            Id = "redwind_local_parcel",
+            Title = "Local Parcel Delivery (Multi-Drop)",
+            Contractor = "Red Wind Linehaul",
+            Faction = "Red Wind Linehaul",
+            MissionType = "Fracht & Transport",
+            BaseReward = 9500,
+            ReputationGain = 120,
+            StarSystems = "Stanton",
+            Description = "Hole 3 Frachtkisten an Außenposten auf Hurston ab und liefere sie am CBD Lorville ab."
+        });
+        Add(new MissionInfo
+        {
+            Id = "redwind_inter_system",
+            Title = "Inter-System Express Haul",
+            Contractor = "Red Wind Linehaul",
+            Faction = "Red Wind Linehaul",
+            MissionType = "Fracht & Transport",
+            BaseReward = 28000,
+            ReputationGain = 350,
+            StarSystems = "Stanton",
+            Description = "Transportiere Eilsendungen von Everus Harbor nach New Babbage (microTech)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "covalex_hub_distribution",
+            Title = "Covalex Hub Freight Relocation",
+            Contractor = "Covalex Shipping",
+            Faction = "Covalex Shipping",
+            MissionType = "Fracht & Transport",
+            BaseReward = 22500,
+            ReputationGain = 280,
+            StarSystems = "Stanton",
+            Description = "Großfracht-Transport zwischen L1-Lagrange-Stationen und Port Tressler."
+        });
+        Add(new MissionInfo
+        {
+            Id = "covalex_hazardous_cargo",
+            Title = "Hazardous Material Transit",
+            Contractor = "Covalex Shipping",
+            Faction = "Covalex Shipping",
+            MissionType = "Fracht & Transport",
+            BaseReward = 38000,
+            ReputationGain = 450,
+            StarSystems = "Stanton",
+            Description = "Gefahrgut-Transport unter Zeitdruck: Keine Erschütterungen oder Quantumsprung-Fehler erlaubt."
+        });
+        Add(new MissionInfo
+        {
+            Id = "united_cargo_supply_run",
+            Title = "Cold Chain Bio-Supply Run",
+            Contractor = "United Cargo",
+            Faction = "United Cargo",
+            MissionType = "Fracht & Transport",
+            BaseReward = 18500,
+            ReputationGain = 220,
+            StarSystems = "Stanton",
+            Description = "Lieferung gekühlter medizinischer Vorräte an Forschungsposten Rayari auf Calliope."
+        });
+        Add(new MissionInfo
+        {
+            Id = "freight_elevator_bulk_haul",
+            Title = "Freight Elevator Bulk Transfer (SC 4.x)",
+            Contractor = "Red Wind Linehaul",
+            Faction = "Red Wind Linehaul",
+            MissionType = "Fracht & Transport",
+            BaseReward = 72000,
+            ReputationGain = 800,
+            StarSystems = "Stanton",
+            Description = "Verlade 96 SCU Frachtkisten über den Frachtaufzug am Hangar und liefere sie am Ziel-Verteilzentrum ab."
+        });
+
+        // ── BERGUNG, SALVAGE & WRACK-VERWERTUNG ──────────────────────────────
+        Add(new MissionInfo
+        {
+            Id = "salvage_hull_scraping_cutlass",
+            Title = "Legal Salvage Claim: Drake Cutlass",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 15000,
+            ReputationGain = 180,
+            StarSystems = "Stanton",
+            Description = "Exklusive Bergbaurechte für ein verlassenes Cutlass-Wrack. Schabe die Hülle ab und sichere RMC."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_constellation_recovery",
+            Title = "Heavy Salvage Rights: RSI Constellation",
+            Contractor = "Hurston Dynamics",
+            Faction = "Hurston Dynamics",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 45000,
+            ReputationGain = 450,
+            StarSystems = "Stanton",
+            Description = "Großes Wrack im Asteroidenring von Yela. Hülle schaben und Strukturteile bergen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_hammerhead_clean_up",
+            Title = "Unsanctioned Clean-up: Aegis Hammerhead",
+            Contractor = "Duenas Syndicate",
+            Faction = "Outlaw Syndicates",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 85000,
+            ReputationGain = 600,
+            IsIllegal = true,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Deadrig Shotgun", "Overlord Arms Supernova" },
+            Description = "Zerstöre und verwertet die Überreste eines illegalen Kriegsschiffs, bevor Sicherheitskräfte eintreffen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_c2_cargo_recovery",
+            Title = "Derelict C2 Hercules Cargo Recovery",
+            Contractor = "Covalex Shipping",
+            Faction = "Covalex Shipping",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 52000,
+            ReputationGain = 500,
+            StarSystems = "Stanton",
+            Description = "Finde das auf Daymar abgestürzte C2-Wrack und berge alle intakten Frachtkisten."
+        });
+
+        // ── ERMITTLUNG, VERSCHIEDENE PERSONEN & BLACK BOX ───────────────────
+        Add(new MissionInfo
+        {
+            Id = "investigation_cave_search",
+            Title = "Search and Recovery: Missing Cave Explorer",
+            Contractor = "United Cargo",
+            Faction = "Civilian Protection",
+            MissionType = "Ermittlung",
+            BaseReward = 18000,
+            ReputationGain = 200,
+            StarSystems = "Stanton",
+            Description = "Erkunde das Höhlensystem auf Daymar / Aberdeen und finde den vermissten Höhlenforscher."
+        });
+        Add(new MissionInfo
+        {
+            Id = "investigation_covalex_gundo",
+            Title = "Covalex Hub Gundo Investigation",
+            Contractor = "Covalex Shipping",
+            Faction = "Covalex Shipping",
+            MissionType = "Ermittlung",
+            BaseReward = 22000,
+            ReputationGain = 250,
+            StarSystems = "Stanton",
+            Description = "Untersuche die zerstörte Covalex-Raumstation Gundo und finde die Ursache der fatalen Explosion."
+        });
+        Add(new MissionInfo
+        {
+            Id = "investigation_black_box_freelancer",
+            Title = "Flight Recorder (Black Box) Retrieval",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Ermittlung",
+            BaseReward = 14500,
+            ReputationGain = 160,
+            StarSystems = "Stanton",
+            Description = "Lokalisiere das Flugschreiber-Signal des abgestürzten Schiffs und bringe die Black Box zur Station."
+        });
+
+        // ── WARTUNG & COMM-ARRAYS ───────────────────────────────────────────
+        Add(new MissionInfo
+        {
+            Id = "aciedo_comm_array_repair",
+            Title = "Comm Array Repair & Reboot",
+            Contractor = "Aciedo Communications",
+            Faction = "Aciedo Communications",
+            MissionType = "Wartung",
+            BaseReward = 10000,
+            ReputationGain = 1000,
+            StarSystems = "Stanton",
+            Description = "Reaktiviere ein von Kriminellen abgeschaltetes Kommunikations-Array im Orbit."
+        });
+        Add(new MissionInfo
+        {
+            Id = "maintenance_waste_disposal",
+            Title = "Orbital Debris & Waste Disposal",
+            Contractor = "Hurston Dynamics",
+            Faction = "Hurston Dynamics",
+            MissionType = "Wartung",
+            BaseReward = 12500,
+            ReputationGain = 150,
+            StarSystems = "Stanton",
+            Description = "Beseitige kontaminierte Abfallbehälter an einem der Außenposten auf Arial."
+        });
+
+        // ── RECCO BATTAGLIA & NYX SYSTEM (DELAMAR / LEVSKI) ─────────────────
         Add(new MissionInfo
         {
             Id = "recco_missing_mining_team",
@@ -122,11 +570,10 @@ public static class MissionCatalog
             Faction = "People's Alliance",
             MissionType = "Ermittlung",
             BaseReward = 26750,
-            ReputationGain = 160,
-            IsIllegal = false,
+            ReputationGain = 200,
             StarSystems = "Nyx",
             Blueprints = new[] { "Piecemeal Armor Core", "Killshot Rifle" },
-            Description = "Eines der lokalen Bergbau-Teams ist verschollen. Suche den letzten bekannten Standort auf und finde heraus, was mit der Crew geschehen ist."
+            Description = "Eines der Bergbau-Teams ist verschollen. Finde heraus, was mit der Crew im Glaciem Ring geschehen ist."
         });
         Add(new MissionInfo
         {
@@ -136,25 +583,10 @@ public static class MissionCatalog
             Faction = "People's Alliance",
             MissionType = "Bergung & Salvage",
             BaseReward = 30500,
-            ReputationGain = 200,
-            IsIllegal = false,
+            ReputationGain = 250,
             StarSystems = "Nyx",
             Blueprints = new[] { "Deadrig Shotgun", "Overlord Helmet Supernova" },
-            Description = "Besorge vertrauliche Forschungs- und Scandaten von der verlassenen Moraine-Basis."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_crew_hasnt_checked_in",
-            Title = "Crew Hasn't Checked In",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Ermittlung",
-            BaseReward = 21250,
-            ReputationGain = 160,
-            IsIllegal = false,
-            StarSystems = "Nyx",
-            Blueprints = new[] { "Badami Helmet", "Killshot Rifle Magazine" },
-            Description = "Ein Bergbau-Team meldet sich seit Stunden nicht. Begib dich zur letzten bekannten Position und identifiziere die Crewmitglieder."
+            Description = "Besorge vertrauliche Forschungs- und Scandaten von der verlassenen Moraine-Basis auf Delamar."
         });
         Add(new MissionInfo
         {
@@ -164,11 +596,10 @@ public static class MissionCatalog
             Faction = "People's Alliance",
             MissionType = "Söldner",
             BaseReward = 58000,
-            ReputationGain = 350,
-            IsIllegal = false,
+            ReputationGain = 450,
             StarSystems = "Nyx",
             Blueprints = new[] { "Overlord Arms Supernova", "Overlord Core Supernova" },
-            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer und sichere das Wrack."
+            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer."
         });
         Add(new MissionInfo
         {
@@ -178,375 +609,124 @@ public static class MissionCatalog
             Faction = "People's Alliance",
             MissionType = "Söldner",
             BaseReward = 45000,
-            ReputationGain = 280,
-            IsIllegal = false,
+            ReputationGain = 350,
             StarSystems = "Nyx",
             Blueprints = new[] { "Overlord Legs Supernova" },
             Description = "Illegale Schürfer verletzen Delamars Bergbaurechte. Vertreibe die unbefugten Schiffe."
         });
 
-        // ── VAUGHN (Attentate & Unterwelt) ───────────────────────────────────
+        // ── PYRO SYSTEM (ROUGH & READY, OVERLORDS, RUIN STATION) ────────────
         Add(new MissionInfo
         {
-            Id = "vaughn_a_challenging_contract",
-            Title = "A Challenging Contract",
-            Contractor = "Vaughn",
-            Faction = "Vaughn Syndicate",
+            Id = "pyro_rough_ready_escort",
+            Title = "Convoy Defense across Monox",
+            Contractor = "Rough & Ready",
+            Faction = "Rough & Ready",
             MissionType = "Söldner",
-            BaseReward = 65000,
-            ReputationGain = 250,
-            IsIllegal = true,
-            StarSystems = "Stanton, Nyx",
-            Blueprints = new[] { "Killshot Rifle", "Deadrig Shotgun", "Overlord Core Supernova" },
-            Description = "Schwer bewachtes Ziel in einer Forschungsstation neutralisieren."
-        });
-        Add(new MissionInfo
-        {
-            Id = "vaughn_a_chance_to_impress",
-            Title = "A Chance to Impress",
-            Contractor = "Vaughn",
-            Faction = "Vaughn Syndicate",
-            MissionType = "Söldner",
-            BaseReward = 27500,
-            ReputationGain = 100,
-            IsIllegal = true,
-            StarSystems = "Stanton, Nyx",
-            Blueprints = new[] { "Badami Helmet" },
-            Description = "Demonstration deiner Fähigkeiten: Diskrete Eliminierung eines Ziels an angegebener Adresse."
-        });
-        Add(new MissionInfo
-        {
-            Id = "vaughn_an_eye_for_an_eye",
-            Title = "An Eye for an Eye",
-            Contractor = "Vaughn",
-            Faction = "Vaughn Syndicate",
-            MissionType = "Söldner",
-            BaseReward = 48000,
-            ReputationGain = 200,
-            IsIllegal = true,
-            StarSystems = "Stanton, Nyx",
-            Blueprints = new[] { "Overlord Helmet Supernova" },
-            Description = "Vergeltungsauftrag gegen einen verräterischen Geschäftspartner."
-        });
-        Add(new MissionInfo
-        {
-            Id = "vaughn_high_profile_target",
-            Title = "High Profile Target",
-            Contractor = "Vaughn",
-            Faction = "Vaughn Syndicate",
-            MissionType = "Söldner",
-            BaseReward = 85000,
-            ReputationGain = 400,
-            IsIllegal = true,
-            StarSystems = "Stanton, Nyx",
-            Blueprints = new[] { "Killshot Rifle", "Overlord Core Supernova" },
-            Description = "Eliminierung eines hochrangigen UEE-Sicherheitsbeamten im Tiefraum."
-        });
-
-        // ── WALLACE KLIM (GrimHEX / Drogen & Schmuggel) ─────────────────────
-        Add(new MissionInfo
-        {
-            Id = "klim_a_batch_from_scratch",
-            Title = "A Batch from Scratch",
-            Contractor = "Wallace Klim",
-            Faction = "Wallace Klim",
-            MissionType = "Fracht & Transport",
-            BaseReward = 32000,
-            ReputationGain = 250,
-            IsIllegal = true,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "MedPen Refill Pack" },
-            Description = "Überwache und transportiere die Rohstoffkette und Endprodukte für Wallace Klims Labor."
-        });
-        Add(new MissionInfo
-        {
-            Id = "klim_distribution_run",
-            Title = "Distribution Run",
-            Contractor = "Wallace Klim",
-            Faction = "Wallace Klim",
-            MissionType = "Fracht & Transport",
-            BaseReward = 45000,
-            ReputationGain = 300,
-            IsIllegal = true,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Piecemeal Armor Core" },
-            Description = "Lieferung von veredeltem SLAM an Abnehmerstationen im Asteroidengürtel."
-        });
-
-        // ── CDF & BOUNTY HUNTERS GUILD (Kopfgeldjagd) ───────────────────────
-        Add(new MissionInfo
-        {
-            Id = "cdf_call_to_arms",
-            Title = "A Call to Arms",
-            Contractor = "Civilian Defense Force",
-            Faction = "UEE / CDF",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 0,
-            ReputationGain = 50,
-            IsIllegal = false,
-            StarSystems = "Stanton, Nyx, Pyro",
-            Description = "Dauerhafter Vertrag: Prämie für jeden neutralisierten Kriminellen mit aktivem CrimeStat im UEE-Raum."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_evaluation",
-            Title = "Bounty Hunter Evaluation",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 5000,
-            ReputationGain = 250,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Zertifizierungsmission zur Aufnahme in die Kopfgeldjäger-Gilde."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_vlrt",
-            Title = "Very Low Risk Target (VLRT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 4000,
-            ReputationGain = 200,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Kopfgeldauftrag gegen Ziel mit minimaler Bewaffnung (Aurora, Mustang)."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_lrt",
-            Title = "Low Risk Target (LRT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 8500,
-            ReputationGain = 350,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Kopfgeldauftrag gegen Ziel mit leichter Kampfeskorte (Avenger, Buccaneer)."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_mrt",
-            Title = "Moderate Risk Target (MRT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 15000,
-            ReputationGain = 600,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Kopfgeldauftrag gegen Ziel im Mehrpersonen-Schiff (Cutlass, Freelancer)."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_hrt",
-            Title = "High Risk Target (HRT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 22500,
-            ReputationGain = 1200,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Kopfgeldauftrag gegen schweres Ziel mit Eskorte (Vanguard, Hurricane, Connie)."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_vhrt",
-            Title = "Very High Risk Target (VHRT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 35000,
-            ReputationGain = 2400,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Gefährliche Zielgruppe mit mehreren schweren Jagdschiffen und Gunships."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bhg_ert",
-            Title = "Extreme Risk Target (ERT)",
-            Contractor = "Bounty Hunters Guild",
-            Faction = "Bounty Hunters Guild",
-            MissionType = "Kopfgeldjagd",
-            BaseReward = 55000,
-            ReputationGain = 5000,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Killshot Rifle", "Overlord Core Supernova" },
-            Description = "Höchste Bedrohungsstufe: Großschiffe (Hammerhead, Reclaimer, Caterpillar) mit Elite-Eskorte."
-        });
-
-        // ── MILES ECKHART & SECURITY ─────────────────────────────────────────
-        Add(new MissionInfo
-        {
-            Id = "eckhart_arlington_gang",
-            Title = "The Arlington Gang",
-            Contractor = "Miles Eckhart",
-            Faction = "Eckhart Security",
-            MissionType = "Söldner",
-            BaseReward = 95000,
-            ReputationGain = 450,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Deadrig Shotgun", "Overlord Arms Supernova" },
-            Description = "Missionskette zur Zerschlagung der berüchtigten Arlington-Gang inklusive ihrer Idris-Fregatte."
-        });
-        Add(new MissionInfo
-        {
-            Id = "eckhart_illegal_occupants",
-            Title = "Clear Outposts of Illegal Occupants",
-            Contractor = "Miles Eckhart",
-            Faction = "Eckhart Security",
-            MissionType = "Söldner",
-            BaseReward = 38000,
-            ReputationGain = 300,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Badami Helmet", "Killshot Rifle Magazine" },
-            Description = "Säubere eine besetzte Bergbaustation am Boden von bewaffneten Kriminellen."
-        });
-
-        // ── REDWIND & COVALEX & HAULING ───────────────────────────────────────
-        Add(new MissionInfo
-        {
-            Id = "redwind_local_freight",
-            Title = "Local Freight Delivery",
-            Contractor = "RedWind Linehaul",
-            Faction = "RedWind Linehaul",
-            MissionType = "Fracht & Transport",
-            BaseReward = 14500,
-            ReputationGain = 200,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Frachttransport zwischen Orbitalstationen und Oberflächen-Außenposten."
-        });
-        Add(new MissionInfo
-        {
-            Id = "redwind_planetary_haul",
-            Title = "Planetary Distribution Haul",
-            Contractor = "RedWind Linehaul",
-            Faction = "RedWind Linehaul",
-            MissionType = "Fracht & Transport",
-            BaseReward = 48000,
+            BaseReward = 62000,
             ReputationGain = 500,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Großraum-Gütertransport von Industrie-Raffinerien zu Verteilzentren (32+ SCU)."
+            IsIllegal = true,
+            StarSystems = "Pyro",
+            Blueprints = new[] { "Killshot Rifle", "Badami Helmet" },
+            Description = "Schütze einen illegalen Treibstoff-Konvoi auf Pyro II vor Überfällen rivalisierender Banden."
         });
         Add(new MissionInfo
         {
-            Id = "covalex_gundo_investigation",
-            Title = "Covalex Hub Gundo Investigation",
-            Contractor = "Covalex Shipping",
-            Faction = "Covalex Shipping",
-            MissionType = "Ermittlung",
-            BaseReward = 18000,
-            ReputationGain = 250,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Untersuche die zerstörte Covalex Hub Gundo Raumstation und finde die Ursache der Explosion heraus."
+            Id = "pyro_ruin_station_bounty",
+            Title = "Ruin Station Elimination Contract",
+            Contractor = "Citizens for Pyro",
+            Faction = "Citizens for Pyro",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 78000,
+            ReputationGain = 750,
+            StarSystems = "Pyro",
+            Blueprints = new[] { "Overlord Helmet Supernova", "Deadrig Shotgun" },
+            Description = "Spüre einen berüchtigten Piratenkapitän im Orbit von Terminus (Pyro VI) auf und eliminiere ihn."
         });
-
-        // ── INVESTIGATION & SALVAGE (Bergung & Suche) ─────────────────────────
         Add(new MissionInfo
         {
-            Id = "salvage_scrap_retrieval",
-            Title = "Scrap & Hull Scraping Rights",
-            Contractor = "Dumper's Depot",
-            Faction = "Dumper's Depot",
+            Id = "pyro_bloom_salvage",
+            Title = "Hazardous Volcanic Salvage: Bloom",
+            Contractor = "Pyro Salvage Union",
+            Faction = "Pyro Salvage Union",
             MissionType = "Bergung & Salvage",
-            BaseReward = 25000,
-            ReputationGain = 300,
-            IsIllegal = false,
-            StarSystems = "Stanton, Nyx",
-            Description = "Kaufe exklusive Bergungsrechte an einem kürzlich verunglückten Frachtschiff."
+            BaseReward = 88000,
+            ReputationGain = 900,
+            StarSystems = "Pyro",
+            Blueprints = new[] { "Overlord Core Supernova", "Overlord Arms Supernova" },
+            Description = "Berge wertvolle Triebwerkskomponenten eines verunglückten Transporters in der Nähe von Lavafeldern auf Pyro III."
         });
         Add(new MissionInfo
         {
-            Id = "investigation_missing_person",
-            Title = "Missing Person Search",
-            Contractor = "InterSec Investigations",
-            Faction = "InterSec",
-            MissionType = "Ermittlung",
-            BaseReward = 16500,
-            ReputationGain = 180,
-            IsIllegal = false,
-            StarSystems = "Stanton, Nyx",
-            Description = "Finde eine in den Höhlen oder Asteroidenfeldern verschollene Person."
-        });
-        Add(new MissionInfo
-        {
-            Id = "investigation_emergency_beacon",
-            Title = "Emergency Beacon Investigation",
-            Contractor = "InterSec Investigations",
-            Faction = "InterSec",
-            MissionType = "Ermittlung",
-            BaseReward = 15000,
-            ReputationGain = 150,
-            IsIllegal = false,
-            StarSystems = "Stanton, Nyx",
-            Description = "Untersuche das Notsignal eines havarierten Schiffes im Asteroidenfeld."
+            Id = "pyro_checkmate_raid",
+            Title = "Repel Outpost Assault at Checkmate",
+            Contractor = "Rough & Ready",
+            Faction = "Rough & Ready",
+            MissionType = "Söldner",
+            BaseReward = 92000,
+            ReputationGain = 1100,
+            IsIllegal = true,
+            StarSystems = "Pyro",
+            Blueprints = new[] { "Killshot Rifle", "Overlord Legs Supernova" },
+            Description = "Verteidige die Checkmate-Station vor feindlichen Kampfschiffen und Entermannschaften."
         });
 
-        // ── BUNKER & FACILITY DEFENSE (Sicherheitsdienste) ─────────────────────
+        // ── UNTERWELT & SPEZIALAUFTRAGGEBER (TWITCH, CLOVUS, RUTO, VAUGHN) ──
         Add(new MissionInfo
         {
-            Id = "bunker_defend_occupants",
-            Title = "Defend Facility from Attackers",
-            Contractor = "Crusader Security",
-            Faction = "Crusader Industries",
-            MissionType = "Söldner",
-            BaseReward = 60000,
-            ReputationGain = 500,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Overlord Arms Supernova", "Killshot Rifle" },
-            Description = "Verteidige das unterirdische Sicherheitszentrum vor mehreren Angriffswellen feindlicher Söldner."
-        });
-        Add(new MissionInfo
-        {
-            Id = "bunker_evict_illegal_occupants",
-            Title = "Evict Illegal Occupants",
-            Contractor = "Hurston Security",
-            Faction = "Hurston Dynamics",
-            MissionType = "Söldner",
-            BaseReward = 75000,
-            ReputationGain = 650,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Blueprints = new[] { "Overlord Core Supernova", "Deadrig Shotgun" },
-            Description = "Dringe in die besetzte Untergrund-Anlage ein und schalte alle feindlichen Eindringlinge aus."
-        });
-        Add(new MissionInfo
-        {
-            Id = "aciedo_comm_array_repair",
-            Title = "Comm Array Repair",
-            Contractor = "Aciedo Communications",
-            Faction = "Aciedo Communications",
-            MissionType = "Wartung",
-            BaseReward = 10000,
-            ReputationGain = 1000,
-            IsIllegal = false,
-            StarSystems = "Stanton",
-            Description = "Reaktiviere ein von Kriminellen deaktiviertes Kommunikations-Array im Orbit."
-        });
-        Add(new MissionInfo
-        {
-            Id = "twitch_the_price_of_freedom",
+            Id = "twitch_price_of_freedom",
             Title = "The Price of Freedom",
             Contractor = "Twitch",
             Faction = "Headhunters",
             MissionType = "Söldner",
             BaseReward = 80000,
-            ReputationGain = 500,
+            ReputationGain = 700,
             IsIllegal = true,
             StarSystems = "Stanton",
             Blueprints = new[] { "Killshot Rifle", "Overlord Helmet Supernova" },
             Description = "Kapere einen Gefangenentransporter der Sicherheitskräfte und befreie inhaftierte Crewmitglieder."
+        });
+        Add(new MissionInfo
+        {
+            Id = "clovus_recovery_operation",
+            Title = "Reclamation and Cover-Up",
+            Contractor = "Clovus Darneely",
+            Faction = "Lorville Underground",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 42000,
+            ReputationGain = 400,
+            IsIllegal = true,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Piecemeal Armor Core" },
+            Description = "Finde das geheime Daten-Relay an einem verlassenen Satelliten auf Hurston und vernichte alle Beweise."
+        });
+        Add(new MissionInfo
+        {
+            Id = "ruto_covert_assassination",
+            Title = "Covert Contract: Silent Execution",
+            Contractor = "Ruto",
+            Faction = "GrimHEX Syndicate",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 85000,
+            ReputationGain = 800,
+            IsIllegal = true,
+            StarSystems = "Stanton",
+            Blueprints = new[] { "Killshot Rifle", "Deadrig Shotgun" },
+            Description = "Finde und eliminiere das Ziel diskret, ohne den Alarm an benachbarten Außenposten auszulösen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "vaughn_challenging_contract",
+            Title = "A Challenging Contract",
+            Contractor = "Vaughn",
+            Faction = "Vaughn Syndicate",
+            MissionType = "Kopfgeldjagd",
+            BaseReward = 95000,
+            ReputationGain = 900,
+            IsIllegal = true,
+            StarSystems = "Stanton, Nyx",
+            Blueprints = new[] { "Killshot Rifle", "Deadrig Shotgun", "Overlord Core Supernova" },
+            Description = "Hochbezahlter Attentatsauftrag im Asteroidenfeld. Schalte die Zielperson und ihre Leibwache aus."
         });
     }
 }

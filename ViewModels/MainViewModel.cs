@@ -98,6 +98,16 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool showStarmapJumpPoints = true;
     [ObservableProperty] private int selectedTabIndex = 0;
 
+    public IReadOnlyList<QuantumDriveProfile> AvailableQuantumDrives => StarmapData.AvailableDrives;
+    [ObservableProperty] private QuantumDriveProfile selectedQuantumDrive = StarmapData.AvailableDrives[0];
+    [ObservableProperty] private bool isStarmapFullscreen = false;
+    public bool ShowDashboardCards => SelectedTabIndex != 4 || !IsStarmapFullscreen;
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowDashboardCards));
+    }
+
     // Star Citizen Wiki API Integration
     [ObservableProperty] private WikiInfo? currentShipWiki;
     [ObservableProperty] private WikiInfo? selectedWikiInfo;
@@ -118,11 +128,94 @@ public partial class MainViewModel : ObservableObject
 
     // In-Game Achievement & Reward Toast Banner (Völlig unabhängig vom Mini-HUD)
     [ObservableProperty] private bool toastOverlayEnabled = true;
+    [ObservableProperty] private bool toastBlueprintEnabled = true;
+    [ObservableProperty] private bool toastMissionEnabled = true;
+    [ObservableProperty] private bool toastReputationEnabled = true;
+    [ObservableProperty] private bool toastRefineryEnabled = true;
+    [ObservableProperty] private bool toastElevatorEnabled = true;
+    [ObservableProperty] private bool toastShipDestructionEnabled = true;
+    [ObservableProperty] private bool toastSoundEnabled = false;
     private Views.AchievementToastWindow? _toastWindow;
 
-    // Fenster- & System-Verhalten
+    // HUD-Sperre, Click-Through & Hotkey
+    [ObservableProperty] private bool overlayLocked = false;
+    [ObservableProperty] private bool overlayClickThrough = false;
+    [ObservableProperty] private bool globalHotkeyEnabled = true;
+
+    // Raffinerie-Tracking & Handelsrouten
+    public ObservableCollection<RefineryJob> RefineryJobs { get; } = new();
+    public ObservableCollection<TradeRouteItem> TradeRoutes { get; } = new();
+    public List<string> AvailableRefineryStations => RefineryCatalog.Stations;
+    public List<string> AvailableRefineryMaterials => RefineryCatalog.Materials;
+    public List<string> AvailableRefineryMethods => RefineryCatalog.Methods;
+    [ObservableProperty] private string newRefineryStation = RefineryCatalog.Stations[0];
+    [ObservableProperty] private string newRefineryMaterial = RefineryCatalog.Materials[0];
+    [ObservableProperty] private string newRefineryMethod = RefineryCatalog.Methods[0];
+    [ObservableProperty] private int newRefineryScu = 32;
+    [ObservableProperty] private int selectedTradeShipCapacity = 696;
+    private DispatcherTimer? _refineryTimer;
+
+    // Fenster- & System-Verhalten & Schriftart
     [ObservableProperty] private bool minimizeToTrayOnClose = true;
     [ObservableProperty] private bool autostartEnabled = false;
+
+    public ObservableCollection<string> AvailableFonts { get; } = new()
+    {
+        "Inter (Modern & Klar)",
+        "Segoe UI (Windows Standard)",
+        "Cascadia Code (Monospace)",
+        "Consolas (Classic Code)",
+        "Bahnschrift (Clean Tech)",
+        "Arial (Universal Sans)",
+        "Verdana (Groß & Lesbar)"
+    };
+
+    [ObservableProperty] private string selectedFontOption = "Inter (Modern & Klar)";
+
+    public string SelectedFontFamilyName => SelectedFontOption switch
+    {
+        "Segoe UI (Windows Standard)" => "Segoe UI",
+        "Cascadia Code (Monospace)" => "Cascadia Code",
+        "Consolas (Classic Code)" => "Consolas",
+        "Bahnschrift (Clean Tech)" => "Bahnschrift",
+        "Arial (Universal Sans)" => "Arial",
+        "Verdana (Groß & Lesbar)" => "Verdana",
+        _ => "Inter"
+    };
+
+    public Avalonia.Media.FontFamily CurrentFontFamily => new Avalonia.Media.FontFamily(SelectedFontFamilyName);
+
+    partial void OnSelectedFontOptionChanged(string value)
+    {
+        if (_initializing) return;
+        _settings.SelectedFontFamily = SelectedFontFamilyName;
+        Settings.Save(_settings);
+        OnPropertyChanged(nameof(SelectedFontFamilyName));
+        OnPropertyChanged(nameof(CurrentFontFamily));
+    }
+
+    // Settings Sub-Tab Navigation
+    [ObservableProperty] private int settingsSubTabIndex = 0;
+
+    // Wipe- & Persistenz-Filter
+    [ObservableProperty] private bool wipeFilterEnabled;
+    [ObservableProperty] private string wipeDateString = "2026-05-15";
+    [ObservableProperty] private bool wipeFilterMoney = true;
+    [ObservableProperty] private bool wipeFilterContracts = true;
+    [ObservableProperty] private bool wipeFilterFleet = false;
+    [ObservableProperty] private bool wipeFilterBlueprints = false;
+
+    // Piloten-Ausrüstung (Visual Loadout Slots)
+    public ObservableCollection<LoadoutItem> PilotLoadoutSlots { get; } = new();
+
+    // Starmap Custom POIs (Persönliche Wegpunkte & Notizen)
+    public ObservableCollection<UserPoi> UserPois { get; } = new();
+    [ObservableProperty] private UserPoi? selectedUserPoi;
+    [ObservableProperty] private string newPoiName = "";
+    [ObservableProperty] private string newPoiBody = "";
+    [ObservableProperty] private string newPoiNotes = "";
+    [ObservableProperty] private string newPoiCategory = "Mining";
+    [ObservableProperty] private string newPoiColor = "#F59E0B";
 
     // Ereignis-Volltextsuche
     [ObservableProperty] private string eventSearchText = "";
@@ -146,6 +239,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string selectedMissionType = "Alle";
     [ObservableProperty] private MissionInfo? selectedMission;
     public int TotalMissionsCount => MissionCatalogList.Count;
+
+    // Fraktionsruf & Reputations-System
+    public ObservableCollection<FactionReputation> Factions { get; } = new();
+    public DataGridCollectionView FactionsView { get; }
+    [ObservableProperty] private string selectedFactionCategory = "Alle";
 
     public IReadOnlyList<StarmapObject> CurrentSystemObjects => StarmapData.GetSystemObjects(SelectedStarmapSystem);
     public IReadOnlyList<StarmapObject> SearchStarmapResults => string.IsNullOrWhiteSpace(StarmapSearchText)
@@ -623,6 +721,81 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Synchronisiert beim Programmstart oder nach Schema/Parser-Updates automatisch alle Backup-Logs
+    /// und indexiert fehlende Sessions geräuschlos im Hintergrund. Der Anwender muss nie manuell scannen.
+    /// </summary>
+    private async Task AutoSyncAndIndexDatabaseAsync()
+    {
+        await Task.Run(() =>
+        {
+            try
+            {
+                var liveLog = LogPath;
+                var dir = Path.GetDirectoryName(liveLog) ?? ".";
+                var backupDir = Path.Combine(dir, "logbackups");
+                var backups = Directory.Exists(backupDir)
+                    ? Directory.GetFiles(backupDir, "*.log")
+                    : System.Array.Empty<string>();
+
+                var allArchived = LogArchive.Sync(backups);
+                Database.Init();
+
+                bool needsFullRescan = Database.WasParserResetRequired;
+                int currentSessionCount = Database.GetSessionCount();
+                int unindexedCount = Database.GetUnindexedCount(allArchived);
+
+                if (needsFullRescan || (currentSessionCount == 0 && allArchived.Count > 0))
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        IsDatabaseBusy = true;
+                        DatabaseStatusMessage = "⚡ Auto-Scan: Aktualisiere Datenbank nach Update...";
+                        DatabaseProgressPercent = 0;
+                    });
+
+                    var result = Database.RescanAll(allArchived, (curr, total, name) =>
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            DatabaseProgressPercent = (double)curr / total * 100.0;
+                            DatabaseStatusMessage = $"⚡ Auto-Scan ({curr}/{total}): {name}";
+                        });
+                    });
+
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        DatabaseStatusMessage = $"✓ Auto-Scan fertig: {result.indexedSessions} Sessions ({result.totalEvents:N0} Events) indexiert.";
+                        IsDatabaseBusy = false;
+                        OnPropertyChanged(nameof(DatabaseSummaryText));
+                        RefreshSessions(selectCurrent: false);
+                        var wipeSince = GetEffectiveWipeDate();
+                        RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
+                    });
+                }
+                else if (unindexedCount > 0)
+                {
+                    int added = Database.IndexNew(allArchived);
+                    if (added > 0)
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            OnPropertyChanged(nameof(DatabaseSummaryText));
+                            RefreshSessions(selectCurrent: false);
+                            var wipeSince = GetEffectiveWipeDate();
+                            RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
+                            Status = $"✓ {added} neue Session(s) automatisch im Hintergrund indexiert.";
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AutoSyncAndIndexDatabaseAsync", ex);
+            }
+        });
+    }
+
     [RelayCommand]
     private async Task CleanupDatabase()
     {
@@ -842,19 +1015,463 @@ public partial class MainViewModel : ObservableObject
 
     readonly System.Collections.Generic.HashSet<string> _shipSet = new();
     public ObservableCollection<string> ShipsSeen { get; } = new();
-    public string FleetText => ShipsSeen.Count == 0 ? "" : $"{ShipsSeen.Count}× geflogen";
-    public string ShipsSeenText => ShipsSeen.Count == 0 ? "—" : string.Join("\n", ShipsSeen);
+    public ObservableCollection<ShipFleetItem> FleetItems { get; } = new();
+    public DataGridCollectionView FleetView { get; private set; }
+
+    [ObservableProperty] private string selectedFleetViewMode = "Hangar"; // "Hangar" oder "Alle" (Flug-Historie)
+    [ObservableProperty] private string selectedFleetAcquisition = "Alle";
+    [ObservableProperty] private string selectedFleetManufacturer = "Alle";
+    [ObservableProperty] private string fleetSearchText = "";
+
+    public int HangarShipCount => FleetItems.Count(s => s.IsInHangar);
+    public int AllFlownShipCount => FleetItems.Count;
+
+    public long TotalFleetValue => FleetItems.Where(s => SelectedFleetViewMode != "Hangar" || s.IsInHangar).Sum(s => s.EstimatedValueAuec);
+    public string TotalFleetValueText => TotalFleetValue > 0 ? $"{TotalFleetValue:N0} aUEC" : "0 aUEC";
+    public int TotalFleetPledgeUsd => FleetItems.Where(s => s.IsPledgeBought && (SelectedFleetViewMode != "Hangar" || s.IsInHangar)).Sum(s => s.PledgeValueUsd);
+    public string TotalFleetPledgeUsdText => TotalFleetPledgeUsd > 0 ? $"${TotalFleetPledgeUsd:N0} USD" : "$0 USD";
+    public int TotalFleetFlights => FleetItems.Sum(s => s.FlightCount);
+    public int TotalFleetQuantumJumps => FleetItems.Sum(s => s.QuantumJumps);
+
+    [ObservableProperty] private Core.ShipCatalogEntry? selectedCatalogShipToAdd;
+    public System.Collections.Generic.List<Core.ShipCatalogEntry> AllCatalogShips => Core.FleetCatalog.AllShips.ToList();
+
+    public System.Collections.Generic.List<string> InsuranceOptions { get; } = new()
+    {
+        "LTI (Lifetime)",
+        "120 Monate (IAE)",
+        "24 Monate",
+        "12 Monate",
+        "6 Monate"
+    };
+
+    public System.Collections.Generic.List<string> AcquisitionOptions { get; } = new()
+    {
+        "Pledge Store",
+        "In-Game (aUEC)",
+        "Miete (Rental)",
+        "Geliehen / Free Fly"
+    };
+
+    public string CurrentShipFlightInfo
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(CurrentShip) || CurrentShip == "—")
+            {
+                return HangarShipCount == 0 ? "Kein Schiff registriert" : $"{HangarShipCount} Schiffe im Hangar";
+            }
+            var item = FleetItems.FirstOrDefault(s => s.Name.Equals(CurrentShip, StringComparison.OrdinalIgnoreCase) || CurrentShip.Contains(s.Name, StringComparison.OrdinalIgnoreCase));
+            if (item != null)
+            {
+                return $"Aktiv · {item.FlightCount}× geflogen · {item.QuantumJumps} QT-Sprünge (Hangar: {HangarShipCount})";
+            }
+            return $"{HangarShipCount} Schiffe im Hangar";
+        }
+    }
+
+    public string FleetText => CurrentShipFlightInfo;
+    public string ShipsSeenText => FleetItems.Count == 0 ? "—" : string.Join("\n", FleetItems.Select(f => $"{f.Name} ({f.FlightCount}× geflogen, {f.QuantumJumps} QT)"));
+
+    public void RebuildFleet(IEnumerable<Database.DbShipStat> stats)
+    {
+        FleetItems.Clear();
+        var customData = Database.GetAllFleetCustomData();
+
+        foreach (var stat in stats)
+        {
+            var cat = FleetCatalog.Lookup(stat.Ship);
+            var item = new ShipFleetItem
+            {
+                Name = stat.Ship,
+                RawCode = stat.Ship,
+                Manufacturer = cat.Manufacturer,
+                ManufacturerBadge = cat.ManufacturerBadge,
+                ManufacturerColor = cat.ManufacturerColor,
+                Role = cat.Role,
+                EstimatedValueAuec = cat.EstimatedValueAuec,
+                FlightCount = stat.FlightCount,
+                QuantumJumps = stat.QtCount,
+                LossCount = stat.LossCount,
+                LastFlown = stat.LastTime,
+                IsCurrent = stat.Ship.Equals(CurrentShip, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(CurrentShip) && CurrentShip.Contains(stat.Ship, StringComparison.OrdinalIgnoreCase))
+            };
+
+            if (customData.TryGetValue(stat.Ship, out var cd))
+            {
+                item.IsInHangar = cd.InHangar;
+                item.IsPledgeBought = cd.IsPledge;
+                item.PledgeValueUsd = cd.PledgeUsd;
+                item.InsuranceType = cd.Insurance;
+                item.AcquisitionType = cd.Acquisition;
+                item.CustomNotes = cd.Notes;
+            }
+            else
+            {
+                // Schiffe aus Logs gehören zur Flug-Historie, nicht automatisch zum persönlichen Hangar
+                item.IsInHangar = false;
+                item.IsPledgeBought = false;
+                item.PledgeValueUsd = cat.PledgeValueUsd;
+                item.InsuranceType = cat.DefaultInsurance;
+                item.AcquisitionType = "Geliehen / Free Fly";
+            }
+
+            FleetItems.Add(item);
+        }
+
+        // Falls der Nutzer Schiffe manuell im Hangar gespeichert hat, die noch nicht geflogen wurden:
+        foreach (var (shipName, cd) in customData)
+        {
+            if (cd.InHangar && !FleetItems.Any(f => f.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase)))
+            {
+                var cat = FleetCatalog.Lookup(shipName);
+                FleetItems.Add(new ShipFleetItem
+                {
+                    Name = shipName,
+                    RawCode = shipName,
+                    Manufacturer = cat.Manufacturer,
+                    ManufacturerBadge = cat.ManufacturerBadge,
+                    ManufacturerColor = cat.ManufacturerColor,
+                    Role = cat.Role,
+                    EstimatedValueAuec = cat.EstimatedValueAuec,
+                    FlightCount = 0,
+                    QuantumJumps = 0,
+                    LossCount = 0,
+                    IsInHangar = true,
+                    IsPledgeBought = cd.IsPledge,
+                    PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd,
+                    InsuranceType = cd.Insurance,
+                    AcquisitionType = cd.Acquisition,
+                    CustomNotes = cd.Notes
+                });
+            }
+        }
+
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(AllFlownShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        OnPropertyChanged(nameof(TotalFleetFlights));
+        OnPropertyChanged(nameof(TotalFleetQuantumJumps));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        OnPropertyChanged(nameof(FleetText));
+        OnPropertyChanged(nameof(ShipsSeenText));
+        FleetView?.Refresh();
+    }
+
+    public void RegisterOrUpdateShip(string shipName, bool isFlight = false, bool isQt = false, bool isLoss = false, DateTime? time = null, string? location = null)
+    {
+        if (string.IsNullOrWhiteSpace(shipName) || shipName == "—" || shipName == "Fahrzeug") return;
+
+        var existing = FleetItems.FirstOrDefault(s => s.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase) || shipName.Contains(s.Name, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            if (isFlight) existing.FlightCount++;
+            if (isQt) existing.QuantumJumps++;
+            if (isLoss) existing.LossCount++;
+            if (time.HasValue) existing.LastFlown = time.Value;
+            if (!string.IsNullOrEmpty(location)) existing.LastLocation = location;
+            existing.NotifyPropertiesChanged();
+        }
+        else
+        {
+            var cat = FleetCatalog.Lookup(shipName);
+            var customData = Database.GetAllFleetCustomData();
+            var item = new ShipFleetItem
+            {
+                Name = shipName,
+                RawCode = shipName,
+                Manufacturer = cat.Manufacturer,
+                ManufacturerBadge = cat.ManufacturerBadge,
+                ManufacturerColor = cat.ManufacturerColor,
+                Role = cat.Role,
+                EstimatedValueAuec = cat.EstimatedValueAuec,
+                FlightCount = isFlight ? 1 : 1,
+                QuantumJumps = isQt ? 1 : 0,
+                LossCount = isLoss ? 1 : 0,
+                LastFlown = time ?? DateTime.UtcNow,
+                LastLocation = location ?? "—",
+                IsCurrent = shipName.Equals(CurrentShip, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(CurrentShip) && CurrentShip.Contains(shipName, StringComparison.OrdinalIgnoreCase))
+            };
+
+            if (customData.TryGetValue(shipName, out var cd))
+            {
+                item.IsInHangar = cd.InHangar;
+                item.IsPledgeBought = cd.IsPledge;
+                item.PledgeValueUsd = cd.PledgeUsd;
+                item.InsuranceType = cd.Insurance;
+                item.AcquisitionType = cd.Acquisition;
+                item.CustomNotes = cd.Notes;
+            }
+            else
+            {
+                item.IsInHangar = false;
+                item.IsPledgeBought = false;
+                item.PledgeValueUsd = cat.PledgeValueUsd;
+                item.InsuranceType = cat.DefaultInsurance;
+                item.AcquisitionType = "Geliehen / Free Fly";
+            }
+
+            FleetItems.Add(item);
+        }
+
+        if (_shipSet.Add(shipName)) ShipsSeen.Add(shipName);
+
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(AllFlownShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        OnPropertyChanged(nameof(TotalFleetFlights));
+        OnPropertyChanged(nameof(TotalFleetQuantumJumps));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        OnPropertyChanged(nameof(FleetText));
+        OnPropertyChanged(nameof(ShipsSeenText));
+        FleetView?.Refresh();
+    }
+
+    partial void OnFleetSearchTextChanged(string value) => FleetView?.Refresh();
+
+    [RelayCommand]
+    private void SwitchToFleetTab() => SelectedTabIndex = 5;
+
+    [RelayCommand]
+    private void SelectFleetViewMode(string mode)
+    {
+        SelectedFleetViewMode = mode;
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        FleetView?.Refresh();
+    }
+
+    [RelayCommand]
+    private void SelectFleetAcquisition(string acq)
+    {
+        SelectedFleetAcquisition = acq;
+        FleetView?.Refresh();
+    }
+
+    [RelayCommand]
+    private void SelectFleetManufacturer(string mfg)
+    {
+        SelectedFleetManufacturer = mfg;
+        FleetView?.Refresh();
+    }
+
+    [RelayCommand]
+    private void SelectShipAsCurrent(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        CurrentShip = ship.Name;
+        foreach (var s in FleetItems)
+        {
+            s.IsCurrent = (s == ship);
+        }
+        OnPropertyChanged(nameof(CurrentShip));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        OnPropertyChanged(nameof(FleetText));
+    }
+
+    [RelayCommand]
+    private void ToggleShipHangar(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        ship.IsInHangar = !ship.IsInHangar;
+        if (ship.IsInHangar && (ship.AcquisitionType == "Geliehen / Free Fly" || string.IsNullOrWhiteSpace(ship.AcquisitionType)))
+        {
+            ship.AcquisitionType = "Pledge Store";
+            ship.IsPledgeBought = true;
+        }
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        FleetView?.Refresh();
+        Status = ship.IsInHangar ? $"✓ {ship.Name} zu 'Mein Hangar' hinzugefügt" : $"— {ship.Name} aus 'Mein Hangar' entfernt (bleibt in Flug-Historie)";
+    }
+
+    [RelayCommand]
+    private void AddShipToHangar(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        ship.IsInHangar = true;
+        if (ship.AcquisitionType == "Geliehen / Free Fly" || string.IsNullOrWhiteSpace(ship.AcquisitionType))
+        {
+            ship.AcquisitionType = "Pledge Store";
+            ship.IsPledgeBought = true;
+        }
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        FleetView?.Refresh();
+        Status = $"✓ {ship.Name} zu 'Mein Hangar' hinzugefügt";
+    }
+
+    [RelayCommand]
+    private void RemoveShipFromHangar(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        ship.IsInHangar = false;
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        FleetView?.Refresh();
+        Status = $"— {ship.Name} aus 'Mein Hangar' entfernt (bleibt in Flug-Historie)";
+    }
+
+    [RelayCommand]
+    private void CycleShipAcquisition(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        var next = ship.AcquisitionType switch
+        {
+            "Pledge Store" => "In-Game (aUEC)",
+            "In-Game (aUEC)" => "Miete (Rental)",
+            "Miete (Rental)" => "Geliehen / Free Fly",
+            _ => "Pledge Store"
+        };
+        ship.AcquisitionType = next;
+        ship.IsPledgeBought = (next == "Pledge Store");
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        Status = $"{ship.Name}: {ship.AcquisitionType}";
+    }
+
+    [RelayCommand]
+    private void CycleShipInsurance(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        if (!ship.IsPledgeBought || ship.AcquisitionType != "Pledge Store")
+        {
+            Status = $"ℹ Versicherung gilt nur für Pledge-Store Käufe (Echtgeld). Aktuell: {ship.AcquisitionType}";
+            return;
+        }
+
+        var next = ship.InsuranceType switch
+        {
+            "LTI (Lifetime)" => "120 Monate (IAE)",
+            "120 Monate (IAE)" => "24 Monate",
+            "24 Monate" => "12 Monate",
+            "12 Monate" => "6 Monate",
+            _ => "LTI (Lifetime)"
+        };
+        ship.InsuranceType = next;
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        Status = $"Versicherung für {ship.Name}: {ship.InsuranceType}";
+    }
+
+    [RelayCommand]
+    private void AddSelectedCatalogShipToHangar()
+    {
+        if (SelectedCatalogShipToAdd == null) return;
+        var cat = SelectedCatalogShipToAdd;
+        var shipName = cat.NormalizedName;
+        var existing = FleetItems.FirstOrDefault(s => s.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            existing.IsInHangar = true;
+            if (existing.AcquisitionType == "Geliehen / Free Fly" || string.IsNullOrWhiteSpace(existing.AcquisitionType))
+            {
+                existing.AcquisitionType = "Pledge Store";
+                existing.IsPledgeBought = true;
+            }
+            existing.NotifyPropertiesChanged();
+            Database.SaveFleetShipCustomData(existing.Name, existing.IsInHangar, existing.IsPledgeBought, existing.PledgeValueUsd, existing.InsuranceType, existing.AcquisitionType, existing.CustomNotes);
+        }
+        else
+        {
+            var item = new ShipFleetItem
+            {
+                Name = cat.NormalizedName,
+                RawCode = cat.NormalizedName,
+                Manufacturer = cat.Manufacturer,
+                ManufacturerBadge = cat.ManufacturerBadge,
+                ManufacturerColor = cat.ManufacturerColor,
+                Role = cat.Role,
+                EstimatedValueAuec = cat.EstimatedValueAuec,
+                FlightCount = 0,
+                QuantumJumps = 0,
+                LossCount = 0,
+                IsInHangar = true,
+                IsPledgeBought = true,
+                PledgeValueUsd = cat.PledgeValueUsd,
+                InsuranceType = cat.DefaultInsurance,
+                AcquisitionType = "Pledge Store",
+                IsCurrent = false
+            };
+            FleetItems.Add(item);
+            Database.SaveFleetShipCustomData(item.Name, item.IsInHangar, item.IsPledgeBought, item.PledgeValueUsd, item.InsuranceType, item.AcquisitionType, item.CustomNotes);
+        }
+
+        OnPropertyChanged(nameof(HangarShipCount));
+        OnPropertyChanged(nameof(AllFlownShipCount));
+        OnPropertyChanged(nameof(TotalFleetValue));
+        OnPropertyChanged(nameof(TotalFleetValueText));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        SelectedFleetViewMode = "Hangar";
+        FleetView?.Refresh();
+        Status = $"✓ {shipName} zu 'Mein Hangar' hinzugefügt";
+    }
+
+    [RelayCommand]
+    private void ToggleShipPledge(ShipFleetItem ship)
+    {
+        CycleShipAcquisition(ship);
+    }
+
+    [RelayCommand]
+    private void OpenShipWiki(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        OpenWikiCommand.Execute(ship.Name);
+    }
+
+    [RelayCommand]
+    private void OpenShipUex(ShipFleetItem ship)
+    {
+        if (ship == null) return;
+        try
+        {
+            var query = Uri.EscapeDataString(ship.Name.Split('·')[0].Trim());
+            var url = $"https://uexcorp.space/vehicles?name={query}";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch { }
+    }
 
     public long IncomeAll => TotalIn + TotalReward + TotalSales + TotalTrade;
     public long SpendAll => TotalOut + TotalPurchases;
     public long NetAll => IncomeAll - SpendAll;
 
     public long LiveSessionIncome => _allMode
-        ? _liveMoney.Where(e => IsMoney(e.Kind) && e.Amount > 0).Sum(e => e.Amount)
+        ? IncomeAll
         : Events.Where(e => IsMoney(e.Kind) && e.Amount > 0).Sum(e => e.Amount);
 
     public long LiveSessionSpend => _allMode
-        ? _liveMoney.Where(e => IsMoney(e.Kind) && e.Amount < 0).Sum(e => -e.Amount)
+        ? SpendAll
         : Events.Where(e => IsMoney(e.Kind) && e.Amount < 0).Sum(e => -e.Amount);
 
     public long LiveSessionNet => LiveSessionIncome - LiveSessionSpend;
@@ -1391,6 +2008,49 @@ public partial class MainViewModel : ObservableObject
                 return true;
             }
         };
+
+        var facList = ReputationCatalog.CreateFreshFactionList();
+        var savedRep = Database.LoadFactionReputations();
+        foreach (var f in facList)
+        {
+            if (savedRep.TryGetValue(f.Id, out var stat))
+            {
+                f.CurrentXp = stat.Xp;
+                f.CompletedMissions = stat.Missions;
+                f.LastMissionTime = stat.LastUpdated;
+                f.NotifyStateChanged();
+            }
+            Factions.Add(f);
+        }
+
+        FactionsView = new DataGridCollectionView(Factions)
+        {
+            Filter = o =>
+            {
+                if (o is not FactionReputation fac) return true;
+                if (SelectedFactionCategory != "Alle" && fac.Category != SelectedFactionCategory) return false;
+                return true;
+            }
+        };
+
+        FleetView = new DataGridCollectionView(FleetItems)
+        {
+            Filter = o =>
+            {
+                if (o is not ShipFleetItem ship) return true;
+                if (SelectedFleetViewMode == "Hangar" && !ship.IsInHangar) return false;
+                if (SelectedFleetAcquisition != "Alle" && !ship.AcquisitionType.StartsWith(SelectedFleetAcquisition, StringComparison.OrdinalIgnoreCase)) return false;
+                if (SelectedFleetManufacturer != "Alle" && !ship.ManufacturerBadge.Equals(SelectedFleetManufacturer, StringComparison.OrdinalIgnoreCase) && !ship.Manufacturer.Contains(SelectedFleetManufacturer, StringComparison.OrdinalIgnoreCase)) return false;
+                if (!string.IsNullOrWhiteSpace(FleetSearchText) &&
+                    !ship.Name.Contains(FleetSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !ship.Manufacturer.Contains(FleetSearchText, StringComparison.OrdinalIgnoreCase) &&
+                    !ship.Role.Contains(FleetSearchText, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+                return true;
+            }
+        };
         AutoOcrEnabled = _settings.AutoOcrEnabled;
         OcrAvailable = _ocrEngine.IsAvailable;
         UpdateOcrRegionText();
@@ -1482,8 +2142,66 @@ public partial class MainViewModel : ObservableObject
         if (!string.IsNullOrEmpty(_settings.UexApiKey))
         {
             UexApiClient.SetApiKey(_settings.UexApiKey);
+            UexStatusMessage = "✓ API-Key gespeichert & aktiv";
+            UexStatusColor = "#4ADE80";
+            _ = CheckUexConnectionOnStartupAsync(_settings.UexApiKey);
         }
         OverlayOpacity = _settings.OverlayOpacity > 0 ? _settings.OverlayOpacity : 0.92;
+        AutostartEnabled = _settings.AutostartEnabled;
+        MinimizeToTrayOnClose = _settings.MinimizeToTrayOnClose;
+
+        // Schriftart initialisieren
+        var savedFont = _settings.SelectedFontFamily ?? "Inter";
+        SelectedFontOption = savedFont switch
+        {
+            var f when f.Contains("Segoe UI") => "Segoe UI (Windows Standard)",
+            var f when f.Contains("Cascadia") => "Cascadia Code (Monospace)",
+            var f when f.Contains("Consolas") => "Consolas (Classic Code)",
+            var f when f.Contains("Bahnschrift") => "Bahnschrift (Clean Tech)",
+            var f when f.Contains("Arial") => "Arial (Universal Sans)",
+            var f when f.Contains("Verdana") => "Verdana (Groß & Lesbar)",
+            _ => "Inter (Modern & Klar)"
+        };
+
+        // Wipe- & Persistenz-Filter initialisieren
+        WipeFilterEnabled = _settings.WipeFilterEnabled;
+        WipeDateString = _settings.WipeDateString ?? "2026-05-15";
+        WipeFilterMoney = _settings.WipeFilterMoney;
+        WipeFilterContracts = _settings.WipeFilterContracts;
+        WipeFilterFleet = _settings.WipeFilterFleet;
+        WipeFilterBlueprints = _settings.WipeFilterBlueprints;
+
+        // Toast-Kategorien initialisieren
+        ToastBlueprintEnabled = _settings.ToastBlueprintEnabled;
+        ToastMissionEnabled = _settings.ToastMissionEnabled;
+        ToastReputationEnabled = _settings.ToastReputationEnabled;
+        ToastRefineryEnabled = _settings.ToastRefineryEnabled;
+        ToastElevatorEnabled = _settings.ToastElevatorEnabled;
+        ToastShipDestructionEnabled = _settings.ToastShipDestructionEnabled;
+        ToastSoundEnabled = _settings.ToastSoundEnabled;
+        OverlayLocked = _settings.OverlayLocked;
+        OverlayClickThrough = _settings.OverlayClickThrough;
+        GlobalHotkeyEnabled = _settings.GlobalHotkeyEnabled;
+
+        // Handelsrouten laden
+        TradeRoutes.Clear();
+        foreach (var r in TradingCatalog.CreatePopularRoutes(SelectedTradeShipCapacity)) TradeRoutes.Add(r);
+
+        // Globaler Hotkey (Alt+H)
+        if (GlobalHotkeyEnabled)
+        {
+            GlobalHotkey.HotkeyPressed += () => Dispatcher.UIThread.Post(() => ToggleOverlay());
+            GlobalHotkey.Start();
+        }
+
+        // Raffinerie Live-Timer
+        _refineryTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _refineryTimer.Tick += (_, _) => CheckRefineryJobs();
+        _refineryTimer.Start();
+
+        // Piloten-Ausrüstung & POIs laden
+        InitPilotLoadoutSlots();
+        LoadUserPois();
 
         RefreshSessions(selectCurrent: true);
         Status = saved != null && start == saved
@@ -1499,6 +2217,9 @@ public partial class MainViewModel : ObservableObject
 
         // Standard: gleich alle Sessions laden
         if (SelectedSession?.IsAll == true) LoadSession();
+
+        // Automatische DB-Synchronisation & Hintergrund-Indexierung
+        _ = AutoSyncAndIndexDatabaseAsync();
 
         // Update-Prüfung: einmal beim Start + danach alle 6 Stunden
         CheckForUpdate();
@@ -1628,7 +2349,7 @@ public partial class MainViewModel : ObservableObject
         Sessions.Add(new SessionInfo { IsAll = true, Label = "★ Alle Sessions (zusammen)" });
         foreach (var s in found) Sessions.Add(s);
         if (selectCurrent)
-            SelectedSession = Sessions.FirstOrDefault();   // Default: „Alle Sessions"
+            SelectedSession = found.FirstOrDefault() ?? Sessions.FirstOrDefault();   // Default: Aktuelle Session
         _initializing = false;
     }
 
@@ -1695,10 +2416,14 @@ public partial class MainViewModel : ObservableObject
         _tailer?.Stop();
         Reset();
 
+        var wipeSince = GetEffectiveWipeDate();
+        var fleetStats = Database.GetFleetStats(WipeFilterFleet ? wipeSince : null);
+        RebuildFleet(fleetStats);
+
         if (SelectedSession?.IsAll == true) { LoadAllSessions(); return; }
 
         _tailer = new LogTailer(LogPath);
-        _tailer.Line += OnLine;
+        _tailer.LineEx += (line, isLive) => OnLine(line, isLive);
         _tailer.Status += s => Dispatcher.UIThread.Post(() => Status = s);
         _tailer.Start(fromStart: true);
         Running = true;
@@ -1727,8 +2452,9 @@ public partial class MainViewModel : ObservableObject
                 Database.Init();
                 int added = Database.IndexNew(archived);
 
-                // 4) Summen/Top per SQL + ALLE Events für die Tabelle (virtualisiert)
-                var agg = Database.Aggregate();
+                // 4) Summen/Top per SQL + ALLE Events für die Tabelle (virtualisiert) mit Wipe-Filter
+                var wipeSince = GetEffectiveWipeDate();
+                var agg = Database.Aggregate(wipeSince, WipeFilterMoney, WipeFilterContracts, WipeFilterFleet);
                 var topDb = Database.TopMoney(40);
                 var recent = Database.LoadAllEvents().ToList();
 
@@ -1758,6 +2484,12 @@ public partial class MainViewModel : ObservableObject
         RebuildMarketPrices(_dbTrades);
         RebuildMissions(recent.Where(e => e.Kind == EventKind.MissionTaken));
 
+        // Piloten-Loadout aus historischen Events initialisieren
+        foreach (var ev in recent.Where(x => x.Kind == EventKind.Loadout))
+        {
+            UpdatePilotLoadout(ev.Detail, ev.Time);
+        }
+
         // Basis-Summen = nur fertige Sessions (DB). Live kommt per Tailer oben drauf.
         TotalIn = agg.In; TotalReward = agg.Reward; TotalSales = agg.Sales;
         TotalTrade = agg.Trade; TotalOut = agg.Out; TotalPurchases = agg.Purchases;
@@ -1784,13 +2516,18 @@ public partial class MainViewModel : ObservableObject
         CurrentShip = Events.FirstOrDefault(e => e.Kind == EventKind.Vehicle)?.Detail ?? "—";
         LastInventory = Events.FirstOrDefault(e => e.Kind == EventKind.Inventory)?.Detail ?? "—";
 
+        var wipeSince = GetEffectiveWipeDate();
+        var fleetStats = Database.GetFleetStats(WipeFilterFleet ? wipeSince : null);
+        RebuildFleet(fleetStats);
+
         _sessionStart = agg.Start;
         _sessionEnd = agg.End;
         _running = ExpectedBalance;   // Stand vom Eintrag + Bewegungen danach (nicht die ganze Historie)
 
         foreach (var n in new[] { nameof(IncomeAll), nameof(SpendAll), nameof(NetAll), nameof(NetBalanceText),
                  nameof(NetSign), nameof(FlowText), nameof(TradeText), nameof(ExpectedText), nameof(ExpectedBalance),
-                 nameof(SessionSpanText), nameof(FleetText), nameof(ShipsSeenText), nameof(MissionsText) })
+                 nameof(SessionSpanText), nameof(FleetText), nameof(ShipsSeenText), nameof(MissionsText),
+                 nameof(TotalFleetValue), nameof(TotalFleetValueText), nameof(TotalFleetFlights), nameof(TotalFleetQuantumJumps), nameof(CurrentShipFlightInfo) })
             OnPropertyChanged(n);
 
         SyncBlueprints();
@@ -1800,7 +2537,7 @@ public partial class MainViewModel : ObservableObject
         // laufende Game.log LIVE dazu tailen (zählt einmal oben drauf)
         _tailer?.Stop();
         _tailer = new LogTailer(liveLog);
-        _tailer.Line += OnLine;
+        _tailer.LineEx += (line, isLive) => OnLine(line, isLive);
         _tailer.Start(fromStart: true);
     }
 
@@ -1830,6 +2567,7 @@ public partial class MainViewModel : ObservableObject
         _parser = new LogParser();
         Events.Clear();
         ShipsSeen.Clear();
+        FleetItems.Clear();
         _shipSet.Clear();
         _blueprints.Clear();
         OnPropertyChanged(nameof(HasBlueprints));
@@ -1932,16 +2670,16 @@ public partial class MainViewModel : ObservableObject
         Status = "JSON gespeichert: " + path;
     }
 
-    void OnLine(string line)
+    void OnLine(string line, bool isLive = false)
     {
         _walletCapture.ProcessLine(line);
         var e = _parser.Feed(line);
         if (e == null) return;
-        Dispatcher.UIThread.Post(() => Apply(e));
+        Dispatcher.UIThread.Post(() => Apply(e, isLive));
     }
 
     // Ein erkanntes Ereignis verarbeiten (Totals, Saldo, Flotte, Liste). Immer auf UI-Thread.
-    void Apply(LogEntry e)
+    void Apply(LogEntry e, bool isLive = false)
     {
         {
             if (_sessionStart is null || e.Time < _sessionStart) _sessionStart = e.Time;
@@ -1956,9 +2694,15 @@ public partial class MainViewModel : ObservableObject
                     TotalIn += e.Amount;
                     break;
                 case EventKind.MissionReward:
+                    if (e.Amount <= 0)
+                    {
+                        var cleanTitle = Regex.Replace(e.Detail, @"^(Contract|Mission|Objective)\s+(Complete|Completed|Accepted|Finished|Erfolgreich):\s*", "", RegexOptions.IgnoreCase).Trim();
+                        var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(e.Detail);
+                        e.Amount = cat != null && cat.BaseReward > 0 ? cat.BaseReward : 25000;
+                    }
                     TotalReward += e.Amount;
-                    HandleMissionCompleted(e.Detail);
-                    if (!_initializing && e.Amount > 0)
+                    HandleMissionCompleted(e.Detail, e.Amount);
+                    if (isLive && e.Amount > 0)
                     {
                         TriggerAchievementToast(AchievementToastData.ForMissionReward(e.Detail, e.Amount));
                     }
@@ -2001,6 +2745,15 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.Vehicle:
                     CurrentShip = e.Detail;
+                    RegisterOrUpdateShip(e.Detail, isFlight: true, isQt: false, isLoss: false, time: e.Time, location: CurrentLocation);
+                    break;
+                case EventKind.Quantum:
+                    var qShip = !string.IsNullOrEmpty(e.Ship) ? e.Ship : CurrentShip;
+                    RegisterOrUpdateShip(qShip, isFlight: false, isQt: true, isLoss: false, time: e.Time, location: CurrentLocation);
+                    break;
+                case EventKind.ShipLoss:
+                    var lShip = !string.IsNullOrEmpty(e.Ship) ? e.Ship : CurrentShip;
+                    RegisterOrUpdateShip(lShip, isFlight: false, isQt: false, isLoss: true, time: e.Time, location: CurrentLocation);
                     break;
                 case EventKind.Inventory:
                     LastInventory = e.Detail;
@@ -2038,18 +2791,30 @@ public partial class MainViewModel : ObservableObject
                 case EventKind.Blueprint:
                     AddBlueprint(e.Detail);
                     SyncBlueprints();
-                    if (!_initializing)
+                    if (isLive)
                     {
                         TriggerAchievementToast(AchievementToastData.ForBlueprint(e.Detail));
+                    }
+                    break;
+                case EventKind.Loadout:
+                    UpdatePilotLoadout(e.Detail, e.Time);
+                    break;
+                case EventKind.Loot:
+                    if (isLive)
+                    {
+                        TriggerAchievementToast(AchievementToastData.ForLoot(e.Detail));
                     }
                     break;
                 case EventKind.MissionTaken:
                     RebuildMissions(Events.Where(x => x.Kind == EventKind.MissionTaken));
                     break;
                 case EventKind.Crash:
-                    ClearContracts();
-                    ContractStatusText = "⚠ Spiel abgestürzt – Aufträge zurückgesetzt";
-                    Status = "⚠ Star Citizen Absturz erkannt! Aktive Aufträge wurden zurückgesetzt.";
+                    if (isLive)
+                    {
+                        ClearContracts();
+                        ContractStatusText = "⚠ Spiel abgestürzt – Aufträge zurückgesetzt";
+                        Status = "⚠ Star Citizen Absturz erkannt! Aktive Aufträge wurden zurückgesetzt.";
+                    }
                     break;
                 case EventKind.SessionChange:
                     Status = e.Detail ?? "Server-/Session-Wechsel";
@@ -2130,7 +2895,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void HandleMissionCompleted(string? detail)
+    private void HandleMissionCompleted(string? detail, long passedReward = 0)
     {
         MissionsDone++;
         OnPropertyChanged(nameof(MissionsText));
@@ -2165,12 +2930,11 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        // NUR entfernen, wenn tatsächlich ein passender aktiver Auftrag gefunden wurde!
+        long reward = matchContract != null && matchContract.Reward > 0 ? matchContract.Reward : passedReward;
+        var completedTitle = matchContract?.Title ?? missionTitle;
+
         if (matchContract != null)
         {
-            var reward = matchContract.Reward;
-            var completedTitle = matchContract.Title;
-
             ActiveContracts.Remove(matchContract);
             Database.RemoveContract(matchContract.Title, matchContract.Reward);
             OnPropertyChanged(nameof(HasActiveContracts));
@@ -2193,14 +2957,32 @@ public partial class MainViewModel : ObservableObject
                 ActiveContractOrg = "";
                 ContractStatusText = "Alle Aufträge abgeschlossen";
             }
+        }
 
-            if (reward > 0)
+        if (reward > 0)
+        {
+            Status = $"★ Auftrag abgeschlossen & Belohnung verbucht: {completedTitle} · +{reward:N0} aUEC";
+        }
+        else
+        {
+            Status = $"★ Auftrag abgeschlossen: {completedTitle}";
+        }
+
+        // Fraktionsruf & XP automatisch verbuchen
+        var fac = ReputationCatalog.MatchFaction(matchContract?.ContractedBy) ?? ReputationCatalog.MatchFaction(completedTitle);
+        if (fac != null)
+        {
+            var target = Factions.FirstOrDefault(f => f.Id == fac.Id);
+            if (target != null)
             {
-                Status = $"★ Auftrag abgeschlossen & Belohnung verbucht: {completedTitle} · +{reward:N0} aUEC";
-            }
-            else
-            {
-                Status = $"★ Auftrag abgeschlossen: {completedTitle}";
+                int xpGained = (int)Math.Max(500, Math.Min(3500, reward > 0 ? reward / 10 : 750));
+                target.CurrentXp += xpGained;
+                target.CompletedMissions += 1;
+                target.LastMissionTime = DateTime.UtcNow;
+                target.NotifyStateChanged();
+                Database.AddFactionReputationXp(target.Id, xpGained, DateTime.UtcNow);
+                FactionsView?.Refresh();
+                Status += $" · +{xpGained:N0} XP ({target.ShortName})";
             }
         }
     }
@@ -2353,9 +3135,91 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void RemoveContract(ContractDetails contract)
+    {
+        if (contract == null) return;
+        ActiveContracts.Remove(contract);
+        Database.RemoveContract(contract.Title, contract.Reward);
+        HasActiveContract = ActiveContracts.Count > 0;
+        ActiveContractTitle = ActiveContracts.FirstOrDefault()?.Title ?? "Kein Auftrag";
+        ActiveContractRewardText = ActiveContracts.FirstOrDefault()?.RewardText ?? "";
+        ActiveContractOrg = ActiveContracts.FirstOrDefault()?.ContractedBy ?? "";
+        ContractStatusText = ActiveContracts.Count == 0 ? "Kein aktiver Auftrag" : ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
+        OnPropertyChanged(nameof(HasActiveContracts));
+        OnPropertyChanged(nameof(ActiveContractsCountText));
+    }
+
+    [RelayCommand]
+    public void SetMissionAsActiveContract(MissionInfo mission)
+    {
+        if (mission == null) return;
+        var contract = new ContractDetails
+        {
+            Title = mission.Title,
+            Reward = (int)mission.BaseReward,
+            ContractedBy = !string.IsNullOrEmpty(mission.Contractor) ? mission.Contractor : (!string.IsNullOrEmpty(mission.Faction) ? mission.Faction : "mobiGlas"),
+            ScannedAt = DateTime.UtcNow
+        };
+
+        var existing = ActiveContracts.FirstOrDefault(c => ContractParser.AreSameContract(c, contract));
+        if (existing == null)
+        {
+            ActiveContracts.Insert(0, contract);
+            Database.SaveContract(contract);
+        }
+
+        HasActiveContract = true;
+        ActiveContractTitle = contract.Title;
+        ActiveContractRewardText = contract.RewardText;
+        ActiveContractOrg = contract.ContractedBy;
+        ContractStatusText = ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
+        OnPropertyChanged(nameof(HasActiveContracts));
+        OnPropertyChanged(nameof(ActiveContractsCountText));
+        Status = $"★ Auftrag gesetzt: {contract.Title}";
+    }
+
+    [RelayCommand]
     public void OpenMissionsTab()
     {
         SelectedTabIndex = 2; // Tab '❖ Missionen'
+    }
+
+    [RelayCommand]
+    public void OpenReputationTab()
+    {
+        SelectedTabIndex = 3; // Tab '🎖 Ruf'
+    }
+
+    [RelayCommand]
+    public void SelectFactionCategory(string category)
+    {
+        SelectedFactionCategory = category;
+        FactionsView?.Refresh();
+    }
+
+    [RelayCommand]
+    public void ToggleStarmapFullscreen()
+    {
+        IsStarmapFullscreen = !IsStarmapFullscreen;
+        OnPropertyChanged(nameof(ShowDashboardCards));
+    }
+
+    [RelayCommand]
+    public void OpenStarmapPopoutWindow()
+    {
+        var win = new Views.StarmapWindow(this);
+        win.Show();
+    }
+
+    [RelayCommand]
+    public void JumpToTargetSystem()
+    {
+        if (SelectedStarmapObject != null && !string.IsNullOrEmpty(SelectedStarmapObject.TargetSystem))
+        {
+            SelectedStarmapSystem = SelectedStarmapObject.TargetSystem;
+            SelectedStarmapObject = null;
+            Status = $"🌀 Sprungtor durchquert: System gewechselt nach {SelectedStarmapSystem}!";
+        }
     }
 
     // Item-Namen live über UEX nachladen und den Eintrag aktualisieren.
@@ -2444,6 +3308,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ResetStarmapView()
+    {
+        SelectedStarmapObject = null;
+    }
+
+    [RelayCommand]
     private void OpenStarmapForCurrentLocation()
     {
         if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
@@ -2451,7 +3321,7 @@ public partial class MainViewModel : ObservableObject
             SelectedStarmapSystem = ResolvedLocation.SystemName;
         }
         SelectedStarmapObject = StarmapData.FindObject(ResolvedLocation.DisplayName) ?? StarmapData.FindObject(ResolvedLocation.ParentBody);
-        SelectedTabIndex = 3; // Neuer Tab '🗺 Karte'
+        SelectedTabIndex = 4; // Tab '🗺 Karte'
     }
 
     [RelayCommand]
@@ -2470,6 +3340,30 @@ public partial class MainViewModel : ObservableObject
         _settings.UexApiKey = cleanKey;
         Settings.Save(_settings);
         UexApiClient.SetApiKey(cleanKey);
+        if (cleanKey == null)
+        {
+            UexStatusMessage = "Schlüssel entfernt (Öffentlicher Modus)";
+            UexStatusColor = "#8B949E";
+        }
+        else
+        {
+            UexStatusMessage = "✓ API-Key in Einstellungen gespeichert";
+            UexStatusColor = "#58A6FF";
+        }
+    }
+
+    private async Task CheckUexConnectionOnStartupAsync(string key)
+    {
+        try
+        {
+            var (success, msg) = await UexApiClient.TestConnectionAsync(key);
+            if (success)
+            {
+                UexStatusMessage = msg;
+                UexStatusColor = "#4ADE80";
+            }
+        }
+        catch { /* ignore */ }
     }
 
     partial void OnMinimizeToTrayOnCloseChanged(bool value)
@@ -2563,17 +3457,32 @@ public partial class MainViewModel : ObservableObject
         UexApiKeyInput = cleanKey ?? "";
         UexApiClient.SetApiKey(cleanKey);
 
+        if (cleanKey == null)
+        {
+            UexStatusMessage = "✓ API-Key entfernt (Öffentlicher Modus aktiv)";
+            UexStatusColor = "#8B949E";
+            Status = "UEX API-Key entfernt";
+            return;
+        }
+
         UexStatusMessage = "Prüfe UEX Corp API-Verbindung...";
         UexStatusColor = "#58A6FF";
 
         var (success, msg) = await UexApiClient.TestConnectionAsync(cleanKey);
-        UexStatusMessage = msg;
+        UexStatusMessage = success ? msg : $"⚠ {msg}";
         UexStatusColor = success ? "#4ADE80" : "#F87171";
         Status = $"UEX API: {msg}";
     }
 
     async partial void OnCurrentShipChanged(string value)
     {
+        foreach (var s in FleetItems)
+        {
+            s.IsCurrent = s.Name.Equals(value, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(value) && value.Contains(s.Name, StringComparison.OrdinalIgnoreCase));
+        }
+        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        OnPropertyChanged(nameof(FleetText));
+
         if (string.IsNullOrWhiteSpace(value) || value == "—")
         {
             CurrentShipWiki = null;
@@ -2685,9 +3594,27 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    partial void OnToastBlueprintEnabledChanged(bool value) { _settings.ToastBlueprintEnabled = value; Settings.Save(_settings); }
+    partial void OnToastMissionEnabledChanged(bool value) { _settings.ToastMissionEnabled = value; Settings.Save(_settings); }
+    partial void OnToastReputationEnabledChanged(bool value) { _settings.ToastReputationEnabled = value; Settings.Save(_settings); }
+    partial void OnToastRefineryEnabledChanged(bool value) { _settings.ToastRefineryEnabled = value; Settings.Save(_settings); }
+    partial void OnToastElevatorEnabledChanged(bool value) { _settings.ToastElevatorEnabled = value; Settings.Save(_settings); }
+    partial void OnToastShipDestructionEnabledChanged(bool value) { _settings.ToastShipDestructionEnabled = value; Settings.Save(_settings); }
+    partial void OnToastSoundEnabledChanged(bool value) { _settings.ToastSoundEnabled = value; Settings.Save(_settings); }
+    partial void OnOverlayLockedChanged(bool value) { _settings.OverlayLocked = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
+    partial void OnOverlayClickThroughChanged(bool value) { _settings.OverlayClickThrough = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
+    partial void OnGlobalHotkeyEnabledChanged(bool value) { _settings.GlobalHotkeyEnabled = value; Settings.Save(_settings); }
+
     public void TriggerAchievementToast(AchievementToastData toast)
     {
         if (!ToastOverlayEnabled) return;
+        if (toast.Type == AchievementToastType.Blueprint && !ToastBlueprintEnabled) return;
+        if (toast.Type == AchievementToastType.MissionReward && !ToastMissionEnabled) return;
+        if (toast.Type == AchievementToastType.ReputationPromotion && !ToastReputationEnabled) return;
+        if (toast.Type == AchievementToastType.RefineryCompleted && !ToastRefineryEnabled) return;
+        if (toast.Type == AchievementToastType.ElevatorReady && !ToastElevatorEnabled) return;
+        if (toast.Type == AchievementToastType.ShipDestroyed && !ToastShipDestructionEnabled) return;
+
         Dispatcher.UIThread.Post(() =>
         {
             if (_toastWindow == null)
@@ -2705,7 +3632,7 @@ public partial class MainViewModel : ObservableObject
     public void TestAchievementToast()
     {
         _testToastCounter++;
-        switch (_testToastCounter % 3)
+        switch (_testToastCounter % 6)
         {
             case 1:
                 TriggerAchievementToast(AchievementToastData.ForBlueprint("Strata Helmet Levski Edition"));
@@ -2713,11 +3640,20 @@ public partial class MainViewModel : ObservableObject
             case 2:
                 TriggerAchievementToast(AchievementToastData.ForMissionReward("Missing Mining Team", 26750));
                 break;
+            case 3:
+                TriggerAchievementToast(AchievementToastData.ForReputationPromotion("Crusader Security", "Senior Deputy", 3));
+                break;
+            case 4:
+                TriggerAchievementToast(AchievementToastData.ForRefineryCompleted("Quantanium", 32, "HUR-L1 Green Glade"));
+                break;
+            case 5:
+                TriggerAchievementToast(AchievementToastData.ForElevatorReady("Frachtaufzug 02", "Area18 Riker Spaceport"));
+                break;
             case 0:
-                TriggerAchievementToast(AchievementToastData.ForLoot("Pyro RYT Multi-Tool (Ghost Edition)"));
+                TriggerAchievementToast(AchievementToastData.ForShipDestroyed("Drake Cutlass Black", claimAvailable: true));
                 break;
         }
-        Status = "✦ Achievement-Banner Test ausgelöst – klicke und ziehe das Banner zum Verschieben!";
+        Status = "✦ Toast-Banner Test ausgelöst – klicke und ziehe das Banner zum Verschieben!";
     }
 
     [RelayCommand]
@@ -2727,6 +3663,72 @@ public partial class MainViewModel : ObservableObject
         _settings.ToastEnabled = ToastOverlayEnabled;
         Settings.Save(_settings);
         Status = ToastOverlayEnabled ? "✦ Achievement-Banner aktiviert" : "Achievement-Banner deaktiviert";
+    }
+
+    // ==========================================
+    // Raffinerie-Tracking & Countdown
+    // ==========================================
+    private void CheckRefineryJobs()
+    {
+        foreach (var job in RefineryJobs)
+        {
+            job.RefreshTime();
+
+            if (job.IsCompleted && !job.HasNotifiedDone && !job.IsCollected)
+            {
+                job.HasNotifiedDone = true;
+                TriggerAchievementToast(AchievementToastData.ForRefineryCompleted(job.Material, job.OutputScu, job.Station));
+            }
+        }
+    }
+
+    [RelayCommand]
+    public void AddRefineryJob()
+    {
+        var durHours = NewRefineryMethod.Contains("Sehr schnell") ? 1.5 : (NewRefineryMethod.Contains("Schnell") ? 2.5 : 4.5);
+        var cost = NewRefineryScu * (NewRefineryMaterial == "Quantanium" ? 450 : 180);
+        var estVal = NewRefineryScu * (NewRefineryMaterial == "Quantanium" ? 24500 : 4200);
+
+        var job = new RefineryJob
+        {
+            Station = NewRefineryStation,
+            Material = NewRefineryMaterial,
+            Method = NewRefineryMethod,
+            InputUnits = NewRefineryScu * 100,
+            OutputScu = (int)(NewRefineryScu * 0.92),
+            CostAuec = cost,
+            EstimatedValueAuec = estVal,
+            StartedAt = DateTime.UtcNow,
+            Duration = TimeSpan.FromHours(durHours)
+        };
+        RefineryJobs.Insert(0, job);
+        Status = $"✓ Veredelungsauftrag {job.OutputScu} SCU {job.Material} auf {job.Station} gestartet";
+    }
+
+    [RelayCommand]
+    public void CollectRefineryJob(RefineryJob? job)
+    {
+        if (job == null) return;
+        job.IsCollected = true;
+        Status = $"✓ Veredelung {job.OutputScu} SCU {job.Material} als abgeholt markiert";
+    }
+
+    [RelayCommand]
+    public void DeleteRefineryJob(RefineryJob? job)
+    {
+        if (job == null) return;
+        RefineryJobs.Remove(job);
+        Status = "Veredelungsauftrag entfernt";
+    }
+
+    partial void OnSelectedTradeShipCapacityChanged(int value) => UpdateTradeRouteProfits();
+
+    private void UpdateTradeRouteProfits()
+    {
+        foreach (var r in TradeRoutes)
+        {
+            r.EstimatedRunProfit = r.ProfitPerScu * Math.Max(1, SelectedTradeShipCapacity);
+        }
     }
 
 
@@ -2771,5 +3773,307 @@ public partial class MainViewModel : ObservableObject
     public void SelectMissionType(string type)
     {
         SelectedMissionType = type;
+    }
+
+    // ==========================================
+    // Piloten-Ausrüstung (Visual Loadout Slots)
+    // ==========================================
+    private void InitPilotLoadoutSlots()
+    {
+        PilotLoadoutSlots.Clear();
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Helmet, SlotName = "Helm", Icon = "🪖" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Torso, SlotName = "Torso / Core", Icon = "🥋" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Arms, SlotName = "Arme", Icon = "🦾" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Legs, SlotName = "Beine", Icon = "🦿" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Undersuit, SlotName = "Undersuit", Icon = "🩱" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Backpack, SlotName = "Rucksack", Icon = "🎒" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Primary1, SlotName = "Primärwaffe 1", Icon = "🎯" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Primary2, SlotName = "Primärwaffe 2", Icon = "🎯" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.Sidearm, SlotName = "Seitenwaffe", Icon = "🔫" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.MultiTool, SlotName = "Multi-Tool", Icon = "🔧" });
+        PilotLoadoutSlots.Add(new LoadoutItem { Slot = LoadoutSlotType.MedItem, SlotName = "Med-Kit / Pen", Icon = "💉" });
+    }
+
+    public string AverageArmorReductionText
+    {
+        get
+        {
+            var armorPieces = PilotLoadoutSlots.Where(s => (s.Slot is LoadoutSlotType.Helmet or LoadoutSlotType.Torso or LoadoutSlotType.Arms or LoadoutSlotType.Legs) && s.IsEquipped).ToList();
+            if (armorPieces.Count == 0) return "Keine Panzerung";
+            var avg = (int)armorPieces.Average(s => s.DamageReductionPercent);
+            return $"{avg}% Reduktion ({armorPieces.Count}/4 Teile)";
+        }
+    }
+
+    public string CombinedTempResistText
+    {
+        get
+        {
+            var suit = PilotLoadoutSlots.FirstOrDefault(s => s.Slot == LoadoutSlotType.Undersuit && s.IsEquipped);
+            if (suit != null && !string.IsNullOrEmpty(suit.TemperatureMinMaxText)) return suit.TemperatureMinMaxText;
+            var torso = PilotLoadoutSlots.FirstOrDefault(s => s.Slot == LoadoutSlotType.Torso && s.IsEquipped);
+            if (torso != null && !string.IsNullOrEmpty(torso.TemperatureMinMaxText)) return torso.TemperatureMinMaxText;
+            return "-40°C bis +65°C";
+        }
+    }
+
+    public string TotalBackpackCapacityText
+    {
+        get
+        {
+            var bp = PilotLoadoutSlots.FirstOrDefault(s => s.Slot == LoadoutSlotType.Backpack && s.IsEquipped);
+            if (bp != null && !string.IsNullOrEmpty(bp.BackpackCapacityText)) return bp.BackpackCapacityText;
+            return "Standard (25k µSCU)";
+        }
+    }
+
+    public string EquippedWeaponsSummaryText
+    {
+        get
+        {
+            var weaps = PilotLoadoutSlots.Where(s => (s.Slot is LoadoutSlotType.Primary1 or LoadoutSlotType.Primary2 or LoadoutSlotType.Sidearm) && s.IsEquipped).ToList();
+            if (weaps.Count == 0) return "Keine Waffen";
+            return string.Join(" · ", weaps.Select(w => w.ItemName));
+        }
+    }
+
+    public void UpdatePilotLoadout(string rawItemName, DateTime timestamp)
+    {
+        if (string.IsNullOrWhiteSpace(rawItemName)) return;
+        var (slotType, slotName, icon) = LogParser.ClassifyLoadoutSlot(rawItemName);
+        var clean = Localization.ItemName(rawItemName) ?? rawItemName;
+
+        var slot = PilotLoadoutSlots.FirstOrDefault(s => s.Slot == slotType);
+        if (slot != null)
+        {
+            slot.ItemName = clean;
+            slot.RawClass = rawItemName;
+            slot.LastObserved = timestamp;
+            slot.Icon = icon;
+
+            var (armorClass, dmgRed, tempRange, badgeColor, attachments, capacity) = LoadoutCatalog.GetItemMeta(slotType, rawItemName, clean);
+            slot.ArmorClass = armorClass;
+            slot.DamageReductionPercent = dmgRed;
+            slot.DamageReductionText = dmgRed > 0 ? $"🛡 {dmgRed}% Reduktion" : "";
+            slot.TemperatureMinMaxText = tempRange;
+            slot.BadgeColor = badgeColor;
+            slot.AttachmentsText = attachments;
+            slot.BackpackCapacityText = capacity;
+
+            OnPropertyChanged(nameof(PilotLoadoutSlots));
+            OnPropertyChanged(nameof(AverageArmorReductionText));
+            OnPropertyChanged(nameof(CombinedTempResistText));
+            OnPropertyChanged(nameof(TotalBackpackCapacityText));
+            OnPropertyChanged(nameof(EquippedWeaponsSummaryText));
+        }
+    }
+
+    [RelayCommand]
+    public async Task CopyLoadoutToClipboard()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("📋 **SCLogMate — Piloten Loadout**");
+        sb.AppendLine($"🛡 Rüstungsschutz: {AverageArmorReductionText} | 🌡 Temperatur: {CombinedTempResistText} | 🎒 {TotalBackpackCapacityText}");
+        sb.AppendLine("---");
+        foreach (var slot in PilotLoadoutSlots)
+        {
+            if (slot.IsEquipped)
+            {
+                sb.Append($"{slot.Icon} **{slot.SlotName}**: {slot.ItemName}");
+                if (!string.IsNullOrEmpty(slot.ArmorClass)) sb.Append($" [{slot.ArmorClass}]");
+                if (!string.IsNullOrEmpty(slot.AttachmentsText)) sb.Append($" ({slot.AttachmentsText})");
+                sb.AppendLine();
+            }
+        }
+        var text = sb.ToString();
+        var clipboard = UiServices.TopLevel?.Clipboard;
+        if (clipboard != null)
+        {
+            await clipboard.SetTextAsync(text);
+            Status = "✓ Aktuelles Piloten-Loadout in die Zwischenablage kopiert!";
+        }
+    }
+
+    [RelayCommand]
+    public async Task ExportLoadoutMarkdown()
+    {
+        var path = await PickSaveAsync("pilot-loadout.md", "Markdown", "md");
+        if (path == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("# 🥋 SCLogMate — Pilot Loadout Report");
+        sb.AppendLine();
+        sb.AppendLine($"*Erstellt am: {DateTime.Now:dd.MM.yyyy HH:mm:ss}*");
+        sb.AppendLine();
+        sb.AppendLine("## 📊 Status & Schutzwerte");
+        sb.AppendLine($"- **Schadensreduktion:** {AverageArmorReductionText}");
+        sb.AppendLine($"- **Umgebungsschutz:** {CombinedTempResistText}");
+        sb.AppendLine($"- **Tragekapazität:** {TotalBackpackCapacityText}");
+        sb.AppendLine($"- **Waffen:** {EquippedWeaponsSummaryText}");
+        sb.AppendLine();
+        sb.AppendLine("## 🪖 Ausgerüstete Slots");
+        sb.AppendLine("| Slot | Gegenstand | Typ / Klasse | Aufsätze & Details | Letzte Sichtung |");
+        sb.AppendLine("| :--- | :--- | :--- | :--- | :--- |");
+        foreach (var slot in PilotLoadoutSlots)
+        {
+            var item = slot.IsEquipped ? slot.ItemName : "*Leer*";
+            var cls = !string.IsNullOrEmpty(slot.ArmorClass) ? slot.ArmorClass : "—";
+            var att = !string.IsNullOrEmpty(slot.AttachmentsText) ? slot.AttachmentsText : (!string.IsNullOrEmpty(slot.BackpackCapacityText) ? slot.BackpackCapacityText : "—");
+            sb.AppendLine($"| {slot.Icon} {slot.SlotName} | {item} | {cls} | {att} | {slot.LastObservedText} |");
+        }
+
+        await File.WriteAllTextAsync(path, sb.ToString(), new UTF8Encoding(false));
+        Status = "✓ Loadout-Report gespeichert: " + path;
+    }
+
+    // ==========================================
+    // Starmap Custom POIs (Persönliche Wegpunkte)
+    // ==========================================
+    public void LoadUserPois()
+    {
+        UserPois.Clear();
+        try
+        {
+            var pois = Database.GetUserPois();
+            foreach (var p in pois) UserPois.Add(p);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("LoadUserPois", ex);
+        }
+    }
+
+    [RelayCommand]
+    public void AddUserPoi()
+    {
+        if (string.IsNullOrWhiteSpace(NewPoiName)) return;
+        var bodyName = !string.IsNullOrWhiteSpace(NewPoiBody) ? NewPoiBody : (SelectedStarmapObject?.Name ?? ResolvedLocation.DisplayName);
+        if (string.IsNullOrWhiteSpace(bodyName) || bodyName == "—") bodyName = SelectedStarmapSystem;
+
+        var poi = new UserPoi
+        {
+            System = SelectedStarmapSystem,
+            Body = bodyName,
+            Name = NewPoiName.Trim(),
+            Notes = NewPoiNotes.Trim(),
+            Category = NewPoiCategory,
+            Color = NewPoiColor,
+            CreatedAt = DateTime.UtcNow
+        };
+        Database.SaveUserPoi(poi);
+        UserPois.Insert(0, poi);
+        NewPoiName = "";
+        NewPoiNotes = "";
+        Status = $"✓ POI \"{poi.Name}\" auf {poi.Body} ({poi.System}) gespeichert";
+        OnPropertyChanged(nameof(UserPois));
+    }
+
+    [RelayCommand]
+    public void DeleteUserPoi(UserPoi? poi)
+    {
+        var target = poi ?? SelectedUserPoi;
+        if (target == null) return;
+        Database.DeleteUserPoi(target.Id);
+        UserPois.Remove(target);
+        Status = $"POI \"{target.Name}\" gelöscht";
+        OnPropertyChanged(nameof(UserPois));
+    }
+
+    // ==========================================
+    // Wipe- & Persistenz-Filter
+    // ==========================================
+    public DateTime? GetEffectiveWipeDate()
+    {
+        if (!WipeFilterEnabled) return null;
+        if (DateTime.TryParse(WipeDateString, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var dt))
+        {
+            return dt;
+        }
+        return null;
+    }
+
+    partial void OnWipeFilterEnabledChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeFilterEnabled = value;
+        Settings.Save(_settings);
+        ApplyWipeFilter();
+    }
+
+    partial void OnWipeDateStringChanged(string value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeDateString = value;
+        Settings.Save(_settings);
+        if (WipeFilterEnabled) ApplyWipeFilter();
+    }
+
+    partial void OnWipeFilterMoneyChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeFilterMoney = value;
+        Settings.Save(_settings);
+        if (WipeFilterEnabled) ApplyWipeFilter();
+    }
+
+    partial void OnWipeFilterContractsChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeFilterContracts = value;
+        Settings.Save(_settings);
+        if (WipeFilterEnabled) ApplyWipeFilter();
+    }
+
+    partial void OnWipeFilterFleetChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeFilterFleet = value;
+        Settings.Save(_settings);
+        if (WipeFilterEnabled) ApplyWipeFilter();
+    }
+
+    partial void OnWipeFilterBlueprintsChanged(bool value)
+    {
+        if (_initializing || !_ready) return;
+        _settings.WipeFilterBlueprints = value;
+        Settings.Save(_settings);
+        if (WipeFilterEnabled) ApplyWipeFilter();
+    }
+
+    [RelayCommand]
+    public void SetWipePreset48()
+    {
+        WipeDateString = "2026-05-15";
+        WipeFilterEnabled = true;
+        Status = "Wipe-Filter auf Alpha 4.8 (15. Mai 2026) gesetzt.";
+    }
+
+    [RelayCommand]
+    public void SetWipePresetToday()
+    {
+        WipeDateString = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        WipeFilterEnabled = true;
+        Status = "Wipe-Filter auf heute gesetzt.";
+    }
+
+    [RelayCommand]
+    public void ClearWipeFilter()
+    {
+        WipeFilterEnabled = false;
+        Status = "Wipe-Filter deaktiviert (alle historischen Daten aktiv).";
+    }
+
+    public void ApplyWipeFilter()
+    {
+        if (SelectedSession?.IsAll == true)
+        {
+            LoadAllSessions();
+        }
+        else
+        {
+            RecomputeBalances();
+        }
+        OnPropertyChanged(nameof(SessionSpanText));
     }
 }

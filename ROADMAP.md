@@ -1,38 +1,70 @@
-# 🚀 SCLogMate — Feature Roadmap & Future Ideas
+# 🚀 SCLogMate — Feature Roadmap & ToDo-Liste
 
-Dieses Dokument sammelt geplante Erweiterungen, Ideen und Feature-Konzepte für zukünftige Versionen von **SCLogMate** (nach v1.0.0).
-
----
-
-## 🛰 In-Game Overlays & Immersion
-- [ ] **Globaler Hotkey für Mini-HUD:** Ein-/Ausblenden des Overlays per Tastenkombination (z. B. `Alt + H` oder `Strg + F12`), ohne aus dem Spiel tappen zu müssen.
-- [ ] **HUD-Sperre (Lock Position & Click-Through):** Verriegeln des Mini-HUDs, um versehentliches Verschieben während des Raumkampfs zu verhindern.
-- [ ] **Subtiler Soundeffekt:** Optionales Audio-Feedback beim Freischalten neuer Baupläne oder Abschluss von Missionen.
-- [ ] **Mehrere HUD-Profile:** Umschalten zwischen Kompakt-, Kampffokus- und Händler-Layout.
+Dieses Dokument sammelt geplante Erweiterungen, Optimierungen und Feature-Konzepte für zukünftige Versionen von **SCLogMate**.
 
 ---
 
-## 💰 Handel, Wirtschaft & UEX Corp API
-- [ ] **Integrierte Terminal- & Preisliste im Starmap-Tab:** Direkte Anzeige der rentabelsten Handelswaren für den aktuell ausgewählten Außenposten / Raumhafen.
-- [ ] **Raffinerie-Timer & Benachrichtigungen:** Visueller Countdown für aktive Veredelungsaufträge mit Benachrichtigung bei Fertigstellung.
-- [ ] **Flotten-Wertrechner:** Automatische Schätzung des aktuellen Flottenwerts anhand der erfassten Schiffe.
+## 🗺 1. Starmap & Navigation (Sternenkarte)
+- [x] **Sprungreise- & Flugzeit-Rechner (Vector Route):**
+  - Zeichnen einer dynamischen Fluglinie vom aktuellen Spieler-Standort zum ausgewählten Zielobjekt auf dem Radar.
+  - Berechnung der echten Distanz in Gigametern (GM) und Kilometern.
+  - Schätzung der Reisezeit basierend auf konfigurierbaren Sprungantrieben (z. B. S1 Atlas/VK-00, S2 Crossfield, S3 TS-2).
+- [x] **Vollständiges Lagrange-Netzwerk (L1 – L5):**
+  - Ergänzung aller Lagrange-Stationen rund um Hurston, Crusader, ArcCorp und microTech (*HUR-L1 bis L5, CRU-L1/L4/L5, ARC-L1 bis L4, MIC-L1 bis L5*).
+  - Visuelle Badges für Stations-Spezialisierungen (*Raffinerie, Frachtzentrum, Rest Stop, Klinik*).
+- [x] **Inter-System Sprungtor-Netzwerk (Jump Gates):**
+  - Visuelle Tunnelsysteme zwischen Stanton, Pyro und Nyx.
+  - 1-Klick Systemwechsel bei Klick auf ein Sprungtor.
+  - Anzeige von Tor-Größen (*S / M / L*) und Transit-Details.
+- [x] **Sicherheits- & Gefahrenzonen-Overlays:**
+  - Farbcodierte visuelle Zonen für UEE-Waffenruhe (Grün/Cyan) vs. gesetzlose Piraten-Sektoren (Rot/Orange, z. B. GrimHEX, Ruin Station).
+- [x] **Rohstoff- & Mining-Hotspots:**
+  - Filterbare Markierung von Planeten und Asteroidengürteln mit Vorkommen (*Quantanium, Gold, Beryll, RMC-Wracks*).
+- [x] **Pop-out Navigations-Großfenster & Immersives Vollbild:**
+  - Separates, maximierbares Starmap-Fenster für Multimonitor-Setups sowie 1-Klick Ausblenden der oberen Dashboard-Karten für maximale Arbeitsfläche.
 
 ---
 
-## 🗺 Starmap & Routenplaner
-- [ ] **Entfernungs- & Sprungrechner:** Berechnung von Quantum-Reisezeiten und Treibstoffverbrauch zwischen Stanton, Pyro und Nyx.
-- [ ] **POI & Höhlen-Katalog:** Detaillierte Koordinaten und Beschreibungen für seltene Höhlen, Minen und Wrackteile.
+## 📜 2. Log-Parsing & Ereignis-Erkennung
+- [x] **Erweiterte Fahrzeug- & Schiffs-Ereignisse:**
+  - Präzise Erfassung von Schiffszerstörungen, Selbstzerstörung, Versicherungs-Claims, ATC-Landefreigaben und Fracht-/Schiffsaufzügen (SC 4.x Freight & Ship Elevators).
+- [x] **Fraktionsruf & Rufstufen-Tracking:**
+  - Automatische Berechnung von Rufstufen bei Auftraggebern (*Bounty Hunters Guild, Northrock, Crusader Security, Hurston Sec, microTech Sec, BlacJac, CDF, Red Wind, United Cargo, Covalex, Recco, Twitch, Wallace Klim, Clovus, Ruto*) anhand abgeschlossener Missionen inkl. Stufenfortschritt (Rang 1 bis 6) & SQLite-Persistenz.
+- [x] **Gruppen- & Mehrspieler-Erweiterungen:**
+  - Automatisches Erfassen von Gruppen-Belohnungen, Crew-Zusammensetzung und geteilten Missionen.
+- [x] **Veredelungs- & Raffinerie-Tracking:**
+  - Log-Erkennung von Veredelungsaufträgen und Statusmeldungen.
 
 ---
 
-## 📊 Analytics & Social Sharing
-- [ ] **Session Share-Card Generator:** 1-Klick Export einer optisch aufbereiteten Grafik (mit Einnahmen, Kills, Missionen und gefundenen Bauplänen) zur Weitergabe in Discord oder Orga-Foren.
-- [ ] **Loot-Wert-Schätzer:** Automatische Bepreisung von erbeuteten Rüstungen, Waffen und Attachments basierend auf Shop-Katalogen.
-- [ ] **Monats- & Langzeit-Trends:** Grafische Charts für Einkommensströme über mehrere Wochen/Monate.
+## 🥋 3. Piloten-Ausrüstung & Loadout
+- [x] **Waffen-Aufsätze & Modifikationen:**
+  - Erkennung von Visieren, Schalldämpfern, Kompensatoren und Magazingrößen an ausgerüsteten Primär- und Sekundärwaffen.
+- [x] **Rüstungsklassen & Umgebungsschutz:**
+  - Anzeige von Rüstungstypen (*Leicht, Mittel, Schwer, Hazmat, Fliegeranzug*) sowie Temperaturwiderständen (-225°C bis +225°C) und Schadenswiderständen (20% bis 40%) im Ausrüstungs-Tab.
+- [x] **Loadout-Export & Sharing:**
+  - 1-Klick Export der aktuellen Ausrüstung als Text für Discord / Zwischenablage sowie formatierter Markdown-Report (`.md`) für Org-Einsätze und Flotten-Briefings.
 
 ---
 
-## ⚙ System & Performance
-- [ ] **Windows-Autostart Integration:** Option zum automatischen Start bei der Windows-Anmeldung (minimiert ins System-Tray).
-- [ ] **Multi-Monitor Erkennung:** Speichern separater Overlay-Positionen je nach aktivem Monitor / Bildschirmauflösung.
-- [ ] **Automatische DB-Kompaktierung:** Hintergrund-Bereinigung und Index-Optimierung für sehr große Log-Archive.
+## 💰 4. Handel, Wirtschaft & Finanzen
+- [x] **Raffinerie-Timer & Benachrichtigungen:**
+  - Visueller Live-Countdown für aktive Veredelungsaufträge (*Station, Material, Methode, Ertrag, Status*) mit automatischer Toast-Benachrichtigung bei Fertigstellung.
+- [x] **Handelsrouten-Empfehlungen & Profit-Kalkulator:**
+  - Katalog profitabler Fracht- & Handelsrouten für Stanton & Pyro inkl. Echtzeit-Gewinnberechnung je nach Schiffsladekapazität (SCU).
+- [x] **Flotten-Gesamtwert & Hangar-Verzeichnis:**
+  - Schätzung des Gesamtwerts aller im Hangar geflogenen Schiffe in aUEC sowie Zählung individueller Flüge und QT-Sprünge.
+- [x] **Loot- & Beute-Wert-Schätzer:**
+  - Automatische Bepreisung erbeuteter Ausrüstung und Waffen anhand gängiger In-Game Händlerpreise.
+
+---
+
+## 🗔 5. In-Game Overlays & System
+- [x] **Globaler Hotkey (`Alt + H`):**
+  - Schnelles Ein-/Ausblenden des Mini-HUDs direkt im Vollbild-Spiel per systemweitem Tastenkürzel (`Alt + H`), ohne aus dem Spiel tappen zu müssen.
+- [x] **HUD-Sperre (Click-Through & Position-Lock):**
+  - Verriegeln des Mini-HUDs gegen versehentliches Verschieben sowie Click-Through Modus (`WS_EX_TRANSPARENT`).
+- [x] **Modulare Toast-Kategorien & Soundeffekt:**
+  - Granulare Checkboxen für alle Toast-Typen (*Baupläne, Missionen, Fraktions-Beförderungen, Raffinerie, Aufzüge, Schiffszerstörung*) inkl. dezentem Audio-Soundeffekt.
+- [x] **Multi-Monitor Profiling:**
+  - Automatisches Speichern und Wiederherstellen separater Overlay-Positionen.

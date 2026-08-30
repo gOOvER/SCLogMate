@@ -17,7 +17,10 @@ public class LogTailer
     CancellationTokenSource? _cts;
 
     public event Action<string>? Line;
+    public event Action<string, bool>? LineEx;
     public event Action<string>? Status;
+
+    public bool IsLiveStreaming { get; private set; } = false;
 
     public LogTailer(string path) => _path = path;
 
@@ -26,6 +29,7 @@ public class LogTailer
         Stop();
         _cts = new CancellationTokenSource();
         _pos = fromStart ? 0 : -1;   // -1 = beim ersten Lauf ans Ende springen
+        IsLiveStreaming = !fromStart;
         var token = _cts.Token;
         Task.Run(() => LoopAsync(token));
     }
@@ -34,6 +38,7 @@ public class LogTailer
     {
         _cts?.Cancel();
         _cts = null;
+        IsLiveStreaming = false;
     }
 
     async Task LoopAsync(CancellationToken ct)
@@ -55,15 +60,19 @@ public class LogTailer
                     if (first && _pos < 0) { _pos = fs.Length; first = false; }
                     first = false;
 
-                    if (fs.Length < _pos) { _pos = 0; Status?.Invoke("Log rotiert – neu eingelesen"); }
+                    if (fs.Length < _pos) { _pos = 0; Status?.Invoke("Log rotiert – neu eingelesen"); IsLiveStreaming = false; }
 
                     fs.Seek(_pos, SeekOrigin.Begin);
                     using var sr = new StreamReader(fs);
                     string? l;
                     while ((l = await sr.ReadLineAsync()) != null)
+                    {
                         Line?.Invoke(l);
+                        LineEx?.Invoke(l, IsLiveStreaming);
+                    }
 
                     _pos = fs.Position;
+                    IsLiveStreaming = true; // Nach dem ersten kompletten Durchlauf sind alle neuen Zeilen echte Live-Events
                     Status?.Invoke($"live · {DateTime.Now:HH:mm:ss}");
                 }
             }
