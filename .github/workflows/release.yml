@@ -90,7 +90,7 @@ jobs:
         
         $exeHash = $env:EXE_HASH
         $notes += "`r`n`r`n---`r`n### 🛡️ Security & Integrity`r`n"
-        $notes += "- **SHA-256 (SCLogMate.exe):** `" + $exeHash + "`"
+        $notes += '- **SHA-256 (SCLogMate.exe):** `' + $exeHash + '`'
         if ($exeHash) {
             $notes += "`r`n- **VirusTotal Report:** [Scan Results](https://www.virustotal.com/gui/file/" + $exeHash + ")"
         }
@@ -109,3 +109,4 @@ jobs:
           ./publish/SCLogMate.exe
           ./publish/SCLogMate-*.zip
           ./publish/SHA256SUMS.txt
+          
