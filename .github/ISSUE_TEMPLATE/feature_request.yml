@@ -1,0 +1,38 @@
+name: 💡 Feature Request / Funktionswunsch
+description: Schlage eine neue Funktion, Verbesserung oder Heuristik für SCLogMate vor.
+title: "[FEATURE]: "
+labels: ["enhancement", "idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Vielen Dank für deine Idee zur Verbesserung von SCLogMate!
+  - type: textarea
+    id: problem
+    attributes:
+      label: 🎯 Problemstellung oder Motivation
+      description: Welches Problem soll gelöst werden oder welcher Spielablauf in Star Citizen soll besser unterstützt werden?
+      placeholder: Mir ist aufgefallen, dass...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 Gewünschte Lösung / Funktionsumfang
+      description: Wie stellst du dir die neue Funktion vor? (z.B. neues Tab, Toast, Overlay-Widget, Log-Heuristik)
+      placeholder: Es wäre genial, wenn SCLogMate...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternative Ansätze
+      description: Gibt es Alternativen oder andere Tools, die das ähnlich lösen?
+      placeholder: Man könnte auch...
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checkliste
+      options:
+        - label: Ich habe geprüft, dass dieser Wunsch nicht bereits in der ROADMAP.md oder bestehenden Issues vorgeschlagen wurde.
+          required: true

@@ -1,5 +1,13 @@
 # 🛰️ SCLogMate
 
+[![Build & Release](https://github.com/gOOvER/SCLogMate/actions/workflows/release.yml/badge.svg)](https://github.com/gOOvER/SCLogMate/actions)
+[![Latest Release](https://img.shields.io/github/v/release/gOOvER/SCLogMate?include_prereleases&style=flat&color=38BDF8&label=Release)](https://github.com/gOOvER/SCLogMate/releases/latest)
+[![VirusTotal Clean](https://img.shields.io/badge/VirusTotal-Clean%20(0%2F70)-34D399?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/search/SCLogMate)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows&logoColor=white)](https://github.com/gOOvER/SCLogMate/releases)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Star Citizen](https://img.shields.io/badge/Star%20Citizen-4.x%20PU%20Ready-F59E0B)](https://robertsspaceindustries.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-6E7681.svg)](LICENSE)
+
 [🇬🇧 English](#-english) &nbsp;|&nbsp; [🇩🇪 Deutsch](#-deutsch)
 
 ---

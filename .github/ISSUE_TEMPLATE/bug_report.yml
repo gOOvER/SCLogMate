@@ -1,0 +1,59 @@
+name: 🐛 Bug Report / Fehlerbericht
+description: Melde ein Problem oder unerwartetes Verhalten in SCLogMate.
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Vielen Dank für das Melden eines Fehlers! Bitte fülle die folgenden Felder so genau wie möglich aus.
+  - type: input
+    id: version
+    attributes:
+      label: SCLogMate Version
+      description: Welche Version verwendest du? (z.B. v1.0.0-beta1)
+      placeholder: v1.0.0-beta1
+    validations:
+      required: true
+  - type: input
+    id: sc_version
+    attributes:
+      label: Star Citizen Version / Channel
+      description: Welcher Star Citizen Channel wird gespielt? (z.B. LIVE 4.0, EPTU 4.0.1, PTU)
+      placeholder: LIVE 4.0.0-LIVE.1234567
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 📝 Beschreibung des Fehlers
+      description: Was ist passiert und was hast du stattdessen erwartet?
+      placeholder: Beschreibe das Verhalten möglichst detailliert...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 🔄 Schritte zur Reproduktion
+      description: Wie lässt sich der Fehler nachvollziehen?
+      placeholder: |
+        1. SCLogMate starten
+        2. In Star Citizen Schiff spawnen
+        3. Beobachten, dass...
+    validations:
+      required: true
+  - type: textarea
+    id: log_snippet
+    attributes:
+      label: 📜 Relevante Zeilen aus Game.log (falls zutreffend)
+      description: Relevante Zeilen aus deiner `%StarCitizen%\LIVE\Game.log` (bitte persönliche Token/Sensibles entfernen).
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checkliste
+      options:
+        - label: Ich habe geprüft, dass kein identisches Issue bereits existiert.
+          required: true
+        - label: Ich verwende die aktuellste Version von SCLogMate.
+          required: false
