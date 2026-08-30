@@ -1486,6 +1486,49 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void StartEditShipPledge(ShipFleetItem? ship)
+    {
+        if (ship == null) return;
+        foreach (var s in FleetItems) s.IsEditingPledge = false;
+        ship.PledgeInputText = ship.PledgeValueUsd.ToString();
+        ship.IsEditingPledge = true;
+    }
+
+    [RelayCommand]
+    private void SaveShipPledge(ShipFleetItem? ship)
+    {
+        if (ship == null) return;
+        var digits = new string((ship.PledgeInputText ?? "").Where(char.IsDigit).ToArray());
+        if (int.TryParse(digits, out var val) && val >= 0)
+        {
+            ship.PledgeValueUsd = val;
+        }
+        ship.IsEditingPledge = false;
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        Status = $"💵 Pledge-Wert für {ship.Name} auf ${ship.PledgeValueUsd} gespeichert";
+    }
+
+    [RelayCommand]
+    private void CancelEditShipPledge(ShipFleetItem? ship)
+    {
+        if (ship == null) return;
+        ship.IsEditingPledge = false;
+    }
+
+    public void AdjustShipPledge(ShipFleetItem? ship, int delta)
+    {
+        if (ship == null) return;
+        ship.PledgeValueUsd = Math.Max(0, ship.PledgeValueUsd + delta);
+        ship.NotifyPropertiesChanged();
+        Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
+        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+    }
+
+    [RelayCommand]
     private void AddSelectedCatalogShipToHangar()
     {
         if (SelectedCatalogShipToAdd == null) return;

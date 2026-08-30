@@ -2168,17 +2168,47 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
 
-              <!-- 3. Herkunft / Erwerb (Klickbar zum Wechseln) -->
-              <DataGridTemplateColumn Header="HERKUNFT" Width="150" SortMemberPath="AcquisitionType">
+              <!-- 3. Herkunft & Pledge-Wert (Klickbar zum Wechseln & Editieren) -->
+              <DataGridTemplateColumn Header="HERKUNFT / PLEDGE" Width="200" SortMemberPath="AcquisitionType">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="m:ShipFleetItem">
-                    <Button Classes="ghost" Padding="6,2" CornerRadius="6" Margin="6,0,0,0" VerticalAlignment="Center"
-                            Command="{Binding ((vm:MainViewModel)DataContext).CycleShipAcquisitionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            CommandParameter="{Binding}"
-                            Background="#060C16" BorderBrush="#1C3857" BorderThickness="1"
-                            ToolTip.Tip="Klicken zum Durchschalten: 💵 Pledge Store ➔ 🪙 In-Game Kauf ➔ 🎟 Miete ➔ 👥 Geliehen">
-                      <TextBlock Text="{Binding PledgeValueText}" Foreground="{Binding PledgeBadgeColor}" FontSize="10.5" FontWeight="SemiBold" />
-                    </Button>
+                    <Grid VerticalAlignment="Center" Margin="6,0,0,0">
+                      <!-- Standard-Ansicht -->
+                      <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsEditingPledge}">
+                        <Button Classes="ghost" Padding="6,2" CornerRadius="6"
+                                Command="{Binding ((vm:MainViewModel)DataContext).CycleShipAcquisitionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                Background="#060C16" BorderBrush="#1C3857" BorderThickness="1"
+                                ToolTip.Tip="Klicken zum Durchschalten: 💵 Pledge Store ➔ 🪙 In-Game Kauf ➔ 🎟 Miete ➔ 👥 Geliehen">
+                          <TextBlock Text="{Binding PledgeValueText}" Foreground="{Binding PledgeBadgeColor}" FontSize="10.5" FontWeight="SemiBold" />
+                        </Button>
+                        <Button Classes="ghost" Padding="4,2" CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                                Command="{Binding ((vm:MainViewModel)DataContext).StartEditShipPledgeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                IsVisible="{Binding IsPledgeBought}"
+                                ToolTip.Tip="💵 Pledge-Preis ($) manuell anpassen (z. B. CCU oder Upgrade-Wert)">
+                          <TextBlock Text="✎" FontSize="10" Foreground="#F59E0B" />
+                        </Button>
+                      </StackPanel>
+
+                      <!-- Inline-Editor für Pledge-Dollar-Wert -->
+                      <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding IsEditingPledge}">
+                        <TextBlock Text="$" Foreground="#F59E0B" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                        <TextBox Classes="path" Text="{Binding PledgeInputText}" Width="65" Height="24" FontSize="10.5" Padding="4,1" VerticalAlignment="Center" />
+                        <Button Classes="accent" Padding="5,2" Height="24" CornerRadius="3"
+                                Command="{Binding ((vm:MainViewModel)DataContext).SaveShipPledgeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Speichern">
+                          <TextBlock Text="✓" FontSize="10" FontWeight="Bold" />
+                        </Button>
+                        <Button Classes="ghost" Padding="5,2" Height="24" CornerRadius="3" Background="#21262D"
+                                Command="{Binding ((vm:MainViewModel)DataContext).CancelEditShipPledgeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Abbrechen">
+                          <TextBlock Text="✕" FontSize="9" Foreground="#8B949E" />
+                        </Button>
+                      </StackPanel>
+                    </Grid>
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>

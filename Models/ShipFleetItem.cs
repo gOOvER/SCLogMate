@@ -50,6 +50,12 @@ public partial class ShipFleetItem : ObservableObject
     private int _pledgeValueUsd = 65;
 
     [ObservableProperty]
+    private bool _isEditingPledge;
+
+    [ObservableProperty]
+    private string _pledgeInputText = "";
+
+    [ObservableProperty]
     private string _insuranceType = "LTI (Lifetime)";
 
     [ObservableProperty]
