@@ -21,8 +21,22 @@ public static class Updater
 
     public record Info(string Version, string Url, string? ReleaseNotes = null, string? HtmlUrl = null);
 
-    public static string CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";
+    public static string CurrentVersion
+    {
+        get
+        {
+            var asm = typeof(Updater).Assembly;
+            var infoVer = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(infoVer))
+            {
+                var clean = infoVer.Split('+')[0].Trim().TrimStart('v', 'V');
+                if (!string.IsNullOrEmpty(clean)) return clean;
+            }
+
+            var v = asm.GetName().Version;
+            return v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "1.0.0";
+        }
+    }
 
     /// <summary>Liefert Update-Info, falls eine neuere Version vorliegt; sonst null.</summary>
     public static async Task<Info?> CheckAsync()

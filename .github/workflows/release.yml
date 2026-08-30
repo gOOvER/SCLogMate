@@ -7,14 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for the release (e.g. v1.0.0)'
+        description: 'Tag name for the release (e.g. v1.0.0-beta2)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.0.0-beta2'
       is_prerelease:
         description: 'Mark this release as a Pre-Release'
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   contents: write
