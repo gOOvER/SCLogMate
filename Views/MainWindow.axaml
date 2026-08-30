@@ -2842,5 +2842,56 @@
       </DockPanel>
     </Border>
   </Border>
+
+    <!-- ══ NEUES MODERNES DATENBANK-FORTSCHRITTS-MODAL ══ -->
+    <Border Background="#D8070D14" IsVisible="{Binding IsDatabaseBusy}"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ZIndex="999">
+      <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="520"
+              Background="#0E1624" BorderBrush="#38BDF8" BorderThickness="1.5" CornerRadius="12"
+              BoxShadow="0 16 48 #80000000" Padding="28,24">
+        <StackPanel Spacing="18">
+          
+          <!-- Header mit pulsierendem Radar-Icon & Titel -->
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Grid.Column="0" Background="#0A2239" BorderBrush="#38BDF8" BorderThickness="1"
+                    CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+              <TextBlock Text="⚡" FontSize="22" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="Star Citizen Datenbank-Indexierung" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
+              <TextBlock Text="Sessions &amp; Ereignisse werden verarbeitet" FontSize="11" Foreground="#8B949E" />
+            </StackPanel>
+          </Grid>
+
+          <!-- Aktuelle Datei & Operation -->
+          <Border Background="#070D16" BorderBrush="#1C2B3E" BorderThickness="1" CornerRadius="8" Padding="12,10">
+            <TextBlock Text="{Binding DatabaseStatusMessage}" FontSize="12" Foreground="#38BDF8" FontWeight="SemiBold"
+                       TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+          </Border>
+
+          <!-- Große animierte Fortschrittsleiste -->
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="FORTSCHRITT" FontSize="10" FontWeight="Bold" Foreground="#8B949E" LetterSpacing="0.5" />
+              <TextBlock Grid.Column="1" Text="{Binding DatabaseProgressPercent, StringFormat='{}{0:F0}%'}"
+                         FontSize="12" FontWeight="Bold" Foreground="#FFB23E" />
+            </Grid>
+            <ProgressBar Height="8" CornerRadius="4" Background="#162232" Foreground="#38BDF8"
+                         Minimum="0" Maximum="100" Value="{Binding DatabaseProgressPercent}" />
+          </StackPanel>
+
+          <!-- Info-Hinweisbox -->
+          <Border Background="#091422" BorderBrush="#16283D" BorderThickness="1" CornerRadius="6" Padding="10,8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Top" />
+              <TextBlock Text="SCLogMate liest deine Star Citizen Game-Logs im Hintergrund ein. Nach Abschluss stehen alle Daten sofort blitzschnell zur Verfügung."
+                         FontSize="10.5" LineHeight="15" Foreground="#7D8590" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </Border>
+    </Border>
+
   </Grid>
 </Window>

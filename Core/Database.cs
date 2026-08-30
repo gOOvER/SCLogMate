@@ -204,16 +204,21 @@ public static class Database
     }
 
     /// <summary>Parst und speichert alle Logs, die noch nicht in der DB sind. Liefert Anzahl neuer.</summary>
-    public static int IndexNew(IEnumerable<string> logFiles)
+    public static int IndexNew(IEnumerable<string> logFiles, Action<int, int, string>? onProgress = null)
     {
         using var db = new SqliteConnection(Conn);
         db.Open();
         int added = 0;
+        var filesList = new List<string>(logFiles);
+        int total = filesList.Count;
 
-        foreach (var file in logFiles)
+        for (int i = 0; i < total; i++)
         {
+            var file = filesList[i];
             var name = Path.GetFileName(file);
             if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n", ("$n", name)) != null) continue;
+
+            onProgress?.Invoke(i + 1, total, name);
 
             try
             {

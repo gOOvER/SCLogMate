@@ -778,18 +778,34 @@ public partial class MainViewModel : ObservableObject
                 }
                 else if (unindexedCount > 0)
                 {
-                    int added = Database.IndexNew(allArchived);
-                    if (added > 0)
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        IsDatabaseBusy = true;
+                        DatabaseStatusMessage = $"⚡ Indexiere {unindexedCount} neue Session(s)...";
+                        DatabaseProgressPercent = 0;
+                    });
+
+                    int added = Database.IndexNew(allArchived, (curr, total, name) =>
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
-                            OnPropertyChanged(nameof(DatabaseSummaryText));
-                            RefreshSessions(selectCurrent: false);
-                            var wipeSince = GetEffectiveWipeDate();
-                            RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
-                            Status = $"✓ {added} neue Session(s) automatisch im Hintergrund indexiert.";
+                            DatabaseProgressPercent = (double)curr / total * 100.0;
+                            DatabaseStatusMessage = $"⚡ Indexiere ({curr}/{total}): {name}";
                         });
-                    }
+                    });
+
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        IsDatabaseBusy = false;
+                        OnPropertyChanged(nameof(DatabaseSummaryText));
+                        RefreshSessions(selectCurrent: false);
+                        var wipeSince = GetEffectiveWipeDate();
+                        RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
+                        if (added > 0)
+                        {
+                            Status = $"✓ {added} neue Session(s) automatisch im Hintergrund indexiert.";
+                        }
+                    });
                 }
             }
             catch (Exception ex)
