@@ -61,13 +61,11 @@ jobs:
         "@
 
         Set-Content -Path "./publish/SHA256SUMS.txt" -Value $checksums -Encoding UTF8
-        echo "EXE_HASH=$exeHash" >> $env:GITHUB_ENV
+        "EXE_HASH=$exeHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
     - name: VirusTotal Analysis
       uses: crazy-max/ghaction-virustotal@v4
-      if: env.VIRUSTOTAL_API_KEY != ''
-      env:
-        VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+      if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
       with:
         vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
         files: |
@@ -90,9 +88,9 @@ jobs:
         
         $exeHash = $env:EXE_HASH
         $notes += "`r`n`r`n---`r`n### 🛡️ Security & Integrity`r`n"
-        $notes += "- **SHA-256 (SCLogMate.exe):** \`$exeHash\`"
+        $notes += "- **SHA-256 (SCLogMate.exe):** `" + $exeHash + "`"
         if ($exeHash) {
-            $notes += "`r`n- **VirusTotal Report:** [Scan Results](https://www.virustotal.com/gui/file/$exeHash)"
+            $notes += "`r`n- **VirusTotal Report:** [Scan Results](https://www.virustotal.com/gui/file/" + $exeHash + ")"
         }
         $notes += "`r`n`r`n---`r`n📋 **Full Changelog:** https://github.com/gOOvER/SCLogMate/blob/main/CHANGELOG.md"
         Set-Content -Path "./publish/RELEASE_NOTES.md" -Value $notes -Encoding UTF8
