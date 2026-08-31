@@ -13,8 +13,8 @@ namespace SCLogReader.Core;
 public class LogTailer
 {
     readonly string _path;
-    long _pos;
     CancellationTokenSource? _cts;
+    Task? _loopTask;
 
     public event Action<string>? Line;
     public event Action<string, bool>? LineEx;
@@ -27,11 +27,10 @@ public class LogTailer
     public void Start(bool fromStart = true)
     {
         Stop();
-        _cts = new CancellationTokenSource();
-        _pos = fromStart ? 0 : -1;   // -1 = beim ersten Lauf ans Ende springen
+        var cts = new CancellationTokenSource();
+        _cts = cts;
         IsLiveStreaming = !fromStart;
-        var token = _cts.Token;
-        Task.Run(() => LoopAsync(token));
+        _loopTask = Task.Run(() => LoopAsync(cts, fromStart));
     }
 
     public void Stop()
@@ -41,10 +40,12 @@ public class LogTailer
         IsLiveStreaming = false;
     }
 
-    async Task LoopAsync(CancellationToken ct)
+    async Task LoopAsync(CancellationTokenSource cts, bool fromStart)
     {
+        var ct = cts.Token;
+        long position = fromStart ? 0 : -1;
         bool first = true;
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && IsCurrent(cts))
         {
             try
             {
@@ -57,30 +58,43 @@ public class LogTailer
                     using var fs = new FileStream(_path, FileMode.Open, FileAccess.Read,
                         FileShare.ReadWrite | FileShare.Delete);
 
-                    if (first && _pos < 0) { _pos = fs.Length; first = false; }
+                    if (first && position < 0) { position = fs.Length; first = false; }
                     first = false;
 
-                    if (fs.Length < _pos) { _pos = 0; Status?.Invoke("Log rotiert – neu eingelesen"); IsLiveStreaming = false; }
+                    if (fs.Length < position) { position = 0; NotifyStatus(cts, "Log rotiert – neu eingelesen"); SetLiveStreaming(cts, false); }
 
-                    fs.Seek(_pos, SeekOrigin.Begin);
+                    fs.Seek(position, SeekOrigin.Begin);
                     using var sr = new StreamReader(fs);
                     string? l;
                     while ((l = await sr.ReadLineAsync()) != null)
                     {
+                        if (!IsCurrent(cts)) return;
                         Line?.Invoke(l);
                         LineEx?.Invoke(l, IsLiveStreaming);
                     }
 
-                    _pos = fs.Position;
-                    IsLiveStreaming = true; // Nach dem ersten kompletten Durchlauf sind alle neuen Zeilen echte Live-Events
-                    Status?.Invoke($"live · {DateTime.Now:HH:mm:ss}");
+                    position = fs.Position;
+                    SetLiveStreaming(cts, true); // Nach dem ersten kompletten Durchlauf sind alle neuen Zeilen echte Live-Events
+                    NotifyStatus(cts, $"live · {DateTime.Now:HH:mm:ss}");
                 }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { Status?.Invoke("Fehler: " + ex.Message); }
+            catch (Exception ex) { NotifyStatus(cts, "Fehler: " + ex.Message); }
 
             try { await Task.Delay(500, ct); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    bool IsCurrent(CancellationTokenSource cts) => ReferenceEquals(_cts, cts);
+
+    void SetLiveStreaming(CancellationTokenSource cts, bool value)
+    {
+        if (IsCurrent(cts)) IsLiveStreaming = value;
+    }
+
+    void NotifyStatus(CancellationTokenSource cts, string message)
+    {
+        if (IsCurrent(cts)) Status?.Invoke(message);
     }
 }

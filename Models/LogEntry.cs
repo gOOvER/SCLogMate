@@ -60,6 +60,9 @@ public partial class LogEntry : ObservableObject
     /// <summary>Schiffsname (bei Vehicle/Quantum) für die Flotten-Liste.</summary>
     public string? Ship { get; init; }
 
+    /// <summary>Erkanntes Reiseziel bei einer Quantum-Ankunft.</summary>
+    public string? Location { get; init; }
+
     /// <summary>Anzeigetext – wird bei Käufen asynchron mit dem echten Item-Namen ersetzt.</summary>
     [ObservableProperty] private string detail = "";
 

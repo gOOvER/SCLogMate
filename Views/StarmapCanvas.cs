@@ -25,6 +25,9 @@ public sealed class StarmapCanvas : Control
     public static readonly StyledProperty<QuantumDriveProfile?> SelectedDriveProperty =
         AvaloniaProperty.Register<StarmapCanvas, QuantumDriveProfile?>(nameof(SelectedDrive));
 
+    public static readonly StyledProperty<int> FocusRequestProperty =
+        AvaloniaProperty.Register<StarmapCanvas, int>(nameof(FocusRequest));
+
     public static readonly StyledProperty<bool> ShowStationsProperty =
         AvaloniaProperty.Register<StarmapCanvas, bool>(nameof(ShowStations), true);
 
@@ -68,6 +71,12 @@ public sealed class StarmapCanvas : Control
     {
         get => GetValue(SelectedDriveProperty);
         set => SetValue(SelectedDriveProperty, value);
+    }
+
+    public int FocusRequest
+    {
+        get => GetValue(FocusRequestProperty);
+        set => SetValue(FocusRequestProperty, value);
     }
 
     public bool ShowStations
@@ -168,6 +177,16 @@ public sealed class StarmapCanvas : Control
         SelectedObject = obj;
         _panOffset = new Point(-obj.RelX * _zoom, -obj.RelY * _zoom);
         InvalidateVisual();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == FocusRequestProperty && SelectedObject is not null)
+        {
+            FocusOnObject(SelectedObject);
+        }
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)

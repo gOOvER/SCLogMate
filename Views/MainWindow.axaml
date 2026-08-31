@@ -1252,6 +1252,7 @@
                                  PlayerLocationName="{Binding ResolvedLocation.DisplayName}"
                                  SelectedObject="{Binding SelectedStarmapObject, Mode=TwoWay}"
                                  SelectedDrive="{Binding SelectedQuantumDrive}"
+                                 FocusRequest="{Binding StarmapFocusRequest}"
                                  ShowStations="{Binding ShowStarmapStations}"
                                  ShowMoons="{Binding ShowStarmapMoons}"
                                  ShowLandingZones="{Binding ShowStarmapLandingZones}"
@@ -3047,7 +3048,7 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                      <TextBox Grid.Column="0" Classes="path" Text="{Binding UexApiKeyInput}" Watermark="UEX Access Token / API Key (z.B. Bearer Token)..." />
+                      <TextBox Grid.Column="0" Classes="path" Text="{Binding UexApiKeyInput}" PasswordChar="●" Watermark="UEX Access Token / API Key (z.B. Bearer Token)..." />
                       <Button Grid.Column="1" Classes="accent" Margin="8,0,0,0" Command="{Binding SaveAndTestUexApiKeyCommand}" Content="💾 Speichern &amp; Testen" />
                     </Grid>
 

@@ -701,6 +701,7 @@ public partial class LogParser
         {
             var t = ParseTs(line);
             var ship = Ships.Prettify(qt.Groups["ship"].Value);
+            string? destination = null;
             if ((t - _lastQt).TotalSeconds > 3)   // doppelte Logzeilen entprellen
             {
                 _lastQt = t;
@@ -711,6 +712,7 @@ public partial class LogParser
                     if (resDest.DisplayName != "—" && !resDest.DisplayName.StartsWith("Im Transit"))
                     {
                         _lastLoc = resDest.DisplayName;
+                        destination = _lastLoc;
                         destText = $" (bei {_lastLoc})";
                     }
                     _pendingQtDestination = null;
@@ -725,6 +727,7 @@ public partial class LogParser
                     Time = t,
                     Kind = EventKind.Quantum,
                     Ship = ship,
+                    Location = destination,
                     Detail = $"QT-Ankunft · {ship}{destText}"
                 };
             }

@@ -6,6 +6,24 @@ All notable changes to this project are documented in this file. Format based on
 
 ## [Unreleased]
 
+## [1.0.0-beta4] - 2026-08-31
+
+### English - Reliability, Security & Starmap
+- **Live Starmap Location Tracking**: The current position now updates immediately after a completed Quantum jump. The integrated map and pop-out map center on the selected current location.
+- **Secure UEX API Key Storage**: API keys are now stored with Windows DPAPI instead of `settings.json`. Existing keys are migrated automatically, the input is masked, and changes are saved only after explicit confirmation.
+- **Verified Auto-Updates**: Downloaded updates are verified against the `SHA256SUMS.txt` release asset before the application is replaced.
+- **Robust Log & OCR Processing**: Session changes no longer allow an old log tailer to emit stale lines. OCR operations are serialized consistently and release native bitmap resources deterministically.
+- **Archive & Cache Integrity**: Differing log backups with identical file names are kept separately. Wiki image caching now uses stable SHA-256 keys and is limited to 128 MB.
+- **UEX Location Retry**: A failed UEX location-data request can be retried instead of disabling location enrichment for the remainder of the app session.
+
+### Deutsch - Zuverlässigkeit, Sicherheit & Sternenkarte
+- **Live-Standort auf der Sternenkarte**: Der aktuelle Standort wird nach einer abgeschlossenen Quantum-Reise sofort aktualisiert. Die integrierte Karte und das Pop-out zentrieren sich auf den gewählten aktuellen Standort.
+- **Geschützte UEX-API-Schlüssel**: API-Schlüssel werden jetzt mit Windows DPAPI statt in `settings.json` gespeichert. Vorhandene Schlüssel werden automatisch migriert, die Eingabe ist maskiert und wird erst nach expliziter Bestätigung gespeichert.
+- **Geprüfte Auto-Updates**: Heruntergeladene Updates werden vor dem Ersetzen der Anwendung gegen die Release-Datei `SHA256SUMS.txt` verifiziert.
+- **Robustere Log- & OCR-Verarbeitung**: Sitzungswechsel lassen keine veralteten Zeilen eines alten Log-Tailers mehr durch. OCR-Vorgänge sind konsistent serialisiert und geben native Bitmap-Ressourcen deterministisch frei.
+- **Archiv- & Cache-Integrität**: Unterschiedliche Log-Backups mit gleichem Dateinamen werden getrennt aufbewahrt. Der Wiki-Bildcache verwendet stabile SHA-256-Schlüssel und ist auf 128 MB begrenzt.
+- **UEX-Standort-Retry**: Fehlgeschlagene UEX-Anfragen für Standortdaten können erneut versucht werden, statt die Standortanreicherung für die restliche Sitzung zu deaktivieren.
+
 ## [1.0.0-beta3] - 2026-08-30
 
 ### 🛰️ RS Signal Decoder & In-Game Scanner Overlay

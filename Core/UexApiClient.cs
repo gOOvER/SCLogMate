@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SCLogReader.Core;
@@ -45,7 +46,7 @@ public static class UexApiClient
 
     private static readonly ConcurrentDictionary<string, UexLocationInfo> LocationCache = new(StringComparer.OrdinalIgnoreCase);
     private static bool _hasLoadedStations = false;
-    private static readonly object _initLock = new();
+    private static readonly SemaphoreSlim LocationsLoadLock = new(1, 1);
     private static string? _apiKey;
 
     static UexApiClient()
@@ -167,33 +168,39 @@ public static class UexApiClient
 
     private static async Task EnsureLocationsLoadedAsync()
     {
-        lock (_initLock)
-        {
-            if (_hasLoadedStations) return;
-            _hasLoadedStations = true;
-        }
-
+        await LocationsLoadLock.WaitAsync();
         try
         {
-            await LoadSpaceStationsAsync();
-            await LoadCitiesAsync();
+            if (_hasLoadedStations) return;
+
+            var stationsLoaded = await LoadSpaceStationsAsync();
+            var citiesLoaded = await LoadCitiesAsync();
+            _hasLoadedStations = stationsLoaded && citiesLoaded;
+            if (!_hasLoadedStations)
+            {
+                Logger.Log("UEX API: Standortdaten konnten nicht vollständig geladen werden und werden später erneut versucht.");
+            }
         }
         catch (Exception ex)
         {
             Logger.Log($"UexApi Init Fehler: {ex.Message}");
         }
+        finally
+        {
+            LocationsLoadLock.Release();
+        }
     }
 
-    private static async Task LoadSpaceStationsAsync()
+    private static async Task<bool> LoadSpaceStationsAsync()
     {
         var response = await Http.GetAsync("space_stations");
-        if (!response.IsSuccessStatusCode) return;
+        if (!response.IsSuccessStatusCode) return false;
 
         using var stream = await response.Content.ReadAsStreamAsync();
         using var doc = await JsonDocument.ParseAsync(stream);
         var root = doc.RootElement;
 
-        if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return;
+        if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return false;
 
         foreach (var item in data.EnumerateArray())
         {
@@ -203,18 +210,19 @@ public static class UexApiClient
                 LocationCache[info.Name] = info;
             }
         }
+        return true;
     }
 
-    private static async Task LoadCitiesAsync()
+    private static async Task<bool> LoadCitiesAsync()
     {
         var response = await Http.GetAsync("cities");
-        if (!response.IsSuccessStatusCode) return;
+        if (!response.IsSuccessStatusCode) return false;
 
         using var stream = await response.Content.ReadAsStreamAsync();
         using var doc = await JsonDocument.ParseAsync(stream);
         var root = doc.RootElement;
 
-        if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return;
+        if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return false;
 
         foreach (var item in data.EnumerateArray())
         {
@@ -224,6 +232,7 @@ public static class UexApiClient
                 LocationCache[info.Name] = info;
             }
         }
+        return true;
     }
 
     private static UexLocationInfo ParseLocation(JsonElement item)

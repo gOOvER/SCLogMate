@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SCLogReader.Models;
 
 namespace SCLogReader.Core;
@@ -25,7 +28,14 @@ public class AppSettings
     public ScanRegion? ContractRegion { get; set; }
 
     /// <summary>Optionaler UEX Corp API-Schlüssel für erweiterte Abfragen & Kontoverknüpfung.</summary>
+    [JsonIgnore]
     public string? UexApiKey { get; set; }
+
+    [JsonPropertyName("UexApiKey")]
+    public string? LegacyUexApiKey
+    {
+        set => UexApiKey = value;
+    }
 
     /// <summary>In-Game Mini-HUD Overlay aktivieren.</summary>
     public bool OverlayEnabled { get; set; } = false;
@@ -127,6 +137,7 @@ public class AppSettings
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>
 public static class Settings
 {
+    private static readonly byte[] UexApiKeyEntropy = Encoding.UTF8.GetBytes("SCLogMate/UEX API key/v1");
     private static readonly string NewDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate");
     private static readonly string LegacyDir = Path.Combine(
@@ -157,13 +168,27 @@ public static class Settings
     }
 
     public static string FilePath => Path.Combine(Dir, "settings.json");
+    private static string UexApiKeyPath => Path.Combine(Dir, "uex-api-key.dat");
 
     public static AppSettings Load()
     {
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new AppSettings();
+            {
+                var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new AppSettings();
+                var protectedKey = LoadUexApiKey();
+                if (!string.IsNullOrWhiteSpace(protectedKey))
+                {
+                    settings.UexApiKey = protectedKey;
+                }
+                else if (!string.IsNullOrWhiteSpace(settings.UexApiKey))
+                {
+                    SaveUexApiKey(settings.UexApiKey);
+                    Save(settings);
+                }
+                return settings;
+            }
         }
         catch { /* defekte Datei ignorieren */ }
         return new AppSettings();
@@ -181,6 +206,40 @@ public static class Settings
         catch (Exception ex)
         {
             Logger.Error("[SETTINGS] Fehler beim Speichern", ex);
+        }
+    }
+
+    public static void SaveUexApiKey(string? key)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                if (File.Exists(UexApiKeyPath)) File.Delete(UexApiKeyPath);
+                return;
+            }
+
+            var protectedKey = ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), UexApiKeyEntropy, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(UexApiKeyPath, protectedKey);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("UEX API-Key speichern", ex);
+        }
+    }
+
+    private static string? LoadUexApiKey()
+    {
+        try
+        {
+            if (!File.Exists(UexApiKeyPath)) return null;
+            var protectedKey = File.ReadAllBytes(UexApiKeyPath);
+            return Encoding.UTF8.GetString(ProtectedData.Unprotect(protectedKey, UexApiKeyEntropy, DataProtectionScope.CurrentUser));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("UEX API-Key laden", ex);
+            return null;
         }
     }
 }

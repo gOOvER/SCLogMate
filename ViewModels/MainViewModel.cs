@@ -156,6 +156,7 @@ public partial class MainViewModel : ObservableObject
     // Starmap-Properties
     [ObservableProperty] private string selectedStarmapSystem = "Stanton";
     [ObservableProperty] private StarmapObject? selectedStarmapObject;
+    [ObservableProperty] private int starmapFocusRequest;
     [ObservableProperty] private string starmapSearchText = "";
     [ObservableProperty] private bool showStarmapStations = true;
     [ObservableProperty] private bool showStarmapMoons = true;
@@ -2233,7 +2234,7 @@ public partial class MainViewModel : ObservableObject
         OcrAvailable = _ocrEngine.IsAvailable;
         UpdateOcrRegionText();
 
-        UexApiKeyInput = _settings.UexApiKey ?? "";
+        UexApiKeyInput = "";
         if (!string.IsNullOrEmpty(_settings.UexApiKey))
         {
             UexApiClient.SetApiKey(_settings.UexApiKey);
@@ -2317,7 +2318,7 @@ public partial class MainViewModel : ObservableObject
         if (_settings.Balance > 0) ManualBalance = _settings.Balance.ToString("N0");
 
         // UEX & Overlay Einstellungen initialisieren
-        UexApiKeyInput = _settings.UexApiKey ?? "";
+        UexApiKeyInput = "";
         if (!string.IsNullOrEmpty(_settings.UexApiKey))
         {
             UexApiClient.SetApiKey(_settings.UexApiKey);
@@ -2985,6 +2986,10 @@ public partial class MainViewModel : ObservableObject
                 case EventKind.Quantum:
                     var qShip = !string.IsNullOrEmpty(e.Ship) ? e.Ship : CurrentShip;
                     RegisterOrUpdateShip(qShip, isFlight: false, isQt: true, isLoss: false, time: e.Time, location: CurrentLocation);
+                    if (!string.IsNullOrEmpty(e.Location))
+                    {
+                        CurrentLocation = e.Location;
+                    }
                     break;
                 case EventKind.ShipLoss:
                     var lShip = !string.IsNullOrEmpty(e.Ship) ? e.Ship : CurrentShip;
@@ -3545,6 +3550,7 @@ public partial class MainViewModel : ObservableObject
             SelectedStarmapSystem = ResolvedLocation.SystemName;
         }
         SelectedStarmapObject = StarmapData.FindObject(ResolvedLocation.DisplayName) ?? StarmapData.FindObject(ResolvedLocation.ParentBody);
+        StarmapFocusRequest++;
         SelectedTabIndex = 4; // Tab '🗺 Karte'
     }
 
@@ -3560,20 +3566,6 @@ public partial class MainViewModel : ObservableObject
     partial void OnUexApiKeyInputChanged(string value)
     {
         if (_initializing || !_ready) return;
-        var cleanKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        _settings.UexApiKey = cleanKey;
-        Settings.Save(_settings);
-        UexApiClient.SetApiKey(cleanKey);
-        if (cleanKey == null)
-        {
-            UexStatusMessage = "Schlüssel entfernt (Öffentlicher Modus)";
-            UexStatusColor = "#8B949E";
-        }
-        else
-        {
-            UexStatusMessage = "✓ API-Key in Einstellungen gespeichert";
-            UexStatusColor = "#58A6FF";
-        }
     }
 
     private async Task CheckUexConnectionOnStartupAsync(string key)
@@ -3697,8 +3689,9 @@ public partial class MainViewModel : ObservableObject
     {
         var cleanKey = string.IsNullOrWhiteSpace(UexApiKeyInput) ? null : UexApiKeyInput.Trim();
         _settings.UexApiKey = cleanKey;
+        Settings.SaveUexApiKey(cleanKey);
         Settings.Save(_settings);
-        UexApiKeyInput = cleanKey ?? "";
+        UexApiKeyInput = "";
         UexApiClient.SetApiKey(cleanKey);
 
         if (cleanKey == null)

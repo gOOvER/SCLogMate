@@ -87,6 +87,7 @@
                            PlayerLocationName="{Binding CurrentLocation}"
                            SelectedObject="{Binding SelectedStarmapObject, Mode=TwoWay}"
                            SelectedDrive="{Binding SelectedQuantumDrive}"
+                           FocusRequest="{Binding StarmapFocusRequest}"
                            ShowStations="{Binding ShowStarmapStations}"
                            ShowMoons="{Binding ShowStarmapMoons}"
                            ShowLandingZones="{Binding ShowStarmapLandingZones}"

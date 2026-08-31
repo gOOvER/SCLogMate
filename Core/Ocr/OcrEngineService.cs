@@ -48,8 +48,8 @@ public sealed class OcrEngineService : IDisposable
             var invBuf = Preprocess(bgra, w, h, scale, padding, invert: true, out int iw, out int ih);
             var plainBuf = Preprocess(bgra, w, h, scale, padding, invert: false, out int pw, out int ph);
 
-            var invBmp = ToSoftwareBitmap(invBuf, iw, ih);
-            var plainBmp = ToSoftwareBitmap(plainBuf, pw, ph);
+            using var invBmp = ToSoftwareBitmap(invBuf, iw, ih);
+            using var plainBmp = ToSoftwareBitmap(plainBuf, pw, ph);
 
             var invResult = await _engine.RecognizeAsync(invBmp);
             var plainResult = await _engine.RecognizeAsync(plainBmp);
@@ -73,12 +73,13 @@ public sealed class OcrEngineService : IDisposable
         if (!IsAvailable || _engine == null || bgra.Length == 0)
             return null;
 
+        await _ocrLock.WaitAsync();
         try
         {
             if (_engine == null) return null;
 
             var buf = Preprocess(bgra, w, h, scale, padding, invert: true, out int outW, out int outH);
-            var bmp = ToSoftwareBitmap(buf, outW, outH);
+            using var bmp = ToSoftwareBitmap(buf, outW, outH);
             var result = await _engine.RecognizeAsync(bmp);
             return result?.Text;
         }
@@ -86,6 +87,10 @@ public sealed class OcrEngineService : IDisposable
         {
             Logger.Error("RecognizeSinglePass", ex);
             return null;
+        }
+        finally
+        {
+            _ocrLock.Release();
         }
     }
 
