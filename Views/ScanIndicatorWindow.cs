@@ -4,9 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 /// <summary>
 /// Persistenter, klick-durchlässiger (WS_EX_TRANSPARENT) Indikator-Rahmen auf dem Bildschirm,

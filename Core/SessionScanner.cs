@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public class SessionInfo
 {

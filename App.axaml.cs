@@ -1,10 +1,10 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using SCLogReader.ViewModels;
-using SCLogReader.Views;
+using SCLogMate.ViewModels;
+using SCLogMate.Views;
 
-namespace SCLogReader;
+namespace SCLogMate;
 
 public partial class App : Application
 {

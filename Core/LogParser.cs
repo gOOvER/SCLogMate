@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Stateful, line-by-line parser for the Star Citizen Game.log.
@@ -313,6 +313,7 @@ public partial class LogParser
     string? _pendWho;
     int _pendDir;          // +1 = rein, -1 = raus
     DateTime _pendTime;
+    int _pendingLines;
 
     string? _lastLoot;                      // gegen Loot-Doppelzeilen
     string? _lastLoc;                       // für Quantum-Kontext
@@ -334,6 +335,9 @@ public partial class LogParser
 
     /// <summary>Unbekannte Notification-Typen (Diagnose: was decken wir noch nicht ab?).</summary>
     public static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> Unknown = new();
+
+    /// <summary>Anzahl verworfener Transferköpfe ohne folgende Betragszeile.</summary>
+    public int ExpiredPendingTransfers { get; private set; }
 
     private DateTime? _lastSeenTime;
 
@@ -358,6 +362,7 @@ public partial class LogParser
                 string who = _pendWho;
                 int dir = _pendDir;
                 _pendWho = null;
+                _pendingLines = 0;
                 return new LogEntry
                 {
                     Time = _pendTime,
@@ -366,14 +371,19 @@ public partial class LogParser
                     Amount = dir * amt
                 };
             }
-            // andere Zeile dazwischen -> pending bleibt bestehen
+            if (++_pendingLines >= 32)
+            {
+                _pendWho = null;
+                _pendingLines = 0;
+                ExpiredPendingTransfers++;
+            }
         }
 
         var r = RecvHdrRegex().Match(line);
-        if (r.Success) { _pendWho = Clean(r.Groups["who"].Value); _pendDir = +1; _pendTime = ParseTs(line); return null; }
+        if (r.Success) { _pendWho = Clean(r.Groups["who"].Value); _pendDir = +1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
 
         var s = SentHdrRegex().Match(line);
-        if (s.Success) { _pendWho = Clean(s.Groups["who"].Value); _pendDir = -1; _pendTime = ParseTs(line); return null; }
+        if (s.Success) { _pendWho = Clean(s.Groups["who"].Value); _pendDir = -1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
 
         var rw = RewardRegex().Match(line);
         if (rw.Success)

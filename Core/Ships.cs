@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Macht aus internen Schiffs-Codes (DRAK_Clipper_795148066379) und Kanal-Namen (Drake Clipper)

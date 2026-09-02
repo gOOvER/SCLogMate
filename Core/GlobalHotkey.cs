@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Avalonia.Threading;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public static class GlobalHotkey
 {

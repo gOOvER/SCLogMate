@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Vollständiger Location-Resolver für Star Citizen Standorte und Systeme.
@@ -350,7 +350,7 @@ public static partial class Locations
             DisplayName = name,
             SystemName = sys,
             ParentBody = sys,
-            Type = StarmapObjectType.JumpPoint,
+            Type = StarmapObjectType.SpaceStation,
             IsArmistice = true
         };
     }

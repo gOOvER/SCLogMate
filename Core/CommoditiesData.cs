@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>Auto-generiert via tools/gen-commodities.ps1 aus scunpacked. resourceGUID -> Warenname.</summary>
 public static partial class Commodities

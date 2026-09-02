@@ -1,4 +1,4 @@
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 /// <summary>Ein Auftraggeber/Fraktion mit Anzahl gespielter Missionen (Ruf-Proxy) und Balkenbreite.</summary>
 public class MissionStat

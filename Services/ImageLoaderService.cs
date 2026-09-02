@@ -6,9 +6,9 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
-using SCLogReader.Core;
+using SCLogMate.Core;
 
-namespace SCLogReader.Services;
+namespace SCLogMate.Services;
 
 /// <summary>
 /// Lädt Bilder asynchron aus dem Web (mit In-Memory & Disk-Caching) für die Wiki- und Schiffsanzeigen.

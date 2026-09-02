@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
-/// Schreibt eine Debug-Datei in %AppData%\SCLogReader\SCLogReader.debug.log (mit Fallback).
+/// Schreibt eine Debug-Datei in %AppData%\SCLogMate\SCLogMate.debug.log (mit Fallback).
 /// Zweck: bei fremden Logs sehen, was schiefläuft und welche Events wir
 /// noch nicht abdecken (unbekannte Notifications etc.).
 /// </summary>

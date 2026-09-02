@@ -1,6 +1,6 @@
 # sign.ps1 — signiert eine Datei mit dem Certum/SimplySign Code-Signing-Zertifikat.
 # Voraussetzung: SimplySign Desktop läuft und ist eingeloggt (Cloud-Cert im Store).
-# Aufruf:  .\sign.ps1 -File .\publish\SCLogReader.exe
+# Aufruf:  .\sign.ps1 -File .\publish\SCLogMate.exe
 param([Parameter(Mandatory)][string]$File)
 $ErrorActionPreference = 'Stop'
 

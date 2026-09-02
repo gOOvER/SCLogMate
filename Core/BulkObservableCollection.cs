@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// ObservableCollection mit <see cref="ReplaceAll"/> – tauscht den kompletten Inhalt aus und

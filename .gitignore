@@ -22,6 +22,9 @@ scan_out.txt
 *.log
 CLAUDE.md
 
+# Local integrations and third-party tools
+VoiceAttack/
+
 # OS specific files
 .DS_Store
 Thumbs.db

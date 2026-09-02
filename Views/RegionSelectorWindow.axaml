@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="SCLogReader.Views.RegionSelectorWindow"
+        x:Class="SCLogMate.Views.RegionSelectorWindow"
         Title="SCLogMate - Bereich auswählen"
         SystemDecorations="None"
         Topmost="True"

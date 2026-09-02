@@ -3,10 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Avalonia;
-using SCLogReader.Core;
-using SCLogReader.Models;
+using SCLogMate.Core;
+using SCLogMate.Models;
 
-namespace SCLogReader;
+namespace SCLogMate;
 
 internal static partial class Program
 {
@@ -19,7 +19,7 @@ internal static partial class Program
         System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = de;
         System.Threading.Thread.CurrentThread.CurrentCulture = de;
 
-        // CLI-Modus:  SCLogReader.exe --scan <Datei-oder-Verzeichnis>
+        // CLI-Modus:  SCLogMate.exe --scan <Datei-oder-Verzeichnis>
         if (args.Length >= 1 && args[0] == "--scan")
         {
             Scan(args.Length >= 2 ? args[1] : ".");
@@ -27,7 +27,7 @@ internal static partial class Program
         }
 
         // Nur eine Instanz zulassen.
-        using var mutex = new System.Threading.Mutex(true, @"Global\SCLogReader_SingleInstance", out bool isNew);
+        using var mutex = new System.Threading.Mutex(true, @"Global\SCLogMate_SingleInstance", out bool isNew);
         if (!isNew)
         {
             Core.Logger.Log("Zweite Instanz blockiert – läuft bereits.");
@@ -54,6 +54,7 @@ internal static partial class Program
 
     static void Scan(string target)
     {
+        LogParser.Unknown.Clear();
         var files = Directory.Exists(target)
             ? Directory.GetFiles(target, "*.log", SearchOption.AllDirectories).OrderBy(f => f).ToArray()
             : new[] { target };
@@ -94,6 +95,11 @@ internal static partial class Program
         Console.WriteLine("GRÖSSTE EINZEL-POSTEN:");
         foreach (var m in all.SelectMany(s => s.Money).OrderByDescending(m => System.Math.Abs(m.amt)).Take(8))
             Console.WriteLine($"   {m.amt,12:N0}  {m.label}");
+
+        Console.WriteLine($"   ! unbekannte Notifications: {LogParser.Unknown.Values.Sum():N0} ({LogParser.Unknown.Count:N0} Typen)");
+        Console.WriteLine($"   ! verworfene Transferköpfe: {all.Sum(session => session.ExpiredTransfers):N0}");
+        foreach (var unknown in LogParser.Unknown.OrderByDescending(item => item.Value).Take(10))
+            Console.WriteLine($"     {unknown.Value,5:N0}x  {unknown.Key}");
     }
 
     class Sess
@@ -111,6 +117,7 @@ internal static partial class Program
         public string? SampleMission;
         public readonly System.Collections.Generic.SortedSet<string> MissionTexts = new();
         public System.Collections.Generic.Dictionary<string, string> Meta = new();
+        public int ExpiredTransfers;
         public long Income => In + Sales + Trade;
         public long Spend => Out + Spent;
         public long Net => Income - Spend;
@@ -122,7 +129,7 @@ internal static partial class Program
         Core.Localization.Hint(file);   // Spiel-Wurzel für Item-Namen-Auflösung
         var parser = new LogParser();
         bool first = true;
-        foreach (var line in ReadSharedLines(file))
+        foreach (var line in Core.LogEntryReader.ReadEntries(ReadSharedLines(file)))
         {
             var ts = TimeOf(line);
             if (ts is { } t) { if (first) { s.Start = t; first = false; } s.End = t; }
@@ -161,6 +168,7 @@ internal static partial class Program
             if (e.Ship != null) s.Ships.Add(e.Ship);
         }
         s.Meta = parser.Meta;
+        s.ExpiredTransfers = parser.ExpiredPendingTransfers;
         return s;
     }
 

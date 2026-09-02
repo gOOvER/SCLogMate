@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace SCLogReader.Services;
+namespace SCLogMate.Services;
 
 /// <summary>Hält die TopLevel-Referenz, damit das ViewModel Datei-Dialoge öffnen kann.</summary>
 public static class UiServices

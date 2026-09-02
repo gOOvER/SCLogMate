@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public static class RsDecoderCatalog
 {

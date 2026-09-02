@@ -2,9 +2,9 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Converters;
+namespace SCLogMate.Converters;
 
 /// <summary>Färbt Beträge: grün = rein, rot = raus, gedimmt = neutral.</summary>
 public class AmountToBrushConverter : IValueConverter
@@ -114,6 +114,18 @@ public class BoolToGreenRedBrushConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Wandelt boolean in Deckkraft: true = 1.0 (voll sichtbar), false = 0.45 (ausgegraut).</summary>
+public class BoolToOpacityConverter : IValueConverter
+{
+    public static readonly BoolToOpacityConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? 1.0 : 0.45;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Wandelt boolean in dezente Status-Hintergrundfarbe: true = Grün (#1F4ADE80), false = Rot (#1FF87171).</summary>
 public class BoolToGreenRedBgConverter : IValueConverter
 {
@@ -128,4 +140,6 @@ public class BoolToGreenRedBgConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+
 

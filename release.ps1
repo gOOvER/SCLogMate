@@ -4,11 +4,11 @@
 param([switch]$SkipSign)
 $ErrorActionPreference = 'Stop'
 $root   = $PSScriptRoot
-$csproj = Join-Path $root 'SCLogReader.csproj'
+$csproj = Join-Path $root 'SCLogMate.csproj'
 $clPath = Join-Path $root 'CHANGELOG.md'
 
 $ver = (Select-String -Path $csproj -Pattern '<Version>(.*?)</Version>').Matches[0].Groups[1].Value
-if (-not $ver) { throw 'Keine <Version> in SCLogReader.csproj gefunden.' }
+if (-not $ver) { throw 'Keine <Version> in SCLogMate.csproj gefunden.' }
 $tag  = "v$ver"
 $date = Get-Date -Format 'yyyy-MM-dd'
 Write-Host "==> Release $tag" -ForegroundColor Cyan

@@ -1,7 +1,7 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 public partial class UserPoi : ObservableObject
 {

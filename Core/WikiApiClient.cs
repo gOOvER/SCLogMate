@@ -8,7 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public sealed class WikiInfo
 {

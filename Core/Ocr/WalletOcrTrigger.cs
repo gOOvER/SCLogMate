@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Erkennt mobiGlas-Triggerzeilen im Log und extrahiert aUEC-Guthaben aus OCR-Text.
@@ -35,15 +35,18 @@ public static partial class WalletOcrTrigger
         return false;
     }
 
-    /// <summary>Wählt den zuverlässigeren Wert aus zwei OCR-Durchläufen (bevorzugt Invertiert für mobiGlas-Cyan).</summary>
+    /// <summary>Wählt den zuverlässigeren Wert aus zwei OCR-Durchläufen.
+    /// Wenn beide Passes divergierende Werte lesen → Misread-Signal, Grab verwerfen.</summary>
     public static string? BestRead(string? a, string? b)
     {
         var va = a is null ? null : ExtractBalance(a);
-        if (va is not null) return a;
-
         var vb = b is null ? null : ExtractBalance(b);
-        if (vb is not null) return b;
 
+        // Beide Passes lesen divergierende Werte → Misread erkannt, verwerfen
+        if (va is not null && vb is not null && va != vb) return null;
+
+        if (va is not null) return a;
+        if (vb is not null) return b;
         return null;
     }
 

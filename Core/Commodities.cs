@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Mappt resourceGUID (Fracht/Waren-Verkäufe) → Warenname.

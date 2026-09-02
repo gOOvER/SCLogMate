@@ -1,8 +1,8 @@
 using System;
 using System.Text.RegularExpressions;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public record ItemArmorMeta(
     string ArmorClass,

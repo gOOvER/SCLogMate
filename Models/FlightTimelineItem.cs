@@ -1,6 +1,6 @@
 using System;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 public enum TimelineItemType
 {

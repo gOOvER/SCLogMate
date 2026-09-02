@@ -16,6 +16,7 @@
     <Version>1.0.0-beta4</Version>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
+    <ApplicationIcon>SCLogMate.ico</ApplicationIcon>
     <!-- Single-File Publishing (alles in einer einzigen kompakten .exe) -->
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
@@ -25,7 +26,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="SCLogReader.ico" />
+    <AvaloniaResource Include="SCLogMate.ico" />
     <EmbeddedResource Include="Data\blueprints.json" />
   </ItemGroup>
 

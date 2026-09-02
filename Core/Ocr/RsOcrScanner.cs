@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Timers;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 public sealed partial class RsOcrScanner : IDisposable
 {
@@ -67,18 +67,11 @@ public sealed partial class RsOcrScanner : IDisposable
         }
         else
         {
-            // Standard: Zentraler HUD- & Scanner-Bereich des primären Bildschirms
-            var (sw, sh) = ScreenCapture.GetPrimaryScreenSize();
-            if (sw <= 0 || sh <= 0) return null;
-
-            int cw = Math.Min(1200, (int)(sw * 0.70));
-            int ch = Math.Min(800, (int)(sh * 0.55));
-            int cx = (sw - cw) / 2;
-            int cy = (sh - ch) / 2;
-
-            raw = ScreenCapture.Capture(cx, cy, cw, ch);
-            w = cw;
-            h = ch;
+            // Kein benutzerdefinierter Bereich → kompakte Standard-Region (35% × 35% zentriert)
+            var defaultRegion = ScreenCapture.GetDefaultRsRegion();
+            raw = ScreenCapture.Capture(defaultRegion.X, defaultRegion.Y, defaultRegion.Width, defaultRegion.Height);
+            w = defaultRegion.Width;
+            h = defaultRegion.Height;
         }
 
         if (raw == null || raw.Length == 0) return null;
@@ -135,7 +128,8 @@ public sealed partial class RsOcrScanner : IDisposable
 
         if (_running && _timer != null)
         {
-            _timer.Start();
+            try { _timer.Start(); }
+            catch (ObjectDisposedException) { }
         }
     }
 

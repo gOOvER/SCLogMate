@@ -1,17 +1,17 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:SCLogReader.ViewModels"
-        xmlns:m="using:SCLogReader.Models"
-        xmlns:core="using:SCLogReader.Core"
-        xmlns:conv="using:SCLogReader.Converters"
-        xmlns:views="using:SCLogReader.Views"
-        x:Class="SCLogReader.Views.MainWindow"
+        xmlns:vm="using:SCLogMate.ViewModels"
+        xmlns:m="using:SCLogMate.Models"
+        xmlns:core="using:SCLogMate.Core"
+        xmlns:conv="using:SCLogMate.Converters"
+        xmlns:views="using:SCLogMate.Views"
+        x:Class="SCLogMate.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Width="1580" Height="920"
-        MinWidth="1180" MinHeight="680"
+        Width="1400" Height="780"
+        MinWidth="1050" MinHeight="520"
         Background="#050811"
         FontFamily="{Binding CurrentFontFamily}"
-        Icon="/SCLogReader.ico"
+        Icon="/SCLogMate.ico"
         Title="SCLogMate">
 
   <Window.Resources>
@@ -21,6 +21,7 @@
     <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
     <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
     <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
+    <conv:BoolToOpacityConverter x:Key="BoolToOpacity" />
   </Window.Resources>
 
   <Grid>
@@ -44,10 +45,57 @@
                 Command="{Binding OpenChangelogCommand}" ToolTip.Tip="Changelog &amp; Releases">
           <TextBlock Text="{Binding VersionText}" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
         </Button>
+        <!-- Debug-Modus Badge (nur sichtbar wenn DebugMode aktiv) -->
+        <Border Background="#2E1B05" BorderBrush="#D97706" BorderThickness="1" CornerRadius="4" Padding="6,2"
+                VerticalAlignment="Center" Margin="6,0,0,0" IsVisible="{Binding IsDebugModeActive}"
+                ToolTip.Tip="Entwickler- &amp; Debug-Modus aktiv (per Build oder settings.json)">
+          <TextBlock Text="🧪 DEBUG" Foreground="#F59E0B" FontSize="10" FontWeight="Bold" />
+        </Border>
       </StackPanel>
 
-      <!-- Rechts: Star Citizen Status, Mini-HUD & Update-Button -->
+      <!-- Rechts: Globale Sprache, Star Citizen Status, Mini-HUD & Update-Button -->
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <!-- Globaler Sprach-Umschalter mit echten Vektor-Flaggen -->
+        <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguageOption}"
+                  Height="30" Padding="6,2" CornerRadius="5" Background="#0A1422" BorderBrush="#1C324A" BorderThickness="1"
+                  FontSize="11" VerticalAlignment="Center"
+                  ToolTip.Tip="{Binding I18n[Header_Language_Tooltip]}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                <!-- 🌐 Auto Icon -->
+                <TextBlock Text="🌐" FontSize="11" IsVisible="{Binding IsAuto}" VerticalAlignment="Center" />
+
+                <!-- 🇩🇪 Echte Deutsche Flagge (Schwarz - Rot - Gold) -->
+                <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" IsVisible="{Binding IsGerman}" VerticalAlignment="Center"
+                        BorderBrush="#30363D" BorderThickness="0.5">
+                  <Grid RowDefinitions="*,*,*">
+                    <Rectangle Grid.Row="0" Fill="#151515" />
+                    <Rectangle Grid.Row="1" Fill="#DD0000" />
+                    <Rectangle Grid.Row="2" Fill="#FFCE00" />
+                  </Grid>
+                </Border>
+
+                <!-- 🇬🇧 Echte Britische Flagge (Union Jack) -->
+                <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#00247D" IsVisible="{Binding IsEnglish}" VerticalAlignment="Center"
+                        BorderBrush="#30363D" BorderThickness="0.5">
+                  <Canvas Width="16" Height="11">
+                    <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#FFFFFF" StrokeThickness="2.2" />
+                    <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#CF142B" StrokeThickness="1.0" />
+                    <Rectangle Canvas.Left="6.5" Canvas.Top="0" Width="3" Height="11" Fill="#FFFFFF" />
+                    <Rectangle Canvas.Left="0" Canvas.Top="4" Width="16" Height="3" Fill="#FFFFFF" />
+                    <Rectangle Canvas.Left="7.2" Canvas.Top="0" Width="1.6" Height="11" Fill="#CF142B" />
+                    <Rectangle Canvas.Left="0" Canvas.Top="4.7" Width="16" Height="1.6" Fill="#CF142B" />
+                  </Canvas>
+                </Border>
+
+                <!-- Text -->
+                <TextBlock Text="{Binding Title}" FontSize="11" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+
         <!-- Star Citizen Prozess-Status Badge -->
         <Border Background="#091422" BorderBrush="{Binding GameStatusColor}" BorderThickness="1"
                 CornerRadius="6" Height="30" Padding="8,0" ToolTip.Tip="{Binding GameStatusTooltip}" VerticalAlignment="Center">
@@ -61,7 +109,7 @@
                 Command="{Binding ToggleOverlayCommand}" ToolTip.Tip="Frei verschiebbares In-Game Mini-HUD Overlay ein-/ausblenden">
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
             <TextBlock Text="🖥" FontSize="11" Foreground="#38BDF8" />
-            <TextBlock Text="Mini-HUD" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+            <TextBlock Text="{Binding I18n[Header_MiniHud]}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
           </StackPanel>
         </Button>
 
@@ -69,7 +117,7 @@
                 Command="{Binding ToggleRsOverlayCommand}" ToolTip.Tip="Frei verschiebbares RS Signal Decoder HUD Overlay ein-/ausblenden">
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
             <TextBlock Text="🛰" FontSize="11" Foreground="#F59E0B" />
-            <TextBlock Text="RS-Overlay" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
+            <TextBlock Text="{Binding I18n[Header_RsOverlay]}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
           </StackPanel>
         </Button>
 
@@ -84,7 +132,7 @@
     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0">
         <TextBlock Text="⚡" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" />
-        <TextBlock Text="SESSION" Foreground="#7E97AD" FontWeight="Bold" FontSize="11" LetterSpacing="0.5" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding I18n[Header_Session]}" Foreground="#7E97AD" FontWeight="Bold" FontSize="11" LetterSpacing="0.5" VerticalAlignment="Center" />
       </StackPanel>
       <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" Height="32"
                 Background="#08101C" BorderBrush="#1A3047"
@@ -108,7 +156,7 @@
             
             <!-- Header: Label + Region-Badge mit echter Flagge -->
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Classes="label" Text="👤  PILOT &amp; SERVER" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="0" Classes="label" Text="{Binding I18n[Dash_Pilot_Server]}" VerticalAlignment="Center" />
               
               <!-- Badge mit Flagge & Kanal -->
               <Border Grid.Column="1" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1" CornerRadius="4" Padding="6,2">
@@ -185,7 +233,7 @@
             <!-- Header: Label + System Badge + Armistice Status + Starmap Button -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto">
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <TextBlock Classes="label" Text="📍 STANDORT" VerticalAlignment="Center" />
+                <TextBlock Classes="label" Text="{Binding I18n[Dash_Location]}" VerticalAlignment="Center" />
                 
                 <!-- System Pill (STANTON / PYRO / NYX) -->
                 <Border Background="#060C16" BorderBrush="{Binding LocationBadgeColor}" BorderThickness="1"
@@ -232,7 +280,7 @@
         <Border Grid.Column="2" Classes="card" Margin="4,0,0,0" Padding="12,10">
           <Grid RowDefinitions="Auto,*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
-              <TextBlock Grid.Column="0" Classes="label" Text="🛸  SCHIFF &amp; FLOTTE" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="0" Classes="label" Text="{Binding I18n[Dash_Ship_Fleet]}" VerticalAlignment="Center" />
               <Button Grid.Column="1" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1" Margin="0,0,4,0"
                       Command="{Binding SwitchToFleetTabCommand}" ToolTip.Tip="🛸 Flottenübersicht &amp; Hangar öffnen">
                 <TextBlock Text="🛸 Flotte" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
@@ -256,7 +304,7 @@
         <Border Grid.Column="0" Classes="card" Margin="0,0,4,0" Padding="14,10">
           <Grid RowDefinitions="Auto,*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Classes="label" Text="◆  KONTOSTAND (aUEC)" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="0" Classes="label" Text="{Binding I18n[Dash_Account]}" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                 <!-- Auto-Sync Toggle -->
                 <Button Classes="ghost" Padding="6,2" CornerRadius="4"
@@ -265,17 +313,17 @@
                         BorderThickness="1"
                         Command="{Binding ToggleAutoOcrCommand}"
                         ToolTip.Tip="⚡ Auto-Sync mobiGlas Kontostand">
-                  <TextBlock Text="⚡ Auto" FontSize="10" FontWeight="Bold" Foreground="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}" />
+                  <TextBlock Text="{Binding I18n[Dash_Auto_Sync]}" FontSize="10" FontWeight="Bold" Foreground="{Binding AutoOcrEnabled, Converter={StaticResource GreenRedBrush}}" />
                 </Button>
                 <!-- Bereich -->
                 <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1"
                         Command="{Binding SelectWalletRegionCommand}" ToolTip.Tip="⊕ Kontostand-Bereich kalibrieren">
-                  <TextBlock Text="⊕ Bereich" FontSize="10" Foreground="#7E97AD" />
+                  <TextBlock Text="{Binding I18n[Dash_Calibrate_Region]}" FontSize="10" Foreground="#7E97AD" />
                 </Button>
                 <!-- Scan -->
                 <Button Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1C4B78" BorderThickness="1"
                         Command="{Binding TriggerOcrCommand}" ToolTip.Tip="▶ Test-Scan starten">
-                  <TextBlock Text="▶ Scan" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+                  <TextBlock Text="{Binding I18n[Dash_Scan]}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
                 </Button>
               </StackPanel>
             </Grid>
@@ -290,13 +338,19 @@
 
             <!-- Subline: Einnahmen · Ausgaben · Netto -->
             <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
-              <TextBlock Grid.Column="0" Foreground="#4ADE80" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace"
-                         Text="{Binding SessionIncomeText, StringFormat='▲ Einnahmen: {0}'}" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Einnahmen" />
-              <TextBlock Grid.Column="1" Foreground="#F87171" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace"
-                         Text="{Binding SessionSpendText, StringFormat='▼ Ausgaben: {0}'}" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Ausgaben" />
-              <TextBlock Grid.Column="2" Foreground="{Binding SessionNetSign, Converter={StaticResource AmountBrush}}" FontSize="11"
-                         FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold"
-                         Text="{Binding SessionNetText, StringFormat='◆ Saldo: {0}'}" ToolTip.Tip="Sitzungs-Bilanz (Netto)" />
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Einnahmen">
+                <TextBlock Foreground="#4ADE80" FontSize="11" Text="{Binding I18n[Dash_Income]}" />
+                <TextBlock Foreground="#4ADE80" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" Text="{Binding SessionIncomeText}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="0,0,12,0" ToolTip.Tip="Sitzungs-Ausgaben">
+                <TextBlock Foreground="#F87171" FontSize="11" Text="{Binding I18n[Dash_Spend]}" />
+                <TextBlock Foreground="#F87171" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" Text="{Binding SessionSpendText}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" ToolTip.Tip="Sitzungs-Bilanz (Netto)">
+                <TextBlock Foreground="{Binding SessionNetSign, Converter={StaticResource AmountBrush}}" FontSize="11" FontWeight="SemiBold" Text="{Binding I18n[Dash_Net]}" />
+                <TextBlock Foreground="{Binding SessionNetSign, Converter={StaticResource AmountBrush}}" FontSize="11"
+                           FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold" Text="{Binding SessionNetText}" />
+              </StackPanel>
             </Grid>
           </Grid>
         </Border>
@@ -306,7 +360,7 @@
           <Grid RowDefinitions="Auto,*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                <TextBlock Classes="label" Text="📋  AUFTRAGSMANAGER" VerticalAlignment="Center" />
+                <TextBlock Classes="label" Text="{Binding I18n[Dash_Contracts]}" VerticalAlignment="Center" />
                 <Border Background="#060C16" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center">
                   <TextBlock Text="{Binding ActiveContractsCountText}" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
                 </Border>
@@ -342,37 +396,37 @@
           <Setter Property="MinHeight" Value="32" />
         </Style>
       </TabControl.Styles>
-      <TabItem Header="📜 Ereignisse">
+      <TabItem Header="{Binding I18n[Tab_Events]}">
     <DockPanel Margin="0,8,0,0">
 
     <!-- Filter-Chips & Volltext-Suche -->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
       <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <Button Classes="chip" Content="Alle" Command="{Binding SetFilterCommand}" CommandParameter="Alle"
+          <Button Classes="chip" Content="{Binding I18n[Filter_All]}" Command="{Binding SetFilterCommand}" CommandParameter="Alle"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
-          <Button Classes="chip" Content="💰 Geld" Command="{Binding SetFilterCommand}" CommandParameter="Geld"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Money]}" Command="{Binding SetFilterCommand}" CommandParameter="Geld"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Geld}" />
-          <Button Classes="chip" Content="📋 Aufträge" Command="{Binding SetFilterCommand}" CommandParameter="Aufträge"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Contracts]}" Command="{Binding SetFilterCommand}" CommandParameter="Aufträge"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Aufträge}" />
-          <Button Classes="chip" Content="⬡ Baupläne" Command="{Binding SetFilterCommand}" CommandParameter="Baupläne"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Blueprints]}" Command="{Binding SetFilterCommand}" CommandParameter="Baupläne"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Baupläne}" />
-          <Button Classes="chip" Content="✈ Schiffe" Command="{Binding SetFilterCommand}" CommandParameter="Schiffe"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Ships]}" Command="{Binding SetFilterCommand}" CommandParameter="Schiffe"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Schiffe}" />
-          <Button Classes="chip" Content="◉ Orte" Command="{Binding SetFilterCommand}" CommandParameter="Orte"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Locations]}" Command="{Binding SetFilterCommand}" CommandParameter="Orte"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
-          <Button Classes="chip" Content="♟ Crew" Command="{Binding SetFilterCommand}" CommandParameter="Crew"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Crew]}" Command="{Binding SetFilterCommand}" CommandParameter="Crew"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Crew}" />
-          <Button Classes="chip" Content="◈ Loot" Command="{Binding SetFilterCommand}" CommandParameter="Loot"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Loot]}" Command="{Binding SetFilterCommand}" CommandParameter="Loot"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Loot}" />
-          <Button Classes="chip" Content="⋯ Sonst" Command="{Binding SetFilterCommand}" CommandParameter="Sonst"
+          <Button Classes="chip" Content="{Binding I18n[Filter_Misc]}" Command="{Binding SetFilterCommand}" CommandParameter="Sonst"
                   Background="{Binding ActiveFilter, Converter={StaticResource FilterBg}, ConverterParameter=Sonst}" />
         </StackPanel>
       </ScrollViewer>
 
       <!-- Schnellsuche mit Clear-Button -->
       <Panel Grid.Column="1" Width="210" Height="28" Margin="8,0,0,0" VerticalAlignment="Center">
-        <TextBox Classes="search" Text="{Binding EventSearchText}" Watermark="Ereignisse filtern…" VerticalAlignment="Center" Height="28" />
+        <TextBox Classes="search" Text="{Binding EventSearchText}" Watermark="{Binding I18n[Filter_Search_Watermark]}" VerticalAlignment="Center" Height="28" />
         <TextBlock Text="🔎" FontSize="11" Foreground="#7E97AD" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False" />
         <Button Classes="ghost" Padding="4,1" Margin="0,0,4,0" CornerRadius="4" HorizontalAlignment="Right" VerticalAlignment="Center"
                 Command="{Binding ClearEventSearchCommand}" IsVisible="{Binding EventSearchText.Length}"
@@ -454,7 +508,7 @@
     </DockPanel>
     </TabItem>
 
-    <TabItem Header="💰 Finanzen">
+    <TabItem Header="{Binding I18n[Tab_Finances]}">
       <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14">
 
@@ -859,7 +913,7 @@
       </ScrollViewer>
     </TabItem>
 
-    <TabItem Header="❖ Missionen">
+    <TabItem Header="{Binding I18n[Tab_Missions]}">
       <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14">
 
@@ -1079,7 +1133,7 @@
     </TabItem>
 
     <!-- Tab 3: Fraktionsruf & Reputation -->
-    <TabItem Header="🎖 Ruf">
+    <TabItem Header="{Binding I18n[Tab_Reputation]}">
       <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
         <StackPanel Spacing="10">
 
@@ -1189,7 +1243,7 @@
     </TabItem>
 
     <!-- Tab 4: Sternenkarte (Starmap & Standorte) -->
-    <TabItem Header="🗺 Karte">
+    <TabItem Header="{Binding I18n[Tab_Starmap]}">
       <Grid ColumnDefinitions="*,330" Margin="0,10,0,0">
         
         <!-- Linker Bereich: System-Toolbar + Starmap Canvas -->
@@ -1466,7 +1520,7 @@
     </TabItem>
 
     <!-- Tab 5: Flugschreiber & Session-Timeline (Black Box) -->
-    <TabItem Header="⏱ Flugschreiber">
+    <TabItem Header="{Binding I18n[Tab_BlackBox]}">
       <Grid RowDefinitions="Auto,*" Margin="0,10,0,0">
         
         <!-- 1. Obere Missions- & Black-Box-Header Leiste -->
@@ -1735,7 +1789,7 @@
     </TabItem>
 
     <!-- Tab 6: RS Signal Decoder & Mining/Salvage Scanner -->
-    <TabItem Header="🛰 Erz-Scanner">
+    <TabItem Header="{Binding I18n[Tab_OreScanner]}">
       <ScrollViewer Margin="0,10,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14">
 
@@ -1970,7 +2024,7 @@
     </TabItem>
 
     <!-- Tab 7: Flotten- & Hangar-Verzeichnis -->
-    <TabItem Header="🛸 Flotte">
+    <TabItem Header="{Binding I18n[Tab_Fleet]}">
       <DockPanel Margin="0,8,0,0">
 
         <!-- Header: Statistik, Filter-Chips & Suche -->
@@ -2323,7 +2377,7 @@
     </TabItem>
 
     <!-- Tab 6: Bauplan-Datenbank -->
-    <TabItem Header="🛠 Baupläne">
+    <TabItem Header="{Binding I18n[Tab_Blueprints]}">
       <DockPanel Margin="0,8,0,0">
 
         <!-- Header: Statistik, Filter-Chips & Suche -->
@@ -2475,7 +2529,7 @@
     </TabItem>
 
     <!-- Tab 5: Piloten-Ausrüstung & Loadout -->
-    <TabItem Header="🥋 Ausrüstung">
+    <TabItem Header="{Binding I18n[Tab_Loadout]}">
       <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14">
           
@@ -2628,8 +2682,8 @@
     </TabItem>
 
     <!-- Tab 6: Einstellungen -->
-    <TabItem Header="⚙ Einstellungen">
-      <DockPanel Margin="0,8,0,0">
+    <TabItem Header="{Binding I18n[Tab_Settings]}">
+      <Grid Margin="0,8,0,0">
         <TabControl SelectedIndex="{Binding SettingsSubTabIndex}">
           <TabControl.Styles>
             <Style Selector="TabItem">
@@ -2639,9 +2693,9 @@
           </TabControl.Styles>
 
           <!-- Sub-Tab 1: 📁 Allgemein -->
-          <TabItem Header="📁 Allgemein">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <TabItem Header="{Binding I18n[SubTab_General]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <!-- 1. Star Citizen & Logdatei -->
                 <Border Classes="card">
@@ -2678,6 +2732,86 @@
                   </StackPanel>
                 </Border>
 
+                <!-- 3. Sprache & Regional-Einstellungen / Language -->
+                <Border Classes="card">
+                  <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Classes="label" Text="🌐  SPRACHE &amp; REGIONAL-EINSTELLUNGEN / LANGUAGE" />
+                        <TextBlock Text="Wähle die Sprache der Anwendung und für sprachabhängige Zusatzmodule wie VoiceAttack &amp; Aurora." Foreground="#8B949E" FontSize="11" />
+                      </StackPanel>
+                      <!-- Status Pill -->
+                      <Border Grid.Column="1" Background="#0D1F2D" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="5" Padding="8,3" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <!-- Deutsche Flagge -->
+                          <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" IsVisible="{Binding IsGermanLanguageActive}" VerticalAlignment="Center">
+                            <Grid RowDefinitions="*,*,*">
+                              <Rectangle Grid.Row="0" Fill="#151515" />
+                              <Rectangle Grid.Row="1" Fill="#DD0000" />
+                              <Rectangle Grid.Row="2" Fill="#FFCE00" />
+                            </Grid>
+                          </Border>
+                          <!-- Britische Flagge -->
+                          <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#00247D" IsVisible="{Binding !IsGermanLanguageActive}" VerticalAlignment="Center">
+                            <Canvas Width="16" Height="11">
+                              <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#FFFFFF" StrokeThickness="2.2" />
+                              <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#CF142B" StrokeThickness="1.0" />
+                              <Rectangle Canvas.Left="6.5" Canvas.Top="0" Width="3" Height="11" Fill="#FFFFFF" />
+                              <Rectangle Canvas.Left="0" Canvas.Top="4" Width="16" Height="3" Fill="#FFFFFF" />
+                              <Rectangle Canvas.Left="7.2" Canvas.Top="0" Width="1.6" Height="11" Fill="#CF142B" />
+                              <Rectangle Canvas.Left="0" Canvas.Top="4.7" Width="16" Height="1.6" Fill="#CF142B" />
+                            </Canvas>
+                          </Border>
+                          <TextBlock Text="{Binding ActiveLanguageBadgeText}" Foreground="#38BDF8" FontSize="11" FontWeight="Bold" />
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="280,*" Margin="0,4,0,0">
+                      <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguageOption}"
+                                HorizontalAlignment="Stretch" Padding="8,6" CornerRadius="6" Background="#0D1117" BorderBrush="#30363D">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                              <!-- 🌐 Auto Icon -->
+                              <TextBlock Text="🌐" FontSize="11" IsVisible="{Binding IsAuto}" VerticalAlignment="Center" />
+
+                              <!-- 🇩🇪 Echte Deutsche Flagge -->
+                              <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" IsVisible="{Binding IsGerman}" VerticalAlignment="Center"
+                                      BorderBrush="#30363D" BorderThickness="0.5">
+                                <Grid RowDefinitions="*,*,*">
+                                  <Rectangle Grid.Row="0" Fill="#151515" />
+                                  <Rectangle Grid.Row="1" Fill="#DD0000" />
+                                  <Rectangle Grid.Row="2" Fill="#FFCE00" />
+                                </Grid>
+                              </Border>
+
+                              <!-- 🇬🇧 Echte Britische Flagge -->
+                              <Border Width="16" Height="11" CornerRadius="1.5" ClipToBounds="True" Background="#00247D" IsVisible="{Binding IsEnglish}" VerticalAlignment="Center"
+                                      BorderBrush="#30363D" BorderThickness="0.5">
+                                <Canvas Width="16" Height="11">
+                                  <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#FFFFFF" StrokeThickness="2.2" />
+                                  <Path Data="M 0,0 L 16,11 M 16,0 L 0,11" Stroke="#CF142B" StrokeThickness="1.0" />
+                                  <Rectangle Canvas.Left="6.5" Canvas.Top="0" Width="3" Height="11" Fill="#FFFFFF" />
+                                  <Rectangle Canvas.Left="0" Canvas.Top="4" Width="16" Height="3" Fill="#FFFFFF" />
+                                  <Rectangle Canvas.Left="7.2" Canvas.Top="0" Width="1.6" Height="11" Fill="#CF142B" />
+                                  <Rectangle Canvas.Left="0" Canvas.Top="4.7" Width="16" Height="1.6" Fill="#CF142B" />
+                                </Canvas>
+                              </Border>
+
+                              <TextBlock Text="{Binding Title}" FontSize="11.5" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <TextBlock Text="{Binding LanguageDescriptionText}" Foreground="#8B949E" FontSize="11.5" />
+                      </StackPanel>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+
                 <!-- 3. Fenster- & System-Verhalten -->
                 <Border Classes="card">
                   <StackPanel Spacing="12">
@@ -2703,9 +2837,9 @@
           </TabItem>
 
           <!-- Sub-Tab 2: ⏳ Wipe & Filter -->
-          <TabItem Header="⏳ Wipe &amp; Filter">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <TabItem Header="{Binding I18n[SubTab_Wipe]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <Border Classes="card">
                   <StackPanel Spacing="14">
@@ -2761,9 +2895,9 @@
           </TabItem>
 
           <!-- Sub-Tab 3: 🖥 Overlays & HUD -->
-          <TabItem Header="🖥 Overlays">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <TabItem Header="{Binding I18n[SubTab_Overlays]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <!-- 1. Mini-HUD Overlay -->
                 <Border Classes="card">
@@ -2936,9 +3070,9 @@
           </TabItem>
 
           <!-- Sub-Tab 4: 👁 mobiGlas & OCR -->
-          <TabItem Header="👁 mobiGlas / OCR">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <TabItem Header="{Binding I18n[SubTab_Ocr]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <!-- mobiGlas Screenreader -->
                 <Border Classes="card">
@@ -3030,9 +3164,9 @@
           </TabItem>
 
           <!-- Sub-Tab 5: 🌐 UEX Integration -->
-          <TabItem Header="🌐 UEX Corp">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <TabItem Header="{Binding I18n[SubTab_Uex]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <Border Classes="card">
                   <StackPanel Spacing="12">
@@ -3068,10 +3202,215 @@
             </ScrollViewer>
           </TabItem>
 
-          <!-- Sub-Tab 6: 💾 Datenbank & Wartung -->
-          <TabItem Header="💾 Datenbank">
-            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,100" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
+          <!-- Sub-Tab 6: 🎙️ VoiceAttack & Aurora Log-Wächter -->
+          <TabItem Header="{Binding I18n[SubTab_VoiceAttack]}">
+            <ScrollViewer Margin="0,4,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="8" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,160">
+
+                <!-- 1. Erkennung & Status Banner -->
+                <Border Classes="card" Padding="10,6">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="1">
+                        <TextBlock Classes="label" Text="🎙️  VOICEATTACK &amp; AURORA LOG-WÄCHTER INTEGRATION" />
+                        <TextBlock Text="Nativer Audio-Begleiter für Star Citizen Live-Events. Greift rein lesend auf das VoiceAttack Aurora Log-Wächter Profil zu." Foreground="#8B949E" FontSize="10.5" />
+                      </StackPanel>
+                      
+                      <!-- Rechts: Test-Schalter & Status Badge -->
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <CheckBox IsChecked="{Binding SimulateAuroraNotInstalled}" VerticalAlignment="Center"
+                                  IsVisible="{Binding IsDebugModeActive}"
+                                  ToolTip.Tip="Schaltet die Ansicht testweise auf 'Nicht installiert', um das Verhalten und den Kauf-Link zu prüfen">
+                          <TextBlock Text="🧪 'Nicht installiert' simulieren" FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" />
+                        </CheckBox>
+
+                        <!-- Status Badge -->
+                        <Border Background="#0D2D20" BorderBrush="#238636" BorderThickness="1" CornerRadius="5" Padding="7,2" VerticalAlignment="Center"
+                                IsVisible="{Binding IsAuroraInstalled}">
+                          <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="🟢" FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Text="Profil Gefunden &amp; Bereit" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                          </StackPanel>
+                        </Border>
+                        <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="5" Padding="7,2" VerticalAlignment="Center"
+                                IsVisible="{Binding !IsAuroraInstalled}">
+                          <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="⚪" FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Text="Nicht Gefunden" Foreground="#8B949E" FontSize="11" FontWeight="Bold" />
+                          </StackPanel>
+                        </Border>
+                      </StackPanel>
+                    </Grid>
+
+                    <!-- Installations-Pfad Infobox -->
+                    <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="8,4">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0" Text="📁" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                          <TextBlock Text="Installations-Pfad (Dokumente / OneDrive)" Foreground="#8B949E" FontSize="9.5" />
+                          <TextBlock Text="{Binding AuroraPath}" Foreground="#F0F6FC" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <!-- Hinweis bei Nicht-Installation -->
+                        <TextBlock Grid.Column="2" Text="Ordner 'VoiceAttack\Aurora Log-Wächter' nicht gefunden (Integration deaktiviert)" Foreground="#F87171" FontSize="10" VerticalAlignment="Center"
+                                   IsVisible="{Binding !IsAuroraInstalled}" />
+                      </Grid>
+                    </Border>
+
+                    <!-- Gumroad Kauf-Banner (erscheint wenn Aurora nicht installiert ist und die Sprache Deutsch ist) -->
+                    <Border Background="#161208" BorderBrush="#D97706" BorderThickness="1.5" CornerRadius="7" Padding="10,6"
+                            IsVisible="{Binding ShowAuroraPurchaseBanner}">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0" Text="🛒" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                          <TextBlock Text="Aurora Log-Wächter Profil nicht installiert" Foreground="#FDE68A" FontSize="12" FontWeight="Bold" />
+                          <TextBlock Text="Erhalte das vollständige VoiceAttack-Paket mit über 150 personalisierten Audio-Sprachausgaben für Schiffe, Zonen &amp; Spielereignisse." Foreground="#D1D5DB" FontSize="10.5" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Classes="accent" Background="#D97706" BorderBrush="#F59E0B" CornerRadius="6" Padding="12,5" VerticalAlignment="Center"
+                                Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://3415383443272.gumroad.com/l/yzpmoa"
+                                ToolTip.Tip="Aurora Log-Wächter auf Gumroad öffnen">
+                          <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="🛍️" FontSize="11" />
+                            <TextBlock Text="Aurora auf Gumroad ansehen" FontWeight="Bold" Foreground="#FFFFFF" FontSize="11" />
+                          </StackPanel>
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <!-- 2. Hauptschalter & Audio-Einstellungen (Kompakt) -->
+                <StackPanel Spacing="8" IsEnabled="{Binding IsAuroraInstalled}" Opacity="{Binding IsAuroraInstalled, Converter={StaticResource BoolToOpacity}}">
+
+                  <!-- Haupt-Steuerung & Lautstärke -->
+                  <Border Classes="card" Padding="10,6">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                      <CheckBox Grid.Column="0" IsChecked="{Binding IsAuroraEnabled}" Content="Audio-Begleiter Aktiv" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" Margin="0,0,16,0" />
+                      
+                      <!-- Lautstärke Slider -->
+                      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Grid.Column="0" Text="Lautstärke:" Foreground="#8B949E" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding AuroraVolume}" VerticalAlignment="Center" />
+                      </Grid>
+                      
+                      <TextBlock Grid.Column="2" Text="{Binding AuroraVolume, StringFormat='{}{0}%'}" Foreground="#58A6FF" FontSize="11" FontWeight="Bold" Width="40" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                      <Button Grid.Column="3" Classes="accent" Command="{Binding PlayAuroraTestSoundCommand}" VerticalAlignment="Center" Padding="12,5">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="▶" FontSize="11" />
+                          <TextBlock Text="Test-Audio" FontWeight="Bold" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                  </Border>
+
+                  <!-- 3. Kategorie-Auswahl (Kompakt) -->
+                  <Border Classes="card" Padding="10,6">
+                    <StackPanel Spacing="6">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="label" Text="🎛️  AKTIVE SPRACH-KATEGORIEN" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="Schutzzonen auf Stationen werden automatisch stummgeschaltet" Foreground="#4ADE80" FontSize="10" FontStyle="Italic" VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,2,0,0">
+                        <!-- Spalte 1 -->
+                        <Border Grid.Row="0" Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="0,0,4,3">
+                          <CheckBox IsChecked="{Binding IsAuroraShipGreetingsEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="🚀 Schiffsbegrüßungen" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="73 Schiffsklassen" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="0,0,4,3">
+                          <CheckBox IsChecked="{Binding IsAuroraBlueprintsEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="📜 Baupläne" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Crafting-Baupläne" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="2" Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="0,0,4,0">
+                          <CheckBox IsChecked="{Binding IsAuroraSafetyZonesEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="🛡️ Sicherheitszonen" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Armistice Zone (im Raum)" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <!-- Spalte 2 -->
+                        <Border Grid.Row="0" Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="2,0,2,3">
+                          <CheckBox IsChecked="{Binding IsAuroraRestrictedZonesEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="⛔ Sperrzonen" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Sperrgebiet / Privat" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="2,0,2,3">
+                          <CheckBox IsChecked="{Binding IsAuroraMonitoredSpaceEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="📡 Überwachter Raum" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Comm-Array" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="2" Grid.Column="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="2,0,2,0">
+                          <CheckBox IsChecked="{Binding IsAuroraJurisdictionsEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="🏛️ Hoheitsgebiete" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="UEE, Hurston, etc." Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <!-- Spalte 3 -->
+                        <Border Grid.Row="0" Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="4,0,0,3">
+                          <CheckBox IsChecked="{Binding IsAuroraQuantumArrivalEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="🌌 Quantenreise" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Sprungziel-Ankunft" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="4,0,0,3">
+                          <CheckBox IsChecked="{Binding IsAuroraPlayerDeathEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="💀 Notfall / Tod" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Spielertod / Med-Bett" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+
+                        <Border Grid.Row="2" Grid.Column="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="5" Padding="6,3" Margin="4,0,0,0">
+                          <CheckBox IsChecked="{Binding IsAuroraServerErrorsEnabled}">
+                            <StackPanel Spacing="0">
+                              <TextBlock Text="⚠️ Serverfehler (30k)" Foreground="#F0F6FC" FontSize="11" FontWeight="SemiBold" />
+                              <TextBlock Text="Verbindungsabbruch" Foreground="#8B949E" FontSize="9" />
+                            </StackPanel>
+                          </CheckBox>
+                        </Border>
+                      </Grid>
+
+                    </StackPanel>
+                  </Border>
+
+                </StackPanel>
+
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+
+          <!-- Sub-Tab 7: 💾 Datenbank & Wartung -->
+          <TabItem Header="{Binding I18n[SubTab_Database]}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
 
                 <Border Classes="card">
                   <StackPanel Spacing="12">
@@ -3194,13 +3533,130 @@
               </StackPanel>
             </ScrollViewer>
           </TabItem>
+ 
+          <!-- Sub-Tab 8: 🧪 Entwickler & Debug Tools (Nur sichtbar, wenn DebugMode aktiv) -->
+          <TabItem Header="{Binding I18n[SubTab_Developer]}" IsVisible="{Binding IsDebugModeActive}">
+            <ScrollViewer Margin="0,6,0,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="0,0,0,120">
+
+                <!-- 1. Star Citizen Live-Events simulieren (Log-Injektion & Audio-Tests) -->
+                <Border Classes="card">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="label" Text="🧪  STAR CITIZEN LIVE-EVENTS SIMULIEREN" />
+                        <TextBlock Text="Injiziert simulierte Star Citizen Game.log-Events zur Prüfung von Audioausgaben, Muting, Cooldowns und Benachrichtigungen." Foreground="#8B949E" FontSize="11" />
+                      </StackPanel>
+                      <Border Grid.Column="1" Background="#2E1B05" BorderBrush="#D97706" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="DEBUG ONLY" Foreground="#F59E0B" FontSize="10" FontWeight="Bold" />
+                      </Border>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+                      <!-- Schutzzone betreten -->
+                      <Button Grid.Row="0" Grid.Column="0" Classes="ghost" Margin="0,0,4,6" Height="36"
+                              Command="{Binding SimulateArmisticeEnterCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="🛡️" FontSize="12" />
+                          <TextBlock Text="Schutzzone betreten" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Schutzzone verlassen -->
+                      <Button Grid.Row="0" Grid.Column="1" Classes="ghost" Margin="2,0,2,6" Height="36"
+                              Command="{Binding SimulateArmisticeLeaveCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="⚔️" FontSize="12" />
+                          <TextBlock Text="Schutzzone verlassen" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Schiffseinstieg Begrüßung -->
+                      <Button Grid.Row="0" Grid.Column="2" Classes="ghost" Margin="4,0,0,6" Height="36"
+                              Command="{Binding SimulateShipJoinCommand}" CommandParameter="Drake Cutlass Black">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="🚀" FontSize="12" />
+                          <TextBlock Text="Schiffseinstieg (Cutlass)" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Bauplan erlernt -->
+                      <Button Grid.Row="1" Grid.Column="0" Classes="ghost" Margin="0,0,4,0" Height="36"
+                              Command="{Binding SimulateBlueprintFoundCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="📜" FontSize="12" />
+                          <TextBlock Text="Bauplan erlernt (Toast)" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Quantensprung Ankunft -->
+                      <Button Grid.Row="1" Grid.Column="1" Classes="ghost" Margin="2,0,2,0" Height="36"
+                              Command="{Binding SimulateQuantumArrivalCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="🌌" FontSize="12" />
+                          <TextBlock Text="Quantensprung Ankunft" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- 30k Serverfehler -->
+                      <Button Grid.Row="1" Grid.Column="2" Classes="ghost" Margin="4,0,0,0" Height="36"
+                              Command="{Binding SimulateServerErrorCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="⚠️" FontSize="12" />
+                          <TextBlock Text="30k Serverfehler" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+                <!-- 2. Diagnose, Log-Dump & Overlays -->
+                <Border Classes="card">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="label" Text="⚙  DIAGNOSE, SYSTEMSTATUS &amp; OVERLAYS" />
+                    <TextBlock Text="Schreibe den vollständigen internen Zustand (Standort, IsAtStation, Schiffe, OCR, Voice) in die Logdatei oder setze Fensterpositionen zurück." Foreground="#8B949E" FontSize="11" />
+
+                    <Grid ColumnDefinitions="*,*,*" Margin="0,4,0,0">
+                      <!-- State Dump -->
+                      <Button Grid.Column="0" Classes="accent" Margin="0,0,4,0" Height="36"
+                              Command="{Binding DumpStateToLogCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="📋" FontSize="12" />
+                          <TextBlock Text="Status in Log dumpen" FontWeight="Bold" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Toast Test -->
+                      <Button Grid.Column="1" Classes="ghost" Margin="2,0,2,0" Height="36"
+                              Command="{Binding TestAchievementToastCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="✦" FontSize="12" Foreground="#F59E0B" />
+                          <TextBlock Text="Achievement Toast Test" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+
+                      <!-- Overlay Coords Reset -->
+                      <Button Grid.Column="2" Classes="ghost" Margin="4,0,0,0" Height="36"
+                              Command="{Binding ResetOverlayPositionsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="🔄" FontSize="12" />
+                          <TextBlock Text="Overlays resetten (50,50)" FontSize="11.5" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
 
         </TabControl>
-      </DockPanel>
+      </Grid>
     </TabItem>
 
     <!-- Tab 7: ℹ Über SCLogMate & Update-Übersicht -->
-    <TabItem Header="ℹ Über">
+    <TabItem Header="{Binding I18n[Tab_About]}">
       <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch">
 
@@ -3310,18 +3766,18 @@
             <StackPanel Spacing="10">
               <TextBlock Classes="label" Text="🤝  FORK-INFORMATION &amp; DANKSAGUNG" />
               <TextBlock Foreground="#C9D1D9" FontSize="12" TextWrapping="Wrap" LineHeight="18"
-                         Text="SCLogMate ist ein umfassend erweiterter, modernisierter Fork des ursprünglichen Basis-Projekts SCLogReader von miwidot. Ein herzliches Dankeschön an miwidot für die hervorragende Vorarbeit und das Fundament der Log-Analyse!" />
+                         Text="SCLogMate ist ein umfassend erweiterter, modernisierter Fork des ursprünglichen Basis-Projekts SCLogMate von miwidot. Ein herzliches Dankeschön an miwidot für die hervorragende Vorarbeit und das Fundament der Log-Analyse!" />
 
               <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
                 <Border Grid.Column="0" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,6,0">
                   <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0" Spacing="2">
                       <TextBlock Text="Original-Projekt (Basis)" Foreground="#8B949E" FontSize="11" />
-                      <TextBlock Text="SCLogReader von miwidot" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
-                      <TextBlock Text="https://github.com/miwidot/SCLogReader" Foreground="#58A6FF" FontSize="10" />
+                      <TextBlock Text="SCLogMate von miwidot" Foreground="#F0F6FC" FontSize="13" FontWeight="Bold" />
+                      <TextBlock Text="https://github.com/miwidot/SCLogMate" Foreground="#58A6FF" FontSize="10" />
                     </StackPanel>
                     <Button Grid.Column="1" Classes="ghost" Padding="8,4" CornerRadius="4" VerticalAlignment="Center"
-                            Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/miwidot/SCLogReader" Content="🔗 Öffnen" />
+                            Command="{Binding OpenWikiWebUrlCommand}" CommandParameter="https://github.com/miwidot/SCLogMate" Content="🔗 Öffnen" />
                   </Grid>
                 </Border>
 

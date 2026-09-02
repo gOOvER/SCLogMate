@@ -1,7 +1,7 @@
 using Avalonia.Controls;
-using SCLogReader.ViewModels;
+using SCLogMate.ViewModels;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public partial class StarmapWindow : Window
 {

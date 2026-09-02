@@ -1,6 +1,6 @@
 using System;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 /// <summary>
 /// Datenmodell für einen per OCR im mobiGlas Contract Manager erfassten Auftrag.

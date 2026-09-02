@@ -5,9 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public partial class BlueprintItem : ObservableObject
 {
@@ -74,7 +74,7 @@ public static class BlueprintCatalog
         try
         {
             var asm = Assembly.GetExecutingAssembly();
-            using var stream = asm.GetManifestResourceStream("SCLogReader.Data.blueprints.json");
+            using var stream = asm.GetManifestResourceStream("SCLogMate.Data.blueprints.json");
             if (stream != null)
             {
                 using var doc = JsonDocument.Parse(stream);

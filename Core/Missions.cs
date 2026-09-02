@@ -1,4 +1,4 @@
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Leitet aus den rohen Missions-Feldern der Log-Zeile

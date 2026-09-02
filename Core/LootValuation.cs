@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public static class LootValuation
 {

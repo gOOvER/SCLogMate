@@ -2,7 +2,7 @@ using System;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 public enum AchievementToastType
 {

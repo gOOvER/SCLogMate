@@ -5,9 +5,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public partial class RegionSelectorWindow : Window
 {

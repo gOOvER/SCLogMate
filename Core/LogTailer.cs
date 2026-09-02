@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Liest die Game.log live mit, OHNE Star Citizen zu stören.
@@ -15,6 +15,7 @@ public class LogTailer
     readonly string _path;
     CancellationTokenSource? _cts;
     Task? _loopTask;
+    string? _carry;
 
     public event Action<string>? Line;
     public event Action<string, bool>? LineEx;
@@ -61,24 +62,51 @@ public class LogTailer
                     if (first && position < 0) { position = fs.Length; first = false; }
                     first = false;
 
-                    if (fs.Length < position) { position = 0; NotifyStatus(cts, "Log rotiert – neu eingelesen"); SetLiveStreaming(cts, false); }
+                    if (fs.Length < position)
+                    {
+                        position = 0;
+                        _carry = null;
+                        NotifyStatus(cts, "Log rotiert – neu eingelesen");
+                        SetLiveStreaming(cts, false);
+                    }
 
                     fs.Seek(position, SeekOrigin.Begin);
                     using var sr = new StreamReader(fs);
-                    string? l;
-                    while ((l = await sr.ReadLineAsync()) != null)
+                    var lines = new System.Collections.Generic.List<string>();
+                    string? line;
+                    while ((line = await sr.ReadLineAsync()) != null)
                     {
-                        if (!IsCurrent(cts)) return;
-                        Line?.Invoke(l);
-                        LineEx?.Invoke(l, IsLiveStreaming);
+                        lines.Add(line);
                     }
 
                     position = fs.Position;
+                    if (_carry is not null)
+                    {
+                        lines.Insert(0, _carry);
+                        _carry = null;
+                    }
+
+                    var entries = new System.Collections.Generic.List<string>(LogEntryReader.ReadEntries(lines));
+                    if (entries.Count > 0 && LogEntryReader.HasUnterminatedQuote(entries[^1]))
+                    {
+                        _carry = entries[^1];
+                        entries.RemoveAt(entries.Count - 1);
+                    }
+
+                    foreach (var entry in entries)
+                    {
+                        if (!IsCurrent(cts)) return;
+                        Line?.Invoke(entry);
+                        LineEx?.Invoke(entry, IsLiveStreaming);
+                    }
+
                     SetLiveStreaming(cts, true); // Nach dem ersten kompletten Durchlauf sind alle neuen Zeilen echte Live-Events
                     NotifyStatus(cts, $"live · {DateTime.Now:HH:mm:ss}");
                 }
             }
             catch (OperationCanceledException) { break; }
+            catch (IOException ex) { NotifyStatus(cts, "Log vorübergehend nicht lesbar: " + ex.Message); }
+            catch (UnauthorizedAccessException ex) { NotifyStatus(cts, "Kein Zugriff auf Log: " + ex.Message); }
             catch (Exception ex) { NotifyStatus(cts, "Fehler: " + ex.Message); }
 
             try { await Task.Delay(500, ct); }

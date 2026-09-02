@@ -1,4 +1,4 @@
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 /// <summary>
 /// Definiert einen Bildschirmbereich (in physischen Pixeln) für OCR-Scans.

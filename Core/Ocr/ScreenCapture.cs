@@ -3,9 +3,9 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Schnelle Win32-GDI-Erfassung beliebiger Bildschirmbereiche in ein 32-Bit-BGRA-Array oder WriteableBitmap.

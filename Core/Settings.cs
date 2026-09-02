@@ -4,9 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public class AppSettings
 {
@@ -100,6 +100,9 @@ public class AppSettings
     /// <summary>Vom Nutzer gewählte UI-Schriftart.</summary>
     public string SelectedFontFamily { get; set; } = "Inter";
 
+    /// <summary>Vom Nutzer gewählte Sprache: "Auto", "de", "en".</summary>
+    public string AppLanguage { get; set; } = "Auto";
+
     /// <summary>Wipe-Filter aktivieren (ignoriert Events vor dem Stichtag bei Statistiken/Summen).</summary>
     public bool WipeFilterEnabled { get; set; } = false;
 
@@ -132,7 +135,56 @@ public class AppSettings
 
     /// <summary>Vom Nutzer ausgewählter RS Scan-Bereich auf dem Bildschirm.</summary>
     public ScanRegion? RsScanRegion { get; set; }
+
+    /// <summary>VoiceAttack & Aurora Log-Wächter Integration aktivieren.</summary>
+    public bool AuroraIntegrationEnabled { get; set; } = true;
+
+    /// <summary>Benutzerdefinierter Pfad zu Aurora Log-Wächter (optional, sonst Auto-Erkennung).</summary>
+    public string? AuroraCustomPath { get; set; }
+
+    /// <summary>Aurora Audio-Lautstärke (0 bis 100).</summary>
+    public int AuroraVolume { get; set; } = 40;
+
+    /// <summary>Aurora: Schiffsbegrüßungen abspielen.</summary>
+    public bool AuroraShipGreetings { get; set; } = true;
+
+    /// <summary>Aurora: Bauplan-Meldungen abspielen.</summary>
+    public bool AuroraBlueprints { get; set; } = true;
+
+    /// <summary>Aurora: Sicherheitszonen-Meldungen (Armistice) abspielen.</summary>
+    public bool AuroraSafetyZones { get; set; } = true;
+
+    /// <summary>Aurora: Sperrzonen-Meldungen abspielen.</summary>
+    public bool AuroraRestrictedZones { get; set; } = true;
+
+    /// <summary>Aurora: Meldungen für überwachten Raum abspielen.</summary>
+    public bool AuroraMonitoredSpace { get; set; } = true;
+
+    /// <summary>Aurora: Hoheitsgebiete-Meldungen abspielen.</summary>
+    public bool AuroraJurisdictions { get; set; } = true;
+
+    /// <summary>Aurora: Quantenreise-Ankunftsmeldungen abspielen.</summary>
+    public bool AuroraQuantumArrival { get; set; } = true;
+
+    /// <summary>Aurora: Spielertod-Meldungen abspielen.</summary>
+    public bool AuroraPlayerDeath { get; set; } = true;
+
+    /// <summary>Aurora: Serverfehler-Meldungen abspielen.</summary>
+    public bool AuroraServerErrors { get; set; } = true;
+
+    /// <summary>
+    /// Aktiviert den Entwickler- & Debug-Modus.
+    /// In lokalen Debug-Builds standardmäßig true, in Release-Builds standardmäßig false.
+    /// Kann im Release-Build ausschließlich manuell per "DebugMode": true in settings.json aktiviert werden.
+    /// </summary>
+    public bool DebugMode { get; set; } =
+#if DEBUG
+        true;
+#else
+        false;
+#endif
 }
+
 
 /// <summary>Merkt sich Einstellungen (Log-Pfad, Kontostand, OCR-Region) über Starts hinweg.</summary>
 public static class Settings

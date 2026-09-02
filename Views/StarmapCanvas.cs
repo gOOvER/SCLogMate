@@ -7,9 +7,9 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
-using SCLogReader.Core;
+using SCLogMate.Core;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public sealed class StarmapCanvas : Control
 {

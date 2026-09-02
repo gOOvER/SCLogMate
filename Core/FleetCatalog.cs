@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public record ShipCatalogEntry(
     string NormalizedName,

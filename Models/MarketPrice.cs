@@ -1,4 +1,4 @@
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 /// <summary>Beobachteter Marktpreis je Ware aus den eigenen Trades: bester Verkaufs- und
 /// günstigster Kaufpreis (pro SCU), inkl. Terminal und Marge.</summary>

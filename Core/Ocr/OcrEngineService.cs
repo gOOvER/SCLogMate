@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Thread-sicherer Dienst zur Texterkennung mit der nativen Windows.Media.Ocr Engine.
@@ -150,7 +150,9 @@ public sealed class OcrEngineService : IDisposable
 
     public void Dispose()
     {
+        _ocrLock.Wait();
         _engine = null;
+        _ocrLock.Release();
         _ocrLock.Dispose();
     }
 }

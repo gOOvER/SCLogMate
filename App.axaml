@@ -1,11 +1,11 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="SCLogReader.App"
+             x:Class="SCLogMate.App"
              RequestedThemeVariant="Dark">
 
   <TrayIcon.Icons>
     <TrayIcons>
-      <TrayIcon Icon="/SCLogReader.ico" ToolTipText="SCLogMate" Clicked="TrayOpen">
+      <TrayIcon Icon="/SCLogMate.ico" ToolTipText="SCLogMate" Clicked="TrayOpen">
         <TrayIcon.Menu>
           <NativeMenu>
             <NativeMenuItem Header="Öffnen" Click="TrayOpen" />

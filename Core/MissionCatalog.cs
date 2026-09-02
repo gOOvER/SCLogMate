@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public sealed class MissionInfo
 {

@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Extrahiert Missions-Details (Belohnung, sauberer Titel, Auftraggeber) aus dem OCR-Text

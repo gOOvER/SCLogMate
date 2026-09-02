@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Übersetzt deutsche Spieltexte (Missions-/Bauplan-Titel aus der Log) ins Englische,

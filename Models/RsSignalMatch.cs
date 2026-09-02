@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 public record RefineryBonus(string Station, string System, int ModifierPct);
 

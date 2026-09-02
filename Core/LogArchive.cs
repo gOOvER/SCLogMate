@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Kopiert fertige Backup-Logs einmalig in ein eigenes Archiv
-/// (%AppData%\SCLogReader\archive). Damit bleiben sie erhalten, auch wenn
+/// (%AppData%\SCLogMate\archive). Damit bleiben sie erhalten, auch wenn
 /// SC seine Backups löscht – Grundlage zum späteren Neu-Parsen.
 /// </summary>
 public static class LogArchive

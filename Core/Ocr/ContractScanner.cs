@@ -1,8 +1,9 @@
 using System;
+using System.Threading;
 using System.Timers;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Pollt den Auftragsbereich im 1000ms-Intervall, extrahiert angenommene Aufträge aus dem
@@ -16,7 +17,7 @@ public sealed class ContractScanner : IDisposable
     private readonly Func<bool> _isEnabled;
     private System.Timers.Timer? _timer;
     private bool _running;
-    private bool _busy;
+    private int _busy;
     private string _lastKey = "";
 
     public event Action<ContractDetails>? ContractScanned;
@@ -58,8 +59,7 @@ public sealed class ContractScanner : IDisposable
 
     private async void OnTick(object? sender, ElapsedEventArgs e)
     {
-        if (_busy) return;
-        _busy = true;
+        if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return;
 
         try
         {
@@ -124,7 +124,7 @@ public sealed class ContractScanner : IDisposable
         }
         finally
         {
-            _busy = false;
+            Interlocked.Exchange(ref _busy, 0);
             if (_running)
             {
                 try { _timer?.Start(); }

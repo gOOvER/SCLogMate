@@ -38,11 +38,11 @@ jobs:
         dotnet-quality: 'preview'
 
     - name: Restore dependencies
-      run: dotnet restore SCLogReader.csproj
+      run: dotnet restore SCLogMate.csproj
 
     - name: Publish Single-File Executable
       run: |
-        dotnet publish SCLogReader.csproj -c Release -r win-x64 --self-contained true `
+        dotnet publish SCLogMate.csproj -c Release -r win-x64 --self-contained true `
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
           -o ./publish

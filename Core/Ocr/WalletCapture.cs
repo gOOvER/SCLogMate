@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core.Ocr;
+namespace SCLogMate.Core.Ocr;
 
 /// <summary>
 /// Burst-State-Machine für das Erfassen des aUEC-Kontostands bei mobiGlas-Öffnung.
@@ -110,6 +110,8 @@ public sealed class WalletCapture : IDisposable
 
             await Task.Delay(SettleDelay, ct).ConfigureAwait(false);
 
+            var seen = new List<long>();
+
             for (int grab = 1; grab <= MaxGrabs; grab++)
             {
                 if (ct.IsCancellationRequested || DateTime.UtcNow - start > BurstBudget)
@@ -138,13 +140,18 @@ public sealed class WalletCapture : IDisposable
                 {
                     Logger.Log($"OCR Grab {grab}: '{bestText?.Trim()}' -> {val:N0} aUEC");
 
-                    // Sofortige Bestätigung bei validem Kontostand
-                    Finish("confirmed");
-                    BalanceCaptured?.Invoke(val);
-                    return;
+                    // Cross-Grab Bestätigung: Derselbe Wert muss 2× im Burst gelesen werden,
+                    // um OCR-Fehllesungen auszuschließen (NexusApp-Muster).
+                    if (seen.Contains(val))
+                    {
+                        Finish("confirmed");
+                        BalanceCaptured?.Invoke(val);
+                        return;
+                    }
+                    seen.Add(val);
                 }
 
-                await Task.Delay(GrabSpacing, ct).ConfigureAwait(false);
+                await Task.Delay(balance is null ? RetrySpacing : GrabSpacing, ct).ConfigureAwait(false);
             }
 
             Finish("unconfirmed");

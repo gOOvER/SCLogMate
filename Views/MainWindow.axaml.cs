@@ -1,8 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using SCLogReader.Services;
+using SCLogMate.Services;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public partial class MainWindow : Window
 {

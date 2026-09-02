@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public partial class TradeRouteItem : ObservableObject
 {

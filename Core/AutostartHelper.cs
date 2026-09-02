@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Win32;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Verwaltet den Windows-Autostart über den CurrentUser Run-Registry-Schlüssel.

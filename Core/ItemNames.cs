@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Löst itemClassGUID → lesbarer Item-Name über die UEX-API auf
@@ -16,7 +16,7 @@ public static class ItemNames
     static readonly HttpClient Http = new()
     {
         Timeout = TimeSpan.FromSeconds(8),
-        DefaultRequestHeaders = { { "User-Agent", "SCLogReader" } }
+        DefaultRequestHeaders = { { "User-Agent", "SCLogMate" } }
     };
     static readonly ConcurrentDictionary<string, string> Cache = new();
 

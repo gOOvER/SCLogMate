@@ -4,7 +4,7 @@ using System.Linq;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 public partial class FactionReputation : ObservableObject
 {

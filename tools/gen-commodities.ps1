@@ -12,7 +12,7 @@ foreach ($url in @(
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('using System.Collections.Generic;')
 [void]$sb.AppendLine('')
-[void]$sb.AppendLine('namespace SCLogReader.Core;')
+[void]$sb.AppendLine('namespace SCLogMate.Core;')
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine('/// <summary>Auto-generiert via tools/gen-commodities.ps1 aus scunpacked. resourceGUID -> Warenname.</summary>')
 [void]$sb.AppendLine('public static partial class Commodities')

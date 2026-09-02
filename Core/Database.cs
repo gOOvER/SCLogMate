@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Microsoft.Data.Sqlite;
-using SCLogReader.Models;
+using SCLogMate.Models;
 
-namespace SCLogReader.Core;
+namespace SCLogMate.Core;
 
 /// <summary>
 /// Lokale SQLite-Datenbank als nachbaubarer Cache/Index der fertigen Sessions.
@@ -15,8 +15,8 @@ namespace SCLogReader.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 6;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 23; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 7;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 24; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
@@ -159,6 +159,14 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v6 (fleet_user_ships mit in_hangar Spalte) angewendet.");
         }
 
+        if (dbSchemaVersion < 7)
+        {
+            Exec(db, "ALTER TABLE sessions ADD COLUMN fingerprint TEXT;");
+            Exec(db, "PRAGMA user_version = 7;");
+            dbSchemaVersion = 7;
+            Logger.Log("DB Schema: Migration auf v7 (Session-Fingerprint) angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -195,7 +203,8 @@ public static class Database
         foreach (var file in logFiles)
         {
             var name = Path.GetFileName(file);
-            if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n LIMIT 1;", ("$n", name)) == null)
+            var fingerprint = GetFileFingerprint(file);
+            if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n AND fingerprint=$f LIMIT 1;", ("$n", name), ("$f", fingerprint)) == null)
             {
                 unindexed++;
             }
@@ -216,12 +225,14 @@ public static class Database
         {
             var file = filesList[i];
             var name = Path.GetFileName(file);
-            if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n", ("$n", name)) != null) continue;
+            var fingerprint = GetFileFingerprint(file);
+            if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n AND fingerprint=$f", ("$n", name), ("$f", fingerprint)) != null) continue;
 
             onProgress?.Invoke(i + 1, total, name);
 
             try
             {
+                Exec(db, "DELETE FROM events WHERE session=$n; DELETE FROM sessions WHERE name=$n;", ("$n", name));
                 var parser = new LogParser();
                 DateTime? first = null, last = null;
                 using var tx = db.BeginTransaction();
@@ -235,7 +246,7 @@ public static class Database
                 var pd = cmd.Parameters.Add("$d", SqliteType.Text);
                 var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
 
-                foreach (var line in ReadShared(file))
+                foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
                 {
                     var e = parser.Feed(line);
                     if (e == null) continue;
@@ -252,10 +263,11 @@ public static class Database
                 using (var s = db.CreateCommand())
                 {
                     s.Transaction = tx;
-                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end) VALUES($n,$st,$en)";
+                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
                     s.Parameters.AddWithValue("$n", name);
                     s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                     s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                    s.Parameters.AddWithValue("$f", fingerprint);
                     s.ExecuteNonQuery();
                 }
                 tx.Commit();
@@ -310,7 +322,7 @@ public static class Database
                 var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
 
                 int sessionEvents = 0;
-                foreach (var line in ReadShared(file))
+                foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
                 {
                     var e = parser.Feed(line);
                     if (e == null) continue;
@@ -328,10 +340,11 @@ public static class Database
                 using (var s = db.CreateCommand())
                 {
                     s.Transaction = tx;
-                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end) VALUES($n,$st,$en)";
+                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
                     s.Parameters.AddWithValue("$n", name);
                     s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                     s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                    s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
                     s.ExecuteNonQuery();
                 }
                 tx.Commit();
@@ -710,10 +723,11 @@ public static class Database
         while ((l = sr.ReadLine()) != null) yield return l;
     }
 
-    static void Exec(SqliteConnection db, string sql)
+    static void Exec(SqliteConnection db, string sql, params (string, object)[] parameters)
     {
         using var c = db.CreateCommand();
         c.CommandText = sql;
+        foreach (var (key, value) in parameters) c.Parameters.AddWithValue(key, value);
         c.ExecuteNonQuery();
     }
 
@@ -727,6 +741,12 @@ public static class Database
 
     static string? GetMeta(SqliteConnection db, string key) =>
         Scalar(db, "SELECT value FROM meta WHERE key=$k", ("$k", key)) as string;
+
+    static string GetFileFingerprint(string file)
+    {
+        var info = new FileInfo(file);
+        return $"{info.Length}:{info.LastWriteTimeUtc.Ticks}";
+    }
 
     static void SetMeta(SqliteConnection db, string key, string value)
     {

@@ -115,7 +115,7 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
 ---
 
 > ℹ️ **Fork-Hinweis & Danksagung**:  
-> **SCLogMate** ist ein umfassend erweiterter und modernisierter Fork des ursprünglichen Projekts [**SCLogReader**](https://github.com/miwidot/SCLogReader) von [**miwidot**](https://github.com/miwidot).  
+> **SCLogMate** ist ein umfassend erweiterter und modernisierter Fork des ursprünglichen Projekts [**SCLogMate**](https://github.com/miwidot/SCLogMate) von [**miwidot**](https://github.com/miwidot).  
 > Ein großes Dankeschön an **miwidot** für das exzellente Fundament des Log-Parsings und der Basis-Architektur!
 
 ---
@@ -179,7 +179,7 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
 
 Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
 
-- Basiert auf dem Originalprojekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot**.
+- Basiert auf dem Originalprojekt [SCLogMate](https://github.com/miwidot/SCLogMate) von **miwidot**.
 - Externe Spieldaten via [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
 - Externe Handelsdaten via [UEX Corp](https://uexcorp.space).
 

@@ -7,10 +7,10 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using SCLogReader.Core;
-using SCLogReader.Models;
+using SCLogMate.Core;
+using SCLogMate.Models;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public partial class AchievementToastWindow : Window
 {
@@ -28,6 +28,7 @@ public partial class AchievementToastWindow : Window
     public ObservableCollection<AchievementToastData> ActiveToasts { get; } = new();
 
     private readonly ConcurrentDictionary<Guid, DispatcherTimer> _itemTimers = new();
+    private readonly ConcurrentDictionary<Guid, DispatcherTimer> _fadeTimers = new();
     private AppSettings? _settings;
     private IntPtr _hwnd;
     private bool _isDragging;
@@ -136,6 +137,7 @@ public partial class AchievementToastWindow : Window
     private void FadeOutItem(AchievementToastData toast)
     {
         var fade = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+        _fadeTimers[toast.Id] = fade;
         fade.Tick += (_, _) =>
         {
             if (toast.Opacity > 0.08)
@@ -145,6 +147,7 @@ public partial class AchievementToastWindow : Window
             else
             {
                 fade.Stop();
+                _fadeTimers.TryRemove(toast.Id, out _);
                 RemoveToastItem(toast);
             }
         };
@@ -156,6 +159,11 @@ public partial class AchievementToastWindow : Window
         if (_itemTimers.TryRemove(toast.Id, out var t))
         {
             t.Stop();
+        }
+
+        if (_fadeTimers.TryRemove(toast.Id, out var fade))
+        {
+            fade.Stop();
         }
 
         ActiveToasts.Remove(toast);

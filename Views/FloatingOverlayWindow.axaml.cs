@@ -4,10 +4,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using SCLogReader.Core;
-using SCLogReader.ViewModels;
+using SCLogMate.Core;
+using SCLogMate.ViewModels;
 
-namespace SCLogReader.Views;
+namespace SCLogMate.Views;
 
 public partial class FloatingOverlayWindow : Window
 {
@@ -21,11 +21,18 @@ public partial class FloatingOverlayWindow : Window
 
     private AppSettings? _settings;
     private IntPtr _hwnd;
+    private readonly Avalonia.Threading.DispatcherTimer _settingsSaveTimer;
 
     public FloatingOverlayWindow()
     {
         InitializeComponent();
         Opened += OnOpened;
+        _settingsSaveTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _settingsSaveTimer.Tick += (_, _) =>
+        {
+            _settingsSaveTimer.Stop();
+            if (_settings != null) Settings.Save(_settings);
+        };
     }
 
     private void OnOpened(object? sender, EventArgs e)
@@ -68,7 +75,8 @@ public partial class FloatingOverlayWindow : Window
             {
                 _settings.OverlayPositionX = Position.X;
                 _settings.OverlayPositionY = Position.Y;
-                Settings.Save(_settings);
+                _settingsSaveTimer.Stop();
+                _settingsSaveTimer.Start();
             }
         };
 

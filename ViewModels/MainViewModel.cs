@@ -13,13 +13,13 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using SCLogReader.Core;
-using SCLogReader.Core.Ocr;
-using SCLogReader.Models;
-using SCLogReader.Services;
-using SCLogReader.Views;
+using SCLogMate.Core;
+using SCLogMate.Core.Ocr;
+using SCLogMate.Models;
+using SCLogMate.Services;
+using SCLogMate.Views;
 
-namespace SCLogReader.ViewModels;
+namespace SCLogMate.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
@@ -29,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     readonly WalletCapture _walletCapture;
     readonly ContractScanner _contractScanner;
     readonly RsOcrScanner _rsScanner;
+    readonly AuroraVoiceService _auroraService;
     readonly ScanIndicatorWindow _scanIndicator = new();
     private Views.RsScanOverlayWindow? _rsOverlayWindow;
     bool _initializing = true;
@@ -36,6 +37,32 @@ public partial class MainViewModel : ObservableObject
     bool _suppressSave;   // Session-Wechsel nicht als Default speichern
     DateTime? _sessionStart, _sessionEnd;
     AppSettings _settings = Settings.Load();
+
+    [ObservableProperty] private bool isAuroraInstalled;
+    [ObservableProperty] private string auroraPath = "Nicht installiert";
+    [ObservableProperty] private bool isAuroraEnabled;
+    [ObservableProperty] private int auroraVolume = 40;
+    [ObservableProperty] private bool isAuroraShipGreetingsEnabled = true;
+    [ObservableProperty] private bool isAuroraBlueprintsEnabled = true;
+    [ObservableProperty] private bool isAuroraSafetyZonesEnabled = true;
+    [ObservableProperty] private bool isAuroraRestrictedZonesEnabled = true;
+    [ObservableProperty] private bool isAuroraMonitoredSpaceEnabled = true;
+    [ObservableProperty] private bool isAuroraJurisdictionsEnabled = true;
+    [ObservableProperty] private bool isAuroraQuantumArrivalEnabled = true;
+    [ObservableProperty] private bool isAuroraPlayerDeathEnabled = true;
+    [ObservableProperty] private bool isAuroraServerErrorsEnabled = true;
+    [ObservableProperty] private bool simulateAuroraNotInstalled;
+
+    /// <summary>Gibt an, ob der Entwickler- & Debug-Modus aktiv ist (über settings.json konfiguriert oder lokaler Debug-Build).</summary>
+    public bool IsDebugModeActive => _settings.DebugMode;
+
+    /// <summary>Kauf-Banner nur anzeigen, wenn Aurora nicht installiert ist (oder im Debug-Modus simuliert wird) UND Deutsch als Sprache aktiv ist.</summary>
+    public bool ShowAuroraPurchaseBanner => (!IsAuroraInstalled || (IsDebugModeActive && SimulateAuroraNotInstalled)) && IsGermanLanguageActive;
+
+    partial void OnIsAuroraInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowAuroraPurchaseBanner));
+    }
 
     [ObservableProperty] private string logPath = "";
     [ObservableProperty] private string status = "bereit";
@@ -63,6 +90,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string gameStatusBadgeBg = "#161B22";
     [ObservableProperty] private string gameStatusTooltip = "Star Citizen ist derzeit nicht gestartet · Parser wartet auf Spielstart";
 
+
     public ObservableCollection<ContractDetails> ActiveContracts { get; } = new();
     public bool HasActiveContracts => ActiveContracts.Count > 0;
     public string ActiveContractsCountText => ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
@@ -79,6 +107,10 @@ public partial class MainViewModel : ObservableObject
     Avalonia.Threading.DispatcherTimer? _updateTimer;
     Avalonia.Threading.DispatcherTimer? _pingTimer;
     Avalonia.Threading.DispatcherTimer? _processTimer;
+    readonly DispatcherTimer _eventSearchTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    readonly object _initialEventQueueLock = new();
+    readonly List<(LogEntry Entry, bool IsLive)> _initialEventQueue = new();
+    bool _initialEventDrainScheduled;
     [ObservableProperty] private SessionInfo? selectedSession;
     [ObservableProperty] private string currentLocation = "—";
     [ObservableProperty] private string currentShip = "—";
@@ -107,6 +139,21 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnResolvedLocationChanged(ResolvedLocation value)
     {
+        if (_auroraService != null)
+        {
+            _auroraService.IsAtStation = value.Type is StarmapObjectType.SpaceStation 
+                or StarmapObjectType.LagrangeStation 
+                or StarmapObjectType.LandingZone 
+                or StarmapObjectType.JumpPoint 
+                or StarmapObjectType.Outpost
+                || value.DisplayName.Contains("Station", StringComparison.OrdinalIgnoreCase)
+                || value.DisplayName.Contains("Port", StringComparison.OrdinalIgnoreCase)
+                || value.DisplayName.Contains("Harbor", StringComparison.OrdinalIgnoreCase)
+                || value.DisplayName.Contains("Point", StringComparison.OrdinalIgnoreCase)
+                || value.DisplayName.Contains("Hangar", StringComparison.OrdinalIgnoreCase)
+                || value.DisplayName.Contains("Rest Stop", StringComparison.OrdinalIgnoreCase);
+        }
+
         OnPropertyChanged(nameof(LocationSystemBadge));
         OnPropertyChanged(nameof(LocationBadgeColor));
         OnPropertyChanged(nameof(LocationMainText));
@@ -121,6 +168,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LocationIsKnown));
     }
 
+
     public bool LocationIsKnown => ResolvedLocation.DisplayName != "—" && ResolvedLocation.DisplayName != "Unbekannt";
     public string LocationSystemBadge => ResolvedLocation.SystemName.ToUpperInvariant();
     public string LocationBadgeColor => ResolvedLocation.SystemBadgeColor;
@@ -130,25 +178,25 @@ public partial class MainViewModel : ObservableObject
             ? ResolvedLocation.DisplayName 
             : $"{ResolvedLocation.DisplayName} · {ResolvedLocation.ParentBody}";
     public string LocationStatusSubline => ResolvedLocation.DisplayName == "—" 
-        ? "Warte auf Log-Daten..." 
+        ? I18n["Dash_Waiting_Logs"] 
         : $"{ResolvedLocation.ArmisticeStatusText} · {ResolvedLocation.SystemName}";
 
     public string LocationTypeBadge => ResolvedLocation.Type switch
     {
-        StarmapObjectType.LandingZone => "🏛 LANDUNGSZONE",
-        StarmapObjectType.SpaceStation => "🛸 RAUMSTATION",
-        StarmapObjectType.LagrangeStation => "⛏ RAFFINERIE / REST STOP",
-        StarmapObjectType.Moon => "🪐 MOND",
-        StarmapObjectType.Planet => "🌍 PLANET",
-        StarmapObjectType.JumpPoint => "🌀 SPRUNGTOR",
-        _ => "📍 STANDORT"
+        StarmapObjectType.LandingZone => I18n["Dash_Type_LandingZone"],
+        StarmapObjectType.SpaceStation => I18n["Dash_Type_SpaceStation"],
+        StarmapObjectType.LagrangeStation => I18n["Dash_Type_RestStop"],
+        StarmapObjectType.Moon => I18n["Dash_Type_Moon"],
+        StarmapObjectType.Planet => I18n["Dash_Type_Planet"],
+        StarmapObjectType.JumpPoint => I18n["Dash_Type_JumpPoint"],
+        _ => I18n["Dash_Type_Default"]
     };
 
     public string LocationParentBadge => !string.IsNullOrEmpty(ResolvedLocation.ParentBody) && ResolvedLocation.ParentBody != "—" && ResolvedLocation.ParentBody != ResolvedLocation.DisplayName
         ? ResolvedLocation.ParentBody
         : ResolvedLocation.SystemName;
 
-    public string LocationArmisticePillText => ResolvedLocation.IsArmistice ? "Schutzzone" : "Waffen aktiv";
+    public string LocationArmisticePillText => ResolvedLocation.IsArmistice ? I18n["Dash_Armistice_Safe"] : I18n["Dash_Armistice_Free"];
     public string LocationArmisticePillColor => ResolvedLocation.IsArmistice ? "#4ADE80" : "#F87171";
     public string LocationArmisticePillBg => ResolvedLocation.IsArmistice ? "#0A2416" : "#240A0E";
     public string LocationArmisticePillBorder => ResolvedLocation.IsArmistice ? "#1E5E3A" : "#5E1E28";
@@ -278,6 +326,62 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedFontFamilyName));
         OnPropertyChanged(nameof(CurrentFontFamily));
     }
+
+    // Sprach-Umschalter / Language Switcher
+    public ObservableCollection<Core.LanguageOption> AvailableLanguages { get; } = new()
+    {
+        new("Auto", "Automatisch (System)"),
+        new("de", "Deutsch (German)"),
+        new("en", "English (Englisch)")
+    };
+
+    [ObservableProperty] private Core.LanguageOption? selectedLanguageOption;
+
+    public bool IsGermanLanguageActive => SelectedLanguageOption?.Code switch
+    {
+        "de" => true,
+        "en" => false,
+        _ => System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("de", StringComparison.OrdinalIgnoreCase) ||
+             System.Globalization.CultureInfo.CurrentCulture.TwoLetterISOLanguageName.Equals("de", StringComparison.OrdinalIgnoreCase)
+    };
+
+    public string ActiveLanguageBadgeText => IsGermanLanguageActive ? "Deutsch" : "English";
+
+    public string LanguageDescriptionText => SelectedLanguageOption?.Code switch
+    {
+        "de" => "Feste Sprache: Deutsch. Deutsche Zusatzmodule wie VoiceAttack Aurora sind aktiv.",
+        "en" => "Fixed language: English. German-only third party companion prompts (like Aurora) are hidden.",
+        _ => $"Automatische Systemerkennung (Aktuell: {(IsGermanLanguageActive ? "Deutsch" : "English")})."
+    };
+
+    public Core.I18n I18n => Core.I18n.Instance;
+
+    partial void OnSelectedLanguageOptionChanged(Core.LanguageOption? value)
+    {
+        if (value == null) return;
+        var code = value.Code;
+
+        if (!_initializing)
+        {
+            _settings.AppLanguage = code;
+            Settings.Save(_settings);
+        }
+
+        I18n.SetLanguage(code);
+        RefreshGameStatusTexts();
+
+        OnPropertyChanged(nameof(I18n));
+        OnPropertyChanged(nameof(IsGermanLanguageActive));
+        OnPropertyChanged(nameof(ShowAuroraPurchaseBanner));
+        OnPropertyChanged(nameof(ActiveLanguageBadgeText));
+        OnPropertyChanged(nameof(LanguageDescriptionText));
+        OnPropertyChanged(nameof(LocationTypeBadge));
+        OnPropertyChanged(nameof(LocationStatusSubline));
+        OnPropertyChanged(nameof(LocationArmisticePillText));
+        OnPropertyChanged(nameof(GameStatusText));
+        OnPropertyChanged(nameof(GameStatusTooltip));
+    }
+
 
     // Settings Sub-Tab Navigation
     [ObservableProperty] private int settingsSubTabIndex = 0;
@@ -728,7 +832,7 @@ public partial class MainViewModel : ObservableObject
             {
                 var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                // 0. SCLogReader eigenes Archiv (%APPDATA%\SCLogReader\archive)
+                // 0. SCLogMate eigenes Archiv (%APPDATA%\SCLogMate\archive)
                 if (Directory.Exists(LogArchive.Dir))
                 {
                     foreach (var f in Directory.GetFiles(LogArchive.Dir, "*.log"))
@@ -2089,6 +2193,11 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel()
     {
         _initializing = true;
+        _eventSearchTimer.Tick += (_, _) =>
+        {
+            _eventSearchTimer.Stop();
+            EventsView?.Refresh();
+        };
         _settings = Settings.Load();
         if (_settings.Balance > 0)
         {
@@ -2247,6 +2356,9 @@ public partial class MainViewModel : ObservableObject
         }
         MinimizeToTrayOnClose = _settings.MinimizeToTrayOnClose;
         AutostartEnabled = AutostartHelper.IsAutostartEnabled();
+        var langCode = _settings.AppLanguage ?? "Auto";
+        SelectedLanguageOption = AvailableLanguages.FirstOrDefault(l => l.Code.Equals(langCode, StringComparison.OrdinalIgnoreCase))
+                                 ?? AvailableLanguages[0];
 
         _walletCapture = new WalletCapture(_ocrEngine, () => _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(), () => AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
@@ -2256,7 +2368,7 @@ public partial class MainViewModel : ObservableObject
             () => _settings.ContractRegion ?? ScreenCapture.GetDefaultContractRegion(),
             () => false); // Mission OCR dauerhaft deaktiviert (Log-basiertes Tracking ist aktiv)
 
-        _rsScanner = new RsOcrScanner(_ocrEngine, () => _settings.RsScanRegion, () => IsRsAutoScanEnabled);
+        _rsScanner = new RsOcrScanner(_ocrEngine, () => _settings.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion(), () => IsRsAutoScanEnabled);
         _rsScanner.RsValueDetected += val => Dispatcher.UIThread.Post(() => OnRsDetected(val));
         _rsScanner.StatusChanged += s => Dispatcher.UIThread.Post(() => RsOcrStatusText = s);
 
@@ -2270,6 +2382,45 @@ public partial class MainViewModel : ObservableObject
         {
             IsRsOverlayActive = true;
         }
+
+        _auroraService = new AuroraVoiceService(_settings.AuroraCustomPath);
+        IsAuroraInstalled = _auroraService.IsInstalled;
+        AuroraPath = _auroraService.AuroraDirectory ?? "Nicht installiert";
+        IsAuroraEnabled = _settings.AuroraIntegrationEnabled;
+        AuroraVolume = _settings.AuroraVolume;
+        IsAuroraShipGreetingsEnabled = _settings.AuroraShipGreetings;
+        IsAuroraBlueprintsEnabled = _settings.AuroraBlueprints;
+        IsAuroraSafetyZonesEnabled = _settings.AuroraSafetyZones;
+        IsAuroraRestrictedZonesEnabled = _settings.AuroraRestrictedZones;
+        IsAuroraMonitoredSpaceEnabled = _settings.AuroraMonitoredSpace;
+        IsAuroraJurisdictionsEnabled = _settings.AuroraJurisdictions;
+        IsAuroraQuantumArrivalEnabled = _settings.AuroraQuantumArrival;
+        IsAuroraPlayerDeathEnabled = _settings.AuroraPlayerDeath;
+        IsAuroraServerErrorsEnabled = _settings.AuroraServerErrors;
+
+        _auroraService.IsEnabled = IsAuroraEnabled;
+        _auroraService.Volume = AuroraVolume;
+        _auroraService.ShipGreetingsEnabled = IsAuroraShipGreetingsEnabled;
+        _auroraService.BlueprintsEnabled = IsAuroraBlueprintsEnabled;
+        _auroraService.SafetyZonesEnabled = IsAuroraSafetyZonesEnabled;
+        _auroraService.RestrictedZonesEnabled = IsAuroraRestrictedZonesEnabled;
+        _auroraService.MonitoredSpaceEnabled = IsAuroraMonitoredSpaceEnabled;
+        _auroraService.JurisdictionsEnabled = IsAuroraJurisdictionsEnabled;
+        _auroraService.QuantumArrivalEnabled = IsAuroraQuantumArrivalEnabled;
+        _auroraService.PlayerDeathEnabled = IsAuroraPlayerDeathEnabled;
+        _auroraService.ServerErrorsEnabled = IsAuroraServerErrorsEnabled;
+        _auroraService.IsAtStation = ResolvedLocation.Type is StarmapObjectType.SpaceStation 
+            or StarmapObjectType.LagrangeStation 
+            or StarmapObjectType.LandingZone 
+            or StarmapObjectType.JumpPoint 
+            or StarmapObjectType.Outpost
+            || ResolvedLocation.DisplayName.Contains("Station", StringComparison.OrdinalIgnoreCase)
+            || ResolvedLocation.DisplayName.Contains("Port", StringComparison.OrdinalIgnoreCase)
+            || ResolvedLocation.DisplayName.Contains("Harbor", StringComparison.OrdinalIgnoreCase)
+            || ResolvedLocation.DisplayName.Contains("Point", StringComparison.OrdinalIgnoreCase)
+            || ResolvedLocation.DisplayName.Contains("Hangar", StringComparison.OrdinalIgnoreCase)
+            || ResolvedLocation.DisplayName.Contains("Rest Stop", StringComparison.OrdinalIgnoreCase);
+
 
         // Gespeicherte aktive Aufträge aus der SQLite-Datenbank laden (Bereinigung von evtl. OCR-Fehlern)
         try
@@ -2420,6 +2571,28 @@ public partial class MainViewModel : ObservableObject
         _processTimer.Start();
     }
 
+    public void RefreshGameStatusTexts()
+    {
+        if (IsGameRunning)
+        {
+            GameStatusText = I18n["Header_Status_Running"];
+            GameStatusColor = "#3FB950";
+            GameStatusBadgeBg = "#0E2818";
+            GameStatusTooltip = I18n["Header_Status_Tooltip_Running"];
+        }
+        else
+        {
+            GameStatusText = I18n["Header_Status_Standby"];
+            GameStatusColor = "#8B949E";
+            GameStatusBadgeBg = "#161B22";
+            GameStatusTooltip = I18n["Header_Status_Tooltip_Standby"];
+        }
+        OnPropertyChanged(nameof(GameStatusText));
+        OnPropertyChanged(nameof(GameStatusColor));
+        OnPropertyChanged(nameof(GameStatusBadgeBg));
+        OnPropertyChanged(nameof(GameStatusTooltip));
+    }
+
     void CheckGameProcess()
     {
         try
@@ -2429,27 +2602,15 @@ public partial class MainViewModel : ObservableObject
             if (running != IsGameRunning)
             {
                 IsGameRunning = running;
+                RefreshGameStatusTexts();
                 if (running)
                 {
-                    GameStatusText = "🟢 SC LÄUFT";
-                    GameStatusColor = "#3FB950";
-                    GameStatusBadgeBg = "#0E2818";
-                    GameStatusTooltip = "Star Citizen (StarCitizen.exe) ist aktiv · Live-Logparser läuft";
                     Status = "★ Star Citizen gestartet – Live-Erfassung aktiv";
                     if (!Running)
                     {
                         LoadSession();
                     }
                 }
-                else
-                {
-                    GameStatusText = "⚪ SC STANDBY";
-                    GameStatusColor = "#8B949E";
-                    GameStatusBadgeBg = "#161B22";
-                    GameStatusTooltip = "Star Citizen ist derzeit nicht gestartet · Parser wartet auf Spielstart";
-                }
-                OnPropertyChanged(nameof(GameStatusText));
-                OnPropertyChanged(nameof(GameStatusColor));
                 OnPropertyChanged(nameof(GameStatusBadgeBg));
                 OnPropertyChanged(nameof(GameStatusTooltip));
             }
@@ -2908,17 +3069,63 @@ public partial class MainViewModel : ObservableObject
     void OnLine(string line, bool isLive = false)
     {
         _walletCapture.ProcessLine(line);
+        if (isLive)
+        {
+            _auroraService.ProcessLiveLine(line);
+        }
+
         var e = _parser.Feed(line);
         if (e == null) return;
-        Dispatcher.UIThread.Post(() => Apply(e, isLive));
+
+        if (isLive)
+        {
+            Dispatcher.UIThread.Post(() => Apply(e, true));
+            return;
+        }
+
+        lock (_initialEventQueueLock)
+        {
+            _initialEventQueue.Add((e, false));
+            if (_initialEventDrainScheduled) return;
+            _initialEventDrainScheduled = true;
+        }
+
+        Dispatcher.UIThread.Post(DrainInitialEventQueue);
+    }
+
+    void DrainInitialEventQueue()
+    {
+        List<(LogEntry Entry, bool IsLive)> batch;
+        lock (_initialEventQueueLock)
+        {
+            var count = Math.Min(250, _initialEventQueue.Count);
+            batch = _initialEventQueue.GetRange(0, count);
+            _initialEventQueue.RemoveRange(0, count);
+            _initialEventDrainScheduled = _initialEventQueue.Count > 0;
+        }
+
+        foreach (var (entry, isLive) in batch)
+            Apply(entry, isLive);
+
+        lock (_initialEventQueueLock)
+        {
+            if (_initialEventDrainScheduled)
+                Dispatcher.UIThread.Post(DrainInitialEventQueue);
+        }
     }
 
     // Ein erkanntes Ereignis verarbeiten (Totals, Saldo, Flotte, Liste). Immer auf UI-Thread.
     void Apply(LogEntry e, bool isLive = false)
     {
+        if (isLive)
+        {
+            _auroraService.ProcessLiveEvent(e);
+        }
+
         {
             if (_sessionStart is null || e.Time < _sessionStart) _sessionStart = e.Time;
             if (_sessionEnd is null || e.Time > _sessionEnd) _sessionEnd = e.Time;
+
 
             Events.Insert(0, e);
             if (Events.Count > 100000) Events.RemoveAt(Events.Count - 1);
@@ -3600,7 +3807,8 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnEventSearchTextChanged(string value)
     {
-        EventsView?.Refresh();
+        _eventSearchTimer.Stop();
+        _eventSearchTimer.Start();
     }
 
     [RelayCommand]
@@ -3711,7 +3919,117 @@ public partial class MainViewModel : ObservableObject
         Status = $"UEX API: {msg}";
     }
 
+    partial void OnSimulateAuroraNotInstalledChanged(bool value)
+    {
+        if (!IsDebugModeActive)
+        {
+            if (value)
+            {
+                Dispatcher.UIThread.Post(() => SimulateAuroraNotInstalled = false);
+            }
+            return;
+        }
+
+        if (value)
+        {
+            IsAuroraInstalled = false;
+            AuroraPath = "Nicht installiert (Simulation aktiv)";
+            if (_auroraService != null) _auroraService.IsEnabled = false;
+        }
+        else
+        {
+            IsAuroraInstalled = _auroraService?.IsInstalled ?? false;
+            AuroraPath = _auroraService?.AuroraDirectory ?? "Nicht installiert";
+            if (_auroraService != null) _auroraService.IsEnabled = IsAuroraEnabled;
+        }
+        OnPropertyChanged(nameof(ShowAuroraPurchaseBanner));
+    }
+
+    partial void OnIsAuroraEnabledChanged(bool value)
+    {
+        _auroraService.IsEnabled = value;
+        _settings.AuroraIntegrationEnabled = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnAuroraVolumeChanged(int value)
+    {
+        _auroraService.Volume = value;
+        _settings.AuroraVolume = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraShipGreetingsEnabledChanged(bool value)
+    {
+        _auroraService.ShipGreetingsEnabled = value;
+        _settings.AuroraShipGreetings = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraBlueprintsEnabledChanged(bool value)
+    {
+        _auroraService.BlueprintsEnabled = value;
+        _settings.AuroraBlueprints = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraSafetyZonesEnabledChanged(bool value)
+    {
+        _auroraService.SafetyZonesEnabled = value;
+        _settings.AuroraSafetyZones = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraRestrictedZonesEnabledChanged(bool value)
+    {
+        _auroraService.RestrictedZonesEnabled = value;
+        _settings.AuroraRestrictedZones = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraMonitoredSpaceEnabledChanged(bool value)
+    {
+        _auroraService.MonitoredSpaceEnabled = value;
+        _settings.AuroraMonitoredSpace = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraJurisdictionsEnabledChanged(bool value)
+    {
+        _auroraService.JurisdictionsEnabled = value;
+        _settings.AuroraJurisdictions = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraQuantumArrivalEnabledChanged(bool value)
+    {
+        _auroraService.QuantumArrivalEnabled = value;
+        _settings.AuroraQuantumArrival = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraPlayerDeathEnabledChanged(bool value)
+    {
+        _auroraService.PlayerDeathEnabled = value;
+        _settings.AuroraPlayerDeath = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsAuroraServerErrorsEnabledChanged(bool value)
+    {
+        _auroraService.ServerErrorsEnabled = value;
+        _settings.AuroraServerErrors = value;
+        Settings.Save(_settings);
+    }
+
+    [RelayCommand]
+    private void PlayAuroraTestSound()
+    {
+        _auroraService.PlayTestSound();
+    }
+
     async partial void OnCurrentShipChanged(string value)
+
     {
         foreach (var s in FleetItems)
         {
@@ -3807,7 +4125,6 @@ public partial class MainViewModel : ObservableObject
                 if (!_overlayWindow.IsVisible)
                 {
                     _overlayWindow.Show();
-                    _overlayWindow.Activate();
                     IsOverlayActive = true;
                     _settings.OverlayEnabled = true;
                     Settings.Save(_settings);
@@ -4443,7 +4760,6 @@ public partial class MainViewModel : ObservableObject
                 if (!_rsOverlayWindow.IsVisible)
                 {
                     _rsOverlayWindow.Show();
-                    _rsOverlayWindow.Activate();
                     IsRsOverlayActive = true;
                     _settings.RsOverlayEnabled = true;
                     Settings.Save(_settings);
@@ -4534,6 +4850,119 @@ public partial class MainViewModel : ObservableObject
         _settings.RsScanRegion = null;
         Settings.Save(_settings);
         Status = "RS Scan-Bereich auf Standard (Mitte) zurückgesetzt";
+    }
+
+    #endregion
+
+    #region Entwickler & Debug Tools
+
+    [RelayCommand]
+    public void SimulateArmisticeEnter()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: Schutzzone betreten...";
+        _auroraService.ProcessLiveLine(@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Schutzzone - Kampfhandlung untersagt!: "" [9001]");
+    }
+
+    [RelayCommand]
+    public void SimulateArmisticeLeave()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: Schutzzone verlassen...";
+        _auroraService.ProcessLiveLine(@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Schutzzone verlassen: "" [9002]");
+    }
+
+    [RelayCommand]
+    public void SimulateShipJoin(string? shipName)
+    {
+        if (!IsDebugModeActive) return;
+        var name = string.IsNullOrWhiteSpace(shipName) ? "Drake Cutlass Black" : shipName;
+        Status = $"🧪 [DEBUG] Simuliere: Schiffskanal beigetreten ({name})...";
+        _auroraService.ProcessLiveLine($@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Du bist Kanal [ {name} ] beigetreten""");
+    }
+
+    [RelayCommand]
+    public void SimulateBlueprintFound()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: Bauplan erlernt...";
+        _auroraService.OnBlueprintLearned("Pyro RYT Multi-Tool");
+        TriggerAchievementToast(AchievementToastData.ForBlueprint("Pyro RYT Multi-Tool (Experimental)"));
+    }
+
+    [RelayCommand]
+    public void SimulateQuantumArrival()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: Quantensprung Ankunft...";
+        _auroraService.OnQuantumArrival();
+    }
+
+    [RelayCommand]
+    public void SimulateServerError()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: 30k Serverfehler...";
+        _auroraService.OnServerError();
+    }
+
+    [RelayCommand]
+    public void SimulatePlayerDeath()
+    {
+        if (!IsDebugModeActive) return;
+        Status = "🧪 [DEBUG] Simuliere: Notfall / Spielertod...";
+        _auroraService.OnPlayerDeath();
+    }
+
+    [RelayCommand]
+    public void DumpStateToLog()
+    {
+        if (!IsDebugModeActive) return;
+        Logger.Log("══════════════════════════════════════════════════════════");
+        Logger.Log($"[DEBUG DUMP] Zeitstempel: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Logger.Log($"[DEBUG DUMP] Debug-Modus aktiv: {IsDebugModeActive}");
+        Logger.Log($"[DEBUG DUMP] Gewählte Sprache: {SelectedLanguageOption?.Title} (Code: {SelectedLanguageOption?.Code}, Deutsch aktiv: {IsGermanLanguageActive})");
+        Logger.Log($"[DEBUG DUMP] LogPath: {LogPath} (Existiert: {File.Exists(LogPath)})");
+        Logger.Log($"[DEBUG DUMP] Standort: '{CurrentLocation}' -> Resolved: '{ResolvedLocation.DisplayName}' (Typ: {ResolvedLocation.Type}, IsArmistice: {ResolvedLocation.IsArmistice})");
+        Logger.Log($"[DEBUG DUMP] Aktuelles Schiff: '{CurrentShip}'");
+        Logger.Log($"[DEBUG DUMP] Kontostand: {LiveBalanceText} (Income: {SessionIncomeText}, Spend: {SessionSpendText}, Net: {SessionNetText})");
+        Logger.Log($"[DEBUG DUMP] Aurora Voice: Installiert={IsAuroraInstalled} (Real={_auroraService.IsInstalled}), Aktiv={IsAuroraEnabled}, Vol={AuroraVolume}%, IsAtStation={_auroraService.IsAtStation}");
+        Logger.Log($"[DEBUG DUMP] Windows OCR: Verfügbar={OcrAvailable}, AutoSync={AutoOcrEnabled}, Region={OcrRegionText}");
+        Logger.Log($"[DEBUG DUMP] Aktive Aufträge: {ActiveContracts.Count}");
+        Logger.Log("══════════════════════════════════════════════════════════");
+        Status = "✓ [DEBUG] Detaillierter Systemstatus in SCLogMate.debug.log geschrieben.";
+    }
+
+    [RelayCommand]
+    public void ClearDebugLog()
+    {
+        if (!IsDebugModeActive) return;
+        try
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate", "SCLogMate.debug.log");
+            if (File.Exists(path))
+            {
+                File.WriteAllText(path, $"[{DateTime.Now:HH:mm:ss}] [DEBUG] Logdatei zurückgesetzt.\n");
+                Status = "✓ [DEBUG] Debug-Logdatei geleert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("ClearDebugLog", ex);
+            Status = $"Fehler beim Leeren des Debug-Logs: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void ResetOverlayPositions()
+    {
+        if (!IsDebugModeActive) return;
+        _settings.OverlayPositionX = 50;
+        _settings.OverlayPositionY = 50;
+        _settings.RsOverlayPositionX = 400;
+        _settings.RsOverlayPositionY = 50;
+        Settings.Save(_settings);
+        Status = "✓ [DEBUG] Overlay-Positionen auf Standard (50,50 / 400,50) zurückgesetzt.";
     }
 
     #endregion

@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SCLogReader.Services;
+namespace SCLogMate.Services;
 
 /// <summary>
 /// Misst die Netzwerk-Latenz (Ping / RTT) zum entsprechenden Star Citizen / AWS Server-Rechenzentrum.

@@ -1,280 +1,129 @@
-# Changelog — SCLogMate
+# Changelog
 
-All notable changes to this project are documented in this file. Format based on
-[Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions adhere to
-[SemVer](https://semver.org/).
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.0.0-beta4] - 2026-08-31
+### Added
+- Dynamic & extensible UI localization service (`Core/I18n.cs`) enabling instant, live switching between German and English across the entire UI without restarting; seamlessly updates all 12 main tabs, 8 settings sub-tabs, dashboard KPI cards, filter chips, location badges, status pills, and system messages.
+- Application Language switcher: located globally in the main application Sci-Fi header bar (accessible from any tab) and in general settings; select between Automatic (System), German, and English with instant reactivity and settings persistence; controls language-specific features and conditionally hides German-only companion prompts.
+- Aurora VoiceAttack test simulation toggle: test the uninstalled/unpurchased state with a single click in the UI.
+- Direct Gumroad store purchase banner for the Aurora Log-Wächter package (`https://3415383443272.gumroad.com/l/yzpmoa`) displayed exclusively on German systems when Aurora is not installed or simulated.
+- Native VoiceAttack & Aurora Log-Wächter integration: auto-detects installation in user documents, plays audio alerts (ship greetings for 73 ship classes, armistice/safety zones, restricted areas, monitored space, jurisdictions, quantum arrival, blueprints, player death, and server 30k errors) strictly read-only, and automatically grays out all controls if Aurora is not found.
+- Parser diagnostics in `--scan` output for unmatched notifications and transfer headers that expire without an amount.
+- Live Starmap location tracking after completed Quantum jumps.
+- High-resolution multi-size application icon with Star Citizen holographic radar & quantum compass design embedded in the executable and taskbar.
+- Integrated Developer & Debug Mode: configured strictly via `%APPDATA%\SCLogMate\settings.json` (defaults to active in local debug builds and strictly inactive in release/production builds).
+- Developer tools sub-tab in settings (`🧪 Entwickler`) providing live Star Citizen log event simulation (Armistice enter/leave, ship boarding greetings, blueprint learned, quantum arrival, 30k error, death), state dumps to debug log, log clearing, and overlay reset.
+- Strict security guard locking Aurora VoiceAttack simulation exclusively behind active debug mode (never exposed or active in production).
 
-### English - Reliability, Security & Starmap
-- **Live Starmap Location Tracking**: The current position now updates immediately after a completed Quantum jump. The integrated map and pop-out map center on the selected current location.
-- **Secure UEX API Key Storage**: API keys are now stored with Windows DPAPI instead of `settings.json`. Existing keys are migrated automatically, the input is masked, and changes are saved only after explicit confirmation.
-- **Verified Auto-Updates**: Downloaded updates are verified against the `SHA256SUMS.txt` release asset before the application is replaced.
-- **Robust Log & OCR Processing**: Session changes no longer allow an old log tailer to emit stale lines. OCR operations are serialized consistently and release native bitmap resources deterministically.
-- **Archive & Cache Integrity**: Differing log backups with identical file names are kept separately. Wiki image caching now uses stable SHA-256 keys and is limited to 128 MB.
-- **UEX Location Retry**: A failed UEX location-data request can be retried instead of disabling location enrichment for the remainder of the app session.
 
-### Deutsch - Zuverlässigkeit, Sicherheit & Sternenkarte
-- **Live-Standort auf der Sternenkarte**: Der aktuelle Standort wird nach einer abgeschlossenen Quantum-Reise sofort aktualisiert. Die integrierte Karte und das Pop-out zentrieren sich auf den gewählten aktuellen Standort.
-- **Geschützte UEX-API-Schlüssel**: API-Schlüssel werden jetzt mit Windows DPAPI statt in `settings.json` gespeichert. Vorhandene Schlüssel werden automatisch migriert, die Eingabe ist maskiert und wird erst nach expliziter Bestätigung gespeichert.
-- **Geprüfte Auto-Updates**: Heruntergeladene Updates werden vor dem Ersetzen der Anwendung gegen die Release-Datei `SHA256SUMS.txt` verifiziert.
-- **Robustere Log- & OCR-Verarbeitung**: Sitzungswechsel lassen keine veralteten Zeilen eines alten Log-Tailers mehr durch. OCR-Vorgänge sind konsistent serialisiert und geben native Bitmap-Ressourcen deterministisch frei.
-- **Archiv- & Cache-Integrität**: Unterschiedliche Log-Backups mit gleichem Dateinamen werden getrennt aufbewahrt. Der Wiki-Bildcache verwendet stabile SHA-256-Schlüssel und ist auf 128 MB begrenzt.
-- **UEX-Standort-Retry**: Fehlgeschlagene UEX-Anfragen für Standortdaten können erneut versucht werden, statt die Standortanreicherung für die restliche Sitzung zu deaktivieren.
+### Changed
+- Join multi-line HUD notifications before parsing in archived sessions and live tailing.
+- Index archived sessions by file size and last-write fingerprint so changed backups are parsed again.
+- Save overlay positions after movement settles, debounce event searches, and render initial log events in batches.
+- Migrate UEX API keys from `settings.json` to protected storage.
+- Use stable SHA-256 keys and a 128 MB limit for the wiki image cache.
+
+### Fixed
+- Restrict ship boarding greetings strictly to the initial boarding in a hangar/pad on a station: completely suppress greetings after ship crashes, collisions, destruction, player death, respawns, insurance claims, or quantum jumps, and only allow one greeting per ship family during a station stay.
+- Fix country flags not displaying on Windows by replacing unrendered Unicode regional indicator emojis with dedicated, crisp XAML vector flags (German Black-Red-Gold and British Union Jack) across language pickers and badges.
+- Completely eliminate false voice announcements on stations and during login/spawning: initialize IsAtStation from startup location, detect habs/spawns/hospitals, add a 60-second login grace period, and suppress Safety Zone, Monitored Space, Restricted Zone, and Jurisdiction voice alerts whenever the player is on a station or logging in.
+- Upgrade Aurora voice playback engine to Windows Media Foundation player with volume control and live debug logging.
+- Fix settings window bottom cutoff by compacting VoiceAttack control cards (single-row volume & test-sound, streamlined category tiles), adding a 160px bottom scroll margin, and reducing default window dimensions to 1400x780 (MinHeight 520) for optimal 1080p DPI scaled display support.
+- Keep game focus when showing the Mini-HUD or RS overlay.
+- Discard unfinished live entries on log rotation instead of carrying them into the next session.
+- Stop a toast fade timer immediately when its toast is dismissed.
+- Prevent stale tailer lines after a session change, serialize OCR work, and release native bitmap resources deterministically.
+- Fall back to standard centered HUD scan region for RS OCR scanner when no custom region is configured.
+- Prevent wallet OCR misreads by adding dual-read disparity rejection and requiring cross-grab confirmation (seen 2×).
+- Improve OCR thread-safety in ContractScanner, timer disposal guards in RsOcrScanner, and lock synchronization on OcrEngineService disposal.
+- Fix multi-size Windows application icon binary encoding to prevent startup bitmap loader errors.
+- Allow retrying failed UEX location-data requests.
+
+### Security
+- Store UEX API keys with Windows DPAPI and mask the input until explicitly confirmed.
+- Verify downloaded updates against the `SHA256SUMS.txt` release asset before replacement.
 
 ## [1.0.0-beta3] - 2026-08-30
 
-### 🛰️ RS Signal Decoder & In-Game Scanner Overlay
-- **Radar-Signatur Decodierung für Mining & Salvage**:
-  - Vollständige Entschlüsselung von Star Citizen RS-Werten (Radar Cross-Section / Resonanz) aus HUD-Pings (`TAB` / `V`).
-  - Erkennt Erztyp (Quantanium, Bexalite, Laranite, Gold, Taranite, Agricium etc.) und Anzahl der Gesteinsbrocken/Nodes.
-  - Automatische Salvage-Wrackteil-Erkennung (*2.000 RS pro Rumpfplatte*, z. B. 6.000 RS = 3x Salvage Panels).
-  - Zeigt Tier-Stufen (S, A, B, C), Seltenheit, geschätzten aUEC-Ertrag und die beste Raffinerie-Station mit Veredelungs-Bonus.
-- **Automatischer Windows OCR-Scan**:
-  - Kontinuierlicher Auto-Scan oder 1-Klick OCR-Erkennung direkt vom Bildschirm via nativer Windows Media OCR Engine.
-  - Einstellbarer Scan-Bereich (Kalibrierung über das visuelle Auswahlfenster) oder zentrierter HUD-Standard.
-  - Vorverarbeitung mit Kontrastverstärkung und 3x/6x Glyph-Skalierung für exakte Ziffernerkennung.
-- **Frei verschiebbares In-Game Live-HUD Overlay**:
-  - Kompaktes, rahmenloses und transparentes Always-On-Top Fenster für das Spiel oder Multi-Monitor-Setups.
-  - Kann per Drag & Drop mit der Maus an jede beliebige Stelle des Monitors verschoben werden (Position wird automatisch gespeichert).
-  - Schnelle Presets für gängige Erz- und Salvage-Signaturen (z. B. `3.170`, `6.340`, `7.200`, `14.400`, `6.000`, `8.000`).
+### Added
+- RS signal decoder and in-game scanner overlay for mining and salvage HUD pings.
+- Windows OCR scanning with configurable capture regions and image preprocessing.
+- Flight recorder timeline, session KPIs, and Markdown flight-report export.
+- Pyro, Nyx, and extended Stanton locations in the Starmap.
+- Reactive location and jurisdiction indicators.
 
-### ⏱️ Flugschreiber & Session-Timeline (Black Box)
-- **Interaktiver Sci-Fi Missions- & Reise-Zeitstrahl**:
-  - Vollständige chronologische Rekonstruktion jeder Spielsitzung aus Roh-Logs (`Game.log` und Backups).
-  - Visualisiert Hangar-Spawns, Quantum-Sprünge (mit Distanzberechnung in GM/km und Reisezeit), Kampfeinsätze, Handels- und Raffinerieaktivitäten sowie Landungen.
-  - Farbige Typ-Badges, relative & absolute Zeitstempel und direkte Verknüpfung zur Starmap (`1-Klick Fokus`).
-- **Missions- & Black-Box-KPIs**:
-  - Gesamte zurückgelegte Quantum-Flugdistanz (in GM und km).
-  - Reine Flugzeit im Cockpit vs. gesamte Sessiondauer.
-  - Netto-Finanzbilanz (Einnahmen vs. Ausgaben) und K/D-Gefechtsbilanz.
-  - Übersicht aller besuchten Himmelskörper und eingesetzten Schiffe.
-- **Flugbericht-Export & Filterung**:
-  - Export vollständiger, formatierter Markdown-Flugberichte für die Organisation oder das Logbuch.
-  - Schnellfilter nach Quantum-Reisen, Gefechten, Handel, Bergbau und Standorten.
+### Fixed
+- Aggregate flights by real sessions and deduplicate live sortie events.
 
-### 🗺️ Starmap & Vollständiges POI-/Lagrange-Netzwerk (Stanton, Pyro & Nyx)
-- **Vollständiges Pyro-System (Pyro I bis Pyro VI)**:
-  - Alle 6 Planeten und Monde (*Pyro I*, *Monox / Pyro II*, *Bloom / Pyro III*, *Pyro IV*, *Pyro V mit Ignis, Vatra, Adir, Fairo, FTransit, Vuur*, *Terminus / Pyro VI*).
-  - Berüchtigte Piratenstationen & Outposts: *Checkmate Station (Rough & Ready HQ)*, *Orbituary*, *Starlight Station*, *Ruin Station*, *Sunset Mesa*, *The Junkyard*, *Sacren's Reach*, *Rustville*.
-  - Legendäre Piraten-Raffinerie *P5-L2 Gaslight Station*, *Megiddo Station* & *The Rat's Nest*.
-  - Vollständiges Lagrange-Netzwerk (*P1-L1 bis P6-L5*) und Sprungtore nach Stanton, Nyx und Terra.
-- **Vollständiges Nyx-System (Delamar, Glaciem Ring & Keeger Belt)**:
-  - *Delamar & Levski* mit *Grand Barter*, *People's Service Station Theta*, *QV Breaker Station BRK-267*, *Bore Hole Site 4* und *Miner's Rest*.
-  - *Keeger Belt* mit *Moraine Base* (Gesetzlose Station) und *Keeger Asteroid Depot*.
-  - *Glaciem Ring* mit *Glaciem RockCracker 12* und *Frostfall Outpost*.
-  - *Nyx I* (Mine), *Nyx III* (Sensor Array) und Sprungtore nach Stanton, Pyro, Castra und Tohil.
-- **Erweiterte Stanton POIs & Outposts**:
-  - *Security Post Kareah (SPK)*, *Klescher Automated Rehabilitation*, *Brio's Breaker Yard*, *Reclamation & Disposal Orinth*, *Samson & Son Salvage*, *Devlin Scrap & Salvage*.
-  - Verteilzentren (*HDPC-Cassidy*, *Sakura Sun Goldenrod Work Center*, *Area 061*).
+## [1.0.0-beta2] - 2026-08-30
 
-### 📍 Standort-Karte & UI-Modernisierung
-- **Modernisierte Standort- & Jurisdiktions-Karte**:
-  - Schnelle reaktive Aktualisierung via `OnCurrentLocationChanged` und `StarmapData.Resolve`.
-  - Dynamische Schutzzonen-Pille (`🟢 Schutzzone` vs `🔴 Waffen aktiv`) und System-Badges (`Stanton`, `Pyro`, `Nyx`).
-  - Standort-Typ Badges (`Landungszone`, `Raumstation`, `Raffinerie`, `Mond`, `Planet`, `Sprungtor`).
-  - Bereinigter und kompakter Hinweistext im Datenbank-Fortschrittsfenster ohne Zeilenüberlauf.
+### Added
+- Update dialog with automatic GitHub release detection and self-replacement.
+- Progress modal for database indexing and re-scans.
 
-## [1.0.0-beta2] - 2026-08-30 — *SCLogMate Pre-Release Beta 2*
+### Changed
+- Improve fleet sortie counts, contract merging, player detection, and database query batching.
 
-### 🚀 Auto-Updater & Start-Dialog
-- **Dediziertes Update-Fenster beim Anwendungsstart**:
-  - Erkennt automatisch neue Versionen auf GitHub.
-  - Zeigt Versions-Badges (`Aktuell ➔ Neu`) und den vollständigen Markdown-Changelog in einer scrollbaren Box an.
-  - **1-Klick Aktualisierung**: Automatischer Download, Selbst-Ersetzung und sauberer Neustart der Anwendung.
-  - Optionen zum sofortigen Aktualisieren, Öffnen der GitHub Release-Seite oder Später-Erinnern.
+### Fixed
+- Prevent inflated flight counters and contract duplicates caused by the fallback contractor.
 
-### ⚡ Datenbank-Fortschritt & UI-Reaktionsfähigkeit
-- **Sci-Fi Glassmorphism Fortschritts-Modal**:
-  - Zeigt bei Re-Scans, Schema-Updates und Hintergrund-Indexierungen ein modernes, animiertes Modal-Overlay.
-  - Live-Dateiname, Schritt-Zähler (`Scanne (14/48): Game_2026-08-30.log...`) und prozentuale Fortschrittsleiste.
-  - Vollständige Entkopplung aller Datenbank-Vorgänge in Hintergrund-Tasks — verhindert jegliches Einfrieren *(„Keine Rückmeldung“)*.
+## [1.0.0-beta1] - 2026-08-30
 
-### 🛸 Flotten-Sorties & Flug-Statistiken
-- **Korrektur überhöhter Flugzähler (`COUNT(DISTINCT session)`)**:
-  - Behebt das Problem, dass fortlaufende In-Flight Telemetriezeilen als Hunderte Einzelflüge gezählt wurden.
-  - Sorties und Flugeinsätze werden nun sauber anhand echter Flug-Sessions und Auslagerungen aggregiert.
-  - Live-Sortie-Entprellung im Parser verhindert Mehrfachzählungen während desselben Flugs.
+### Added
+- Starmap navigation, Quantum route calculation, Lagrange stations, and jump-gate support.
+- Fleet and hangar management, ship history, insurance tracking, and flight statistics.
+- Faction reputation tracking, freight and ship-elevator parsing, and pilot loadout analysis.
+- SQLite session indexing, raw-log archiving, and migration from SCLogMate to SCLogMate.
+- Toast notifications, global hotkey support, click-through HUD mode, refinery orders, trade routes, and loot estimates.
+- Mission catalog and log matching, wipe-date filtering, custom Starmap points, and UI search and clipboard tools.
+- Windows autostart, minimize-to-tray, crash handling, OCR calibration, and bilingual mobiGlas scanning.
 
-### 📜 Missions-Tracking & Deduplizierung
-- **Nahtlose Auftrags-Zusammenführung**:
-  - [`AreSameContract`](file:///x:/Github%20Workspace/SCLogReader/Core/Ocr/ContractParser.cs) führt Log-Meldungen (noch ohne Belohnung) und mobiGlas OCR-Scans (mit Belohnung) intelligent zusammen.
-  - Aktualisiert bestehende Aufträge in Speicher und Datenbank ohne Duplikateinträge.
-  - Falscher Fallback-Auftraggeber entfernt.
+### Changed
+- Move background synchronization and database rebuilds off the UI thread.
 
-### 🔍 Dynamische Spieler-Erkennung & Log-Parser Optimierungen
-- **Automatische Piloten-Erkennung**:
-  - Extrahiert den Spielernamen dynamisch aus `[Legacy login response]` (`handle: <name>`) und `[AccountLoginCharacterStatus_Character]`.
-  - Perfekte Zuordnung von Kills vs. eigenen Toden im Killfeed für den aktuell eingeloggten Piloten.
-  - Zusätzliche Erkennung von `CSessionManager::OnClientSpawned`, ASOP-Auslagerungen (`SetVehicleSpawningInformations`) und Cockpit-Sitzwechseln.
-
-## [1.0.0-beta1] - 2026-08-30 — *SCLogMate Pre-Release Beta 1*
-
-### 🗺 Starmap & Navigation
-- **Vector Route & Flight Time Calculator**:
-  - Live cyan glowing flight vector line connecting player's current location (`YOU ARE HERE`) to any selected waypoint or destination.
-  - Accurate distance calculation in Gigameters (GM) and kilometers (km).
-  - Estimated quantum travel flight time based on selectable Quantum Drive profiles (**S1**: *Atlas*, *VK-00*, *Beacon*; **S2**: *Crossfield*, *Yeager*, *Bolon*; **S3**: *TS-2*, *Pontes*, *Agni*).
-- **Full Lagrange Network (L1 – L5)**:
-  - Added all Lagrange stations across Stanton (*HUR-L1 to L5, CRU-L1/L4/L5, ARC-L1 to L4, MIC-L1 to L5*) with station specializations (⛏ *Refinery*, 📦 *Cargo Hub*, 🏥 *Clinic*, 🏪 *Rest Stop*).
-- **Inter-System Jump Gate Network**:
-  - Full support for jump gates between Stanton, Pyro, and Nyx with 1-click system jumping.
-- **Security & Danger Halos & Mining Hotspots**:
-  - Glowing red halos for lawless / piracy zones (GrimHEX, Ruin Station, Checkmate) vs UEE armistice zones.
-  - Resource tags for planets and moons (*Quantanium, Gold, Beryl, RMC wrecks, Bexalite*).
-- **Pop-out Starmap Window & Immersive Layout**:
-  - Dedicated multi-monitor Starmap window (`StarmapWindow.axaml`) for second screens and sim-pits.
-  - Collapsible dashboard HUD cards toggle in main window for full-height Starmap display.
-
-### 🛸 Flotten- & Hangar-Verzeichnis (Fleet Management)
-- **Trennung zwischen `🏠 Mein Hangar` und `✈ Flug-Historie`**:
-  - **`🏠 Mein Hangar`**: Zeigt ausschließlich Schiffe im persönlichen Besitz (Pledge Store oder in-game mit aUEC gekauft).
-  - **`✈ Flug-Historie`**: Vollständiges Logbuch aller jemals geflogenen Schiffe (inklusive Free Fly Events, Leihschiffe von Freunden oder temporäre Mieten).
-  - 1-Klick Stern-Schaltfläche (`★` / `☆`) zum Hinzufügen oder Entfernen von Schiffen aus dem persönlichen Hangar.
-- **Erweiterte Erwerbsarten (Acquisition Tracking)**:
-  - Jedes Schiff kann durchgeschaltet werden: `💵 Pledge Store ($)`, `🪙 In-Game Kauf (aUEC)`, `🎟 Miete (Rental)` oder `👥 Geliehen / Free Fly`.
-  - Berechnet den Echtgeld-Gesamtwert der Flotte (`$ USD`) ausschließlich anhand der echten Pledge-Store Schiffe.
-- **Bedingte Versicherungsverwaltung (Insurance Rules)**:
-  - Versicherungen (`♾ LTI`, `🛡 10 Jahre (IAE)`, `24M`, `12M`, `6M`) sind nur für **Pledge Store** Schiffe aktivierbar.
-  - In-game gekaufte Schiffe werden als `Keine (In-Game)` gekennzeichnet.
-- **Schiffserkennung via Funkkanäle & Namens-Harmonisierung**:
-  - Unterstützung für `You have joined channel '<Ship> : <Player>'`, `ClearDriver` und `ItemNavigation`-Routen zur lückenlosen Erfassung aller Flüge.
-  - Automatische Namens-Normalisierung und Versionierungs-Harmonisierung (z. B. `Aurora Mk2`, `Aurora Mk II` und `Aurora` einheitlich zu **`Aurora Mk II · RSI`**; `Hornet Mk2` zu `Hornet Mk II`).
-- **Individuelle Flugzähler & QT-Statistiken je Schiff**:
-  - Jedes registrierte Schiff besitzt seinen eigenen Zähler für tatsächliche Flüge (`X× geflogen`), absolvierte QT-Sprünge (`Y QT-Sprünge`) und Verlusthistorie (`Z Verluste`).
-- **Hersteller- & Erwerbs-Filter**:
-  - Schnelle Filterung nach Typ (*Pledge, In-Game, Miete*) und Hersteller (*Drake, Aegis, Crusader, Anvil, RSI, MISC, Origin, Argo, Mirai*).
-
-### 📜 Log-Parsing & Faction Reputation Tracking
-- **Faction Reputation & Rank Progression**:
-  - Full catalog of Star Citizen factions with XP progression thresholds and rank titles (Tiers 1 to 6).
-  - Automatic XP accumulation on completed missions with SQLite persistence.
-- **SC 4.x Freight & Ship Elevators & Vessel Destruction**:
-  - Event parsing for cargo elevator operations, ship hangar calls, destruction, and insurance claims (passive elevator idle noise filtered out).
-
-### 🥋 Piloten-Ausrüstung & Loadout-Intelligence
-- **Rüstungsklassen & Schadensreduktion**:
-  - Automatische Berechnung von Rüstungstypen (*Leicht (20%), Mittel (30%), Schwer (40%), Spezial-/Hazmat-Anzüge*) sowie Berechnung des durchschnittlichen Gesamt-Panzerschutzes aller angelegten Teile.
-- **Umgebungsschutz & Temperatur-Resistenzen**:
-  - Live-Analyse der minimalen und maximalen Temperaturverträglichkeit (-225°C bis +225°C bei Hazmat, -50°C bis +75°C bei Kampfpanzerungen).
-- **Waffen-Aufsätze & Modifikationen**:
-  - Erkennung und Anzeige von Visieren (Optiken/Scopes), Schalldämpfern, Kompensatoren, Laser-Modulen und Magazingrößen an ausgerüsteten Waffen.
-- **1-Klick Loadout-Export & Discord-Sharing**:
-  - Schneller Export der gesamten Ausrüstung in die Zwischenablage für Orgs/Discord sowie Erstellung formatierter Markdown-Reports (`.md`).
-
-### 🎨 UI & Layout Fixes
-- **Search Box Alignment**: Fixed shifted watermark placeholder text in search boxes with centered vertical content alignment and adjusted padding.
-
-### 💾 Automatische SQLite-Indexierung & Auto-Sync
-- **Geräuschloser Hintergrund-Sync beim Start**:
-  - SCLogMate gleicht beim Anwendungsstart automatisch das Backup- und Archivverzeichnis ab und indexiert neue Sessions geräuschlos im Hintergrund.
-- **Automatischer Re-Scan bei DB- & Parser-Updates**:
-  - Bei Änderungen an der Schema- oder Parser-Version (z. B. neuen Heuristiken oder Event-Typen) wird die SQLite-Datenbank automatisch im Hintergrund neu aufgebaut, ohne dass der Anwender manuell einen Re-Scan anstoßen muss.
-
-### Project Rebranding & Architecture
-- **Project Rebranded to SCLogMate**: Full rebranding from *SCLogReader* to **SCLogMate** (Executable: `SCLogMate.exe`).
-- **Seamless Data Migration (%APPDATA%\SCLogMate)**: Automatic, non-destructive import of all previous settings, SQLite databases, and OCR calibrations.
-- **.NET 10 & High-Performance Core**: Zero-allocation compiled Source Generator regular expressions (`[GeneratedRegex]`), SQLite WAL mode, and optimized DataGrid render pipelines.
-
-### 🗔 In-Game Overlays, Hotkeys & Modulare Toasts
-- **Modulare Toast-Kategorien & Soundeffekt**:
-  - Konfigurierbare Checkboxen für alle Toast-Benachrichtigungstypen (*Baupläne, Missions-Belohnungen, Fraktions-Beförderungen, Veredelungsabschluss, Frachtaufzüge, Schiffszerstörung/Claims*).
-  - Optionaler, subtiler Windows-Soundeffekt bei eingehenden Erfolgsbannern.
-- **Globaler System-Hotkey (`Alt + H`)**:
-  - Blitzschnelles Ein- und Ausblenden des Mini-HUDs direkt im Spiel per Windows-Tastenkombination `Alt + H`, ohne das Vollbild-Spiel verlassen zu müssen.
-- **HUD-Sperre & Click-Through Modus**:
-  - Sperrung der Overlay-Position (`🔒 Position sperren`) gegen versehentliches Verschieben sowie `🖱️ Click-Through` (`WS_EX_TRANSPARENT`), um Klicks transparent an das Raumschiff-Cockpit durchzureichen.
-
-### 💰 Handel, Raffinerie & Wirtschaft
-- **Raffinerie-Aufträge & Live-Countdown-Timer**:
-  - Erfassung und Verwaltung aktiver Veredelungen inkl. Methoden (*Dinyx, Ferron, Gaskin, Cormack*), Restzeit-Countdown und automatischem Benachrichtigungs-Toast bei Abholbereitschaft.
-- **Profitable Handelsrouten & Profit-Kalkulator**:
-  - Katalog profitabler Fracht- & Handelsrouten für Stanton & Pyro inkl. Echtzeit-Gewinnberechnung je nach Schiffsladekapazität (SCU).
-- **Loot- & Beute-Wert-Schätzer**:
-  - Automatische Bepreisung erbeuteter FPS-Ausrüstung und Waffen anhand typischer In-Game Shop- und Händlerpreise.
-
-### SC 4.x PU Log Parsing & Refinements
-- **SC 4.x Vehicle Retrieval Request Support**: Added support for ship spawn tracking via `Vehicle Retrieval Request` lines (replacing legacy pad delivery logs dropped in SC 4.x build 12519617+).
-- **Vehicle Comms Channel & Party Notification Parsing**: Automatically tracks personal ship boarding and crew members via `Vehicle Comms Channel` (`[ <Ship> : <Owner> ]`), along with party member join (`New Member Joined`) and leave (`Member Left`) notifications.
-- **cSCU/SCU Normalization**: Robust commodity handling for centi-SCU (`cSCU`) reported in `SShopCommodityBuyRequest` and `SShopCommoditySellRequest`.
-
-### Wipe- & Persistenz-Filter
-- **Granular Wipe-Datum Filtering**: Filter historical balances, completed missions, flown fleets, and blueprint unlocks starting from a specified wipe date (e.g. Star Citizen Alpha 4.8 / 15. Mai 2026 or Today).
-- **Settings & Presets**: Dedicated Wipe-Filter card in Settings with 1-click presets (*Alpha 4.8 Wipe*, *Heute*, *Aus*) and modular checkboxes for Money, Missions, Fleet, and Blueprints.
-
-### Piloten-Ausrüstung & Starmap Notizen
-- **11-Slot Piloten-Ausrüstung (Visual Loadout Tab)**: Live tracking of all 11 pilot slots (Helm, Torso/Core, Arme, Beine, Undersuit, Rucksack, Primärwaffen, Seitenwaffe, Multi-Tool, Med-Kit) updated automatically on gear changes and loot.
-- **Persönliche Starmap-Wegpunkte & Notizen (Custom POIs)**: Add custom coordinates and notes (Mining, Salvage, Trade, Bunker, Secret) directly to the 2D Starmap, with persistent SQLite storage (`user_pois`) and amber diamond radar markers on planets, moons, and stations.
-
-### Mission Tracking & Master Catalog
-- **Built-in Master Mission Database (`scunpacked-data`)**:
-  - Comprehensive catalog of all Star Citizen 4.x PU missions including contractors (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch*, etc.), factions, default rewards, reputation XP, star systems, and crafting blueprint drops.
-  - Interactive **Mission Browser** tab with instant text search and category filters.
-- **Zero-OCR Log-Matching & Auto-Sync**:
-  - Automatic extraction of contractor, faction, and reward details directly from `Game.log`.
-  - **Comprehensive Status Tracking**: Detects `Accepted`, `Complete`, `Abandoned`, and `Failed` mission states in real-time.
-  - **Automatic Mission Sync**: Completed, abandoned, or failed missions are immediately cleared from active contract tracking and the SQLite database.
-
-### UI & Usability Innovations
-- **Visual Blueprint Progress Bar**:
-  - Emerald glowing progress bar in the ⬡ Blueprints tab reflecting crafting progression (`X of Y learned (%)`).
-- **Live Event Full-Text Search**:
-  - Instant search filter in the Events tab to filter events by ship, item, location, amount, or time, with a 1-click clear button.
-- **Glowing Pill Badges in Event Log**:
-  - High-contrast categorized pill badges with icons for every event type (Gold for Rewards, Emerald for Blueprints, Cyan for Ships, Crimson for Combat/Kills, Purple for Locations).
-- **Clipboard Copy Context Menu**:
-  - Right-click any event entry to copy detail text, amount, or the entire tab-separated row to clipboard.
-- **Dedicated "ℹ Über" Tab**:
-  - Complete brand overview, update checking center, diagnostics, and external API attributions.
-
-### System Integration & Window Management
-- **Windows Autostart (Minimized to Tray)**:
-  - Option in Settings to launch SCLogMate automatically on Windows login directly into the System Tray.
-- **Minimize-to-Tray on Close (X)**:
-  - Toggle in Settings to keep background tracking, OCR, and overlays running in the Tray when clicking close, or exit completely.
-- **Crash Prevention & Tray Lifecycle**:
-  - Intercepted Avalonia window disposal on close to prevent `ObjectDisposedException` on Tray restore.
-- **Streamlined Header Bar**:
-  - Removed redundant manual Start/Stop button; monitoring runs 100% automatically.
-
-### OCR & Data Synchronization Fixes
-- **OCR Leading Digit Truncation Fix**:
-  - Added token and symbol pre-processing to eliminate truncated leading digits on high balance amounts (`aUEC`, `¤`, `|`).
-  - Widened default capture scan bounds (500x80) with safety margins.
-  - Live session balance and saldo recomputation immediately synced on mobiGlas scan.
-- **UEX Corp API Key Persistence**:
-  - Full two-way data-binding and verified storage in `%APPDATA%\SCLogMate\settings.json`.
-
----
-
-# Archive: Legacy SCLogReader Changelog (Base Fork by miwidot)
-
-Historical changelog from the original *SCLogReader* foundation by **miwidot**:
+### Fixed
+- Correct OCR leading-digit truncation and live balance recomputation.
+- Prevent tray lifecycle disposal failures.
 
 ## [1.2.0] - 2026-08-29
-- Settings Page tab with grouped cards.
-- Star Citizen crash & fatal error detection with automated contract reset.
-- Bilingual English/German mobiGlas scanning.
-- Multi-monitor area calibration.
+
+### Added
+- Settings page, crash and fatal-error detection, bilingual mobiGlas scanning, and multi-monitor OCR calibration.
 
 ## [1.1.19] - 2026-08-28
-- Mission Reputation Proxy tab by contractor/faction.
-- Database query performance optimization via SQL batching.
+
+### Added
+- Mission reputation view grouped by contractor and faction.
+
+### Changed
+- Batch database queries.
 
 ## [1.1.18] - 2026-08-18
-- Cargo buy requests (`SShopCommodityBuyRequest`) included in balance calculations.
-- Commodity market prices and extended loot tracking.
+
+### Changed
+- Include cargo-buy requests in balance calculations and expand commodity prices and loot tracking.
 
 ## [1.1.17] - 2026-07-19
-- Balance calculations fixed relative to timestamp entry.
+
+### Fixed
+- Calculate balances relative to the recorded balance timestamp.
 
 ## [1.1.14] - 2026-07-14
-- Loot item tracking and name resolution via localized `global.ini`.
+
+### Added
+- Loot-item tracking and localized `global.ini` name resolution.
 
 ## [1.1.0] - 2026-06-28
-- SQLite index for sessions and raw log archiving.
+
+### Added
+- SQLite session index and raw-log archive.
 
 ## [1.0.0] - 2026-06-28
+
+### Added
 - Initial public release of SCLogReader by miwidot.

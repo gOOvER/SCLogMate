@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Media;
 
-namespace SCLogReader.Models;
+namespace SCLogMate.Models;
 
 /// <summary>Ein Balken/Posten in der Geld-Statistik (Label, Wert, Balkenbreite, Farbe, Zeit).</summary>
 public class StatItem
