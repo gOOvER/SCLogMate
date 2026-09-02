@@ -56,8 +56,8 @@ Do **not** start the app after building — Nicolas runs it himself.
 
 ### 3. Git pushes only on request
 
-**Never push to GitHub** unless Nicolas explicitly asks for it. Commits are
-fine, pushes are not.
+- **Never push to GitHub** unless Nicolas explicitly asks for it. Commits are fine, pushes are not.
+- When Nicolas asks to push ("push", "pushe", etc.), run a direct, simple `git push` without detour, complex refspecs, or token-wasting checks. Direct and minimal execution.
 
 ---
 
