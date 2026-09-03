@@ -22,6 +22,8 @@
     <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
     <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
     <conv:BoolToOpacityConverter x:Key="BoolToOpacity" />
+    <conv:BoolToAccentBrushConverter x:Key="AccentBg" />
+    <conv:BoolToAccentBorderConverter x:Key="AccentBorder" />
   </Window.Resources>
 
   <Grid>
@@ -518,192 +520,268 @@
             <TextBlock Text="{Binding MissionsText}" Foreground="#FBBF24" FontSize="12" TextWrapping="Wrap" />
           </Border>
 
-          <!-- Übersicht -->
-          <Grid ColumnDefinitions="*,*,*">
-            <Border Grid.Column="0" Classes="card" Margin="0,0,6,0">
+          <!-- ══ 1. Top KPI Summary HUD Cards ══ -->
+          <Grid ColumnDefinitions="*,*,*,*,*" Margin="0,0,0,4">
+            <Border Grid.Column="0" Classes="card" Margin="0,0,5,0">
               <StackPanel>
-                <TextBlock Classes="label" Text="▼  EINNAHMEN" />
-                <TextBlock Classes="value" Text="{Binding IncomeTotalText}" Foreground="#4ADE80" />
+                <TextBlock Classes="label" Text="{Binding I18n[Finance_Kpi_Income]}" />
+                <TextBlock Classes="value" Text="{Binding FinanceIncomeTotalText}" Foreground="#4ADE80" />
+                <TextBlock Text="↗ Einnahmen" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
               </StackPanel>
             </Border>
-            <Border Grid.Column="1" Classes="card" Margin="6,0,6,0">
+            <Border Grid.Column="1" Classes="card" Margin="5,0,5,0">
               <StackPanel>
-                <TextBlock Classes="label" Text="▲  AUSGABEN" />
-                <TextBlock Classes="value" Text="{Binding SpendTotalText}" Foreground="#F87171" />
+                <TextBlock Classes="label" Text="{Binding I18n[Finance_Kpi_Spend]}" />
+                <TextBlock Classes="value" Text="{Binding FinanceSpendTotalText}" Foreground="#F87171" />
+                <TextBlock Text="↘ Ausgaben" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
               </StackPanel>
             </Border>
-            <Border Grid.Column="2" Classes="card" Margin="6,0,0,0">
+            <Border Grid.Column="2" Classes="card" Margin="5,0,5,0">
               <StackPanel>
-                <TextBlock Classes="label" Text="◆  NETTO (Log)" />
-                <TextBlock Classes="value" Text="{Binding NetBalanceText}"
-                           Foreground="{Binding NetSign, Converter={StaticResource AmountBrush}}" />
+                <TextBlock Classes="label" Text="{Binding I18n[Finance_Kpi_Net]}" />
+                <TextBlock Classes="value" Text="{Binding FinanceNetBalanceText}"
+                           Foreground="{Binding FinanceNetSign, Converter={StaticResource AmountBrush}}" />
+                <TextBlock Text="{Binding ProfitMarginText, StringFormat='Marge: {0}'}" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" Margin="0,2,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Classes="card" Margin="5,0,5,0">
+              <StackPanel>
+                <TextBlock Classes="label" Text="{Binding I18n[Finance_Kpi_Wallet]}" />
+                <TextBlock Classes="value" Text="{Binding LiveBalanceText}" Foreground="#38BDF8" />
+                <TextBlock Text="Live Saldo (mobiGlas)" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="4" Classes="card" Margin="5,0,0,0">
+              <StackPanel>
+                <TextBlock Classes="label" Text="{Binding I18n[Finance_Kpi_TradeVolume]}" />
+                <TextBlock Classes="value" Text="{Binding TotalCargoAuecText}" Foreground="#FBBF24" />
+                <TextBlock Text="{Binding TotalCargoScuText}" Foreground="#F59E0B" FontSize="10" FontWeight="Bold" Margin="0,2,0,0" />
               </StackPanel>
             </Border>
           </Grid>
 
-          <!-- Einnahmen-Aufschlüsselung -->
-          <Border Classes="card">
-            <StackPanel>
-              <TextBlock Classes="label" Text="EINNAHMEN NACH QUELLE" Margin="0,0,0,8" />
-              <ItemsControl ItemsSource="{Binding IncomeStats}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="m:StatItem">
-                    <Grid ColumnDefinitions="150,290,Auto" Margin="0,3">
-                      <TextBlock Grid.Column="0" Text="{Binding Label}" Foreground="#C9D1D9" VerticalAlignment="Center" />
-                      <Border Grid.Column="1" Height="16" CornerRadius="4" HorizontalAlignment="Left"
-                              Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
-                                 FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
-                                 Margin="10,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <!-- Ausgaben-Aufschlüsselung -->
-          <Border Classes="card">
-            <StackPanel>
-              <TextBlock Classes="label" Text="AUSGABEN NACH ART" Margin="0,0,0,8" />
-              <ItemsControl ItemsSource="{Binding SpendStats}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="m:StatItem">
-                    <Grid ColumnDefinitions="150,290,Auto" Margin="0,3">
-                      <TextBlock Grid.Column="0" Text="{Binding Label}" Foreground="#C9D1D9" VerticalAlignment="Center" />
-                      <Border Grid.Column="1" Height="16" CornerRadius="4" HorizontalAlignment="Left"
-                              Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
-                                 FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
-                                 Margin="10,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <!-- Handel je Ware -->
-          <Border Classes="card" IsVisible="{Binding HasTrades}">
-            <StackPanel>
-              <TextBlock Classes="label" Text="HANDEL JE WARE (SCU · Ø Preis/SCU)" Margin="0,0,0,8" />
-              <ItemsControl ItemsSource="{Binding CommodityTrades}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="m:StatItem">
-                    <Grid ColumnDefinitions="150,*,Auto" Margin="0,4">
-                      <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding Label}" Foreground="#F0F6FC" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding Sub}" Foreground="#8B949E" FontSize="11" />
-                      </StackPanel>
-                      <Border Grid.Column="1" Height="16" CornerRadius="4" HorizontalAlignment="Left"
-                              Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
-                                 FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
-                                 Margin="10,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <!-- Marktpreise (aus eigenen Runs) -->
-          <Border Classes="card" IsVisible="{Binding HasMarket}">
-            <StackPanel>
-              <TextBlock Classes="label" Text="MARKTPREISE — GESEHEN IN DEINEN RUNS (Ø Preis/SCU · Terminal)" Margin="0,0,0,8" />
-              <Grid ColumnDefinitions="140,*,*,Auto" Margin="0,0,0,4">
-                <TextBlock Grid.Column="0" Text="WARE" Foreground="#8B949E" FontSize="10" />
-                <TextBlock Grid.Column="1" Text="↥ BESTER VERKAUF" Foreground="#3FB950" FontSize="10" />
-                <TextBlock Grid.Column="2" Text="↧ GÜNSTIGSTER KAUF" Foreground="#F0883E" FontSize="10" />
-                <TextBlock Grid.Column="3" Text="MARGE" Foreground="#8B949E" FontSize="10" Margin="10,0,0,0" />
-              </Grid>
-              <ItemsControl ItemsSource="{Binding MarketPrices}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="m:MarketPrice">
-                    <Grid ColumnDefinitions="140,*,*,Auto" Margin="0,3">
-                      <TextBlock Grid.Column="0" Text="{Binding Commodity}" Foreground="#F0F6FC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="1" Text="{Binding SellText}" Foreground="#3FB950" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding BuyText}" Foreground="#F0883E" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="3" Text="{Binding MarginText}" Foreground="#58A6FF" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
-
-          <!-- 🏭 Raffinerie-Aufträge & Live-Timer (Roadmap Feature) -->
+          <!-- ══ 2. Interaktives Sci-Fi Vektor-Diagramm (QuantumWake-Stil) ══ -->
           <Border Classes="card">
             <StackPanel Spacing="10">
-              <Grid ColumnDefinitions="*,Auto">
+              <!-- Chart Header & Controls -->
+              <Grid ColumnDefinitions="Auto,*,Auto">
                 <StackPanel Grid.Column="0" Spacing="2">
-                  <TextBlock Classes="label" Text="🏭  RAFFINERIE-AUFTRÄGE &amp; LIVE-TIMER" />
-                  <TextBlock Text="Verwalte aktive Veredelungsaufträge. SCLogMate benachrichtigt dich per Toast, sobald dein Erz fertig veredelt ist." Foreground="#8B949E" FontSize="11" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border Background="#0C233C" BorderBrush="#1C4B78" BorderThickness="1" CornerRadius="4" Padding="5,2" VerticalAlignment="Center">
+                      <TextBlock Text="❖ QUANTUM TIMELINE" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" />
+                    </Border>
+                    <TextBlock Classes="label" Text="{Binding I18n[Finance_Chart_Title]}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding I18n[Finance_Chart_Subtitle]}" Foreground="#8B949E" FontSize="11" />
                 </StackPanel>
 
-                <!-- Neuen Veredelungsauftrag erfassen -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                  <ComboBox ItemsSource="{Binding AvailableRefineryStations}" SelectedItem="{Binding NewRefineryStation}" Width="190" Height="28" VerticalAlignment="Center" />
-                  <ComboBox ItemsSource="{Binding AvailableRefineryMaterials}" SelectedItem="{Binding NewRefineryMaterial}" Width="130" Height="28" VerticalAlignment="Center" />
-                  <ComboBox ItemsSource="{Binding AvailableRefineryMethods}" SelectedItem="{Binding NewRefineryMethod}" Width="210" Height="28" VerticalAlignment="Center" />
-                  <NumericUpDown Value="{Binding NewRefineryScu}" Minimum="1" Maximum="1000" Width="90" Height="28" VerticalAlignment="Center" FormatString="{}{0} SCU" />
-                  <Button Classes="accent" Command="{Binding AddRefineryJobCommand}" Content="➕ Starten" Height="28" Padding="10,2" VerticalAlignment="Center" />
+                <!-- Chart Controls: Scope + Mode + Filter Toggles -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                  <!-- Scope Buttons (Alle Sessions vs Aktuelle Session) -->
+                  <Button Classes="chip" Height="28" Padding="10,3"
+                          Command="{Binding SetFinanceScopeCommand}" CommandParameter="0"
+                          Background="{Binding IsFinanceScopeAll, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsFinanceScopeAll, Converter={StaticResource AccentBorder}}"
+                          ToolTip.Tip="Gesamter Finanzverlauf über alle Sessions">
+                    <TextBlock Text="{Binding I18n[Finance_Scope_All]}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{Binding IsFinanceScopeAll, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+                  <Button Classes="chip" Height="28" Padding="10,3"
+                          Command="{Binding SetFinanceScopeCommand}" CommandParameter="1"
+                          Background="{Binding IsFinanceScopeCurrent, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsFinanceScopeCurrent, Converter={StaticResource AccentBorder}}"
+                          ToolTip.Tip="Nur Buchungen der aktuellen Einzelsession">
+                    <TextBlock Text="{Binding I18n[Finance_Scope_Current]}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{Binding IsFinanceScopeCurrent, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+
+                  <Rectangle Width="1" Height="16" Fill="#1E324A" Margin="4,0" VerticalAlignment="Center" />
+
+                  <!-- Mode Buttons -->
+                  <Button Classes="chip" Height="28" Padding="10,3"
+                          Command="{Binding SetFinanceChartModeCommand}" CommandParameter="0"
+                          Background="{Binding IsChartModeCumulative, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartModeCumulative, Converter={StaticResource AccentBorder}}">
+                    <TextBlock Text="{Binding I18n[Finance_Mode_Cumulative]}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{Binding IsChartModeCumulative, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+                  <Button Classes="chip" Height="28" Padding="10,3"
+                          Command="{Binding SetFinanceChartModeCommand}" CommandParameter="1"
+                          Background="{Binding IsChartModeNetTrend, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartModeNetTrend, Converter={StaticResource AccentBorder}}">
+                    <TextBlock Text="{Binding I18n[Finance_Mode_NetTrend]}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{Binding IsChartModeNetTrend, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+                  <Button Classes="chip" Height="28" Padding="10,3"
+                          Command="{Binding SetFinanceChartModeCommand}" CommandParameter="2"
+                          Background="{Binding IsChartModeCashflow, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartModeCashflow, Converter={StaticResource AccentBorder}}">
+                    <TextBlock Text="{Binding I18n[Finance_Mode_Cashflow]}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{Binding IsChartModeCashflow, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+
+                  <Rectangle Width="1" Height="16" Fill="#1E324A" Margin="4,0" VerticalAlignment="Center" />
+
+                  <!-- Filter Buttons -->
+                  <Button Classes="chip" Height="28" Padding="8,3"
+                          Command="{Binding SetFinanceChartFilterCommand}" CommandParameter="0"
+                          Background="{Binding IsChartFilterAll, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartFilterAll, Converter={StaticResource AccentBorder}}"
+                          ToolTip.Tip="{Binding I18n[Finance_Filter_All]}">
+                    <TextBlock Text="{Binding I18n[Finance_Filter_All]}" FontSize="11"
+                               Foreground="{Binding IsChartFilterAll, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+                  <Button Classes="chip" Height="28" Padding="8,3"
+                          Command="{Binding SetFinanceChartFilterCommand}" CommandParameter="1"
+                          Background="{Binding IsChartFilterTrade, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartFilterTrade, Converter={StaticResource AccentBorder}}"
+                          ToolTip.Tip="{Binding I18n[Finance_Filter_Trade]}">
+                    <TextBlock Text="{Binding I18n[Finance_Filter_Trade]}" FontSize="11"
+                               Foreground="{Binding IsChartFilterTrade, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
+                  <Button Classes="chip" Height="28" Padding="8,3"
+                          Command="{Binding SetFinanceChartFilterCommand}" CommandParameter="2"
+                          Background="{Binding IsChartFilterMissions, Converter={StaticResource AccentBg}}"
+                          BorderBrush="{Binding IsChartFilterMissions, Converter={StaticResource AccentBorder}}"
+                          ToolTip.Tip="{Binding I18n[Finance_Filter_Missions]}">
+                    <TextBlock Text="{Binding I18n[Finance_Filter_Missions]}" FontSize="11"
+                               Foreground="{Binding IsChartFilterMissions, Converter={StaticResource ActiveBrush}}" />
+                  </Button>
                 </StackPanel>
               </Grid>
 
-              <!-- Liste der aktiven Aufträge -->
-              <ItemsControl ItemsSource="{Binding RefineryJobs}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="core:RefineryJob">
-                    <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,3">
-                      <Grid ColumnDefinitions="220,140,*,Auto,Auto">
-                        <!-- Station & Material -->
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Material, StringFormat='{}{0}'}" Foreground="#F0F6FC" FontWeight="Bold" FontSize="12" />
-                          <TextBlock Text="{Binding Station}" Foreground="#8B949E" FontSize="10.5" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
+              <!-- Sci-Fi Chart Control -->
+              <views:FinanceTimelineChart Height="230"
+                                          ItemsSource="{Binding FinanceChartPoints}"
+                                          ChartMode="{Binding SelectedFinanceChartMode}"
+                                          EmptyText="{Binding I18n[Finance_Empty_Chart]}" />
 
-                        <!-- Menge & Methode -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding OutputScu, StringFormat='{}{0} SCU Ertrag'}" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="11" />
-                          <TextBlock Text="{Binding Method}" Foreground="#6E7681" FontSize="10" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-
-                        <!-- Fortschritt & Timer -->
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0" Spacing="3">
-                          <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="{Binding StatusColor}" FontWeight="SemiBold" FontSize="11" />
-                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat='{}{0:F0}%'}" Foreground="#8B949E" FontSize="10" />
-                          </Grid>
-                          <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Height="5" CornerRadius="2"
-                                       Foreground="#3FB950" Background="#161B22" />
-                        </StackPanel>
-
-                        <!-- Schätzwert -->
-                        <Border Grid.Column="3" Background="#061810" BorderBrush="#1D6A35" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="6,0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding EstimatedValueAuec, StringFormat='{}{0:N0} aUEC'}" Foreground="#3FB950" FontWeight="Bold" FontSize="11" />
-                        </Border>
-
-                        <!-- Aktionen -->
-                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                          <Button Classes="ghost" Padding="6,2" CornerRadius="4"
-                                  Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).CollectRefineryJobCommand}"
-                                  CommandParameter="{Binding}" IsVisible="{Binding !IsCollected}" ToolTip.Tip="Als abgeholt markieren">
-                            <TextBlock Text="✓ Abholen" FontSize="10.5" Foreground="#38BDF8" FontWeight="Bold" />
-                          </Button>
-                          <Button Classes="ghost" Padding="4,2" CornerRadius="4"
-                                  Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).DeleteRefineryJobCommand}"
-                                  CommandParameter="{Binding}" ToolTip.Tip="Auftrag löschen">
-                            <TextBlock Text="✕" FontSize="10" Foreground="#8B949E" />
-                          </Button>
-                        </StackPanel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+              <!-- Chart Legende -->
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsChartModeNetTrend}">
+                    <Ellipse Width="8" Height="8" Fill="#38BDF8" />
+                    <TextBlock Text="{Binding I18n[Finance_Legend_Earned]}" Foreground="#94A3B8" FontSize="11" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsChartModeNetTrend}">
+                    <Ellipse Width="8" Height="8" Fill="#F87171" />
+                    <TextBlock Text="{Binding I18n[Finance_Legend_Spent]}" Foreground="#94A3B8" FontSize="11" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsChartModeCumulative}">
+                    <Ellipse Width="8" Height="8" Fill="#60A5FA" />
+                    <TextBlock Text="{Binding I18n[Finance_Legend_Net]}" Foreground="#94A3B8" FontSize="11" />
+                  </StackPanel>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="💡 Tipp: Bewege den Mauszeiger über das Diagramm für exakte Buchungsdetails" Foreground="#64748B" FontSize="10.5" VerticalAlignment="Center" />
+              </Grid>
             </StackPanel>
           </Border>
+
+          <!-- ══ 3. Zwei-Spalten Finanz- & Handels-Analyse ══ -->
+          <Grid ColumnDefinitions="*,*">
+            <!-- Linke Spalte: Einnahmen- & Ausgaben-Aufschlüsselung -->
+            <StackPanel Grid.Column="0" Margin="0,0,6,0" Spacing="12">
+              <!-- Einnahmen-Aufschlüsselung -->
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="{Binding I18n[Finance_Section_Sources]}" Margin="0,0,0,8" />
+                  <ItemsControl ItemsSource="{Binding IncomeStats}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="m:StatItem">
+                        <Grid ColumnDefinitions="140,*,Auto" Margin="0,3">
+                          <TextBlock Grid.Column="0" Text="{Binding Label}" Foreground="#C9D1D9" VerticalAlignment="Center" FontSize="11.5" />
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Border Height="14" CornerRadius="3" HorizontalAlignment="Left"
+                                    Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Sub}" Foreground="#8B949E" FontSize="10.5" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
+                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="11.5"
+                                     Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+
+              <!-- Ausgaben-Aufschlüsselung -->
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="{Binding I18n[Finance_Section_Expenses]}" Margin="0,0,0,8" />
+                  <ItemsControl ItemsSource="{Binding SpendStats}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="m:StatItem">
+                        <Grid ColumnDefinitions="140,*,Auto" Margin="0,3">
+                          <TextBlock Grid.Column="0" Text="{Binding Label}" Foreground="#C9D1D9" VerticalAlignment="Center" FontSize="11.5" />
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Border Height="14" CornerRadius="3" HorizontalAlignment="Left"
+                                    Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Sub}" Foreground="#8B949E" FontSize="10.5" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
+                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="11.5"
+                                     Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <!-- Rechte Spalte: Warenhandel & Marktpreise -->
+            <StackPanel Grid.Column="1" Margin="6,0,0,0" Spacing="12">
+              <!-- Handel je Ware -->
+              <Border Classes="card" IsVisible="{Binding HasTrades}">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="{Binding I18n[Finance_Section_Commodities]}" Margin="0,0,0,8" />
+                  <ItemsControl ItemsSource="{Binding CommodityTrades}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="m:StatItem">
+                        <Grid ColumnDefinitions="140,*,Auto" Margin="0,4">
+                          <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Label}" Foreground="#F0F6FC" FontWeight="SemiBold" FontSize="12" />
+                            <TextBlock Text="{Binding Sub}" Foreground="#8B949E" FontSize="10.5" />
+                          </StackPanel>
+                          <Border Grid.Column="1" Height="14" CornerRadius="3" HorizontalAlignment="Left"
+                                  Width="{Binding BarWidth}" Background="{Binding Color}" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Text="{Binding ValueText}" Foreground="#F0F6FC"
+                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="11.5"
+                                     Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+
+              <!-- Marktpreise (aus eigenen Runs) -->
+              <Border Classes="card" IsVisible="{Binding HasMarket}">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="MARKTPREISE — GESEHEN IN DEINEN RUNS (Ø Preis/SCU · Terminal)" Margin="0,0,0,8" />
+                  <Grid ColumnDefinitions="130,*,*,Auto" Margin="0,0,0,4">
+                    <TextBlock Grid.Column="0" Text="WARE" Foreground="#8B949E" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="↥ BESTER VERKAUF" Foreground="#3FB950" FontSize="10" />
+                    <TextBlock Grid.Column="2" Text="↧ GÜNSTIGSTER KAUF" Foreground="#F0883E" FontSize="10" />
+                    <TextBlock Grid.Column="3" Text="MARGE" Foreground="#8B949E" FontSize="10" Margin="10,0,0,0" />
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding MarketPrices}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="m:MarketPrice">
+                        <Grid ColumnDefinitions="130,*,*,Auto" Margin="0,3">
+                          <TextBlock Grid.Column="0" Text="{Binding Commodity}" Foreground="#F0F6FC" FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Text="{Binding SellText}" Foreground="#3FB950" FontSize="11.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Text="{Binding BuyText}" Foreground="#F0883E" FontSize="11.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="3" Text="{Binding MarginText}" Foreground="#58A6FF" FontFamily="Cascadia Code, Consolas, monospace" FontSize="11.5" Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Grid>
 
           <!-- 📈 Empfohlene Handelsrouten & Profit-Kalkulator (Roadmap Feature) -->
           <Border Classes="card">
@@ -744,124 +822,6 @@
                   <DataGridTextColumn Header="EMPFOHLENES SCHIFF" Binding="{Binding RecommendedShip}" Width="*" />
                 </DataGrid.Columns>
               </DataGrid>
-            </StackPanel>
-          </Border>
-
-          <!-- ══ RS Signal Decoder & Mining/Salvage Scanner ══ -->
-          <Border Classes="card">
-            <StackPanel Spacing="10">
-              
-              <!-- Header: Titel, Subtitel & Actions (Overlay Toggle + Auto-Scan Toggle) -->
-              <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Grid.Column="0" Spacing="2">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="label" Text="🛰  RS SIGNAL DECODER &amp; MINING/SALVAGE SCANNER" />
-                    <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
-                      <TextBlock Text="SC 4.x SIGNATUREN" FontSize="9" FontWeight="Bold" Foreground="#38BDF8" />
-                    </Border>
-                  </StackPanel>
-                  <TextBlock Text="Entschlüsselt Radar-Resonanz-Signaturen (RS-Werte) von Asteroiden und Wrackteilen noch vor dem Nahbereichsscan." Foreground="#8B949E" FontSize="11" />
-                </StackPanel>
-
-                <!-- Action Controls -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <Button Classes="accent" Padding="8,4" Command="{Binding TriggerRsOcrScanCommand}" ToolTip.Tip="Jetzt Ziffern auf dem Bildschirm scannen">
-                    <StackPanel Orientation="Horizontal" Spacing="5">
-                      <TextBlock Text="⚡" />
-                      <TextBlock Text="OCR Scan" FontSize="11" FontWeight="Bold" />
-                    </StackPanel>
-                  </Button>
-                  <ToggleButton Classes="ghost" Padding="8,4" IsChecked="{Binding IsRsAutoScanEnabled}" Command="{Binding ToggleRsAutoScanCommand}" ToolTip.Tip="Automatischer kontinuierlicher Scan der RS-Signatur">
-                    <StackPanel Orientation="Horizontal" Spacing="5">
-                      <TextBlock Text="👁" />
-                      <TextBlock Text="Auto-Scan" FontSize="11" />
-                    </StackPanel>
-                  </ToggleButton>
-                  <ToggleButton Classes="ghost" Padding="8,4" IsChecked="{Binding IsRsOverlayActive}" Command="{Binding ToggleRsOverlayCommand}" ToolTip.Tip="Verschiebbares In-Game HUD Overlay ein-/ausblenden">
-                    <StackPanel Orientation="Horizontal" Spacing="5">
-                      <TextBlock Text="🗔" Foreground="#38BDF8" />
-                      <TextBlock Text="Overlay" FontSize="11" Foreground="#38BDF8" FontWeight="Bold" />
-                    </StackPanel>
-                  </ToggleButton>
-                </StackPanel>
-              </Grid>
-
-              <!-- Eingabezeile & Preset-Buttons -->
-              <Grid ColumnDefinitions="200,Auto,*" Margin="0,4,0,0">
-                <TextBox Grid.Column="0" Classes="path" Text="{Binding RsInputText}" Watermark="RS-Wert (z.B. 7200, 3170)" Height="30" FontSize="12" />
-                <Button Grid.Column="1" Classes="accent" Content="Entschlüsseln" Command="{Binding DecodeRsCommand}" CommandParameter="{Binding RsInputText}" Margin="8,0,0,0" Height="30" Padding="12,4" />
-
-                <!-- Quick Presets -->
-                <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="12,0,0,0">
-                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="Presets:" FontSize="10.5" Foreground="#64748B" VerticalAlignment="Center" />
-                    <Button Classes="chip" Content="3.170 (1x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="3170" />
-                    <Button Classes="chip" Content="6.340 (2x Quant)" Command="{Binding SetRsPresetCommand}" CommandParameter="6340" />
-                    <Button Classes="chip" Content="7.200 (2x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="7200" />
-                    <Button Classes="chip" Content="14.400 (4x Bex/Lar)" Command="{Binding SetRsPresetCommand}" CommandParameter="14400" />
-                    <Button Classes="chip" Content="6.000 (3x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="6000" />
-                    <Button Classes="chip" Content="8.000 (4x Salvage)" Command="{Binding SetRsPresetCommand}" CommandParameter="8000" />
-                  </StackPanel>
-                </ScrollViewer>
-              </Grid>
-
-              <!-- Treffer-Ergebnis Karten -->
-              <Grid ColumnDefinitions="*,*" Margin="0,4,0,0" IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
-                
-                <!-- Bester Treffer Hero Card -->
-                <Border Grid.Column="0" Background="#0C1A30" BorderBrush="#1E40AF" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,6,0">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="HAUPT-ERGEBNIS" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.5" />
-                        <Border Background="{Binding BestRsMatch.BadgeColor}" CornerRadius="3" Padding="5,1">
-                          <TextBlock Text="{Binding BestRsMatch.Resource.Tier, StringFormat='Tier {0}'}" FontSize="9" FontWeight="Bold" Foreground="#FFFFFF" />
-                        </Border>
-                      </StackPanel>
-                      <TextBlock Grid.Column="1" Text="{Binding CurrentRsDisplayValue}" FontSize="13" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" />
-                    </Grid>
-
-                    <TextBlock Text="{Binding BestRsMatch.DisplayTitle}" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
-                    <TextBlock Text="{Binding BestRsMatch.Subtitle}" FontSize="11" Foreground="#94A3B8" />
-
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Text="🏭" FontSize="11" />
-                        <TextBlock Text="{Binding BestRsMatch.BestRefineryText, StringFormat='Beste Raffinerie: {0}'}" FontSize="11" Foreground="#4ADE80" FontWeight="SemiBold" />
-                      </StackPanel>
-                      <TextBlock Grid.Column="1" Text="{Binding BestRsMatch.EstimatedValueText}" FontSize="12" FontWeight="Bold" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" />
-                    </Grid>
-                  </StackPanel>
-                </Border>
-
-                <!-- Alle passenden Alternativen / Multi-Node Liste -->
-                <Border Grid.Column="1" Background="#08101C" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,0,0,0">
-                  <StackPanel Spacing="6">
-                    <TextBlock Text="ALLE MÖGLICHEN RESSOURCEN" FontSize="9.5" FontWeight="Bold" Foreground="#8B949E" LetterSpacing="0.5" />
-                    
-                    <ItemsControl ItemsSource="{Binding CurrentRsMatches}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="m:RsMatch">
-                          <Border Background="#0E1726" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                              <Border Grid.Column="0" Background="{Binding BadgeColor}" CornerRadius="3" Padding="4,1" Margin="0,0,8,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Resource.Tier}" FontSize="8.5" FontWeight="Bold" Foreground="#FFFFFF" />
-                              </Border>
-                              <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding DisplayTitle}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" />
-                                <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="#64748B" TextTrimming="CharacterEllipsis" />
-                              </StackPanel>
-                              <TextBlock Grid.Column="2" Text="{Binding BestRefineryText}" FontSize="10" Foreground="#4ADE80" VerticalAlignment="Center" />
-                            </Grid>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </Border>
-
-              </Grid>
-
             </StackPanel>
           </Border>
 
@@ -1551,26 +1511,26 @@
               </Grid>
             </Border>
 
-            <!-- KPI 3: Netto-Finanzbilanz -->
+            <!-- KPI 3: Schiffseinsätze & Flotte -->
             <Border Grid.Column="2" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
               <Grid ColumnDefinitions="Auto,*">
-                <TextBlock Grid.Column="0" Text="💰" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="0" Text="🛸" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1">
-                  <TextBlock Text="FINANZEN (NETTO-PROFIT)" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
-                  <TextBlock Text="{Binding FlightSummary.NetAuecText}" FontSize="13.5" FontWeight="Bold" Foreground="{Binding FlightSummary.NetAuecColor}" />
-                  <TextBlock Text="Einnahmen minus Ausgaben" FontSize="10.5" Foreground="#8B949E" />
+                  <TextBlock Text="SCHIFFSEINSÄTZE" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.SortieCount, StringFormat='{}{0} Starts'}" FontSize="13.5" FontWeight="Bold" Foreground="#38BDF8" />
+                  <TextBlock Text="{Binding FlightSummary.ShipsUsedText}" FontSize="10.5" Foreground="#8B949E" />
                 </StackPanel>
               </Grid>
             </Border>
 
-            <!-- KPI 4: Gefechts-Bilanz -->
+            <!-- KPI 4: Navigation & Himmelskörper -->
             <Border Grid.Column="3" Background="#060C16" BorderBrush="#172B40" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,8,0">
               <Grid ColumnDefinitions="Auto,*">
-                <TextBlock Grid.Column="0" Text="⚔️" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="0" Text="🪐" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1">
-                  <TextBlock Text="KAMPFREKORD" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
-                  <TextBlock Text="{Binding FlightSummary.CombatKdRatio}" FontSize="13.5" FontWeight="Bold" Foreground="#34D399" />
-                  <TextBlock Text="{Binding FlightSummary.Kills, StringFormat='{}{0} Kills · {1} Verluste', FallbackValue='0 Kills', TargetNullValue='0 Kills'}" FontSize="10.5" Foreground="#8B949E" />
+                  <TextBlock Text="NAVIGATION &amp; ZONEN" FontSize="9.5" FontWeight="Bold" Foreground="#7E97AD" LetterSpacing="0.5" />
+                  <TextBlock Text="{Binding FlightSummary.VisitedBodies.Count, StringFormat='{}{0} Himmelskörper'}" FontSize="13.5" FontWeight="Bold" Foreground="#34D399" />
+                  <TextBlock Text="{Binding FlightSummary.VisitedBodiesText}" FontSize="10.5" Foreground="#8B949E" />
                 </StackPanel>
               </Grid>
             </Border>
@@ -1601,26 +1561,33 @@
           <Border Grid.Column="0" Classes="card" Padding="12" Margin="0,0,8,0">
             <DockPanel>
               
-              <!-- Filter-Leiste & Volltextsuche -->
-              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Button Classes="chip" Content="Alle Ereignisse" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Alle"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
-                    <Button Classes="chip" Content="🌀 Quantum" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Quantum"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Quantum}" />
-                    <Button Classes="chip" Content="⚔️ Kampf" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Kampf"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Kampf}" />
-                    <Button Classes="chip" Content="💰 Handel" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Handel"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Handel}" />
-                    <Button Classes="chip" Content="⛏️ Mining" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Mining"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Mining}" />
-                    <Button Classes="chip" Content="📍 Orte &amp; Landung" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Orte"
-                            Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
+              <!-- Filter-Leiste & Volltextsuche (OHNE störende Scrollbars!) -->
+              <Grid DockPanel.Dock="Top" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                <!-- Zeile 1: Flug-Explorer & Volltextsuche -->
+                <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="FLUG-EXPLORER:" Classes="label" FontSize="10.5" FontWeight="Bold" Foreground="#7E97AD" VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding FlightSessions}"
+                              SelectedItem="{Binding SelectedFlightSession}"
+                              Width="260" Height="28" FontSize="11" />
                   </StackPanel>
-                </ScrollViewer>
 
-                <TextBox Grid.Column="1" Classes="search" Text="{Binding TimelineSearchText}" Watermark="Timeline durchsuchen…" Width="200" Height="28" Margin="8,0,0,0" />
+                  <TextBox Grid.Column="2" Classes="search" Text="{Binding TimelineSearchText}" Watermark="Timeline durchsuchen…" Width="200" Height="28" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Zeile 2: Schnelle Flug-Ereignis Filter Chips -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6">
+                  <Button Classes="chip" Content="Alle Ereignisse" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Alle"
+                          Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Alle}" />
+                  <Button Classes="chip" Content="🌀 Quantum" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Quantum"
+                          Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Quantum}" />
+                  <Button Classes="chip" Content="🛸 Schiffe" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Schiffe"
+                          Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Schiffe}" />
+                  <Button Classes="chip" Content="📍 Orte &amp; Landung" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Orte"
+                          Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Orte}" />
+                  <Button Classes="chip" Content="💥 Vorfälle &amp; Verluste" Command="{Binding SelectTimelineFilterCommand}" CommandParameter="Verluste"
+                          Background="{Binding SelectedTimelineFilter, Converter={StaticResource FilterBg}, ConverterParameter=Verluste}" />
+                </StackPanel>
               </Grid>
 
               <!-- Timeline Items Liste -->
@@ -1649,8 +1616,8 @@
                           <TextBlock Text="{Binding RelativeTimeText}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="9.5" Foreground="#7E97AD" />
                         </StackPanel>
 
-                        <!-- Spalte 1: Icon & Typ-Badge -->
-                        <Border Grid.Column="1" Background="#08101C" BorderBrush="{Binding BadgeBorder}" BorderThickness="1" CornerRadius="6" Width="36" Height="36" Margin="8,0,12,0" VerticalAlignment="Center">
+                        <!-- Spalte 1: Icon Badge -->
+                        <Border Grid.Column="1" Background="#0D1B2A" BorderBrush="{Binding BadgeBorder}" BorderThickness="1" CornerRadius="6" Width="34" Height="34" Margin="10,0,12,0">
                           <TextBlock Text="{Binding IconGlyph}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 
@@ -1666,14 +1633,13 @@
                           <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="#64748B" TextTrimming="CharacterEllipsis" IsVisible="{Binding Detail.Length}" />
                         </StackPanel>
 
-                        <!-- Spalte 3: Distanz / Delta / Map Button -->
+                        <!-- Spalte 3: Distanz / Map Button -->
                         <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
-                          <TextBlock Text="{Binding DeltaAuecText}" Foreground="{Binding DeltaAuecColor}" FontWeight="Bold" FontSize="11.5" HorizontalAlignment="Right" IsVisible="{Binding DeltaAuecText.Length}" />
                           <TextBlock Text="{Binding DistanceText}" Foreground="#818CF8" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding DistanceText.Length}" />
                           <Button Classes="ghost" Padding="6,2" CornerRadius="4" HorizontalAlignment="Right"
                                   Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).JumpToTimelineLocationCommand}"
                                   CommandParameter="{Binding}"
-                                  ToolTip.Tip="Diesen Wegpunkt auf der Starmap anzeigen"
+                                  ToolTip.Tip="Diesen Wegpunkt auf der Starmap fokussieren"
                                   IsVisible="{Binding LocationName.Length}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <TextBlock Text="🗺" FontSize="10" />
@@ -1691,98 +1657,96 @@
             </DockPanel>
           </Border>
 
-          <!-- Rechte Spalte: Detail-Inspektor & Session-Analysen -->
-          <Border Grid.Column="1" Classes="card" Padding="12">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="10">
-                
-                <!-- 1. Header -->
-                <TextBlock Text="🛰  BLACK BOX DETAIL-INSPEKTOR" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.5" />
+          <!-- Rechte Spalte: Detail-Inspektor & Session-Analysen (wie QuantumWake) -->
+          <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="10">
+              
+              <!-- 1. Header -->
+              <TextBlock Text="🛰  BLACK BOX DETAIL-INSPEKTOR" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.5" />
 
-                <!-- 2. Selektiertes Ereignis Detail -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
-                  <StackPanel Spacing="6">
-                    <TextBlock Text="AUSGEWÄHLTER FLUGWEGPUNKT" FontSize="9.5" FontWeight="Bold" Foreground="#8B949E" />
-                    
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,4,0,0">
-                      <TextBlock Grid.Row="0" Grid.Column="0" Text="Ereignis:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
-                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTimelineItem.TypeLabel, FallbackValue='Keine Auswahl'}" Foreground="#F0F6FC" FontWeight="Bold" FontSize="11" />
+              <!-- 2. Selektiertes Ereignis Detail -->
+              <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="AUSGEWÄHLTER FLUGWEGPUNKT" FontSize="9.5" FontWeight="Bold" Foreground="#8B949E" />
+                  
+                  <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Ereignis:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTimelineItem.TypeLabel, FallbackValue='Keine Auswahl'}" Foreground="#F0F6FC" FontWeight="Bold" FontSize="11" />
 
-                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Zeitstempel:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
-                      <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTimelineItem.FormattedTime, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Zeitstempel:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTimelineItem.FormattedTime, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
 
-                      <TextBlock Grid.Row="2" Grid.Column="0" Text="Standort:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
-                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedTimelineItem.LocationName, FallbackValue='—'}" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="11" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Standort:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedTimelineItem.LocationName, FallbackValue='—'}" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="11" />
 
-                      <TextBlock Grid.Row="3" Grid.Column="0" Text="Schiff:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
-                      <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedTimelineItem.ShipName, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
-                    </Grid>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Schiff:" Foreground="#7E97AD" FontSize="11" Margin="0,0,8,4" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedTimelineItem.ShipName, FallbackValue='—'}" Foreground="#F0F6FC" FontSize="11" />
+                  </Grid>
 
-                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
-                            Command="{Binding JumpToTimelineLocationCommand}"
-                            CommandParameter="{Binding SelectedTimelineItem}"
-                            IsEnabled="{Binding SelectedTimelineItem, Converter={x:Static ObjectConverters.IsNotNull}}">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="🗺" />
-                        <TextBlock Text="Ort auf Starmap fokussieren" FontWeight="Bold" FontSize="11" />
-                      </StackPanel>
-                    </Button>
-                  </StackPanel>
-                </Border>
+                  <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
+                          Command="{Binding JumpToTimelineLocationCommand}"
+                          CommandParameter="{Binding SelectedTimelineItem}"
+                          IsEnabled="{Binding SelectedTimelineItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="🗺" />
+                      <TextBlock Text="Ort im großen Karten-Tab fokussieren" FontWeight="Bold" FontSize="11" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </Border>
 
-                <!-- 3. Besuchte Himmelskörper -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Text="🪐  BESUCHTE HIMMELSKÖRPER" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
-                      <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
-                        <TextBlock Text="{Binding FlightSummary.VisitedBodies.Count, StringFormat='{}{0} Zonen'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
-                      </Border>
-                    </Grid>
+              <!-- 3. Besuchte Himmelskörper -->
+              <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="🪐  BESUCHTE HIMMELSKÖRPER" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
+                    <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
+                      <TextBlock Text="{Binding FlightSummary.VisitedBodies.Count, StringFormat='{}{0} Zonen'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+                    </Border>
+                  </Grid>
 
-                    <ItemsControl ItemsSource="{Binding FlightSummary.VisitedBodies}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="🪐" Foreground="#F59E0B" VerticalAlignment="Center" />
-                              <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </Border>
+                  <ItemsControl ItemsSource="{Binding FlightSummary.VisitedBodies}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="🪐" Foreground="#F59E0B" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
 
-                <!-- 4. Eingesetzte Schiffe -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Text="🛸  EINGESETZTE SCHIFFE" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
-                      <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
-                        <TextBlock Text="{Binding FlightSummary.UsedShips.Count, StringFormat='{}{0} Schiffe'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
-                      </Border>
-                    </Grid>
+              <!-- 4. Eingesetzte Schiffe -->
+              <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="🛸  EINGESETZTE SCHIFFE" FontSize="10.5" FontWeight="Bold" Foreground="#F0F6FC" />
+                    <Border Grid.Column="1" Background="#21262D" CornerRadius="4" Padding="5,1">
+                      <TextBlock Text="{Binding FlightSummary.UsedShips.Count, StringFormat='{}{0} Schiffe'}" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" />
+                    </Border>
+                  </Grid>
 
-                    <ItemsControl ItemsSource="{Binding FlightSummary.UsedShips}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="✈" Foreground="#38BDF8" VerticalAlignment="Center" />
-                              <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </Border>
+                  <ItemsControl ItemsSource="{Binding FlightSummary.UsedShips}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="✈" Foreground="#38BDF8" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding}" FontSize="11" Foreground="#F0F6FC" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
 
-              </StackPanel>
-            </ScrollViewer>
-          </Border>
+            </StackPanel>
+          </ScrollViewer>
 
         </Grid>
       </Grid>
@@ -1986,7 +1950,80 @@
 
           </Grid>
 
-          <!-- 3. Vollständige Star Citizen 4.x Signatur-Referenztabelle -->
+          <!-- 3. 🏭 Raffinerie-Aufträge & Live-Timer -->
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <TextBlock Classes="label" Text="🏭  RAFFINERIE-AUFTRÄGE &amp; LIVE-TIMER" />
+                  <TextBlock Text="Verwalte aktive Veredelungsaufträge. SCLogMate benachrichtigt dich per Toast, sobald dein Erz fertig veredelt ist." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+
+                <!-- Neuen Veredelungsauftrag erfassen -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                  <ComboBox ItemsSource="{Binding AvailableRefineryStations}" SelectedItem="{Binding NewRefineryStation}" Width="190" Height="28" VerticalAlignment="Center" />
+                  <ComboBox ItemsSource="{Binding AvailableRefineryMaterials}" SelectedItem="{Binding NewRefineryMaterial}" Width="130" Height="28" VerticalAlignment="Center" />
+                  <ComboBox ItemsSource="{Binding AvailableRefineryMethods}" SelectedItem="{Binding NewRefineryMethod}" Width="210" Height="28" VerticalAlignment="Center" />
+                  <NumericUpDown Value="{Binding NewRefineryScu}" Minimum="1" Maximum="1000" Width="90" Height="28" VerticalAlignment="Center" FormatString="{}{0} SCU" />
+                  <Button Classes="accent" Command="{Binding AddRefineryJobCommand}" Content="➕ Starten" Height="28" Padding="10,2" VerticalAlignment="Center" />
+                </StackPanel>
+              </Grid>
+
+              <!-- Liste der aktiven Aufträge -->
+              <ItemsControl ItemsSource="{Binding RefineryJobs}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="core:RefineryJob">
+                    <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,3">
+                      <Grid ColumnDefinitions="220,140,*,Auto,Auto">
+                        <!-- Station & Material -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Material, StringFormat='{}{0}'}" Foreground="#F0F6FC" FontWeight="Bold" FontSize="12" />
+                          <TextBlock Text="{Binding Station}" Foreground="#8B949E" FontSize="10.5" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <!-- Menge & Methode -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding OutputScu, StringFormat='{}{0} SCU Ertrag'}" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="11" />
+                          <TextBlock Text="{Binding Method}" Foreground="#6E7681" FontSize="10" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <!-- Fortschritt & Timer -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0" Spacing="3">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="{Binding StatusColor}" FontWeight="SemiBold" FontSize="11" />
+                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat='{}{0:F0}%'}" Foreground="#8B949E" FontSize="10" />
+                          </Grid>
+                          <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Height="5" CornerRadius="2"
+                                       Foreground="#3FB950" Background="#161B22" />
+                        </StackPanel>
+
+                        <!-- Schätzwert -->
+                        <Border Grid.Column="3" Background="#061810" BorderBrush="#1D6A35" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="6,0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding EstimatedValueAuec, StringFormat='{}{0:N0} aUEC'}" Foreground="#3FB950" FontWeight="Bold" FontSize="11" />
+                        </Border>
+
+                        <!-- Aktionen -->
+                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                          <Button Classes="ghost" Padding="6,2" CornerRadius="4"
+                                  Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).CollectRefineryJobCommand}"
+                                  CommandParameter="{Binding}" IsVisible="{Binding !IsCollected}" ToolTip.Tip="Als abgeholt markieren">
+                            <TextBlock Text="✓ Abholen" FontSize="10.5" Foreground="#38BDF8" FontWeight="Bold" />
+                          </Button>
+                          <Button Classes="ghost" Padding="4,2" CornerRadius="4"
+                                  Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).DeleteRefineryJobCommand}"
+                                  CommandParameter="{Binding}" ToolTip.Tip="Auftrag löschen">
+                            <TextBlock Text="✕" FontSize="10" Foreground="#8B949E" />
+                          </Button>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <!-- 4. Vollständige Star Citizen 4.x Signatur-Referenztabelle -->
           <Border Classes="card">
             <StackPanel Spacing="10">
               <TextBlock Classes="label" Text="📖  VOLLSTÄNDIGER STAR CITIZEN 4.x ERZ- &amp; SIGNATUR-KATALOG" />

@@ -20,7 +20,9 @@ public enum TimelineItemType
 public sealed class FlightTimelineItem
 {
     public DateTime Timestamp { get; set; }
-    public string FormattedTime => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+    public string FormattedTime => Timestamp.ToLocalTime().Date == DateTime.Today
+        ? Timestamp.ToLocalTime().ToString("HH:mm:ss")
+        : Timestamp.ToLocalTime().ToString("dd.MM. HH:mm");
     public string RelativeTimeText { get; set; } = "+00:00";
     public TimelineItemType Type { get; set; } = TimelineItemType.Generic
     ;

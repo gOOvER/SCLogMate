@@ -962,6 +962,7 @@ public partial class MainViewModel : ObservableObject
                         RefreshSessions(selectCurrent: false);
                         var wipeSince = GetEffectiveWipeDate();
                         RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
+                        LoadIndependentFinancesAsync();
                     });
                 }
                 else if (unindexedCount > 0)
@@ -989,11 +990,16 @@ public partial class MainViewModel : ObservableObject
                         RefreshSessions(selectCurrent: false);
                         var wipeSince = GetEffectiveWipeDate();
                         RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
+                        LoadIndependentFinancesAsync();
                         if (added > 0)
                         {
                             Status = $"✓ {added} neue Session(s) automatisch im Hintergrund indexiert.";
                         }
                     });
+                }
+                else
+                {
+                    Dispatcher.UIThread.Post(LoadIndependentFinancesAsync);
                 }
             }
             catch (Exception ex)
@@ -1733,7 +1739,7 @@ public partial class MainViewModel : ObservableObject
     public long SessionNetSign => LiveSessionNet;
     public string LiveBalanceText => ExpectedBalance > 0 ? $"{ExpectedBalance:N0} aUEC" : StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
 
-    // Geld-Statistik (eigener Tab)
+    // Geld-Statistik & Sci-Fi Vektor-Diagramme (eigener Tab)
     public ObservableCollection<StatItem> IncomeStats { get; } = new();
     public ObservableCollection<StatItem> SpendStats { get; } = new();
     public ObservableCollection<StatItem> TopTransactions { get; } = new();
@@ -1748,25 +1754,399 @@ public partial class MainViewModel : ObservableObject
     public bool HasMissionFactions => MissionFactions.Count > 0;
     public string MissionsTotalText => $"{_missionTotal:N0} Missionen · {MissionFactions.Count} Auftraggeber";
     int _missionTotal;
-    public string IncomeTotalText => $"{IncomeAll:N0} aUEC";
-    public string SpendTotalText => $"{SpendAll:N0} aUEC";
+
+    // ---- Unabhängiges Daten-Subsystem (Standard: Alle Sessions / Historie) ----
+    private List<LogEntry> _allDbFinanceEvents = new();
+    private List<LogEntry> _allDbTrades = new();
+    private List<LogEntry> _allDbTopMoney = new();
+    private List<LogEntry> _allDbRecentMoney = new();
+    private List<LogEntry> _allDbTimelineEvents = new();
+    private List<LogEntry> _allDbMissionEvents = new();
+    private Database.Agg _allDbFinanceAgg = new();
+    private bool _historyLoaded = false;
+
+    private List<LogEntry> _liveTimelineEvents = new();
+    private List<LogEntry> _liveMissionEvents = new();
+
+    // Starmap-Integration für Flugschreiber
+    private string _flightRecorderSelectedSystem = "Stanton";
+    public string FlightRecorderSelectedSystem
+    {
+        get => _flightRecorderSelectedSystem;
+        set => SetProperty(ref _flightRecorderSelectedSystem, value);
+    }
+
+    private StarmapObject? _flightRecorderSelectedObject;
+    public StarmapObject? FlightRecorderSelectedObject
+    {
+        get => _flightRecorderSelectedObject;
+        set => SetProperty(ref _flightRecorderSelectedObject, value);
+    }
+
+    public ObservableCollection<string> FlightRouteLocations { get; } = new();
+
+    public ObservableCollection<SessionInfo> FlightSessions { get; } = new();
+    private SessionInfo? _selectedFlightSession;
+    public SessionInfo? SelectedFlightSession
+    {
+        get => _selectedFlightSession;
+        set
+        {
+            if (SetProperty(ref _selectedFlightSession, value))
+            {
+                OnFlightSessionChanged();
+            }
+        }
+    }
+
+    [RelayCommand]
+    public void SetFlightRecorderSystem(string system)
+    {
+        if (!string.IsNullOrEmpty(system) && StarmapData.SystemNames.Contains(system))
+        {
+            FlightRecorderSelectedSystem = system;
+            var sysStar = StarmapData.GetSystemObjects(system).FirstOrDefault(o => o.Type == StarmapObjectType.Star);
+            if (sysStar != null) FlightRecorderSelectedObject = sysStar;
+        }
+    }
+
+    private void OnFlightSessionChanged()
+    {
+        var targetScope = (SelectedFlightSession == null || SelectedFlightSession.IsAll) ? 0
+                        : (SelectedFlightSession.IsCurrent ? 1 : 2);
+
+        if (_timelineScope != targetScope)
+        {
+            TimelineScope = targetScope;
+        }
+        else
+        {
+            RebuildIndependentTimeline();
+        }
+    }
+
+    public void RefreshFlightSessions()
+    {
+        var prev = SelectedFlightSession?.Path;
+        FlightSessions.Clear();
+        foreach (var s in Sessions)
+        {
+            FlightSessions.Add(s);
+        }
+        SelectedFlightSession = FlightSessions.FirstOrDefault(x => x.Path == prev)
+                                ?? FlightSessions.FirstOrDefault(x => x.IsAll)
+                                ?? FlightSessions.FirstOrDefault();
+    }
+
+    private int _timelineScope = 0; // 0 = Alle Sessions (Standard), 1 = Aktuelle Session, 2 = Spezifisch
+    public int TimelineScope
+    {
+        get => _timelineScope;
+        set
+        {
+            if (SetProperty(ref _timelineScope, value))
+            {
+                RebuildIndependentTimeline();
+                OnPropertyChanged(nameof(IsTimelineScopeAll));
+                OnPropertyChanged(nameof(IsTimelineScopeCurrent));
+            }
+        }
+    }
+    public bool IsTimelineScopeAll => TimelineScope == 0;
+    public bool IsTimelineScopeCurrent => TimelineScope == 1;
+
+    [RelayCommand]
+    public void SetTimelineScope(string scopeStr)
+    {
+        if (int.TryParse(scopeStr, out var s))
+            TimelineScope = s;
+    }
+
+    private int _financeScope = 0; // 0 = Alle Sessions (Standard), 1 = Aktuelle Session
+    public int FinanceScope
+    {
+        get => _financeScope;
+        set
+        {
+            if (SetProperty(ref _financeScope, value))
+            {
+                RebuildIndependentFinances();
+                OnPropertyChanged(nameof(IsFinanceScopeAll));
+                OnPropertyChanged(nameof(IsFinanceScopeCurrent));
+            }
+        }
+    }
+    public bool IsFinanceScopeAll => FinanceScope == 0;
+    public bool IsFinanceScopeCurrent => FinanceScope == 1;
+
+    [RelayCommand]
+    public void SetFinanceScope(string scopeStr)
+    {
+        if (int.TryParse(scopeStr, out var s))
+            FinanceScope = s;
+    }
+
+    public long FinanceIncomeAll => FinanceScope == 0
+        ? (_allDbFinanceAgg.In + _allDbFinanceAgg.Reward + _allDbFinanceAgg.Sales + _allDbFinanceAgg.Trade + _liveMoney.Where(e => e.Amount > 0).Sum(e => e.Amount))
+        : Events.Where(e => IsMoney(e.Kind) && e.Amount > 0).Sum(e => e.Amount);
+
+    public long FinanceSpendAll => FinanceScope == 0
+        ? (_allDbFinanceAgg.Out + _allDbFinanceAgg.Purchases + _liveMoney.Where(e => e.Amount < 0).Sum(e => System.Math.Abs(e.Amount)))
+        : Events.Where(e => IsMoney(e.Kind) && e.Amount < 0).Sum(e => System.Math.Abs(e.Amount));
+
+    public long FinanceNetAll => FinanceIncomeAll - FinanceSpendAll;
+
+    public string FinanceIncomeTotalText => $"{FinanceIncomeAll:N0} aUEC";
+    public string FinanceSpendTotalText => $"{FinanceSpendAll:N0} aUEC";
+    public string FinanceNetBalanceText => $"{(FinanceNetAll >= 0 ? "+" : "")}{FinanceNetAll:N0} aUEC";
+    public long FinanceNetSign => FinanceNetAll;
+
+    public string IncomeTotalText => FinanceIncomeTotalText;
+    public string SpendTotalText => FinanceSpendTotalText;
+
+    // Interaktives Sci-Fi Finanz-Diagramm (QuantumWake-Stil)
+    public ObservableCollection<FinanceTimelinePoint> FinanceChartPoints { get; } = new();
+
+    int _selectedFinanceChartMode = 0;
+    public int SelectedFinanceChartMode
+    {
+        get => _selectedFinanceChartMode;
+        set
+        {
+            if (SetProperty(ref _selectedFinanceChartMode, value))
+            {
+                RebuildFinanceChart();
+                OnPropertyChanged(nameof(IsChartModeCumulative));
+                OnPropertyChanged(nameof(IsChartModeNetTrend));
+                OnPropertyChanged(nameof(IsChartModeCashflow));
+            }
+        }
+    }
+
+    public bool IsChartModeCumulative => SelectedFinanceChartMode == 0;
+    public bool IsChartModeNetTrend => SelectedFinanceChartMode == 1;
+    public bool IsChartModeCashflow => SelectedFinanceChartMode == 2;
+
+    int _selectedFinanceChartFilter = 0;
+    public int SelectedFinanceChartFilter
+    {
+        get => _selectedFinanceChartFilter;
+        set
+        {
+            if (SetProperty(ref _selectedFinanceChartFilter, value))
+            {
+                RebuildFinanceChart();
+                OnPropertyChanged(nameof(IsChartFilterAll));
+                OnPropertyChanged(nameof(IsChartFilterTrade));
+                OnPropertyChanged(nameof(IsChartFilterMissions));
+            }
+        }
+    }
+
+    public bool IsChartFilterAll => SelectedFinanceChartFilter == 0;
+    public bool IsChartFilterTrade => SelectedFinanceChartFilter == 1;
+    public bool IsChartFilterMissions => SelectedFinanceChartFilter == 2;
+
+    public string ProfitMarginText { get; private set; } = "0.0%";
+    public string TotalCargoAuecText { get; private set; } = "0 aUEC";
+    public string TotalCargoScuText { get; private set; } = "0 SCU";
+
+    [RelayCommand]
+    public void SetFinanceChartMode(string modeStr)
+    {
+        if (int.TryParse(modeStr, out var m))
+            SelectedFinanceChartMode = m;
+    }
+
+    [RelayCommand]
+    public void SetFinanceChartFilter(string filterStr)
+    {
+        if (int.TryParse(filterStr, out var f))
+            SelectedFinanceChartFilter = f;
+    }
 
     const double BarMax = 280.0;
 
-    void RebuildStats()
+    public void LoadGlobalDataAsync()
+    {
+        var liveLog = LogPath;
+        var dir = Path.GetDirectoryName(liveLog) ?? ".";
+        var backupDir = Path.Combine(dir, "logbackups");
+
+        Task.Run(() =>
+        {
+            try
+            {
+                var backups = Directory.Exists(backupDir)
+                    ? Directory.GetFiles(backupDir, "*.log")
+                    : System.Array.Empty<string>();
+
+                if (backups.Length > 0)
+                {
+                    var archived = LogArchive.Sync(backups);
+                    Database.Init();
+                    Database.IndexNew(archived);
+                }
+                else
+                {
+                    Database.Init();
+                }
+
+                var wipeSince = GetEffectiveWipeDate();
+                var agg = Database.Aggregate(wipeSince, WipeFilterMoney, WipeFilterContracts, WipeFilterFleet);
+                var financeEvents = Database.AllFinanceEvents(WipeFilterMoney ? wipeSince : null);
+                var trades = Database.AllTrades();
+                var topMoney = Database.TopMoney(40);
+                var recentMoney = Database.RecentMoneyEvents(30);
+                var timelineEvents = Database.AllTimelineEvents(WipeFilterFleet ? wipeSince : null);
+                var missionEvents = Database.AllMissionTakenEvents();
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _allDbFinanceAgg = agg;
+                    _allDbFinanceEvents = financeEvents;
+                    _allDbTrades = trades;
+                    _allDbTopMoney = topMoney;
+                    _allDbRecentMoney = recentMoney;
+                    _allDbTimelineEvents = timelineEvents;
+                    _allDbMissionEvents = missionEvents;
+                    _historyLoaded = true;
+
+                    RebuildIndependentFinances();
+                    RebuildIndependentTimeline();
+                    RebuildIndependentMissions();
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("LoadGlobalDataAsync", ex);
+            }
+        });
+    }
+
+    public void LoadIndependentFinancesAsync() => LoadGlobalDataAsync();
+
+    public void RebuildIndependentFinances()
     {
         RebuildBars();
-        // Top aus der aktuellen Events-Liste (Live-/Einzelsession)
-        var top = Events.Where(e => IsMoney(e.Kind))
-                        .OrderByDescending(e => System.Math.Abs(e.Amount))
-                        .Take(8)
-                        .OrderBy(e => System.Math.Abs(e.Amount))
-                        .ToList();
-        SetTopTransactions(top);
-        RebuildCommodityTrades(Events.Where(e => e.Kind == EventKind.Trade));
-        RebuildMarketPrices(Events.Where(e => e.Kind == EventKind.Trade));
-        RebuildMissions(Events.Where(e => e.Kind == EventKind.MissionTaken));
-        RebuildTimeline();
+
+        if (FinanceScope == 0)
+        {
+            var trades = _allDbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade));
+            RebuildCommodityTrades(trades);
+            RebuildMarketPrices(trades);
+
+            var top = _allDbTopMoney.Concat(_liveMoney.Where(x => IsMoney(x.Kind)))
+                                    .OrderByDescending(e => System.Math.Abs(e.Amount))
+                                    .Take(8)
+                                    .OrderBy(e => System.Math.Abs(e.Amount));
+            SetTopTransactions(top);
+
+            var recent = _liveMoney.Where(x => IsMoney(x.Kind))
+                                   .Concat(_allDbRecentMoney)
+                                   .Take(20);
+            RecentMoney.Clear();
+            foreach (var e in recent)
+            {
+                RecentMoney.Add(new StatItem
+                {
+                    Label = e.Detail ?? e.KindText,
+                    Value = e.Amount,
+                    Time = e.Time,
+                    Color = Brush(e.Amount >= 0 ? "#4ADE80" : "#F87171")
+                });
+            }
+        }
+        else
+        {
+            var sessionTrades = Events.Where(e => e.Kind == EventKind.Trade);
+            RebuildCommodityTrades(sessionTrades);
+            RebuildMarketPrices(sessionTrades);
+
+            var sessionTop = Events.Where(e => IsMoney(e.Kind))
+                                   .OrderByDescending(e => System.Math.Abs(e.Amount))
+                                   .Take(8)
+                                   .OrderBy(e => System.Math.Abs(e.Amount));
+            SetTopTransactions(sessionTop);
+
+            RecentMoney.Clear();
+            foreach (var e in Events.Where(e => IsMoney(e.Kind)).Take(20))
+            {
+                RecentMoney.Add(new StatItem
+                {
+                    Label = e.Detail ?? e.KindText,
+                    Value = e.Amount,
+                    Time = e.Time,
+                    Color = Brush(e.Amount >= 0 ? "#4ADE80" : "#F87171")
+                });
+            }
+        }
+
+        RebuildFinanceChart();
+    }
+
+    public void RebuildIndependentTimeline()
+    {
+        IEnumerable<LogEntry> source;
+        if (TimelineScope == 0)
+        {
+            source = _allDbTimelineEvents.Concat(_liveTimelineEvents);
+        }
+        else if (TimelineScope == 1)
+        {
+            source = Events.Where(IsTimelineRelevant);
+        }
+        else if (SelectedFlightSession != null && !string.IsNullOrEmpty(SelectedFlightSession.Path))
+        {
+            var fname = Path.GetFileName(SelectedFlightSession.Path);
+            var sessionEvents = Database.GetTimelineEventsForSession(fname);
+            source = sessionEvents.Count > 0 ? sessionEvents : Events.Where(IsTimelineRelevant);
+        }
+        else
+        {
+            source = _allDbTimelineEvents.Concat(_liveTimelineEvents);
+        }
+
+        var (items, summary) = FlightRecorderService.BuildTimeline(source);
+        SessionTimeline.Clear();
+        FlightRouteLocations.Clear();
+        foreach (var item in items)
+        {
+            SessionTimeline.Add(item);
+            if (!string.IsNullOrWhiteSpace(item.LocationName) && item.LocationName != "—")
+            {
+                FlightRouteLocations.Add(item.LocationName);
+            }
+        }
+
+        // Automatische System-Erkennung für Starmap im Flugschreiber
+        var lastLocItem = items.LastOrDefault(i => !string.IsNullOrEmpty(i.SystemName) && StarmapData.SystemNames.Contains(i.SystemName));
+        if (lastLocItem != null)
+        {
+            FlightRecorderSelectedSystem = lastLocItem.SystemName;
+            var obj = StarmapData.FindObject(lastLocItem.LocationName);
+            if (obj != null) FlightRecorderSelectedObject = obj;
+        }
+
+        FlightSummary = summary;
+        TimelineView?.Refresh();
+        OnPropertyChanged(nameof(FlightSummary));
+    }
+
+    static bool IsTimelineRelevant(LogEntry e) =>
+        e.Kind is EventKind.Vehicle or EventKind.ShipLoss or EventKind.Quantum or EventKind.Location or EventKind.Hangar or EventKind.Crash or EventKind.Death;
+
+    public void RebuildIndependentMissions()
+    {
+        var source = _allDbMissionEvents.Concat(_liveMissionEvents);
+        RebuildMissions(source);
+    }
+
+    void RebuildStats()
+    {
+        RebuildIndependentFinances();
+        RebuildIndependentTimeline();
+        RebuildIndependentMissions();
     }
 
     void SetTopTransactions(System.Collections.Generic.IEnumerable<LogEntry> events)
@@ -1776,15 +2156,16 @@ public partial class MainViewModel : ObservableObject
         foreach (var e in list) max = System.Math.Max(max, System.Math.Abs(e.Amount));
         TopTransactions.Clear();
         foreach (var e in list)
+        {
             TopTransactions.Add(new StatItem
             {
-                Label = $"{e.KindText}: {e.Detail}",
+                Label = e.Detail ?? e.KindText,
                 Value = e.Amount,
                 Time = e.Time,
                 BarWidth = System.Math.Abs(e.Amount) / (double)max * BarMax,
                 Color = Brush(e.Amount >= 0 ? "#4ADE80" : "#F87171")
             });
-        RebuildRecentMoney();
+        }
     }
 
     // Letzte Geld-Bewegungen, neueste zuerst (mit Datum).
@@ -1801,35 +2182,197 @@ public partial class MainViewModel : ObservableObject
             });
     }
 
+    void RebuildFinanceChart()
+    {
+        IEnumerable<LogEntry> source = FinanceScope == 0
+            ? _allDbFinanceEvents.Concat(_liveMoney.Where(x => IsMoney(x.Kind)))
+            : Events.Where(x => IsMoney(x.Kind));
+
+        if (SelectedFinanceChartFilter == 1) // Nur Fracht
+        {
+            source = source.Where(x => x.Kind == EventKind.Trade);
+        }
+        else if (SelectedFinanceChartFilter == 2) // Nur Belohnungen & Transfers
+        {
+            source = source.Where(x => x.Kind is EventKind.MissionReward or EventKind.TransferIn or EventKind.TransferOut);
+        }
+
+        var sorted = source.OrderBy(x => x.Time).ToList();
+
+        long runningInc = 0;
+        long runningSpd = 0;
+        long runningNet = 0;
+
+        var pts = new List<FinanceTimelinePoint>(sorted.Count + 1);
+
+        if (sorted.Count > 0)
+        {
+            var firstTime = sorted[0].Time;
+            pts.Add(new FinanceTimelinePoint
+            {
+                Time = firstTime.AddSeconds(-1),
+                Amount = 0,
+                CumulativeIncome = 0,
+                CumulativeSpend = 0,
+                CumulativeNet = 0,
+                Label = "Start",
+                Kind = EventKind.Info,
+                Detail = "Startpunkt"
+            });
+        }
+
+        long totalCargoAuec = 0;
+        long totalCargoScu = 0;
+
+        foreach (var e in sorted)
+        {
+            if (e.Amount >= 0)
+            {
+                runningInc += e.Amount;
+            }
+            else
+            {
+                runningSpd += System.Math.Abs(e.Amount);
+            }
+            runningNet = runningInc - runningSpd;
+
+            if (e.Kind == EventKind.Trade)
+            {
+                totalCargoAuec += System.Math.Abs(e.Amount);
+                var m = TradeDetailRegex().Match(e.Detail ?? "");
+                if (m.Success && long.TryParse(m.Groups["scu"].Value, out var scu))
+                {
+                    totalCargoScu += scu;
+                }
+            }
+
+            pts.Add(new FinanceTimelinePoint
+            {
+                Time = e.Time,
+                Amount = e.Amount,
+                CumulativeIncome = runningInc,
+                CumulativeSpend = runningSpd,
+                CumulativeNet = runningNet,
+                Label = $"{e.KindText}: {e.Detail}",
+                Kind = e.Kind,
+                Detail = e.Detail ?? e.KindText
+            });
+        }
+
+        FinanceChartPoints.Clear();
+        foreach (var p in pts)
+        {
+            FinanceChartPoints.Add(p);
+        }
+
+        // Gewinnspanne & Metriken
+        long spend = FinanceSpendAll;
+        long inc = FinanceIncomeAll;
+        if (spend > 0)
+        {
+            double margin = ((double)(inc - spend) / spend) * 100.0;
+            ProfitMarginText = $"{(margin >= 0 ? "+" : "")}{margin:F1}%";
+        }
+        else if (inc > 0) ProfitMarginText = "+100%";
+        else ProfitMarginText = "0.0%";
+
+        TotalCargoAuecText = $"{totalCargoAuec:N0} aUEC";
+        TotalCargoScuText = $"{totalCargoScu:N0} SCU";
+
+        OnPropertyChanged(nameof(ProfitMarginText));
+        OnPropertyChanged(nameof(TotalCargoAuecText));
+        OnPropertyChanged(nameof(TotalCargoScuText));
+        OnPropertyChanged(nameof(FinanceIncomeTotalText));
+        OnPropertyChanged(nameof(FinanceSpendTotalText));
+        OnPropertyChanged(nameof(FinanceNetBalanceText));
+        OnPropertyChanged(nameof(FinanceNetSign));
+        OnPropertyChanged(nameof(IncomeTotalText));
+        OnPropertyChanged(nameof(SpendTotalText));
+    }
+
     void RebuildBars()
     {
+        long tIn, tRew, tSales, tTrade, tOut, tPurch;
+        if (FinanceScope == 0)
+        {
+            long liveIn = _liveMoney.Where(e => e.Kind == EventKind.TransferIn).Sum(e => e.Amount);
+            long liveRew = _liveMoney.Where(e => e.Kind == EventKind.MissionReward).Sum(e => e.Amount);
+            long liveSales = _liveMoney.Where(e => e.Kind == EventKind.Sale).Sum(e => e.Amount);
+            long liveTrade = _liveMoney.Where(e => e.Kind == EventKind.Trade).Sum(e => e.Amount);
+            long liveOut = _liveMoney.Where(e => e.Kind == EventKind.TransferOut).Sum(e => System.Math.Abs(e.Amount));
+            long livePurch = _liveMoney.Where(e => e.Kind == EventKind.Purchase).Sum(e => System.Math.Abs(e.Amount));
+
+            tIn = _allDbFinanceAgg.In + liveIn;
+            tRew = _allDbFinanceAgg.Reward + liveRew;
+            tSales = _allDbFinanceAgg.Sales + liveSales;
+            tTrade = _allDbFinanceAgg.Trade + liveTrade;
+            tOut = _allDbFinanceAgg.Out + liveOut;
+            tPurch = _allDbFinanceAgg.Purchases + livePurch;
+        }
+        else
+        {
+            tIn = TotalIn;
+            tRew = TotalReward;
+            tSales = TotalSales;
+            tTrade = TotalTrade;
+            tOut = TotalOut;
+            tPurch = TotalPurchases;
+        }
+
         var inc = new (string L, long V, string C)[]
         {
-            ("Transfers rein", TotalIn,    "#4ADE80"),
-            ("Belohnungen",    TotalReward, "#FBBF24"),
-            ("Item-Verkäufe",  TotalSales,  "#34D399"),
-            ("Fracht-Handel",  TotalTrade,  "#22D3EE"),
+            ("Transfers rein", tIn,    "#4ADE80"),
+            ("Belohnungen",    tRew,   "#FBBF24"),
+            ("Item-Verkäufe",  tSales, "#34D399"),
+            ("Fracht-Handel",  tTrade, "#22D3EE"),
         };
         var spd = new (string L, long V, string C)[]
         {
-            ("Transfers raus", TotalOut,       "#F87171"),
-            ("Käufe",          TotalPurchases, "#FB923C"),
+            ("Transfers raus", tOut,   "#F87171"),
+            ("Käufe",          tPurch, "#FB923C"),
         };
 
         long max = 1;
         foreach (var x in inc) max = System.Math.Max(max, x.V);
         foreach (var x in spd) max = System.Math.Max(max, x.V);
 
+        long totalInc = inc.Sum(i => i.V);
+        long totalSpd = spd.Sum(i => i.V);
+
         IncomeStats.Clear();
         foreach (var x in inc.Where(i => i.V > 0).OrderByDescending(i => i.V))
-            IncomeStats.Add(new StatItem { Label = x.L, Value = x.V, BarWidth = x.V / (double)max * BarMax, Color = Brush(x.C) });
+        {
+            double pct = totalInc > 0 ? ((double)x.V / totalInc * 100.0) : 0;
+            IncomeStats.Add(new StatItem
+            {
+                Label = x.L,
+                Value = x.V,
+                Sub = $"{pct:F1}%",
+                BarWidth = x.V / (double)max * BarMax,
+                Color = Brush(x.C)
+            });
+        }
 
         SpendStats.Clear();
         foreach (var x in spd.Where(i => i.V > 0).OrderByDescending(i => i.V))
-            SpendStats.Add(new StatItem { Label = x.L, Value = x.V, BarWidth = x.V / (double)max * BarMax, Color = Brush(x.C) });
+        {
+            double pct = totalSpd > 0 ? ((double)x.V / totalSpd * 100.0) : 0;
+            SpendStats.Add(new StatItem
+            {
+                Label = x.L,
+                Value = x.V,
+                Sub = $"{pct:F1}%",
+                BarWidth = x.V / (double)max * BarMax,
+                Color = Brush(x.C)
+            });
+        }
 
         OnPropertyChanged(nameof(IncomeTotalText));
         OnPropertyChanged(nameof(SpendTotalText));
+        OnPropertyChanged(nameof(FinanceIncomeTotalText));
+        OnPropertyChanged(nameof(FinanceSpendTotalText));
+        OnPropertyChanged(nameof(FinanceNetBalanceText));
+        OnPropertyChanged(nameof(FinanceNetSign));
     }
 
     [GeneratedRegex(@"^(?<ware>.+?) ×(?<scu>\d+) SCU")]
@@ -2322,10 +2865,9 @@ public partial class MainViewModel : ObservableObject
             {
                 if (o is not FlightTimelineItem item) return true;
                 if (SelectedTimelineFilter == "Quantum" && item.Type != TimelineItemType.QuantumTravel) return false;
-                if (SelectedTimelineFilter == "Kampf" && item.Type != TimelineItemType.CombatKill && item.Type != TimelineItemType.CombatDeath) return false;
-                if (SelectedTimelineFilter == "Handel" && item.Type != TimelineItemType.Trade) return false;
-                if (SelectedTimelineFilter == "Mining" && item.Type != TimelineItemType.Mining && item.Type != TimelineItemType.Refinery) return false;
-                if (SelectedTimelineFilter == "Orte" && item.Type != TimelineItemType.Arrival && item.Type != TimelineItemType.Departure && item.Type != TimelineItemType.Spawn) return false;
+                if (SelectedTimelineFilter == "Schiffe" && item.Type != TimelineItemType.Spawn && item.Type != TimelineItemType.Departure) return false;
+                if (SelectedTimelineFilter == "Orte" && item.Type != TimelineItemType.Arrival && item.Type != TimelineItemType.Generic) return false;
+                if (SelectedTimelineFilter == "Verluste" && item.Type != TimelineItemType.CombatDeath) return false;
                 if (!string.IsNullOrWhiteSpace(TimelineSearchText))
                 {
                     if (!item.Title.Contains(TimelineSearchText, StringComparison.OrdinalIgnoreCase) &&
@@ -2744,6 +3286,8 @@ public partial class MainViewModel : ObservableObject
         if (selectCurrent)
             SelectedSession = found.FirstOrDefault() ?? Sessions.FirstOrDefault();   // Default: Aktuelle Session
         _initializing = false;
+
+        RefreshFlightSessions();
     }
 
     [RelayCommand]
@@ -2812,6 +3356,18 @@ public partial class MainViewModel : ObservableObject
         var wipeSince = GetEffectiveWipeDate();
         var fleetStats = Database.GetFleetStats(WipeFilterFleet ? wipeSince : null);
         RebuildFleet(fleetStats);
+
+        // Globale unabhängige Subsysteme sicherstellen (Finanzen, Flugschreiber, Missionen laden alle historischen Sessions)
+        if (_historyLoaded)
+        {
+            RebuildIndependentFinances();
+            RebuildIndependentTimeline();
+            RebuildIndependentMissions();
+        }
+        else
+        {
+            LoadGlobalDataAsync();
+        }
 
         if (SelectedSession?.IsAll == true) { LoadAllSessions(); return; }
 
@@ -2925,6 +3481,7 @@ public partial class MainViewModel : ObservableObject
 
         SyncBlueprints();
         RebuildTimeline();
+        RebuildFinanceChart();
 
         Status = $"alle Sessions (DB: {agg.Sessions}) – laufende live…";
 
@@ -2988,6 +3545,8 @@ public partial class MainViewModel : ObservableObject
         _allMode = false;
         _dbTop = new System.Collections.Generic.List<LogEntry>();
         _liveMoney.Clear();
+        _liveTimelineEvents.Clear();
+        _liveMissionEvents.Clear();
         _running = StartBalance();
         OnPropertyChanged(nameof(NetBalanceText));
         OnPropertyChanged(nameof(NetSign));
@@ -3283,20 +3842,20 @@ public partial class MainViewModel : ObservableObject
                     e.HasBalance = false;
                 }
 
-                if (_allMode)
-                {
-                    _liveMoney.Add(e);
-                    RebuildBars();
-                    SetTopTransactions(_dbTop.Concat(_liveMoney)
-                        .OrderByDescending(x => System.Math.Abs(x.Amount)).Take(8)
-                        .OrderBy(x => System.Math.Abs(x.Amount)));
-                    if (e.Kind == EventKind.Trade)
-                    {
-                        RebuildCommodityTrades(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
-                        RebuildMarketPrices(_dbTrades.Concat(_liveMoney.Where(x => x.Kind == EventKind.Trade)));
-                    }
-                }
-                else RebuildStats();
+                _liveMoney.Add(e);
+                RebuildIndependentFinances();
+            }
+
+            if (IsTimelineRelevant(e))
+            {
+                _liveTimelineEvents.Add(e);
+                RebuildIndependentTimeline();
+            }
+
+            if (e.Kind == EventKind.MissionTaken)
+            {
+                _liveMissionEvents.Add(e);
+                RebuildIndependentMissions();
             }
 
             // Flotte: Schiffe aus Vehicle- UND Quantum-Events sammeln
@@ -3881,7 +4440,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void JumpToRsScannerTab()
     {
-        SelectedTabIndex = 6; // 🛰 Erz-Scanner
+        SelectedTabIndex = 6; // ⛏ Mining
     }
 
     [RelayCommand]
@@ -4647,6 +5206,22 @@ public partial class MainViewModel : ObservableObject
     partial void OnTimelineSearchTextChanged(string value) => TimelineView?.Refresh();
     partial void OnSelectedTimelineFilterChanged(string value) => TimelineView?.Refresh();
 
+    partial void OnSelectedTimelineItemChanged(FlightTimelineItem? value)
+    {
+        if (value != null && !string.IsNullOrWhiteSpace(value.LocationName) && value.LocationName != "—")
+        {
+            if (!string.IsNullOrEmpty(value.SystemName) && StarmapData.SystemNames.Contains(value.SystemName))
+            {
+                FlightRecorderSelectedSystem = value.SystemName;
+            }
+            var obj = StarmapData.FindObject(value.LocationName);
+            if (obj != null)
+            {
+                FlightRecorderSelectedObject = obj;
+            }
+        }
+    }
+
     [RelayCommand]
     public void SelectTimelineFilter(string filter)
     {
@@ -4657,12 +5232,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void RebuildTimeline()
     {
-        var (items, summary) = FlightRecorderService.BuildTimeline(Events);
-        SessionTimeline.Clear();
-        foreach (var item in items) SessionTimeline.Add(item);
-        FlightSummary = summary;
-        TimelineView?.Refresh();
-        OnPropertyChanged(nameof(FlightSummary));
+        RebuildIndependentTimeline();
     }
 
     [RelayCommand]

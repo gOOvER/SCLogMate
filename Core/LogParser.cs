@@ -750,11 +750,15 @@ public partial class LogParser
             var victim = kl.Groups["victim"].Value;
             var killer = kl.Groups["killer"].Value;
             var weapon = ItemNames.CleanFallback(kl.Groups["weapon"].Value);
-            string detail =
-                _ownNames.Contains(victim) ? $"☠ getötet von {killer} ({weapon})" :
-                _ownNames.Contains(killer) ? $"Kill: {victim} ({weapon})" :
-                $"{killer} ✟ {victim} ({weapon})";
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = detail };
+            if (_ownNames.Contains(victim))
+            {
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Death, Detail = $"☠ getötet von {killer} ({weapon})" };
+            }
+            if (_ownNames.Contains(killer))
+            {
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"Kill: {victim} ({weapon})" };
+            }
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"{killer} ✟ {victim} ({weapon})" };
         }
 
         // SC 4.x Fracht- & Schiffs-Aufzüge (technisches Hintergrundrauschen herausfiltern)

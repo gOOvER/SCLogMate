@@ -54,10 +54,10 @@ dotnet publish -c Release -r win-x64 --self-contained true `
 
 Do **not** start the app after building — Torsten runs it himself.
 
-### 3. Git pushes only on request
+### 3. Git Commits & Pushes nur auf Aufforderung
 
-- **Never push to GitHub** unless Torsten explicitly asks for it. Commits are fine, pushes are not.
-- When Torsten asks to push ("push", "pushe", etc.), run a direct, simple `git push` without detour, complex refspecs, or token-wasting checks. Direct and minimal execution.
+- **Weder Commits noch Pushes eigenständig ausführen**, es sei denn, Torsten fordert ausdrücklich dazu auf ("commit", "push", "pushe", "sichern", etc.).
+- Wenn Torsten dazu auffordert, direkt und minimal ausführen (ohne Umwege, überflüssige Abfragen oder Token-Verschwendung).
 
 ---
 

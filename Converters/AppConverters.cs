@@ -141,5 +141,35 @@ public class BoolToGreenRedBgConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Wandelt boolean in Akzent-Hintergrundfarbe: true = #1D6FA5 (Sci-Fi Cyan/Blau aktiv), false = #0A1422 (Idle).</summary>
+public class BoolToAccentBrushConverter : IValueConverter
+{
+    public static readonly BoolToAccentBrushConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#1D6FA5"));
+    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#0A1422"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Wandelt boolean in Rand-Farbe: true = #38BDF8 (Neon-Rand), false = #1A3047 (Dezent).</summary>
+public class BoolToAccentBorderConverter : IValueConverter
+{
+    public static readonly BoolToAccentBorderConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#38BDF8"));
+    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#1A3047"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 
 

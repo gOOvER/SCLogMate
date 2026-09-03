@@ -43,10 +43,19 @@ public sealed class StarmapCanvas : Control
     public static readonly StyledProperty<IEnumerable<Models.UserPoi>?> UserPoisProperty =
         AvaloniaProperty.Register<StarmapCanvas, IEnumerable<Models.UserPoi>?>(nameof(UserPois));
 
+    public static readonly StyledProperty<IEnumerable<string>?> RouteLocationsProperty =
+        AvaloniaProperty.Register<StarmapCanvas, IEnumerable<string>?>(nameof(RouteLocations));
+
     public string SystemName
     {
         get => GetValue(SystemNameProperty);
         set => SetValue(SystemNameProperty, value);
+    }
+
+    public IEnumerable<string>? RouteLocations
+    {
+        get => GetValue(RouteLocationsProperty);
+        set => SetValue(RouteLocationsProperty, value);
     }
 
     public IEnumerable<Models.UserPoi>? UserPois
@@ -161,7 +170,8 @@ public sealed class StarmapCanvas : Control
             ShowMoonsProperty,
             ShowLandingZonesProperty,
             ShowJumpPointsProperty,
-            UserPoisProperty
+            UserPoisProperty,
+            RouteLocationsProperty
         );
     }
 
@@ -428,6 +438,57 @@ public sealed class StarmapCanvas : Control
 
             string routeText = $"✈ {distGm:F1} GM ({distKm:N0} km) · {flightTime.Minutes}m {flightTime.Seconds:D2}s ({drive.Name})";
             DrawRouteBadge(context, routeText, midPoint);
+        }
+
+        // 7b. Mehretappen-Flugroute aus RouteLocations
+        if (RouteLocations != null)
+        {
+            var resolvedPoints = new List<(Point Pt, StarmapObject Obj)>();
+            foreach (var locName in RouteLocations)
+            {
+                if (string.IsNullOrWhiteSpace(locName)) continue;
+                var obj = objects.FirstOrDefault(o => o.Name.Equals(locName, StringComparison.OrdinalIgnoreCase) ||
+                                                      o.Id.Equals(locName, StringComparison.OrdinalIgnoreCase));
+                if (obj == null)
+                {
+                    var res = StarmapData.Resolve(locName);
+                    if (!string.IsNullOrEmpty(res.DisplayName))
+                    {
+                        obj = objects.FirstOrDefault(o => o.Name.Equals(res.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                                                          (!string.IsNullOrEmpty(res.ParentBody) && o.Name.Equals(res.ParentBody, StringComparison.OrdinalIgnoreCase)));
+                    }
+                }
+                if (obj != null)
+                {
+                    var pt = new Point(center.X + obj.RelX * _zoom, center.Y + obj.RelY * _zoom);
+                    if (resolvedPoints.Count == 0 || resolvedPoints[^1].Obj.Id != obj.Id)
+                    {
+                        resolvedPoints.Add((pt, obj));
+                    }
+                }
+            }
+
+            if (resolvedPoints.Count > 1)
+            {
+                var trailGlowPen = new Pen(new SolidColorBrush(Color.FromArgb(50, 96, 165, 250)), 4);
+                var trailLinePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.6, DashStyle.Dash);
+
+                for (int i = 0; i < resolvedPoints.Count - 1; i++)
+                {
+                    context.DrawLine(trailGlowPen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
+                    context.DrawLine(trailLinePen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
+                }
+
+                // Wegpunkt-Nummern
+                for (int i = 0; i < resolvedPoints.Count; i++)
+                {
+                    var p = resolvedPoints[i].Pt;
+                    var badgeBrush = new SolidColorBrush(Color.Parse("#0C233C"));
+                    var badgeBorder = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.2);
+                    context.DrawEllipse(badgeBrush, badgeBorder, p, 8, 8);
+                    DrawText(context, (i + 1).ToString(), new Point(p.X, p.Y - 5), "#38BDF8", 8.5, true, true);
+                }
+            }
         }
 
         // 8. Objekte zeichnen

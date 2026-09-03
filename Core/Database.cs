@@ -15,7 +15,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 7;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 8;  // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 24; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -165,6 +165,17 @@ public static class Database
             Exec(db, "PRAGMA user_version = 7;");
             dbSchemaVersion = 7;
             Logger.Log("DB Schema: Migration auf v7 (Session-Fingerprint) angewendet.");
+        }
+
+        if (dbSchemaVersion < 8)
+        {
+            Exec(db, @"
+                CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
+                CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
+            ");
+            Exec(db, "PRAGMA user_version = 8;");
+            dbSchemaVersion = 8;
+            Logger.Log("DB Schema: Migration auf v8 (Composite-Indizes für session/kind und kind/time) angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -681,15 +692,187 @@ public static class Database
         using var db = new SqliteConnection(Conn);
         db.Open();
         using var c = db.CreateCommand();
-        c.CommandText = @"SELECT kind,amount,detail FROM events
+        c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
                           WHERE kind IN ('TransferIn','TransferOut','MissionReward','Purchase','Sale','Trade','Fine')
                           ORDER BY ABS(amount) DESC LIMIT $n";
         c.Parameters.AddWithValue("$n", n);
         using var r = c.ExecuteReader();
         while (r.Read())
         {
-            Enum.TryParse<EventKind>(r.GetString(0), out var kind);
-            list.Add(new LogEntry { Kind = kind, Amount = r.GetInt64(1), Detail = r.IsDBNull(2) ? "" : r.GetString(2) });
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Alle Geld-Events (chronologisch aufsteigend) für das Finanzdiagramm.</summary>
+    public static List<LogEntry> AllFinanceEvents(DateTime? since = null)
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        if (since.HasValue)
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE kind IN ('TransferIn','TransferOut','MissionReward','Purchase','Sale','Trade','Fine')
+                              AND time >= $since
+                              ORDER BY time ASC";
+            c.Parameters.AddWithValue("$since", since.Value.ToString("o", CultureInfo.InvariantCulture));
+        }
+        else
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE kind IN ('TransferIn','TransferOut','MissionReward','Purchase','Sale','Trade','Fine')
+                              ORDER BY time ASC";
+        }
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Neueste N Geld-Events (chronologisch absteigend, neueste zuerst).</summary>
+    public static List<LogEntry> RecentMoneyEvents(int n)
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                          WHERE kind IN ('TransferIn','TransferOut','MissionReward','Purchase','Sale','Trade','Fine')
+                          ORDER BY time DESC LIMIT $n";
+        c.Parameters.AddWithValue("$n", n);
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Flugschreiber-Events für eine bestimmte Session (Dateiname) oder alle Sessions.</summary>
+    public static List<LogEntry> GetTimelineEventsForSession(string? sessionName = null)
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        if (!string.IsNullOrEmpty(sessionName))
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE session = $sess
+                              AND kind IN ('Vehicle','ShipLoss','Quantum','Location','Hangar','Crash','Death')
+                              ORDER BY time ASC";
+            c.Parameters.AddWithValue("$sess", sessionName);
+        }
+        else
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE kind IN ('Vehicle','ShipLoss','Quantum','Location','Hangar','Crash','Death')
+                              ORDER BY time ASC";
+        }
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Alle Flugschreiber-relevanten Events aus allen Sessions chronologisch aufsteigend.</summary>
+    public static List<LogEntry> AllTimelineEvents(DateTime? since = null)
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        if (since.HasValue)
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE kind IN ('Vehicle','ShipLoss','Quantum','Location','Hangar','Crash','Death')
+                              AND time >= $since
+                              ORDER BY time ASC";
+            c.Parameters.AddWithValue("$since", since.Value.ToString("o", CultureInfo.InvariantCulture));
+        }
+        else
+        {
+            c.CommandText = @"SELECT time,kind,amount,detail,ship FROM events
+                              WHERE kind IN ('Vehicle','ShipLoss','Quantum','Location','Hangar','Crash','Death')
+                              ORDER BY time ASC";
+        }
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Alle angenommenen Missionen aus allen Sessions chronologisch aufsteigend.</summary>
+    public static List<LogEntry> AllMissionTakenEvents()
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        c.CommandText = "SELECT time,detail FROM events WHERE kind='MissionTaken' ORDER BY time ASC";
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            list.Add(new LogEntry { Time = t, Kind = EventKind.MissionTaken, Detail = r.IsDBNull(1) ? "" : r.GetString(1) });
         }
         return list;
     }
