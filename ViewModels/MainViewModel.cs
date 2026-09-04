@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject
     readonly RsOcrScanner _rsScanner;
     readonly AuroraVoiceService _auroraService;
     readonly ScanIndicatorWindow _scanIndicator = new();
+    readonly ScanIndicatorWindow _rsScanIndicator = new("RS Scan", "#D946EF");
     private Views.RsScanOverlayWindow? _rsOverlayWindow;
     bool _initializing = true;
     bool _ready;          // Persistenz erst nach Konstruktor
@@ -122,7 +123,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(value) || value == "—")
         {
-            ResolvedLocation = new ResolvedLocation { DisplayName = "—", SystemName = "Stanton", ParentBody = "—" };
+            ResolvedLocation = new ResolvedLocation { DisplayName = "—", SystemName = Locations.ActiveSystem, ParentBody = "—" };
         }
         else
         {
@@ -220,6 +221,10 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedTabIndexChanged(int value)
     {
         OnPropertyChanged(nameof(ShowDashboardCards));
+        if (value == 8) // Tab 8: 📊 Markt
+        {
+            _ = RefreshUexMarketDataInternal(force: false);
+        }
     }
 
     // Star Citizen Wiki API Integration
@@ -277,6 +282,7 @@ public partial class MainViewModel : ObservableObject
     public string SecondaryRsMatchesText => CurrentRsMatches.Count > 1 
         ? string.Join(" · ", CurrentRsMatches.Skip(1).Take(2).Select(m => $"{m.Nodes}x {m.Resource.Name}")) 
         : "Keine weiteren Übereinstimmungen";
+    public string RsStandbyText => CurrentRsValue.HasValue ? "Keine bekannte Erz- oder Schiffssignatur" : "Warte auf Radar-Signal (TAB / V)…";
 
     public List<string> AvailableRefineryStations => RefineryCatalog.Stations;
     public List<string> AvailableRefineryMaterials => RefineryCatalog.Materials;
@@ -467,6 +473,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private long? serverPingMs;
     [ObservableProperty] private bool isPingingServer;
 
+    public bool ShowDatabaseCompletionStatus => !IsDatabaseBusy && !string.IsNullOrWhiteSpace(DatabaseStatusMessage);
+
+    partial void OnIsDatabaseBusyChanged(bool value) => OnPropertyChanged(nameof(ShowDatabaseCompletionStatus));
+    partial void OnDatabaseStatusMessageChanged(string value) => OnPropertyChanged(nameof(ShowDatabaseCompletionStatus));
+
     public Core.BulkObservableCollection<LogEntry> Events { get; } = new();
     public ObservableCollection<SessionInfo> Sessions { get; } = new();
 
@@ -493,6 +504,18 @@ public partial class MainViewModel : ObservableObject
     };
 
     [ObservableProperty] private LogEntry? selectedEntry;
+
+    [RelayCommand]
+    public async Task CopySelectedLogLine()
+    {
+        if (SelectedEntry == null) return;
+        var text = $"[{SelectedEntry.Time:yyyy-MM-dd HH:mm:ss}] [{SelectedEntry.Kind}] {SelectedEntry.Detail} {(SelectedEntry.Amount != 0 ? $"({SelectedEntry.Amount:N0} aUEC)" : "")}";
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            await clip.SetTextAsync(text);
+            Status = "✓ Log-Eintrag in Zwischenablage kopiert!";
+        }
+    }
 
     // Zeile online nachschlagen (Schiff/Bauplan/Item/Ware) – öffnet eine gezielte Web-Suche.
     [RelayCommand]
@@ -830,19 +853,27 @@ public partial class MainViewModel : ObservableObject
         {
             await Task.Run(() =>
             {
-                var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var filesByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                void AddLogFile(string path)
+                {
+                    if (File.Exists(path))
+                    {
+                        var fn = Path.GetFileName(path);
+                        filesByFileName.TryAdd(fn, path);
+                    }
+                }
 
                 // 0. SCLogMate eigenes Archiv (%APPDATA%\SCLogMate\archive)
                 if (Directory.Exists(LogArchive.Dir))
                 {
                     foreach (var f in Directory.GetFiles(LogArchive.Dir, "*.log"))
-                        files.Add(f);
+                        AddLogFile(f);
                 }
 
                 // 1. Aktuelle Game.log
                 if (!string.IsNullOrEmpty(LogPath) && File.Exists(LogPath))
                 {
-                    files.Add(LogPath);
+                    AddLogFile(LogPath);
                     var dir = Path.GetDirectoryName(LogPath);
                     if (!string.IsNullOrEmpty(dir))
                     {
@@ -850,7 +881,7 @@ public partial class MainViewModel : ObservableObject
                         if (Directory.Exists(backups))
                         {
                             foreach (var f in Directory.GetFiles(backups, "*.log"))
-                                files.Add(f);
+                                AddLogFile(f);
                         }
                     }
                 }
@@ -858,7 +889,7 @@ public partial class MainViewModel : ObservableObject
                 // 2. Automatische Suche über alle Star Citizen Kanäle
                 foreach (var log in PathFinder.FindAll())
                 {
-                    files.Add(log);
+                    AddLogFile(log);
                     var dir = Path.GetDirectoryName(log);
                     if (!string.IsNullOrEmpty(dir))
                     {
@@ -866,13 +897,13 @@ public partial class MainViewModel : ObservableObject
                         if (Directory.Exists(backups))
                         {
                             foreach (var f in Directory.GetFiles(backups, "*.log"))
-                                files.Add(f);
+                                AddLogFile(f);
                         }
                     }
                 }
 
                 // 3. Re-Scan ausführen
-                var result = Database.RescanAll(files, (curr, total, name) =>
+                var result = Database.RescanAll(filesByFileName.Values, (curr, total, name) =>
                 {
                     Dispatcher.UIThread.Post(() =>
                     {
@@ -889,6 +920,7 @@ public partial class MainViewModel : ObservableObject
             });
 
             // UI-Daten neu laden
+            _historyLoaded = false;
             if (!string.IsNullOrEmpty(LogPath) && File.Exists(LogPath))
             {
                 RefreshSessions(selectCurrent: true);
@@ -896,6 +928,7 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
+                LoadGlobalDataAsync();
                 OnPropertyChanged(nameof(DatabaseSummaryText));
             }
             SyncBlueprints();
@@ -1247,6 +1280,28 @@ public partial class MainViewModel : ObservableObject
     public int TotalFleetFlights => FleetItems.Sum(s => s.FlightCount);
     public int TotalFleetQuantumJumps => FleetItems.Sum(s => s.QuantumJumps);
 
+    [ObservableProperty] private bool isFleetGridView = true;
+    public bool IsFleetTableView => !IsFleetGridView;
+
+    public int CombatShipsCount => FleetItems.Count(s => (SelectedFleetViewMode != "Hangar" || s.IsInHangar) && 
+        (s.Role.Contains("Jäger") || s.Role.Contains("Gunship") || s.Role.Contains("Bomber") || s.Role.Contains("Kampf") || s.Role.Contains("Abfangjäger")));
+
+    public int CargoShipsCount => FleetItems.Count(s => (SelectedFleetViewMode != "Hangar" || s.IsInHangar) && 
+        (s.Role.Contains("Frachter") || s.Role.Contains("Transport") || s.Role.Contains("Kurier") || s.Role.Contains("Fracht")));
+
+    public int IndustrialShipsCount => FleetItems.Count(s => (SelectedFleetViewMode != "Hangar" || s.IsInHangar) && 
+        (s.Role.Contains("Bergung") || s.Role.Contains("Salvage") || s.Role.Contains("Mining") || s.Role.Contains("Erz") || s.Role.Contains("Veredelung")));
+
+    public int ExplorationShipsCount => FleetItems.Count(s => (SelectedFleetViewMode != "Hangar" || s.IsInHangar) && 
+        (s.Role.Contains("Erkundung") || s.Role.Contains("Expedition") || s.Role.Contains("Aufklärung")));
+
+    [RelayCommand]
+    public void SetFleetDisplayMode(string mode)
+    {
+        IsFleetGridView = mode == "Grid";
+        OnPropertyChanged(nameof(IsFleetTableView));
+    }
+
     [ObservableProperty] private Core.ShipCatalogEntry? selectedCatalogShipToAdd;
     public System.Collections.Generic.List<Core.ShipCatalogEntry> AllCatalogShips => Core.FleetCatalog.AllShips.ToList();
 
@@ -1450,7 +1505,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnFleetSearchTextChanged(string value) => FleetView?.Refresh();
 
     [RelayCommand]
-    private void SwitchToFleetTab() => SelectedTabIndex = 7;
+    private void SwitchToFleetTab() => SelectedTabIndex = 9;
 
     [RelayCommand]
     private void SelectFleetViewMode(string mode)
@@ -2015,6 +2070,7 @@ public partial class MainViewModel : ObservableObject
                     RebuildIndependentFinances();
                     RebuildIndependentTimeline();
                     RebuildIndependentMissions();
+                    RebuildPlacesFromDatabase(_allDbTimelineEvents);
                 });
             }
             catch (Exception ex)
@@ -2037,6 +2093,7 @@ public partial class MainViewModel : ObservableObject
             RebuildMarketPrices(trades);
 
             var top = _allDbTopMoney.Concat(_liveMoney.Where(x => IsMoney(x.Kind)))
+                                    .DistinctBy(e => (e.Time, e.Kind, e.Amount, e.Detail ?? ""))
                                     .OrderByDescending(e => System.Math.Abs(e.Amount))
                                     .Take(8)
                                     .OrderBy(e => System.Math.Abs(e.Amount));
@@ -2044,6 +2101,7 @@ public partial class MainViewModel : ObservableObject
 
             var recent = _liveMoney.Where(x => IsMoney(x.Kind))
                                    .Concat(_allDbRecentMoney)
+                                   .DistinctBy(e => (e.Time, e.Kind, e.Amount, e.Detail ?? ""))
                                    .Take(20);
             RecentMoney.Clear();
             foreach (var e in recent)
@@ -2064,13 +2122,14 @@ public partial class MainViewModel : ObservableObject
             RebuildMarketPrices(sessionTrades);
 
             var sessionTop = Events.Where(e => IsMoney(e.Kind))
+                                   .DistinctBy(e => (e.Time, e.Kind, e.Amount, e.Detail ?? ""))
                                    .OrderByDescending(e => System.Math.Abs(e.Amount))
                                    .Take(8)
                                    .OrderBy(e => System.Math.Abs(e.Amount));
             SetTopTransactions(sessionTop);
 
             RecentMoney.Clear();
-            foreach (var e in Events.Where(e => IsMoney(e.Kind)).Take(20))
+            foreach (var e in Events.Where(e => IsMoney(e.Kind)).DistinctBy(e => (e.Time, e.Kind, e.Amount, e.Detail ?? "")).Take(20))
             {
                 RecentMoney.Add(new StatItem
                 {
@@ -3075,6 +3134,7 @@ public partial class MainViewModel : ObservableObject
         // Piloten-Ausrüstung & POIs laden
         InitPilotLoadoutSlots();
         LoadUserPois();
+        InitializeTools();
 
         RefreshSessions(selectCurrent: true);
         Status = saved != null && start == saved
@@ -3363,6 +3423,7 @@ public partial class MainViewModel : ObservableObject
             RebuildIndependentFinances();
             RebuildIndependentTimeline();
             RebuildIndependentMissions();
+            RebuildPlacesFromDatabase(_allDbTimelineEvents);
         }
         else
         {
@@ -3461,7 +3522,29 @@ public partial class MainViewModel : ObservableObject
         // View jedes Mal neu filtern/sortieren (das war die „ewig lange"-Bremse).
         Events.ReplaceAll(recent.AsEnumerable().Reverse());
 
-        CurrentLocation = Events.FirstOrDefault(e => e.Kind == EventKind.Location)?.Detail ?? "—";
+        var locEv = Events.FirstOrDefault(e => e.Kind == EventKind.Location);
+        if (locEv != null)
+        {
+            CurrentLocation = locEv.Detail;
+        }
+        else
+        {
+            var qtEv = Events.FirstOrDefault(e => e.Kind == EventKind.Quantum && !string.IsNullOrEmpty(e.Location));
+            CurrentLocation = qtEv?.Location ?? "—";
+        }
+
+        var jurEv = Events.FirstOrDefault(e => e.Kind == EventKind.Jurisdiction && (e.Detail.Contains("Nyx") || e.Detail.Contains("People's Alliance") || e.Detail.Contains("Pyro")));
+        if (jurEv != null)
+        {
+            var sys = jurEv.Detail.Contains("Nyx") || jurEv.Detail.Contains("People's Alliance") ? "Nyx" : "Pyro";
+            Locations.ActiveSystem = sys;
+            ResolvedLocation.SystemName = sys;
+            SelectedStarmapSystem = sys;
+            OnPropertyChanged(nameof(LocationSystemBadge));
+            OnPropertyChanged(nameof(LocationBadgeColor));
+            OnPropertyChanged(nameof(LocationStatusSubline));
+        }
+
         CurrentShip = Events.FirstOrDefault(e => e.Kind == EventKind.Vehicle)?.Detail ?? "—";
         LastInventory = Events.FirstOrDefault(e => e.Kind == EventKind.Inventory)?.Detail ?? "—";
 
@@ -3482,6 +3565,7 @@ public partial class MainViewModel : ObservableObject
         SyncBlueprints();
         RebuildTimeline();
         RebuildFinanceChart();
+        RebuildPlacesFromDatabase(recent);
 
         Status = $"alle Sessions (DB: {agg.Sessions}) – laufende live…";
 
@@ -3556,6 +3640,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(TradeText));
         OnPropertyChanged(nameof(FleetText));
         OnPropertyChanged(nameof(ShipsSeenText));
+        ResetQuantumViews();
         OnPropertyChanged(nameof(SessionSpanText));
     }
 
@@ -3670,6 +3755,8 @@ public partial class MainViewModel : ObservableObject
         {
             if (_initialEventDrainScheduled)
                 Dispatcher.UIThread.Post(DrainInitialEventQueue);
+            else
+                SyncQuantumViewsFromParser();
         }
     }
 
@@ -3732,6 +3819,12 @@ public partial class MainViewModel : ObservableObject
                     OnPropertyChanged(nameof(LocationBadgeColor));
                     OnPropertyChanged(nameof(LocationMainText));
                     OnPropertyChanged(nameof(LocationStatusSubline));
+                    if (isLive)
+                    {
+                        var locRes = Locations.ResolveLocation(e.Detail);
+                        _rawLocations.Add((e.Time, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                        UpdatePlacesView();
+                    }
                     break;
                 case EventKind.Jurisdiction:
                     if (e.Detail.Contains("🟢") || e.Detail.Contains("Schutzzone aktiv"))
@@ -3742,6 +3835,32 @@ public partial class MainViewModel : ObservableObject
                     {
                         ResolvedLocation.IsArmistice = false;
                     }
+
+                    if (e.Detail.Contains("Nyx") || e.Detail.Contains("People's Alliance"))
+                    {
+                        Locations.ActiveSystem = "Nyx";
+                        ResolvedLocation.SystemName = "Nyx";
+                        SelectedStarmapSystem = "Nyx";
+                        OnPropertyChanged(nameof(LocationSystemBadge));
+                        OnPropertyChanged(nameof(LocationBadgeColor));
+                    }
+                    else if (e.Detail.Contains("Pyro"))
+                    {
+                        Locations.ActiveSystem = "Pyro";
+                        ResolvedLocation.SystemName = "Pyro";
+                        SelectedStarmapSystem = "Pyro";
+                        OnPropertyChanged(nameof(LocationSystemBadge));
+                        OnPropertyChanged(nameof(LocationBadgeColor));
+                    }
+                    else if (e.Detail.Contains("Stanton") || e.Detail.Contains("UEE"))
+                    {
+                        Locations.ActiveSystem = "Stanton";
+                        ResolvedLocation.SystemName = "Stanton";
+                        SelectedStarmapSystem = "Stanton";
+                        OnPropertyChanged(nameof(LocationSystemBadge));
+                        OnPropertyChanged(nameof(LocationBadgeColor));
+                    }
+
                     OnPropertyChanged(nameof(LocationStatusSubline));
                     break;
                 case EventKind.Vehicle:
@@ -3755,6 +3874,21 @@ public partial class MainViewModel : ObservableObject
                     if (!string.IsNullOrEmpty(e.Location))
                     {
                         CurrentLocation = e.Location;
+                        ResolvedLocation = StarmapData.Resolve(e.Location);
+                        if (!string.IsNullOrEmpty(ResolvedLocation.SystemName) && StarmapData.SystemNames.Contains(ResolvedLocation.SystemName))
+                        {
+                            Locations.ActiveSystem = ResolvedLocation.SystemName;
+                            SelectedStarmapSystem = ResolvedLocation.SystemName;
+                        }
+                        OnPropertyChanged(nameof(LocationSystemBadge));
+                        OnPropertyChanged(nameof(LocationBadgeColor));
+                        OnPropertyChanged(nameof(LocationMainText));
+                        OnPropertyChanged(nameof(LocationStatusSubline));
+                    }
+                    if (isLive && !string.IsNullOrWhiteSpace(e.Detail))
+                    {
+                        _rawQuantumDestinations.Add((e.Time, e.Detail));
+                        UpdatePlacesView();
                     }
                     break;
                 case EventKind.ShipLoss:
@@ -3895,6 +4029,11 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(ServerSublineText));
             OnPropertyChanged(nameof(ServerTooltipText));
             OnPropertyChanged(nameof(MetaSummary));
+
+            if (isLive)
+            {
+                RequestQuantumViewsSync();
+            }
         }
     }
 
@@ -4377,6 +4516,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void ClearFleetSearch()
+    {
+        FleetSearchText = "";
+    }
+
+    [RelayCommand]
     private async Task CopyEntryDetail(LogEntry? entry)
     {
         var e = entry ?? SelectedEntry;
@@ -4432,21 +4577,33 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void JumpToPlacesTab()
+    {
+        SelectedTabIndex = 5; // 📍 Orte
+    }
+
+    [RelayCommand]
     public void JumpToTimelineTab()
     {
-        SelectedTabIndex = 5; // ⏱ Flugschreiber
+        SelectedTabIndex = 6; // ⏱ Flugschreiber
     }
 
     [RelayCommand]
     public void JumpToRsScannerTab()
     {
-        SelectedTabIndex = 6; // ⛏ Mining
+        SelectedTabIndex = 7; // ⛏ Mining
+    }
+
+    [RelayCommand]
+    public void JumpToMarketTab()
+    {
+        SelectedTabIndex = 8; // 📊 Markt
     }
 
     [RelayCommand]
     public void JumpToBlueprintsTab()
     {
-        SelectedTabIndex = 8; // 🛠 Baupläne
+        SelectedTabIndex = 10; // 🛠 Baupläne
     }
 
     public IReadOnlyList<RsResource> AllCatalogResources => RsDecoderCatalog.AllResources;
@@ -5267,6 +5424,60 @@ public partial class MainViewModel : ObservableObject
         Status = "✓ Flugbericht gespeichert: " + path;
     }
 
+    [RelayCommand]
+    public void ExportHtmlFlightReport()
+    {
+        var label = SelectedFlightSession?.Label ?? SelectedSession?.Label ?? "Aktuelle Session";
+        var file = Core.HtmlReportGenerator.ExportAndOpen(label, SessionTimeline, FlightSummary);
+        Status = $"✓ Interaktiver HTML-Flugbericht erstellt & geöffnet: {Path.GetFileName(file)}";
+    }
+
+    [RelayCommand]
+    public async Task CopyFinanceDiscordSummary()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("```yaml");
+        sb.AppendLine($"# 💰 Star Citizen Finanzbericht — {SelectedSession?.Label ?? "Gesamt-Session"}");
+        sb.AppendLine($"Einnahmen: {FinanceIncomeTotalText}");
+        sb.AppendLine($"Ausgaben: {FinanceSpendTotalText}");
+        sb.AppendLine($"Netto-Saldo: {FinanceNetBalanceText} (Marge: {ProfitMarginText})");
+        sb.AppendLine($"Live-Guthaben: {LiveBalanceText}");
+        sb.AppendLine($"Handelsvolumen: {TotalCargoAuecText} ({TotalCargoScuText})");
+        sb.AppendLine("```");
+        sb.AppendLine("*Erstellt mit SCLogMate*");
+
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            await clip.SetTextAsync(sb.ToString());
+            Status = "✓ Finanz-Zusammenfassung in Zwischenablage kopiert (Discord-Format)!";
+        }
+    }
+
+    [RelayCommand]
+    public async Task CopyFleetDiscordSummary()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("```yaml");
+        sb.AppendLine("# 🚀 Star Citizen Flotte — Übersicht");
+        sb.AppendLine($"Hangar-Schiffe: {HangarShipCount} (Flug-Historie: {AllFlownShipCount})");
+        sb.AppendLine($"Flottenwert (aUEC): {TotalFleetValueText}");
+        sb.AppendLine($"Pledge-Wert (USD): {TotalFleetPledgeUsdText}");
+        sb.AppendLine($"Rollen-Verteilung: {CombatShipsCount} Kampf · {CargoShipsCount} Fracht · {IndustrialShipsCount} Industrie · {ExplorationShipsCount} Erkundung");
+        sb.AppendLine("----------------------------------------");
+        foreach (var s in FleetItems.Where(s => s.IsInHangar))
+        {
+            sb.AppendLine($"• {s.Name} [{s.ManufacturerBadge}] ({s.Role}) - {s.InsuranceType} / {s.PledgeValueText}");
+        }
+        sb.AppendLine("```");
+        sb.AppendLine("*Erstellt mit SCLogMate*");
+
+        if (UiServices.TopLevel?.Clipboard is { } clip)
+        {
+            await clip.SetTextAsync(sb.ToString());
+            Status = "✓ Flotten-Zusammenfassung in Zwischenablage kopiert (Discord-Format)!";
+        }
+    }
+
     #endregion
 
     #region RS Signal Scanner & Mining/Salvage Decoder
@@ -5280,8 +5491,10 @@ public partial class MainViewModel : ObservableObject
         foreach (var m in matches) CurrentRsMatches.Add(m);
         BestRsMatch = matches.FirstOrDefault();
 
+        RsOcrStatusText = $"✓ Erkannt: {rs:N0} RS ({DateTime.Now:HH:mm:ss})";
         OnPropertyChanged(nameof(CurrentRsDisplayValue));
         OnPropertyChanged(nameof(SecondaryRsMatchesText));
+        OnPropertyChanged(nameof(RsStandbyText));
         Status = BestRsMatch != null
             ? $"🛰 RS Signal {rs:N0} erkannt: {BestRsMatch.DisplayTitle} ({BestRsMatch.Subtitle})"
             : $"🛰 RS Signal {rs:N0} erkannt (Keine bekannte Signatur)";
@@ -5332,8 +5545,9 @@ public partial class MainViewModel : ObservableObject
                     _rsOverlayWindow.Show();
                     IsRsOverlayActive = true;
                     _settings.RsOverlayEnabled = true;
+                    IsRsAutoScanEnabled = true;
                     Settings.Save(_settings);
-                    Status = "🛰 RS Signal Scanner Overlay eingeblendet";
+                    Status = "🛰 RS Signal Scanner Overlay eingeblendet (Auto-Scan aktiv)";
                 }
                 else
                 {
@@ -5354,25 +5568,72 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
-    public void ToggleRsAutoScan()
-    {
-        IsRsAutoScanEnabled = !IsRsAutoScanEnabled;
-        _settings.RsAutoScanEnabled = IsRsAutoScanEnabled;
-        Settings.Save(_settings);
+    [ObservableProperty] private bool isRsScanBoxVisible;
 
-        if (IsRsAutoScanEnabled)
+    partial void OnIsRsScanBoxVisibleChanged(bool value)
+    {
+        if (value)
+        {
+            var region = _settings.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion();
+            _rsScanIndicator.SetRegion(region);
+            _rsScanIndicator.Show();
+        }
+        else
+        {
+            _rsScanIndicator.Hide();
+        }
+        OnPropertyChanged(nameof(RsScanBoxButtonBg));
+        OnPropertyChanged(nameof(RsScanBoxButtonBorder));
+        OnPropertyChanged(nameof(RsScanBoxButtonFg));
+    }
+
+    [RelayCommand]
+    public void ToggleRsScanBox()
+    {
+        IsRsScanBoxVisible = !IsRsScanBoxVisible;
+    }
+
+    public string RsScanBoxButtonBg => IsRsScanBoxVisible ? "#701A75" : "#1E293B";
+    public string RsScanBoxButtonBorder => IsRsScanBoxVisible ? "#F472B6" : "#334155";
+    public string RsScanBoxButtonFg => IsRsScanBoxVisible ? "#F472B6" : "#94A3B8";
+
+    partial void OnIsRsAutoScanEnabledChanged(bool value)
+    {
+        _settings.RsAutoScanEnabled = value;
+        Settings.Save(_settings);
+        Logger.Log($"[RsOcr] Auto-Scan Status: {(value ? "AKTIV (150ms Loop gestartet)" : "INAKTIV / GESTOPPT")}");
+
+        if (value)
         {
             _rsScanner.Start();
+            RsOcrStatusText = "⚡ Auto-Scan aktiv";
+            if (IsRsScanBoxVisible)
+            {
+                var region = _settings.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion();
+                _rsScanIndicator.SetRegion(region);
+                _rsScanIndicator.Show();
+            }
         }
         else
         {
             _rsScanner.Stop();
+            RsOcrStatusText = "Auto-Scan gestoppt";
+            if (!IsRsScanBoxVisible)
+            {
+                _rsScanIndicator.Hide();
+            }
         }
+
         OnPropertyChanged(nameof(RsAutoScanStatusText));
         OnPropertyChanged(nameof(RsAutoScanBadgeBg));
         OnPropertyChanged(nameof(RsAutoScanBadgeBorder));
         OnPropertyChanged(nameof(RsAutoScanBadgeFg));
+    }
+
+    [RelayCommand]
+    public void ToggleRsAutoScan()
+    {
+        IsRsAutoScanEnabled = !IsRsAutoScanEnabled;
     }
 
     [RelayCommand]
@@ -5385,16 +5646,15 @@ public partial class MainViewModel : ObservableObject
         }
 
         Status = "Scanne RS-Signal vom Bildschirm…";
-        var val = await _rsScanner.ScanOnceAsync();
+        var val = await _rsScanner.ScanOnceAsync(logDiagnostics: true);
         if (val.HasValue)
         {
             OnRsDetected(val.Value);
-            RsOcrStatusText = $"✓ Erkannt: {val.Value:N0} RS ({DateTime.Now:HH:mm:ss})";
         }
         else
         {
             Status = "Kein RS-Signal auf dem Bildschirm erkannt";
-            RsOcrStatusText = "Kein Signal gefunden";
+            RsOcrStatusText = "Kein Signal gefunden (Bereich prüfen)";
         }
     }
 
@@ -5407,8 +5667,14 @@ public partial class MainViewModel : ObservableObject
             Dispatcher.UIThread.Post(() =>
             {
                 _settings.RsScanRegion = r;
+                _rsScanIndicator.SetRegion(r);
+                IsRsScanBoxVisible = false;
+                _rsScanIndicator.Hide();
+                IsRsAutoScanEnabled = true;
+                _settings.RsAutoScanEnabled = true;
                 Settings.Save(_settings);
-                Status = $"RS Scan-Bereich kalibriert: {r.Width}x{r.Height} @ ({r.X},{r.Y})";
+                Status = $"RS Scan-Bereich kalibriert: {r.Width}x{r.Height} @ ({r.X},{r.Y}) (Auto-Scan aktiv)";
+                Logger.Log($"[RsOcr] Neuer Scan-Bereich kalibriert: {r.Width}x{r.Height} @ ({r.X},{r.Y})");
             });
         };
         win.Show();
@@ -5419,7 +5685,10 @@ public partial class MainViewModel : ObservableObject
     {
         _settings.RsScanRegion = null;
         Settings.Save(_settings);
-        Status = "RS Scan-Bereich auf Standard (Mitte) zurückgesetzt";
+        var def = ScreenCapture.GetDefaultRsRegion();
+        _rsScanIndicator.SetRegion(def);
+        Status = "RS Scan-Bereich auf Standard zurückgesetzt";
+        Logger.Log($"[RsOcr] Scan-Bereich zurückgesetzt auf Standard: {def.Width}x{def.Height} @ ({def.X},{def.Y})");
     }
 
     #endregion

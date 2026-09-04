@@ -13,7 +13,7 @@
     <Product>SCLogMate</Product>
     <Title>SCLogMate</Title>
     <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
-    <Version>1.0.0-beta4</Version>
+    <Version>1.0.0-beta5</Version>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
     <ApplicationIcon>SCLogMate.ico</ApplicationIcon>
@@ -28,6 +28,7 @@
   <ItemGroup>
     <AvaloniaResource Include="SCLogMate.ico" />
     <EmbeddedResource Include="Data\blueprints.json" />
+    <EmbeddedResource Include="Data\seed_data.json" />
   </ItemGroup>
 
   <ItemGroup>

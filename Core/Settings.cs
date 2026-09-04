@@ -97,6 +97,9 @@ public class AppSettings
     /// <summary>Mit Windows automatisch starten (minimiert ins System-Tray).</summary>
     public bool AutostartEnabled { get; set; } = false;
 
+    /// <summary>Vom Nutzer gewählter Cloud-Sync-Pfad (z. B. OneDrive, Dropbox, Nextcloud).</summary>
+    public string? CloudStoragePath { get; set; }
+
     /// <summary>Vom Nutzer gewählte UI-Schriftart.</summary>
     public string SelectedFontFamily { get; set; } = "Inter";
 
@@ -131,7 +134,7 @@ public class AppSettings
     public double RsOverlayPositionY { get; set; } = 50;
 
     /// <summary>Automatischer RS Scanner OCR-Scan aktiv.</summary>
-    public bool RsAutoScanEnabled { get; set; } = false;
+    public bool RsAutoScanEnabled { get; set; } = true;
 
     /// <summary>Vom Nutzer ausgewählter RS Scan-Bereich auf dem Bildschirm.</summary>
     public ScanRegion? RsScanRegion { get; set; }

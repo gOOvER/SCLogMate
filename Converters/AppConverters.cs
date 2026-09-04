@@ -30,8 +30,68 @@ public class FilterActiveConverter : IValueConverter
 {
     public static readonly FilterActiveConverter Instance = new();
 
-    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#1F6FEB"));
-    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#21262D"));
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#0C3E69"));
+    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#0B1522"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.Ordinal) ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Rahmenfarbe eines Filter-Chips: aktiv = leuchtend, sonst subtil.</summary>
+public class FilterActiveBorderConverter : IValueConverter
+{
+    public static readonly FilterActiveBorderConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#38BDF8"));
+    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#16283C"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.Ordinal) ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Vordergrund/Textfarbe eines Filter-Chips: aktiv = hell/leuchtend, sonst dezent gedimmt.</summary>
+public class FilterActiveForegroundConverter : IValueConverter
+{
+    public static readonly FilterActiveForegroundConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#38BDF8"));
+    static readonly IBrush Idle = new SolidColorBrush(Color.Parse("#94A3B8"));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.Ordinal) ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Segment-Hintergrund (aktiv = MFD-Kachel, sonst transparent).</summary>
+public class SegmentActiveBgConverter : IValueConverter
+{
+    public static readonly SegmentActiveBgConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#0E3B66"));
+    static readonly IBrush Idle = new SolidColorBrush(Colors.Transparent);
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.Ordinal) ? Active : Idle;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Segment-Rahmen (aktiv = Cyan/Akzent, sonst transparent).</summary>
+public class SegmentActiveBorderConverter : IValueConverter
+{
+    public static readonly SegmentActiveBorderConverter Instance = new();
+
+    static readonly IBrush Active = new SolidColorBrush(Color.Parse("#38BDF8"));
+    static readonly IBrush Idle = new SolidColorBrush(Colors.Transparent);
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => string.Equals(value as string, parameter as string, StringComparison.Ordinal) ? Active : Idle;

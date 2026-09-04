@@ -90,7 +90,7 @@ public partial class RsScanOverlayWindow : Window
         ApplyWindowStyles();
     }
 
-    private void OnBorderPointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnTitlePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {

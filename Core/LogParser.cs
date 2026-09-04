@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 using SCLogMate.Models;
 
@@ -78,6 +79,14 @@ public partial class LogParser
     // Fracht-/Waren-KAUF (Cargo-Trading): price = Gesamtbetrag, quantity in cSCU (÷100 = SCU!).
     [GeneratedRegex(@"SShopCommodityBuyRequest.*?shopName\[(?<shop>[^\]]*)\].*?price\[(?<price>[\d.]+)\].*?resourceGUID\[(?<guid>[^\]]*)\].*?quantity\[(?<qty>[\d.]+)\s*cSCU\]")]
     private static partial Regex CommodityBuyRegex();
+
+    // Shop Response (Kaufbestätigung)
+    [GeneratedRegex(@"(?:Shop Flow Response|RmShopFlowResponse).*?result\[(?<result>[^\]]*)\]")]
+    private static partial Regex ShopResponseRegex();
+
+    // Objective Status & Fortschritt
+    [GeneratedRegex(@"mission_id (?<mission>[0-9a-fA-F-]+) - objective_id (?<objective>\S+) - state (?<state>MISSION_OBJECTIVE_STATE_\w+)(?:.*?flags=(?<flags>[^\s\[]*))?")]
+    private static partial Regex ObjectiveRegex();
 
     // Notification-Kopfzeile (einmal pro Ereignis): Text bis ':' , '"' oder Zeilenende.
     // (Manche Notifications sind mehrzeilig – z.B. Geld-Angebote – daher auch $.)
@@ -317,6 +326,7 @@ public partial class LogParser
 
     string? _lastLoot;                      // gegen Loot-Doppelzeilen
     string? _lastLoc;                       // für Quantum-Kontext
+    string _currentSystem = "Stanton";      // aktuell erkanntes Sternensystem (Stanton / Pyro / Nyx)
     string? _lastShip;                      // aktuell erkanntes Schiff
     string? _pendingQtDestination;          // aus Route-Kalkulation (Quantum Route)
     DateTime _lastQt = DateTime.MinValue;   // Drosselung der QT-Marker
@@ -332,6 +342,51 @@ public partial class LogParser
 
     /// <summary>Session-Metadaten (Build, Hardware, Charakter, Shard, …).</summary>
     public Dictionary<string, string> Meta { get; } = new();
+
+    // Tracking für Contracts, Spending, Ledger, Cargo und Places
+    public sealed record PendingPurchase(DateTime Timestamp, string Shop, string Item, string Guid, decimal Price, int Qty);
+    private PendingPurchase? _pendingPurchase;
+
+    public List<ConfirmedPurchaseRecord> ConfirmedPurchases { get; } = new();
+    public List<CargoTradeRecord> CargoTrades { get; } = new();
+    public List<LedgerRecord> LedgerRecords { get; } = new();
+    public List<(DateTime Time, string RawId, string Name, string? System, string? Body, string Kind)> LocationVisits { get; } = new();
+    public List<(DateTime Time, string Destination)> QuantumDestinations { get; } = new();
+
+    private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyCollection<ContractRecord> ContractsList => _contracts.Values;
+
+    public string PlaceAt(DateTime at)
+    {
+        for (int i = LocationVisits.Count - 1; i >= 0; i--)
+        {
+            if (LocationVisits[i].Time <= at)
+                return LocationVisits[i].Name;
+        }
+        for (int i = QuantumDestinations.Count - 1; i >= 0; i--)
+        {
+            if (QuantumDestinations[i].Time <= at)
+                return QuantumDestinations[i].Destination;
+        }
+        return _lastLoc ?? "—";
+    }
+
+    public static string CategorizeItem(string? guid, string item)
+    {
+        var s = item.ToLowerInvariant();
+        if (s.Contains("rifle") || s.Contains("pistol") || s.Contains("shotgun") || s.Contains("sniper") || s.Contains("smg") || s.Contains("weapon") || s.Contains("gun") || s.Contains("cannon") || s.Contains("repeater") || s.Contains("missile") || s.Contains("torpedo") || s.Contains("laser") || s.Contains("ballistic"))
+            return "Waffen";
+        if (s.Contains("helmet") || s.Contains("torso") || s.Contains("arms") || s.Contains("legs") || s.Contains("armor") || s.Contains("undersuit") || s.Contains("suit") || s.Contains("core") || s.Contains("backpack"))
+            return "Rüstung";
+        if (s.Contains("shield") || s.Contains("cooler") || s.Contains("power") || s.Contains("quantum") || s.Contains("generator") || s.Contains("drive") || s.Contains("thruster") || s.Contains("radar") || s.Contains("avionics"))
+            return "Schiffsteile";
+        if (s.Contains("medpen") || s.Contains("oxypen") || s.Contains("drink") || s.Contains("food") || s.Contains("can") || s.Contains("bottle") || s.Contains("snack") || s.Contains("seren") || s.Contains("medical"))
+            return "Verbrauchsgüter";
+        if (s.Contains("container") || s.Contains("box") || s.Contains("scu") || s.Contains("crate") || s.Contains("carryable"))
+            return "Behälter";
+        return "Ausrüstung & Sonstiges";
+    }
 
     /// <summary>Unbekannte Notification-Typen (Diagnose: was decken wir noch nicht ab?).</summary>
     public static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> Unknown = new();
@@ -352,6 +407,93 @@ public partial class LogParser
 
         CaptureMeta(line);
 
+        // Kiosk-Kaufbestätigung (Shop Flow Response)
+        if (_pendingPurchase != null && (line.Contains("Shop Flow Response", StringComparison.OrdinalIgnoreCase) || line.Contains("RmShopFlowResponse", StringComparison.OrdinalIgnoreCase)))
+        {
+            var sres = ShopResponseRegex().Match(line);
+            if (sres.Success && sres.Groups["result"].Value.Equals("Success", StringComparison.OrdinalIgnoreCase))
+            {
+                var p = _pendingPurchase;
+                _pendingPurchase = null;
+                var where = PlaceAt(p.Timestamp);
+                var cat = CategorizeItem(p.Guid, p.Item);
+                ConfirmedPurchases.Add(new ConfirmedPurchaseRecord
+                {
+                    Timestamp = p.Timestamp,
+                    ItemName = p.Item,
+                    Category = cat,
+                    Shop = p.Shop,
+                    Location = where,
+                    TotalPrice = p.Price,
+                    Quantity = p.Qty,
+                    Confirmed = true
+                });
+
+                LedgerRecords.Add(new LedgerRecord
+                {
+                    Timestamp = p.Timestamp,
+                    Kind = "Item gekauft",
+                    What = p.Qty > 1 ? $"{p.Item} ×{p.Qty}" : p.Item,
+                    Where = where,
+                    Shop = p.Shop,
+                    Amount = -p.Price,
+                    Quantity = p.Qty,
+                    Confirmed = true
+                });
+            }
+        }
+
+        // Mission Objective Status & Auftrags-Fortschritt (ObjectiveUpserted)
+        if (line.Contains("ObjectiveUpserted", StringComparison.OrdinalIgnoreCase))
+        {
+            var om = ObjectiveRegex().Match(line);
+            if (om.Success)
+            {
+                var mId = om.Groups["mission"].Value;
+                var objId = om.Groups["objective"].Value;
+                var stateStr = om.Groups["state"].Value;
+                bool isShowInLog = om.Groups["flags"].Success && om.Groups["flags"].Value.Contains("ShowInLog", StringComparison.OrdinalIgnoreCase);
+
+                if (!_contractObjectives.TryGetValue(mId, out var steps))
+                {
+                    steps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    _contractObjectives[mId] = steps;
+                }
+                if (isShowInLog || !steps.ContainsKey(objId))
+                {
+                    steps[objId] = stateStr;
+                }
+
+                int totalSteps = steps.Count;
+                int doneSteps = steps.Values.Count(st => st.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase));
+
+                var dt = ParseTs(line);
+                ContractOutcome outcome = stateStr switch
+                {
+                    "MISSION_OBJECTIVE_STATE_COMPLETED" => ContractOutcome.Completed,
+                    "MISSION_OBJECTIVE_STATE_WITHDRAWN" or "MISSION_OBJECTIVE_STATE_FAILED" => ContractOutcome.Abandoned,
+                    _ => ContractOutcome.InProgress
+                };
+
+                if (_contracts.TryGetValue(mId, out var existing))
+                {
+                    var finalOutcome = existing.Outcome == ContractOutcome.Completed
+                        ? ContractOutcome.Completed
+                        : outcome;
+
+                    _contracts[mId] = existing with
+                    {
+                        StepsTotal = Math.Max(existing.StepsTotal, totalSteps),
+                        StepsDone = Math.Max(existing.StepsDone, doneSteps),
+                        Outcome = finalOutcome,
+                        CompletedAt = finalOutcome == ContractOutcome.Completed || finalOutcome == ContractOutcome.Abandoned
+                            ? (existing.CompletedAt ?? dt)
+                            : null
+                    };
+                }
+            }
+        }
+
         // Eine offene Überweisung wird durch die nächste Betragszeile aufgelöst.
         if (_pendWho != null)
         {
@@ -363,6 +505,21 @@ public partial class LogParser
                 int dir = _pendDir;
                 _pendWho = null;
                 _pendingLines = 0;
+                var ts = _pendTime;
+                var where = PlaceAt(ts);
+
+                LedgerRecords.Add(new LedgerRecord
+                {
+                    Timestamp = ts,
+                    Kind = dir > 0 ? "Überweisung empfangen" : "Überweisung gesendet",
+                    What = dir > 0 ? $"von {who}" : $"an {who}",
+                    Where = where,
+                    Shop = "mobiGlas",
+                    Amount = dir * amt,
+                    Quantity = 1,
+                    Confirmed = true
+                });
+
                 return new LogEntry
                 {
                     Time = _pendTime,
@@ -387,13 +544,44 @@ public partial class LogParser
 
         var rw = RewardRegex().Match(line);
         if (rw.Success)
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = ParseAmt(rw.Groups["amt"].Value) };
+        {
+            var ts = ParseTs(line);
+            long amt = ParseAmt(rw.Groups["amt"].Value);
+            LedgerRecords.Add(new LedgerRecord
+            {
+                Timestamp = ts,
+                Kind = "Belohnung",
+                What = "Missions-Belohnung",
+                Where = PlaceAt(ts),
+                Shop = "mobiGlas",
+                Amount = amt,
+                Quantity = 1,
+                Confirmed = true
+            });
+            return new LogEntry { Time = ts, Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = amt };
+        }
 
-        // Quantum Route-Berechnungen (Destination merken für QT-Ankunft)
+        // Quantum Route-Berechnungen (Destination merken für QT-Ankunft & System-Erkennung)
         var qr = QuantumRouteRegex().Match(line);
         if (qr.Success)
         {
             _pendingQtDestination = qr.Groups["dest"].Value;
+            var origin = qr.Groups["origin"].Value;
+            if (origin.Contains("Nyx", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Nyx";
+                Locations.ActiveSystem = "Nyx";
+            }
+            else if (origin.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Pyro";
+                Locations.ActiveSystem = "Pyro";
+            }
+            else if (origin.Contains("Stanton", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Stanton";
+                Locations.ActiveSystem = "Stanton";
+            }
         }
         else
         {
@@ -412,6 +600,27 @@ public partial class LogParser
             }
         }
 
+        if (!string.IsNullOrEmpty(_pendingQtDestination))
+        {
+            if (_pendingQtDestination.Contains("nyx", StringComparison.OrdinalIgnoreCase)
+                || _pendingQtDestination.Contains("levski", StringComparison.OrdinalIgnoreCase)
+                || _pendingQtDestination.Contains("delamar", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Nyx";
+                Locations.ActiveSystem = "Nyx";
+            }
+            else if (_pendingQtDestination.Contains("pyro", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Pyro";
+                Locations.ActiveSystem = "Pyro";
+            }
+            else if (_pendingQtDestination.Contains("stanton", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentSystem = "Stanton";
+                Locations.ActiveSystem = "Stanton";
+            }
+        }
+
         var by = BuyRegex().Match(line);
         if (by.Success)
         {
@@ -422,9 +631,12 @@ public partial class LogParser
             if (shopLoc != null) _lastLoc = shopLoc;
             var item = ItemNames.CleanFallback(by.Groups["item"].Value);
             var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
+            var ts = ParseTs(line);
+            _pendingPurchase = new PendingPurchase(ts, shop, item, by.Groups["guid"].Value, price, qty);
+
             return new LogEntry
             {
-                Time = ParseTs(line),
+                Time = ts,
                 Kind = EventKind.Purchase,
                 Amount = -price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
                 ItemRef = by.Groups["guid"].Value,
@@ -463,9 +675,36 @@ public partial class LogParser
             var shopLoc = ExtractLocationFromShop(shop);
             if (shopLoc != null) _lastLoc = shopLoc;
             var ware = Commodities.Resolve(co.Groups["guid"].Value);
+            var ts = ParseTs(line);
+            var where = PlaceAt(ts);
+
+            CargoTrades.Add(new CargoTradeRecord
+            {
+                Timestamp = ts,
+                IsSell = true,
+                Commodity = ware,
+                ResourceGuid = co.Groups["guid"].Value,
+                QuantityScu = qty,
+                TotalAuec = amt,
+                Shop = shop,
+                Where = where
+            });
+
+            LedgerRecords.Add(new LedgerRecord
+            {
+                Timestamp = ts,
+                Kind = "Frachtverkauf",
+                What = $"{ware} · {qty:N0} SCU",
+                Where = where,
+                Shop = shop,
+                Amount = amt,
+                Quantity = qty,
+                Confirmed = true
+            });
+
             return new LogEntry
             {
-                Time = ParseTs(line),
+                Time = ts,
                 Kind = EventKind.Trade,
                 Amount = amt,
                 Detail = $"{ware} ×{qty} SCU  · {shop}"
@@ -477,14 +716,41 @@ public partial class LogParser
         if (cb.Success)
         {
             long price = (long)ParseDouble(cb.Groups["price"].Value);
-            long scu = (long)Math.Round(ParseDouble(cb.Groups["qty"].Value) / 100.0);
+            int scu = (int)Math.Round(ParseDouble(cb.Groups["qty"].Value) / 100.0);
             var shop = CleanShop(cb.Groups["shop"].Value);
             var shopLoc = ExtractLocationFromShop(shop);
             if (shopLoc != null) _lastLoc = shopLoc;
             var ware = Commodities.Resolve(cb.Groups["guid"].Value);
+            var ts = ParseTs(line);
+            var where = PlaceAt(ts);
+
+            CargoTrades.Add(new CargoTradeRecord
+            {
+                Timestamp = ts,
+                IsSell = false,
+                Commodity = ware,
+                ResourceGuid = cb.Groups["guid"].Value,
+                QuantityScu = scu,
+                TotalAuec = price,
+                Shop = shop,
+                Where = where
+            });
+
+            LedgerRecords.Add(new LedgerRecord
+            {
+                Timestamp = ts,
+                Kind = "Frachtkauf",
+                What = $"{ware} · {scu:N0} SCU",
+                Where = where,
+                Shop = shop,
+                Amount = -price,
+                Quantity = scu,
+                Confirmed = true
+            });
+
             return new LogEntry
             {
-                Time = ParseTs(line),
+                Time = ts,
                 Kind = EventKind.Trade,
                 Amount = -price,
                 Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)"
@@ -516,7 +782,7 @@ public partial class LogParser
         // Spawn ins Spiel
         if (ClientSpawnedRegex().IsMatch(line))
         {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = "Im Spiel gespawnt (Station / Hangar)" };
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = "Im Spiel gespawnt (Station / Hangar)" };
         }
 
         // ASOP Terminal Fahrzeugbereitstellung
@@ -567,11 +833,20 @@ public partial class LogParser
             // 3. Jurisdiktion / Rechtssystem
             if (text.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase))
             {
+                _currentSystem = "Nyx";
+                Locations.ActiveSystem = "Nyx";
+                if (_lastLoc == null || _lastLoc == "—") _lastLoc = "Delamar";
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: People's Alliance (Nyx)" };
             }
             if (text.Contains("UEE Jurisdiction", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet der UEE", StringComparison.OrdinalIgnoreCase))
             {
+                _currentSystem = "Stanton";
+                Locations.ActiveSystem = "Stanton";
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: UEE (Stanton)" };
+            }
+            if (text.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) || text.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase))
+            {
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = $"🏴 Ungesetzlicher Sektor ({_currentSystem})" };
             }
             if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) || text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
             {
@@ -586,10 +861,15 @@ public partial class LogParser
             if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
             {
                 var locRes = Locations.ResolveLocation(raw);
-                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
                 {
-                    _lastLoc = locRes.DisplayName;
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                    var ts = ParseTs(line);
+                    LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                    if (locRes.DisplayName != _lastLoc)
+                    {
+                        _lastLoc = locRes.DisplayName;
+                        return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                    }
                 }
             }
         }
@@ -601,10 +881,15 @@ public partial class LogParser
             if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
             {
                 var locRes = Locations.ResolveLocation(raw);
-                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
                 {
-                    _lastLoc = locRes.DisplayName;
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                    var ts = ParseTs(line);
+                    LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                    if (locRes.DisplayName != _lastLoc)
+                    {
+                        _lastLoc = locRes.DisplayName;
+                        return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                    }
                 }
             }
         }
@@ -613,10 +898,15 @@ public partial class LogParser
         if (an.Success)
         {
             var locRes = Locations.ResolveLocation(an.Groups["loc"].Value);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
             {
-                _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                var ts = ParseTs(line);
+                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                if (locRes.DisplayName != _lastLoc)
+                {
+                    _lastLoc = locRes.DisplayName;
+                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                }
             }
         }
 
@@ -624,10 +914,15 @@ public partial class LogParser
         if (spz.Success)
         {
             var locRes = Locations.ResolveLocation(spz.Groups["loc"].Value);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
             {
-                _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                var ts = ParseTs(line);
+                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                if (locRes.DisplayName != _lastLoc)
+                {
+                    _lastLoc = locRes.DisplayName;
+                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                }
             }
         }
 
@@ -636,10 +931,15 @@ public partial class LogParser
         {
             var raw = zn.Groups["loc"].Value;
             var locRes = Locations.ResolveLocation(raw);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit") && locRes.DisplayName != _lastLoc)
+            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
             {
-                _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = _lastLoc };
+                var ts = ParseTs(line);
+                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+                if (locRes.DisplayName != _lastLoc)
+                {
+                    _lastLoc = locRes.DisplayName;
+                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                }
             }
         }
 
@@ -724,12 +1024,23 @@ public partial class LogParser
                         _lastLoc = resDest.DisplayName;
                         destination = _lastLoc;
                         destText = $" (bei {_lastLoc})";
+
+                        if (resDest.SystemName is "Nyx" or "Pyro" or "Stanton")
+                        {
+                            _currentSystem = resDest.SystemName;
+                            Locations.ActiveSystem = resDest.SystemName;
+                        }
                     }
                     _pendingQtDestination = null;
                 }
                 else if (_lastLoc != null)
                 {
                     destText = $" (bei {_lastLoc})";
+                }
+
+                if (!string.IsNullOrEmpty(destination))
+                {
+                    QuantumDestinations.Add((t, destination));
                 }
 
                 return new LogEntry
@@ -931,9 +1242,30 @@ public partial class LogParser
         var mk = MissionMarkerRegex().Match(line);
         if (mk.Success)
         {
-            if (_missionsTaken.Add(mk.Groups["id"].Value))
+            var mId = mk.Groups["id"].Value;
+            var gen = mk.Groups["gen"].Value;
+            var con = mk.Groups["con"].Value;
+            var info = Missions.Derive(gen, con);
+
+            if (!_contracts.TryGetValue(mId, out var existing))
             {
-                var info = Missions.Derive(mk.Groups["gen"].Value, mk.Groups["con"].Value);
+                _contracts[mId] = new ContractRecord
+                {
+                    MissionId = mId,
+                    AcceptedAt = ParseTs(line),
+                    Title = Missions.Format(info),
+                    Issuer = info.Faction,
+                    Type = info.Type,
+                    Difficulty = info.Difficulty,
+                    System = info.System,
+                    StepsTotal = 1,
+                    StepsDone = 0,
+                    Outcome = ContractOutcome.InProgress
+                };
+            }
+
+            if (_missionsTaken.Add(mId))
+            {
                 return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
             }
             return null;
@@ -943,7 +1275,16 @@ public partial class LogParser
         var md = MissionDoneRegex().Match(line);
         if (md.Success)
         {
-            _missionsDone.Add(md.Groups["id"].Value);
+            var mId = md.Groups["id"].Value;
+            _missionsDone.Add(mId);
+            if (_contracts.TryGetValue(mId, out var existing))
+            {
+                _contracts[mId] = existing with
+                {
+                    Outcome = ContractOutcome.Completed,
+                    CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                };
+            }
             return null;
         }
 
@@ -965,7 +1306,19 @@ public partial class LogParser
         if (fn.Success)
         {
             long amt = ParseAmt(fn.Groups["amt"].Value);
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Fine, Amount = -amt, Detail = $"Strafe gezahlt: {amt:N0} aUEC" };
+            var ts = ParseTs(line);
+            LedgerRecords.Add(new LedgerRecord
+            {
+                Timestamp = ts,
+                Kind = "Strafe gezahlt",
+                What = $"Strafe: {amt:N0} aUEC",
+                Where = PlaceAt(ts),
+                Shop = "Klescher / UEE",
+                Amount = -amt,
+                Quantity = 1,
+                Confirmed = true
+            });
+            return new LogEntry { Time = ts, Kind = EventKind.Fine, Amount = -amt, Detail = $"Strafe gezahlt: {amt:N0} aUEC" };
         }
 
         // Begangene Straftat (Crimestat)

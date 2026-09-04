@@ -9,6 +9,31 @@ using System.Threading.Tasks;
 
 namespace SCLogMate.Core;
 
+public sealed class UexCommodityTerminalPrice
+{
+    public string TerminalName { get; set; } = "";
+    public decimal PriceBuy { get; set; }
+    public decimal PriceSell { get; set; }
+    public decimal StockScu { get; set; }
+    public decimal DemandScu { get; set; }
+    public long DateModified { get; set; }
+}
+
+public sealed class UexCommodityPriceInfo
+{
+    public string CommodityName { get; set; } = "";
+    public decimal BestSell { get; set; }
+    public string? BestSellTerminal { get; set; }
+    public decimal BestBuy { get; set; }
+    public string? BestBuyTerminal { get; set; }
+    public decimal AvgSell { get; set; }
+    public int TerminalsCount { get; set; }
+    public int SellTerminalsCount { get; set; }
+    public int BuyTerminalsCount { get; set; }
+    public DateTimeOffset? LastReportedAt { get; set; }
+    public List<UexCommodityTerminalPrice> Terminals { get; set; } = [];
+}
+
 public sealed class UexLocationInfo
 {
     public string Name { get; set; } = "";
@@ -41,8 +66,15 @@ public static class UexApiClient
     private static readonly HttpClient Http = new()
     {
         BaseAddress = new Uri("https://api.uexcorp.uk/2.0/"),
-        Timeout = TimeSpan.FromSeconds(8)
+        Timeout = TimeSpan.FromSeconds(15)
     };
+
+    private static readonly ConcurrentDictionary<string, UexCommodityPriceInfo> CommodityPricesCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly SemaphoreSlim CommodityPricesLock = new(1, 1);
+    public static DateTimeOffset? LastCommodityPricesFetch { get; private set; }
+    public static readonly TimeSpan CommodityPricesCacheDuration = TimeSpan.FromHours(1);
+    private static bool _diskCacheChecked = false;
+    private static string CommodityCacheFilePath => System.IO.Path.Combine(Settings.Dir, "uex", "commodities_prices_cache.json");
 
     private static readonly ConcurrentDictionary<string, UexLocationInfo> LocationCache = new(StringComparer.OrdinalIgnoreCase);
     private static bool _hasLoadedStations = false;
@@ -261,5 +293,166 @@ public static class UexApiClient
         };
 
         return info;
+    }
+
+    public static void EnsureDiskCacheLoaded()
+    {
+        if (_diskCacheChecked) return;
+        _diskCacheChecked = true;
+        try
+        {
+            var path = CommodityCacheFilePath;
+            if (System.IO.File.Exists(path))
+            {
+                var fi = new System.IO.FileInfo(path);
+                var json = System.IO.File.ReadAllText(path);
+                var list = JsonSerializer.Deserialize<List<UexCommodityPriceInfo>>(json);
+                if (list != null && list.Count > 0)
+                {
+                    CommodityPricesCache.Clear();
+                    foreach (var item in list)
+                    {
+                        CommodityPricesCache[item.CommodityName] = item;
+                    }
+                    LastCommodityPricesFetch = fi.LastWriteTimeUtc;
+                    Logger.Log($"UEX API: {list.Count} Marktpreise aus lokalem Cache geladen (Stand: {fi.LastWriteTime:dd.MM.yy HH:mm}).");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"UEX API Disk-Cache Fehler: {ex.Message}");
+        }
+    }
+
+    public static async Task<bool> FetchCommodityPricesAsync(bool force = false)
+    {
+        EnsureDiskCacheLoaded();
+
+        if (!force && LastCommodityPricesFetch.HasValue &&
+            (DateTimeOffset.UtcNow - LastCommodityPricesFetch.Value) < CommodityPricesCacheDuration &&
+            !CommodityPricesCache.IsEmpty)
+        {
+            return true;
+        }
+
+        await CommodityPricesLock.WaitAsync();
+        try
+        {
+            if (!force && LastCommodityPricesFetch.HasValue &&
+                (DateTimeOffset.UtcNow - LastCommodityPricesFetch.Value) < CommodityPricesCacheDuration &&
+                !CommodityPricesCache.IsEmpty)
+            {
+                return true;
+            }
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await Http.GetAsync("commodities_prices_all", cts.Token);
+            if (!response.IsSuccessStatusCode) return false;
+
+            using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cts.Token);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+                return false;
+
+            var grouped = new Dictionary<string, List<UexCommodityTerminalPrice>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in data.EnumerateArray())
+            {
+                var commName = item.TryGetProperty("commodity_name", out var cn) ? cn.GetString() : null;
+                if (string.IsNullOrWhiteSpace(commName)) continue;
+
+                var termName = item.TryGetProperty("terminal_name", out var tn) ? tn.GetString() ?? "Unbekannt" : "Unbekannt";
+                decimal buy = item.TryGetProperty("price_buy", out var pb) && pb.TryGetDecimal(out var dBuy) ? dBuy : 0;
+                decimal sell = item.TryGetProperty("price_sell", out var ps) && ps.TryGetDecimal(out var dSell) ? dSell : 0;
+                decimal stock = item.TryGetProperty("scu_buy", out var sb) && sb.TryGetDecimal(out var dStock) ? dStock : 0;
+                decimal demand = item.TryGetProperty("scu_sell_stock", out var ss) && ss.TryGetDecimal(out var dDemand) ? dDemand : 0;
+                long dateMod = item.TryGetProperty("date_modified", out var dm) && dm.TryGetInt64(out var dMod) ? dMod : 0;
+
+                if (!grouped.TryGetValue(commName, out var list))
+                {
+                    list = new List<UexCommodityTerminalPrice>();
+                    grouped[commName] = list;
+                }
+
+                list.Add(new UexCommodityTerminalPrice
+                {
+                    TerminalName = termName,
+                    PriceBuy = buy,
+                    PriceSell = sell,
+                    StockScu = stock,
+                    DemandScu = demand,
+                    DateModified = dateMod
+                });
+            }
+
+            CommodityPricesCache.Clear();
+            var resultList = new List<UexCommodityPriceInfo>();
+            foreach (var (commName, rows) in grouped)
+            {
+                var bestSell = rows.Where(r => r.PriceSell > 0).OrderByDescending(r => r.PriceSell).FirstOrDefault();
+                var bestBuy = rows.Where(r => r.PriceBuy > 0).OrderBy(r => r.PriceBuy).FirstOrDefault();
+                var avgSell = rows.Where(r => r.PriceSell > 0).Select(r => r.PriceSell).DefaultIfEmpty(0).Average();
+                long maxSeen = rows.Select(r => r.DateModified).DefaultIfEmpty(0).Max();
+
+                var info = new UexCommodityPriceInfo
+                {
+                    CommodityName = commName,
+                    BestSell = bestSell?.PriceSell ?? 0,
+                    BestSellTerminal = bestSell?.TerminalName,
+                    BestBuy = bestBuy?.PriceBuy ?? 0,
+                    BestBuyTerminal = bestBuy?.TerminalName,
+                    AvgSell = Math.Round(avgSell, 0),
+                    TerminalsCount = rows.Count,
+                    SellTerminalsCount = rows.Count(r => r.PriceSell > 0),
+                    BuyTerminalsCount = rows.Count(r => r.PriceBuy > 0),
+                    LastReportedAt = maxSeen > 0 ? DateTimeOffset.FromUnixTimeSeconds(maxSeen) : null,
+                    Terminals = rows
+                };
+
+                CommodityPricesCache[commName] = info;
+                resultList.Add(info);
+            }
+
+            LastCommodityPricesFetch = DateTimeOffset.UtcNow;
+
+            // In Disk-Cache sichern
+            try
+            {
+                var uexDir = System.IO.Path.Combine(Settings.Dir, "uex");
+                System.IO.Directory.CreateDirectory(uexDir);
+                var json = JsonSerializer.Serialize(resultList, new JsonSerializerOptions { WriteIndented = false });
+                System.IO.File.WriteAllText(CommodityCacheFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Fehler beim Speichern des UEX Disk-Caches: {ex.Message}");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Fehler beim Abrufen der UEX-Marktpreise: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            CommodityPricesLock.Release();
+        }
+    }
+
+    public static UexCommodityPriceInfo? GetCommodityPrice(string name)
+    {
+        EnsureDiskCacheLoaded();
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        return CommodityPricesCache.TryGetValue(name, out var info) ? info : null;
+    }
+
+    public static IReadOnlyDictionary<string, UexCommodityPriceInfo> GetAllCommodityPrices()
+    {
+        EnsureDiskCacheLoaded();
+        return CommodityPricesCache;
     }
 }

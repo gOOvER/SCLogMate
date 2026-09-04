@@ -11,8 +11,9 @@ public class RsResource
     public int BaseRs { get; set; }
     public string Tier { get; set; } = "C";      // S, A, B, C
     public string Rarity { get; set; } = "common"; // common, uncommon, rare, epic, legendary
-    public string Method { get; set; } = "ship";   // ship, salvage, fps, vehicle
+    public string Method { get; set; } = "ship";   // ship, salvage, fps, vehicle, fps+vehicle
     public double EstimatedPricePerScu { get; set; }
+    public List<string> Locations { get; set; } = new();
     public List<RefineryBonus> Refineries { get; set; } = new();
 
     public string TierColor => Tier switch
@@ -25,20 +26,19 @@ public class RsResource
 
     public (bool Matches, int Nodes, bool IsExact, double ErrorPct) CheckRs(int rs)
     {
-        if (BaseRs <= 0 || (Method != "ship" && Method != "salvage")) return (false, 0, false, 0);
+        if (BaseRs <= 0) return (false, 0, false, 0);
 
         double ratio = (double)rs / BaseRs;
         int nearest = (int)Math.Round(ratio);
         if (nearest < 1) return (false, 0, false, 0);
 
-        // Cluster Limits: Verhindert unmögliche Node-Multiplikatoren
-        int maxCap = Rarity switch
+        // Cluster Limits: Bis zu 16 Asteroiden in großen Clustern und Missionen
+        int maxCap = Method switch
         {
-            "legendary" => 4,
-            "epic" => 6,
-            "rare" => 8,
-            "uncommon" => 12,
-            _ => 16
+            "salvage" => 100, // Wrackfeld-Panels
+            "fps" or "fps+vehicle" => 6,
+            "vehicle" => 8,
+            _ => 16 // Alle Ship-Mining Erze (auch Legendary/Epic/Rare in großen Clustern bis 16 Nodes)
         };
 
         if (nearest > maxCap) return (false, 0, false, 0);
@@ -62,13 +62,21 @@ public class RsMatch
     public double ErrorPct { get; set; }
     public int ScannedRs { get; set; }
 
-    public string DisplayTitle => Resource.Method == "salvage"
-        ? $"{Nodes}x Salvage Panel(s)"
-        : $"{Nodes}x {Resource.Name}";
+    public string DisplayTitle => Resource.Method switch
+    {
+        "salvage" => $"{Nodes}x Salvage Panel(s)",
+        "fps" or "fps+vehicle" => $"{Nodes}x {Resource.Name} (Hand-Gem)",
+        "vehicle" => $"{Nodes}x {Resource.Name} (Fahrzeug-Gem)",
+        _ => $"{Nodes}x {Resource.Name}"
+    };
 
-    public string Subtitle => Resource.Method == "salvage"
-        ? $"Rumpf-Wrackteile (2.000 RS / Panel) · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}"
-        : $"Tier {Resource.Tier} ({Resource.Rarity}) · Base-RS {Resource.BaseRs:N0} · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}";
+    public string Subtitle => Resource.Method switch
+    {
+        "salvage" => $"Rumpf-Wrackteile (2.000 RS / Panel) · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}",
+        "fps" or "fps+vehicle" => $"Edelstein / FPS-Mining · Base-RS {Resource.BaseRs:N0} · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}",
+        "vehicle" => $"Edelstein / ROC-Mining · Base-RS {Resource.BaseRs:N0} · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}",
+        _ => $"Tier {Resource.Tier} ({Resource.Rarity}) · Base-RS {Resource.BaseRs:N0} · {(IsExact ? "Exakte Signatur" : $"Signal ±{ErrorPct:F1}%")}"
+    };
 
     public string BestRefineryText
     {

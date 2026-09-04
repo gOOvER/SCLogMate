@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 
 namespace SCLogMate.Core;
 
@@ -24,25 +23,23 @@ public static class LogArchive
             try
             {
                 var dest = Path.Combine(Dir, Path.GetFileName(f));
-                if (File.Exists(dest) && !FilesMatch(f, dest))
+                if (File.Exists(dest))
                 {
-                    var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f)))[..16];
-                    dest = Path.Combine(Dir, $"{Path.GetFileNameWithoutExtension(f)}_{hash}{Path.GetExtension(f)}");
+                    var sourceInfo = new FileInfo(f);
+                    var destInfo = new FileInfo(dest);
+                    if (sourceInfo.Length > destInfo.Length)
+                    {
+                        File.Copy(f, dest, overwrite: true);
+                    }
                 }
-                if (!File.Exists(dest)) File.Copy(f, dest);
+                else
+                {
+                    File.Copy(f, dest);
+                }
             }
             catch (Exception ex) { Logger.Error("Archive copy " + f, ex); }
         }
         return Directory.GetFiles(Dir, "*.log").ToList();
     }
-
-    private static bool FilesMatch(string source, string destination)
-    {
-        var sourceInfo = new FileInfo(source);
-        var destinationInfo = new FileInfo(destination);
-        if (sourceInfo.Length != destinationInfo.Length) return false;
-
-        return SHA256.HashData(File.ReadAllBytes(source))
-            .SequenceEqual(SHA256.HashData(File.ReadAllBytes(destination)));
-    }
 }
+

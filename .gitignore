@@ -21,6 +21,7 @@ publish/
 scan_out.txt
 *.log
 CLAUDE.md
+AGENTS.md
 
 # Local integrations and third-party tools
 VoiceAttack/

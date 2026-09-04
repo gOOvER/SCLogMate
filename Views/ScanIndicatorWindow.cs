@@ -22,6 +22,8 @@ public class ScanIndicatorWindow : Window
     private static readonly IBrush CyanBrush = new SolidColorBrush(Color.Parse("#22D3EE"));
     private static readonly IBrush GreenBrush = new SolidColorBrush(Color.Parse("#4ADE80"));
 
+    private readonly string _title;
+    private readonly IBrush _accentBrush;
     private readonly Border _border;
     private readonly TextBlock _label;
     private IntPtr _hwnd;
@@ -34,8 +36,11 @@ public class ScanIndicatorWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
-    public ScanIndicatorWindow()
+    public ScanIndicatorWindow() : this("aUEC Scan", "#22D3EE") { }
+
+    public ScanIndicatorWindow(string title, string hexColor)
     {
+        _title = title;
         SystemDecorations = SystemDecorations.None;
         Background = Brushes.Transparent;
         Topmost = true;
@@ -43,11 +48,16 @@ public class ScanIndicatorWindow : Window
         CanResize = false;
         Focusable = false;
 
+        var brush = new SolidColorBrush(Color.Parse(hexColor));
+        _accentBrush = brush;
+        var c = Color.Parse(hexColor);
+        var bgBrush = new SolidColorBrush(Color.FromArgb(18, c.R, c.G, c.B));
+
         _label = new TextBlock
         {
-            Text = "aUEC Scan",
+            Text = title,
             FontSize = 10,
-            Foreground = CyanBrush,
+            Foreground = brush,
             FontWeight = FontWeight.Bold,
             Margin = new Thickness(4, -15, 0, 0),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left
@@ -55,9 +65,9 @@ public class ScanIndicatorWindow : Window
 
         _border = new Border
         {
-            BorderBrush = CyanBrush,
+            BorderBrush = brush,
             BorderThickness = new Thickness(2),
-            Background = new SolidColorBrush(Color.Parse("#1022D3EE")),
+            Background = bgBrush,
             CornerRadius = new CornerRadius(3),
             Child = _label
         };
@@ -99,25 +109,26 @@ public class ScanIndicatorWindow : Window
         {
             ApplyPhysicalBounds();
         }
-        else
-        {
-            Show();
-        }
     }
 
     public void FlashGreen()
     {
+        // Niemals einblenden, wenn die Box vom Nutzer nicht explizit eingeschaltet wurde
         if (!IsVisible) return;
+
         _border.BorderBrush = GreenBrush;
         _label.Foreground = GreenBrush;
-        _label.Text = "✓ aUEC gelesen";
+        _label.Text = $"✓ {_title}";
 
-        DispatcherTimer.RunOnce(() =>
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        timer.Tick += (_, _) =>
         {
-            _border.BorderBrush = CyanBrush;
-            _label.Foreground = CyanBrush;
-            _label.Text = "aUEC Scan";
-        }, TimeSpan.FromMilliseconds(1000));
+            timer.Stop();
+            _border.BorderBrush = _accentBrush;
+            _label.Foreground = _accentBrush;
+            _label.Text = _title;
+        };
+        timer.Start();
     }
 
     private void ApplyPhysicalBounds()

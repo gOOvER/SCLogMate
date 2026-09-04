@@ -193,20 +193,26 @@ public static partial class Locations
 
     #region Resolution Logic
 
+    /// <summary>Aktuell aktives Sternensystem (Stanton, Pyro, Nyx) für Kontext-Auflösungen und Beacons.</summary>
+    public static string ActiveSystem { get; set; } = "Stanton";
+
     public static ResolvedLocation ResolveLocation(string rawId)
     {
         if (string.IsNullOrWhiteSpace(rawId) || rawId == "—")
-            return new ResolvedLocation { RawCode = rawId ?? "", DisplayName = "—", SystemName = "Stanton", ParentBody = "—" };
+            return new ResolvedLocation { RawCode = rawId ?? "", DisplayName = "—", SystemName = ActiveSystem, ParentBody = "—" };
 
         var id = CleanRawId(rawId);
 
-        // 1. Sentinels / Unspezifische Filter
+        // 1. Sentinels / Unspezifische Filter / Dynamische Beacons
         if (IsAmbiguous(id))
-            return new ResolvedLocation { RawCode = rawId, DisplayName = "Im Transit (Quantum-Route)", SystemName = "Stanton", ParentBody = "—" };
+            return new ResolvedLocation { RawCode = rawId, DisplayName = "Im Transit (Quantum-Route)", SystemName = ActiveSystem, ParentBody = "—" };
 
         // 2. Bekannte Orte (Well-Known)
         if (WellKnown.TryGetValue(id, out var wk))
         {
+            if (wk.System is "Nyx" or "Pyro" or "Stanton")
+                ActiveSystem = wk.System;
+
             return new ResolvedLocation
             {
                 RawCode = rawId,
@@ -218,7 +224,7 @@ public static partial class Locations
             };
         }
 
-        // 3. Nyx Spezifisch
+        // 3. Nyx Spezifisch (inkl. Levski, Delamar, Glaciem Ring, Keeger Belt)
         var nyx = TryNyx(rawId, id);
         if (nyx != null) return nyx;
 
@@ -250,7 +256,7 @@ public static partial class Locations
         var embed = TryEmbeddedSystem(rawId, id);
         if (embed != null) return embed;
 
-        // 11. Städte / LZ Token (NewBabbage, Lorville, Orison, Area18)
+        // 11. Städte / LZ Token (NewBabbage, Lorville, Orison, Area18, Levski)
         var city = TryWellKnownCity(rawId, id);
         if (city != null) return city;
 
@@ -260,10 +266,10 @@ public static partial class Locations
         {
             RawCode = rawId,
             DisplayName = pretty,
-            SystemName = "Stanton",
-            ParentBody = "Stanton",
+            SystemName = ActiveSystem,
+            ParentBody = ActiveSystem,
             Type = StarmapObjectType.Outpost,
-            IsArmistice = true
+            IsArmistice = ActiveSystem == "Stanton"
         };
     }
 
@@ -300,29 +306,51 @@ public static partial class Locations
         return id.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase)
             || id.Equals("ObjectContainer_RestStop", StringComparison.OrdinalIgnoreCase)
             || id.Equals("RestStop", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("gespawnt", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("spawn", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("login", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("MISSION_QT_", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("MISSION QT", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("NavPoint_", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("NavPoint ", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("MissionObjectiveMarker", StringComparison.OrdinalIgnoreCase)
             || NavPointRegex.IsMatch(id)
             || MissionBeaconRegex.IsMatch(id);
     }
 
     private static ResolvedLocation? TryNyx(string rawId, string id)
     {
-        if (!id.StartsWith("Nyx", StringComparison.OrdinalIgnoreCase) && !NyxGatewayRegex.IsMatch(id))
-            return null;
+        bool isNyx = id.Contains("Nyx", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Levski", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Delamar", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Glaciem", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Keeger", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Moraine", StringComparison.OrdinalIgnoreCase)
+            || NyxGatewayRegex.IsMatch(id);
+
+        if (!isNyx) return null;
+
+        ActiveSystem = "Nyx";
 
         var body = id.Contains("Glaciem", StringComparison.OrdinalIgnoreCase) ? "Glaciem Ring"
-            : id.Contains("Keeger", StringComparison.OrdinalIgnoreCase) ? "Keeger Belt"
-            : id.Contains("Levski", StringComparison.OrdinalIgnoreCase) ? "Delamar"
+            : id.Contains("Keeger", StringComparison.OrdinalIgnoreCase) || id.Contains("Moraine", StringComparison.OrdinalIgnoreCase) ? "Keeger Belt"
             : "Delamar";
 
-        var name = id.Contains("SocialStation_003", StringComparison.OrdinalIgnoreCase) ? "People's Service Station Theta"
-            : id.Contains("RockCracker_007", StringComparison.OrdinalIgnoreCase) ? "QV Breaker Station BRK-267"
-            : id.Contains("OutlawStation_Keeger", StringComparison.OrdinalIgnoreCase) || id.Contains("Keeger", StringComparison.OrdinalIgnoreCase) ? "Moraine Base (Keeger Depot)"
+        var name = id.Contains("SocialStation_003", StringComparison.OrdinalIgnoreCase) || id.Contains("ThetaStation", StringComparison.OrdinalIgnoreCase) ? "People's Service Station Theta"
+            : id.Contains("RockCracker_007", StringComparison.OrdinalIgnoreCase) || id.Contains("BRK267", StringComparison.OrdinalIgnoreCase) ? "QV Breaker Station BRK-267"
+            : id.Contains("OutlawStation_Keeger", StringComparison.OrdinalIgnoreCase) || id.Contains("Keeger", StringComparison.OrdinalIgnoreCase) || id.Contains("Moraine", StringComparison.OrdinalIgnoreCase) ? "Moraine Base (Keeger Belt)"
             : id.Contains("Levski", StringComparison.OrdinalIgnoreCase) ? "Levski"
+            : id.Contains("Delamar", StringComparison.OrdinalIgnoreCase) ? "Delamar"
             : Spaced(id);
 
         var type = id.Contains("Levski", StringComparison.OrdinalIgnoreCase) ? StarmapObjectType.LandingZone
-            : id.Contains("Station", StringComparison.OrdinalIgnoreCase) ? StarmapObjectType.SpaceStation
+            : id.Contains("Delamar", StringComparison.OrdinalIgnoreCase) ? StarmapObjectType.Moon
+            : id.Contains("Station", StringComparison.OrdinalIgnoreCase) || id.Contains("BRK", StringComparison.OrdinalIgnoreCase) || id.Contains("Moraine", StringComparison.OrdinalIgnoreCase) ? StarmapObjectType.SpaceStation
             : StarmapObjectType.Outpost;
+
+        var isArmistice = id.Contains("Levski", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("SocialStation", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("Theta", StringComparison.OrdinalIgnoreCase);
 
         return new ResolvedLocation
         {
@@ -331,7 +359,7 @@ public static partial class Locations
             SystemName = "Nyx",
             ParentBody = body,
             Type = type,
-            IsArmistice = true
+            IsArmistice = isArmistice
         };
     }
 
@@ -342,7 +370,10 @@ public static partial class Locations
 
         var route = m.Groups["route"].Value;
         var name = JumpPoints.TryGetValue(route, out var known) ? $"{known} Station" : $"{Spaced(route)} Jump Point Station";
-        var sys = route.StartsWith("Pyro", StringComparison.OrdinalIgnoreCase) ? "Pyro" : "Stanton";
+        var sys = route.StartsWith("Nyx", StringComparison.OrdinalIgnoreCase) ? "Nyx"
+            : route.StartsWith("Pyro", StringComparison.OrdinalIgnoreCase) ? "Pyro"
+            : "Stanton";
+        ActiveSystem = sys;
 
         return new ResolvedLocation
         {
@@ -408,9 +439,14 @@ public static partial class Locations
         var m = JumpPointRegex.Match(id);
         if (!m.Success) return null;
 
-        var key = $"{m.Groups["from"].Value}-{m.Groups["to"].Value}";
-        var name = JumpPoints.TryGetValue(key, out var known) ? known : $"{Title(m.Groups["from"].Value)} – {Title(m.Groups["to"].Value)} Jump Point";
-        var sys = m.Groups["from"].Value.Contains("pyro", StringComparison.OrdinalIgnoreCase) ? "Pyro" : "Stanton";
+        var from = m.Groups["from"].Value;
+        var to = m.Groups["to"].Value;
+        var key = $"{from}-{to}";
+        var name = JumpPoints.TryGetValue(key, out var known) ? known : $"{Title(from)} – {Title(to)} Jump Point";
+        var sys = from.Contains("nyx", StringComparison.OrdinalIgnoreCase) ? "Nyx"
+            : from.Contains("pyro", StringComparison.OrdinalIgnoreCase) ? "Pyro"
+            : "Stanton";
+        ActiveSystem = sys;
 
         return new ResolvedLocation
         {
@@ -541,27 +577,33 @@ public static partial class Locations
     private static ResolvedLocation? TryWellKnownCity(string rawId, string id)
     {
         var trimmed = id.Replace("_City", string.Empty, StringComparison.OrdinalIgnoreCase);
-        if (Cities.TryGetValue(trimmed, out var city))
+        foreach (var (code, name) in Cities)
         {
-            var pBody = trimmed switch
+            if (trimmed.Equals(code, StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(code + "_", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(code + "-", StringComparison.OrdinalIgnoreCase))
             {
-                "NewBabbage" => "microTech",
-                "Lorville" => "Hurston",
-                "Orison" => "Crusader",
-                "Area18" or "Area061" => "ArcCorp",
-                "Levski" => "Delamar",
-                _ => "Stanton"
-            };
-            var sys = trimmed == "Levski" ? "Nyx" : "Stanton";
-            return new ResolvedLocation
-            {
-                RawCode = rawId,
-                DisplayName = city,
-                SystemName = sys,
-                ParentBody = pBody,
-                Type = StarmapObjectType.LandingZone,
-                IsArmistice = true
-            };
+                var pBody = code switch
+                {
+                    "NewBabbage" => "microTech",
+                    "Lorville" => "Hurston",
+                    "Orison" => "Crusader",
+                    "Area18" or "Area061" => "ArcCorp",
+                    "Levski" => "Delamar",
+                    _ => "Stanton"
+                };
+                var sys = code.Equals("Levski", StringComparison.OrdinalIgnoreCase) ? "Nyx" : "Stanton";
+                ActiveSystem = sys;
+                return new ResolvedLocation
+                {
+                    RawCode = rawId,
+                    DisplayName = name,
+                    SystemName = sys,
+                    ParentBody = pBody,
+                    Type = StarmapObjectType.LandingZone,
+                    IsArmistice = true
+                };
+            }
         }
         return null;
     }
@@ -659,10 +701,10 @@ public static partial class Locations
     [GeneratedRegex(@"^(?:Stanton|Pyro)_(?:Nyx_JPStation|JumpPoint_Nyx)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NyxGatewayRegex { get; }
 
-    [GeneratedRegex(@"^NavPoint_\w+_\d+$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"^NavPoint_.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NavPointRegex { get; }
 
-    [GeneratedRegex(@"^MISSION_QT_\w*Beacon_\d+$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"^MISSION_QT_.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex MissionBeaconRegex { get; }
 
     [GeneratedRegex(@"_?\{[0-9A-Fa-f-]{36}\}", RegexOptions.Compiled)]

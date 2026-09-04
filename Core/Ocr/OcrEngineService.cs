@@ -96,6 +96,32 @@ public sealed class OcrEngineService : IDisposable
 
     private static byte[] Preprocess(byte[] bgra, int w, int h, int scale, int padding, bool invert, out int outW, out int outH)
     {
+        int origW = w;
+        int origH = h;
+        int step = 1;
+
+        // Falls das Ausgangsbild bereits extrem groß ist, Sub-Sampling verwenden
+        if (w > 2600 || h > 2600)
+        {
+            step = 2;
+            w /= 2;
+            h /= 2;
+            scale = 1;
+            padding = 4;
+        }
+
+        // Windows OCR Limit: MaxImageDimension = 2600 Pixel
+        int maxDim = Math.Max(w, h);
+        while (scale > 1 && (maxDim * scale + padding * 2) > 2600)
+        {
+            scale--;
+        }
+
+        if ((maxDim * scale + padding * 2) > 2600)
+        {
+            padding = Math.Max(0, (2600 - maxDim * scale) / 2);
+        }
+
         outW = w * scale + padding * 2;
         outH = h * scale + padding * 2;
 
@@ -104,20 +130,35 @@ public sealed class OcrEngineService : IDisposable
 
         for (int sy = 0; sy < h; sy++)
         {
-            int srcRow = sy * w * 4;
+            int srcRow = (sy * step) * origW * 4;
             for (int sx = 0; sx < w; sx++)
             {
-                int src = srcRow + (sx * 4);
-                byte ib = invert ? (byte)Math.Min(255, (255 - bgra[src]) * 14 / 10) : bgra[src];
-                byte ig = invert ? (byte)Math.Min(255, (255 - bgra[src + 1]) * 14 / 10) : bgra[src + 1];
-                byte ir = invert ? (byte)Math.Min(255, (255 - bgra[src + 2]) * 14 / 10) : bgra[src + 2];
+                int src = srcRow + ((sx * step) * 4);
+
+                // Farbiger Star Citizen HUD-Text (Bernstein, Orange, Cyan, Grün, Weiß)
+                // Nutze maximale Farbkanalintensität für optimalen Signal-Rausch-Abstand
+                int maxColor = Math.Max(bgra[src], Math.Max(bgra[src + 1], bgra[src + 2]));
+
+                byte v;
+                if (invert)
+                {
+                    // Invertieren: Dunkler Text auf reinem Weiß
+                    // Text (maxColor > 60) wird tiefschwarz (0..20), dunkler Weltraum (<45) wird reinweiß (255)
+                    v = (byte)Math.Clamp(255 - (maxColor - 45) * 3, 0, 255);
+                }
+                else
+                {
+                    // Plain: Heller Text auf reinem Schwarz
+                    // Text (maxColor > 60) wird reinweiß (235..255), dunkler Weltraum (<45) wird pechschwarz (0)
+                    v = (byte)Math.Clamp((maxColor - 45) * 3, 0, 255);
+                }
 
                 if (scale == 1)
                 {
                     int dst = ((sy + padding) * outW + (sx + padding)) * 4;
-                    output[dst] = ib;
-                    output[dst + 1] = ig;
-                    output[dst + 2] = ir;
+                    output[dst] = v;
+                    output[dst + 1] = v;
+                    output[dst + 2] = v;
                     output[dst + 3] = 255;
                 }
                 else
@@ -128,9 +169,9 @@ public sealed class OcrEngineService : IDisposable
                         for (int dx = 0; dx < scale; dx++)
                         {
                             int dst = dstRow + ((sx * scale + dx) * 4);
-                            output[dst] = ib;
-                            output[dst + 1] = ig;
-                            output[dst + 2] = ir;
+                            output[dst] = v;
+                            output[dst + 1] = v;
+                            output[dst + 2] = v;
                             output[dst + 3] = 255;
                         }
                     }

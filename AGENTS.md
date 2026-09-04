@@ -61,6 +61,18 @@ Do **not** start the app after building — Torsten runs it himself.
 
 ---
 
+## Database & Migration Versioning
+
+Any change to the SQLite schema, tables, columns, indexes, data cleanups, or parser models stored in the database **must bump the version** in `Core/Database.cs`:
+
+- **`CurrentSchemaVersion`**: Bump whenever modifying tables, adding columns, adding indexes, or adding one-time data cleanup migrations.
+  - Add the corresponding `if (dbSchemaVersion < N)` migration block in `ApplySchemaMigrations()`.
+  - Always execute `PRAGMA user_version = N;` within the migration block.
+  - **Critical**: Without bumping `CurrentSchemaVersion`, existing installations skip the migration and remain on the outdated schema/data state.
+- **`CurrentParserVersion`**: Bump whenever `LogParser` extracts new event kinds, new fields, or changes parsed event semantics that require rebuilding/re-indexing all historical sessions from the archive.
+
+---
+
 ## OCR subsystem
 
 The `Core/Ocr/` directory contains five services. Key invariants:

@@ -155,9 +155,9 @@ public sealed class I18n : INotifyPropertyChanged
             ["Dash_No_Ship"] = "Kein Schiff registriert",
             ["Dash_No_Contract"] = "— Kein aktiver Auftrag —",
             ["Dash_No_Contracts_Active"] = "Keine aktiven Aufträge",
-            ["Dash_Income"] = "▲ Einnahmen: {0}",
-            ["Dash_Spend"] = "▼ Ausgaben: {0}",
-            ["Dash_Net"] = "◆ Saldo: {0}",
+            ["Dash_Income"] = "▲ Einnahmen:",
+            ["Dash_Spend"] = "▼ Ausgaben:",
+            ["Dash_Net"] = "◆ Saldo:",
             ["Dash_Auto_Sync"] = "⚡ Auto",
             ["Dash_Calibrate_Region"] = "⊕ Bereich",
             ["Dash_Scan"] = "▶ Scan",
@@ -172,10 +172,12 @@ public sealed class I18n : INotifyPropertyChanged
             ["Dash_Type_Outpost"] = "🏕 AUSSENPOSTEN",
             ["Dash_Type_Default"] = "📍 STANDORT",
 
-            // 12 Haupt-Tabs
+            // 14 Haupt-Tabs
             ["Tab_Events"] = "📜 Ereignisse",
             ["Tab_Finances"] = "💰 Finanzen",
             ["Tab_Missions"] = "❖ Missionen",
+            ["Tab_Places"] = "📍 Orte",
+            ["Tab_Market"] = "📊 Markt",
             ["Tab_Reputation"] = "🎖 Ruf",
             ["Tab_Starmap"] = "🗺 Karte",
             ["Tab_BlackBox"] = "⏱ Flugschreiber",
@@ -183,8 +185,17 @@ public sealed class I18n : INotifyPropertyChanged
             ["Tab_Fleet"] = "🛸 Flotte",
             ["Tab_Blueprints"] = "🛠 Baupläne",
             ["Tab_Loadout"] = "🥋 Ausrüstung",
+            ["Tab_Tools"] = "🛠 Tools",
             ["Tab_Settings"] = "⚙ Einstellungen",
             ["Tab_About"] = "ℹ Über",
+
+            // Sub-Tabs
+            ["SubTab_Overview"] = "📊 Übersicht",
+            ["SubTab_Ledger"] = "📑 Ledger",
+            ["SubTab_Spending"] = "💳 Ausgaben",
+            ["SubTab_Cargo"] = "📦 Fracht",
+            ["SubTab_ContractsHistory"] = "🎯 Aufträge (Contracts)",
+            ["SubTab_Catalog"] = "📚 Katalog",
 
             // Filter Chips
             ["Filter_All"] = "Alle",
@@ -324,9 +335,9 @@ public sealed class I18n : INotifyPropertyChanged
             ["Dash_No_Ship"] = "No ship registered",
             ["Dash_No_Contract"] = "— No active contract —",
             ["Dash_No_Contracts_Active"] = "No active contracts",
-            ["Dash_Income"] = "▲ Income: {0}",
-            ["Dash_Spend"] = "▼ Expenses: {0}",
-            ["Dash_Net"] = "◆ Net Balance: {0}",
+            ["Dash_Income"] = "▲ Income:",
+            ["Dash_Spend"] = "▼ Expenses:",
+            ["Dash_Net"] = "◆ Net:",
             ["Dash_Auto_Sync"] = "⚡ Auto",
             ["Dash_Calibrate_Region"] = "⊕ Region",
             ["Dash_Scan"] = "▶ Scan",
@@ -341,10 +352,12 @@ public sealed class I18n : INotifyPropertyChanged
             ["Dash_Type_Outpost"] = "🏕 OUTPOST",
             ["Dash_Type_Default"] = "📍 LOCATION",
 
-            // 12 Main Tabs
+            // 14 Main Tabs
             ["Tab_Events"] = "📜 Events",
             ["Tab_Finances"] = "💰 Finances",
             ["Tab_Missions"] = "❖ Missions",
+            ["Tab_Places"] = "📍 Places",
+            ["Tab_Market"] = "📊 Market",
             ["Tab_Reputation"] = "🎖 Reputation",
             ["Tab_Starmap"] = "🗺 Starmap",
             ["Tab_BlackBox"] = "⏱ Flight Recorder",
@@ -352,8 +365,17 @@ public sealed class I18n : INotifyPropertyChanged
             ["Tab_Fleet"] = "🛸 Fleet",
             ["Tab_Blueprints"] = "🛠 Blueprints",
             ["Tab_Loadout"] = "🥋 Loadout",
+            ["Tab_Tools"] = "🛠 Tools",
             ["Tab_Settings"] = "⚙ Settings",
             ["Tab_About"] = "ℹ About",
+
+            // Sub-Tabs
+            ["SubTab_Overview"] = "📊 Overview",
+            ["SubTab_Ledger"] = "📑 Ledger",
+            ["SubTab_Spending"] = "💳 Spending",
+            ["SubTab_Cargo"] = "📦 Cargo",
+            ["SubTab_ContractsHistory"] = "🎯 Contracts",
+            ["SubTab_Catalog"] = "📚 Catalog",
 
             // Filter Chips
             ["Filter_All"] = "All",

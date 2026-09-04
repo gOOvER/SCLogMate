@@ -22,6 +22,8 @@
 
     <!-- ══ Sci-Fi Buttons ══ -->
     <Style Selector="Button.accent">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="#1D6FA5" />
       <Setter Property="Foreground" Value="#F0F6FC" />
       <Setter Property="BorderBrush" Value="#38BDF8" />
@@ -37,6 +39,8 @@
     </Style>
 
     <Style Selector="Button.ghost">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="#0D1624" />
       <Setter Property="Foreground" Value="#C9D6E2" />
       <Setter Property="BorderThickness" Value="1" />

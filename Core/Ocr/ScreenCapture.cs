@@ -155,10 +155,10 @@ public static class ScreenCapture
     public static ScanRegion GetDefaultRsRegion()
     {
         var (sw, sh) = GetPrimaryScreenSize();
-        int w = Math.Min(600, (int)(sw * 0.35));
-        int h = Math.Min(360, (int)(sh * 0.35));
+        int w = Math.Min(960, (int)(sw * 0.48));
+        int h = Math.Min(560, (int)(sh * 0.45));
         int x = (sw - w) / 2;
-        int y = (sh - h) / 2;
+        int y = (int)(sh * 0.25);
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }
 }

@@ -1,0 +1,310 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SCLogMate.ViewModels"
+        xmlns:core="using:SCLogMate.Core"
+        xmlns:conv="using:SCLogMate.Converters"
+        x:Class="SCLogMate.Views.UserCfgEditorWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Star Citizen user.cfg Tuning-Studio &amp; Versions-Archiv — SCLogMate"
+        Width="1160" Height="780" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#050811" Foreground="#E6EDF3"
+        Icon="/SCLogMate.ico"
+        FontFamily="{Binding CurrentFontFamily}">
+
+  <Window.Resources>
+    <conv:FilterActiveConverter x:Key="FilterBg" />
+    <conv:AmountToBrushConverter x:Key="AmountBrush" />
+    <conv:KindToBrushConverter x:Key="KindBrush" />
+    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
+    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
+    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
+  </Window.Resources>
+
+  <DockPanel Margin="14">
+
+    <!-- ══ Sci-Fi Top Header Bar ══ -->
+    <Border DockPanel.Dock="Top" Background="#0A1422" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        
+        <!-- Left: Branding & Current File Info -->
+        <StackPanel Spacing="3" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Border Background="#0D2847" BorderBrush="#1E4E7A" BorderThickness="1" CornerRadius="5" Width="26" Height="26" VerticalAlignment="Center">
+              <TextBlock Text="⚙️" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="USER.CFG TUNING-STUDIO &amp; VERSIONS-ARCHIV" FontSize="14" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.8" />
+            <Border Background="#060C16" BorderBrush="{Binding UserCfgStatusColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="6,0,0,0">
+              <TextBlock Text="{Binding UserCfgStatusText}" FontSize="10" FontWeight="Bold" Foreground="{Binding UserCfgStatusColor}" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="{Binding ToolsUserCfgPath, StringFormat='Aktive Datei: {0}'}" FontSize="10.5" Foreground="#7E97AD" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <!-- Right: Action Buttons -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                  Command="{Binding ReloadUserCfgFromDiskCommand}" ToolTip.Tip="Liest die Datei frisch von der Festplatte neu ein">
+            <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="↺" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" />
+              <TextBlock Text="Neu laden" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#141026" BorderBrush="#3B256B" BorderThickness="1"
+                  Command="{Binding BackupUserCfgCommand}" ToolTip.Tip="Legt sofort ein manuelles Zeitstempel-Backup lokal &amp; in der Cloud an">
+            <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="✦" FontSize="11" Foreground="#A78BFA" VerticalAlignment="Center" />
+              <TextBlock Text="Stand archivieren" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                  Command="{Binding OpenLiveFolderCommand}" ToolTip.Tip="Öffnet den Star Citizen LIVE Ordner im Windows Explorer">
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Path Data="M 1,2 L 6,2 L 8,4 L 15,4 C 15.6,4 16,4.4 16,5 L 16,13 C 16,13.6 15.6,14 15,14 L 1,14 C 0.4,14 0,13.6 0,13 L 0,3 C 0,2.4 0.4,2 1,2 Z"
+                    Fill="#38BDF8" Width="13" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="LIVE Ordner" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Button Classes="ghost" Height="30" Padding="12,0" CornerRadius="5" Background="#0C253F" BorderBrush="#1F5A94" BorderThickness="1"
+                  Command="{Binding SaveUserCfgCommand}" ToolTip.Tip="Speichert die aktuellen Werte in die user.cfg (erstellt automatisch ein Archiv-Backup)">
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="✓" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
+              <TextBlock Text="Speichern &amp; Anwenden" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- ══ Bottom Status Toast Bar ══ -->
+    <Border DockPanel.Dock="Bottom" Background="#071320" BorderBrush="#162E48" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ToolsStatusMessage, FallbackValue='Bereit. Änderungen werden beim Speichern automatisch archiviert.'}"
+                     Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Text="Dual-Replikation: Lokal &amp; Cloud" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ══ 3-Column Studio Layout ══ -->
+    <Grid ColumnDefinitions="320,*,320">
+
+      <!-- ── Linke Spalte: Presets, Parameter & Hinweise ── -->
+      <ScrollViewer Grid.Column="0" Margin="0,0,7,0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="12">
+
+          <!-- Schnell-Profile -->
+          <Border Classes="card" Background="#08101C" BorderBrush="#192C44" BorderThickness="1" Padding="12" CornerRadius="7">
+            <StackPanel Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="⚡" FontSize="12" Foreground="#F59E0B" />
+                <TextBlock Text="SCHNELL-PROFILE" Classes="label" Foreground="#F59E0B" />
+              </StackPanel>
+
+              <Button Classes="ghost" Height="30" CornerRadius="5" Background="#0C182A" BorderBrush="#1E3857" BorderThickness="1"
+                      HorizontalAlignment="Stretch" Command="{Binding ApplyPresetHighFpsCommand}"
+                      ToolTip.Tip="165 FPS Limit, 8 GB VRAM StreamPool, DisplayInfo=1, VSync Aus, MotionBlur Aus">
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Grid.Column="0" Text="⚡" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="High FPS / E-Sport" FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+
+              <Button Classes="ghost" Height="30" CornerRadius="5" Background="#0C182A" BorderBrush="#1E3857" BorderThickness="1"
+                      HorizontalAlignment="Stretch" Command="{Binding ApplyPresetQualityCommand}"
+                      ToolTip.Tip="Unbegrenzt FPS, 12 GB VRAM StreamPool, DisplayInfo Aus, VSync Ein">
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Grid.Column="0" Text="🎨" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="Grafik &amp; Immersion" FontSize="11" FontWeight="SemiBold" Foreground="#A78BFA" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+
+              <Button Classes="ghost" Height="30" CornerRadius="5" Background="#0C182A" BorderBrush="#1E3857" BorderThickness="1"
+                      HorizontalAlignment="Stretch" Command="{Binding ApplyPresetLowEndCommand}"
+                      ToolTip.Tip="60 FPS Limit, 4 GB VRAM StreamPool, DisplayInfo=1, VSync Aus">
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Grid.Column="0" Text="💻" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="Minimal / Einsteiger-PC" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+            </StackPanel>
+          </Border>
+
+          <!-- Parameter-Auswahl -->
+          <Border Classes="card" Background="#08101C" BorderBrush="#192C44" BorderThickness="1" Padding="12" CornerRadius="7">
+            <StackPanel Spacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="🛠" FontSize="12" Foreground="#38BDF8" />
+                <TextBlock Text="TUNING-PARAMETER" Classes="label" Foreground="#38BDF8" />
+              </StackPanel>
+
+              <CheckBox Content="Konsole freigeben (Con_Restricted=0)" IsChecked="{Binding CfgConsoleUnlocked}" FontSize="11"
+                        ToolTip.Tip="Ermöglicht das Öffnen der Konsole mit der Zirkumflex-Taste (~ / ^)" />
+              <CheckBox Content="VSync deaktivieren (r_VSync=0)" IsChecked="{Binding CfgVSyncOff}" FontSize="11"
+                        ToolTip.Tip="Schaltet vertikale Synchronisation ab, reduziert Input-Lag" />
+              <CheckBox Content="Bewegungsunschärfe aus (r_MotionBlur=0)" IsChecked="{Binding CfgMotionBlurOff}" FontSize="11"
+                        ToolTip.Tip="Deaktiviert Motion Blur für klarere Sicht in schnellen Dogfights" />
+
+              <!-- Display Info -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="DisplayInfo Telemetrie:" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" SelectedIndex="{Binding CfgDisplayInfoLevel}" Height="26" FontSize="10.5" Width="95">
+                  <ComboBoxItem Content="0 (Aus)" />
+                  <ComboBoxItem Content="1 (FPS)" />
+                  <ComboBoxItem Content="2 (Erweitert)" />
+                  <ComboBoxItem Content="3 (Voll)" />
+                </ComboBox>
+              </Grid>
+
+              <!-- Max FPS -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Max FPS Limiter:" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="1" Value="{Binding CfgMaxFps}" Minimum="0" Maximum="360" Increment="10" FormatString="0" Height="26" FontSize="10.5" Width="95" />
+              </Grid>
+
+              <!-- Texture Stream Pool -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Texture Stream Pool:" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" SelectedIndex="{Binding CfgStreamPoolIndex}" Height="26" FontSize="10.5" Width="95">
+                  <ComboBoxItem Content="4096 MB" />
+                  <ComboBoxItem Content="8192 MB" />
+                  <ComboBoxItem Content="12288 MB" />
+                </ComboBox>
+              </Grid>
+
+              <!-- Sprachen -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Spieltext-Sprache:" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding CfgLanguage}" Height="26" FontSize="10.5" Width="95" />
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Audio-Sprache:" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding CfgLanguageAudio}" Height="26" FontSize="10.5" Width="95" />
+              </Grid>
+
+              <Button Classes="ghost" Height="28" CornerRadius="4" Background="#0C182A" BorderBrush="#1C3857" BorderThickness="1"
+                      HorizontalAlignment="Stretch" Command="{Binding ApplyCfgPresetsToTextCommand}">
+                <TextBlock Text="➔ In Texteditor übertragen" FontSize="10.5" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Center" />
+              </Button>
+            </StackPanel>
+          </Border>
+
+          <!-- Wissenswertes / Engine Info -->
+          <Border Background="#060F1A" BorderBrush="#13273D" BorderThickness="1" Padding="10" CornerRadius="6">
+            <StackPanel Spacing="4">
+              <TextBlock Text="💡 ENGINE-TIPPS" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+              <TextBlock Text="• TextureStreamPoolSize: Reserviert VRAM für Texturen – verhindert Nachladeruckler in Städten."
+                         FontSize="9.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+              <TextBlock Text="• Con_Restricted=0: Erlaubt Konsolenbefehle wie r_displayinfo direkt im Spiel."
+                         FontSize="9.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- ── Mittlere Spalte: Volltext Syntax-Editor ── -->
+      <Border Grid.Column="1" Classes="card" Background="#050B14" BorderBrush="#16283D" BorderThickness="1" Padding="12" CornerRadius="7" Margin="7,0,7,0">
+        <Grid RowDefinitions="Auto,*,Auto">
+          
+          <!-- Header -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="📝" FontSize="12" Foreground="#38BDF8" />
+              <TextBlock Text="VOLLTEXT-EDITOR (USER.CFG)" Classes="label" Foreground="#38BDF8" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" Text="UTF-8 ohne BOM" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+          </Grid>
+
+          <!-- Textbox -->
+          <TextBox Grid.Row="1" Text="{Binding ToolsUserCfgContent}"
+                   AcceptsReturn="True" AcceptsTab="True"
+                   FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" LineHeight="18"
+                   Background="#03070D" BorderBrush="#142336" BorderThickness="1" CornerRadius="5"
+                   Padding="10" />
+
+          <!-- Hint Footer -->
+          <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <TextBlock Grid.Column="0" Text="Hinweis: Änderungen wirken sich beim nächsten Start von Star Citizen aus."
+                       FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="Automatische Archivierung vor Speichern aktiv" FontSize="10" FontWeight="SemiBold" Foreground="#4ADE80" VerticalAlignment="Center" />
+          </Grid>
+
+        </Grid>
+      </Border>
+
+      <!-- ── Rechte Spalte: Versions-Archiv & Rollback ── -->
+      <Border Grid.Column="2" Classes="card" Background="#08101C" BorderBrush="#192C44" BorderThickness="1" Padding="12" CornerRadius="7" Margin="7,0,0,0">
+        <Grid RowDefinitions="Auto,*,Auto">
+          
+          <!-- Header -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="📦" FontSize="12" Foreground="#A78BFA" />
+              <TextBlock Text="VERSIONS-ARCHIV" Classes="label" Foreground="#A78BFA" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="#16122C" BorderBrush="#3B2A6B" BorderThickness="1" CornerRadius="4" Padding="6,1.5">
+              <TextBlock Text="{Binding ToolsConfigBackups.Count, StringFormat='{}{0} Backups'}" FontSize="9.5" FontWeight="Bold" Foreground="#A78BFA" />
+            </Border>
+          </Grid>
+
+          <!-- Backup-Liste -->
+          <Border Grid.Row="1" Background="#050B14" BorderBrush="#142336" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10">
+            <ListBox ItemsSource="{Binding ToolsConfigBackups}" SelectedItem="{Binding ToolsSelectedConfigBackup}"
+                     Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="*,Auto" Margin="2,3">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="{Binding CreatedAt, StringFormat='{}{0:dd.MM.yyyy HH:mm}'}" FontSize="9.5" Foreground="#64748B" />
+                        <TextBlock Text="·" FontSize="9.5" Foreground="#3A536B" />
+                        <TextBlock Text="{Binding SizeFormatted}" FontSize="9.5" Foreground="#94A3B8" />
+                      </StackPanel>
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="#0A1626" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="3" Padding="5,1.5" Margin="4,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding LocationType}" FontSize="9" FontWeight="Bold" Foreground="#38BDF8" />
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
+
+          <!-- Actions für ausgewähltes Backup -->
+          <StackPanel Grid.Row="2" Spacing="6">
+            <Button Classes="ghost" Height="28" CornerRadius="4" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                    HorizontalAlignment="Stretch" Command="{Binding LoadSelectedConfigBackupIntoEditorCommand}"
+                    ToolTip.Tip="Lädt den Inhalt dieser gesicherten Version in den mittleren Texteditor zur Vorschau">
+              <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                <TextBlock Text="👁" FontSize="10.5" Foreground="#94A3B8" />
+                <TextBlock Text="Im Editor betrachten" FontSize="10.5" FontWeight="SemiBold" Foreground="#F0F6FC" />
+              </StackPanel>
+            </Button>
+
+            <Button Classes="ghost" Height="28" CornerRadius="4" Background="#0C1B2E" BorderBrush="#1C4B78" BorderThickness="1"
+                    HorizontalAlignment="Stretch" Command="{Binding RestoreSelectedConfigBackupCommand}"
+                    ToolTip.Tip="Stellt diese Version sofort als aktive user.cfg in Star Citizen LIVE wieder her (legt vorher ein .bak an)">
+              <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                <TextBlock Text="↺" FontSize="11" Foreground="#38BDF8" />
+                <TextBlock Text="In LIVE wiederherstellen" FontSize="10.5" FontWeight="SemiBold" Foreground="#38BDF8" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+        </Grid>
+      </Border>
+
+    </Grid>
+
+  </DockPanel>
+</Window>
