@@ -63,10 +63,34 @@ Single standalone Windows `.exe`, no installation required, no .NET runtime setu
   - Reads your genuine live aUEC balance via native Windows OCR whenever opening mobiGlas (`F1`).
   - Multi-monitor area calibration (`⊕ Area`) with DPI-aware hardware pixel scaling and in-game indicator box.
 
-### 💰 Economy & Cargo Tracking
+### 📡 RS Radar Signature Scanner & In-Game Overlay
+- **Real-Time Mining & Salvage Ping Decoding**:
+  - Live optical recognition of Star Citizen radar RS signature pings (e.g. `1.800`, `7.200`, `8.000`) for instant identification of valuable deposits, asteroids, and salvage panels.
+  - Slashed-zero (`Ø`) character context recovery for reliable readings even during fast flight.
+  - Transparent market rate guidance and realistic panel yield calculations.
+- **Target Watchlist & Multi-Sensory Alert System**:
+  - Configurable material watchlist with category filters (`⭐ High-Value`, `🪨 Schiffserze`, `🚗 ROC-Gems`, `💎 Hand-Gems`, `🏗️ Salvage`) and instant search.
+  - In-RAM synthesized 16-bit PCM Sci-Fi sonar chime alert (0 ms latency, no external sound files required) and optional native Windows TTS speech.
+  - Smart contact-tracking & repeat suppression (no spamming on sustained pings).
+  - Compact modern Sci-Fi HUD overlay with ambient alert border glow and quick controls.
+
+### 🎙️ Aurora AI Voice Co-Pilot & Audio Integration
+- Atmospheric synthesized voice announcements for quantum jumps, docking, combat kills, safe zone transitions, and radar contact alerts.
+- Sequential asynchronous audio channel preventing sound overlap or cut-offs.
+- Integrated VoiceAttack sound pack support with automatic path resolution.
+
+### 💰 Economy, Cargo & Maintenance Expense Tracking
 - Running balance calculations for every store purchase, sale, commodity run, reward, or fine.
+- **Unlogged Expense Tracking & Wallet-Delta Auto-Reconciliation**:
+  - Automatically captures hidden expenses (repairs, hydrogen/quantum refuel, rearm, clinic visits, claim expedites, cargo fees) via mobiGlas wallet OCR balance reconciliation.
+  - Manual quick-expense booking bar (`➕ Ausgabe erfassen`) with 1-click presets and location prefill.
 - In-depth financial analytics, profit margins, and commodity market prices.
 - **UEX Corp API 2.0 Integration**: Connect your personal UEX Bearer Token for live trade terminal and pricing data.
+
+### 🛠️ System Tools, Keybind Vault & Cloud Backups
+- **Structured Tools Hub**: System shader cache cleaner (DirectX & Vulkan), crash dump cleanup, and live hardware telemetry.
+- **Keybind & Config Vault**: Standalone popouts for versioned `actionmaps.xml` keybinding backups, `user.cfg` editing with rollback, and ZIP log bundle export.
+- **Cloud Replication**: Automatic sync to OneDrive, Dropbox, or Nextcloud.
 
 ### 🚀 Fleet, Starmap & Navigation
 - Fleets flown, Quantum travel arrivals, and collision vessel losses.
@@ -154,10 +178,34 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
   - Liest beim Öffnen des mobiGlas (`F1`) den echten Kontostand per Windows Native OCR ab.
   - Multi-Monitor Bereichsauswahl (`⊕ Bereich`) mit pixelgenauer DPI-Synchronisation und In-Game Scan-Box.
 
-### 💰 Finanzen & Wirtschaft
+### 📡 RS Radar-Signatur-Scanner & In-Game Overlay
+- **Echtzeit-Dekodierung von Bergbau- & Bergungs-Pings**:
+  - Optische Erkennung von Star Citizen Radar-Signaturen (z. B. `1.800`, `7.200`, `8.000`) zur sofortigen Identifikation wertvoller Erzvorkommen, Asteroiden und Salvage-Panels.
+  - Erkennung und Wiederherstellung von durchgestrichenen Nullen (`Ø`) der SC-Schriftart für zuverlässiges Lesen im rasanten Flug.
+  - Reale Marktpreis-Orientierung und realistische Panel-Ertragsberechnung.
+- **Ziel-Watchlist & Sensorisches Alarmsystem**:
+  - Konfigurierbare Rohstoff-Suchliste mit Kategoriefiltern (`⭐ High-Value`, `🪨 Schiffserze`, `🚗 ROC-Gems`, `💎 Hand-Gems`, `🏗️ Salvage`) und Volltextsuche.
+  - Im RAM generierter 16-Bit-PCM Sci-Fi Sonar-Chime-Alarm (0 ms Latenz, keine externen Sounddateien nötig) und optionale Windows TTS-Sprachausgabe.
+  - Intelligente Kontakthaltung & Wiederholungsunterdrückung (kein Spam bei andauernden Radar-Pings).
+  - Modernes, kompaktes HUD-Overlay mit sanftem Amber-Gold-Warnleuchten und Schnellsteuerungs-Pills.
+
+### 🎙️ Aurora KI-Sprachausgabe & Audio-Integration
+- Atmosphärische Sprachansagen bei Quantum-Sprüngen, Landungen, Abschüssen, Sicherheitszonen-Wechseln und Radar-Signalfunden.
+- Sequenzieller, asynchroner Audio-Kanal ohne Überlagerungen oder Sound-Abschneiden.
+- Direkte Unterstützung für VoiceAttack-Soundpacks inklusive automatischer Pfaderkennung.
+
+### 💰 Finanzen, Fracht & Ausgabenerfassung
 - Mitlaufender Kontostand bei jedem Kauf, Verkauf, Handel, Belohnungseingang oder Bußgeld.
+- **Erfassung versteckter Ausgaben & mobiGlas-Wallet-Delta-Abgleich**:
+  - Erfasst automatisch Reparaturen, Wasserstoff-/Quantum-Tanken, Munition, Klinikbesuche, Schiffs-Claims und Ladegebühren über den mobiGlas-OCR-Delta-Abgleich.
+  - Manuelle Schnellerfassung im Ausgaben-Tab (`➕ Ausgabe erfassen`) mit 1-Klick-Presets und automatischer Orts-/Schiffsvorbelegung.
 - Detaillierte Finanz-Statistiken, Margen-Rechner und Marktpreise je Ware.
 - **UEX Corp API 2.0 Integration**: Hinterlegung des persönlichen UEX Bearer Tokens für Live-Handelsdaten und Terminals.
+
+### 🛠️ Werkzeuge, Keybind-Tresor & Cloud-Backups
+- **Strukturierter Werkzeug-Hub**: Shader-Cache-Bereinigung (DirectX & Vulkan), Bereinigung alter Crash-Dumps und Live-Hardware-Telemetrie.
+- **Keybind- & Config-Tresor**: Standalone-Fenster für versionierte `actionmaps.xml`-Backups, Bearbeitung der `user.cfg` mit Rollback und ZIP-Log-Bündel-Export.
+- **Cloud-Replikation**: Automatische Spiegelung auf OneDrive, Dropbox oder Nextcloud.
 
 ### 🚀 Flotte, Starmap & Standorte
 - Geflogene Schiffe, Quantum-Ankünfte und Schiffsverluste.

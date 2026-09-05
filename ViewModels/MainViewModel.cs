@@ -320,6 +320,34 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int selectedTradeShipCapacity = 696;
     private DispatcherTimer? _refineryTimer;
 
+    // Manuelle Ausgaben-Erfassung (Wartung, Tanken, Reparatur)
+    [ObservableProperty] private string newExpenseAmountText = "";
+    [ObservableProperty] private string selectedExpenseCategory = "🔧 Reparatur & Wartung";
+    [ObservableProperty] private string newExpenseLocation = "";
+    [ObservableProperty] private string newExpenseNote = "";
+
+    public bool AutoRecordWalletDelta
+    {
+        get => _settings.AutoRecordWalletDelta;
+        set
+        {
+            _settings.AutoRecordWalletDelta = value;
+            Settings.Save(_settings);
+            OnPropertyChanged();
+        }
+    }
+
+    public List<string> AvailableExpenseCategories { get; } = new()
+    {
+        "🔧 Reparatur & Wartung",
+        "⛽ Tanken & Treibstoff",
+        "🚀 Munition & Rearm",
+        "⏱️ Schiffsrückholung (Expedite)",
+        "📦 Ladegebühr (Auto-Load)",
+        "🏥 Medizinisch / Klinik",
+        "🛒 Sonstige Ausgabe"
+    };
+
     // Fenster- & System-Verhalten & Schriftart
     [ObservableProperty] private bool minimizeToTrayOnClose = true;
     [ObservableProperty] private bool autostartEnabled = false;
@@ -517,7 +545,7 @@ public partial class MainViewModel : ObservableObject
     {
         ["Alle"] = null,
         ["Geld"] = new() { EventKind.TransferIn, EventKind.TransferOut, EventKind.MissionReward,
-                           EventKind.Purchase, EventKind.Sale, EventKind.Trade, EventKind.Offer, EventKind.Fine },
+                           EventKind.Purchase, EventKind.Sale, EventKind.Trade, EventKind.Offer, EventKind.Fine, EventKind.Maintenance },
         ["Aufträge"] = new() { EventKind.Mission, EventKind.MissionDone, EventKind.MissionTaken },
         ["Baupläne"] = new() { EventKind.Blueprint },
         ["Schiffe"] = new() { EventKind.Vehicle, EventKind.Quantum, EventKind.ShipLoss },
@@ -1258,6 +1286,50 @@ public partial class MainViewModel : ObservableObject
     {
         Dispatcher.UIThread.Post(() =>
         {
+            long oldBalance = _settings.Balance;
+            DateTime? oldSetAt = _settings.BalanceSetAt;
+
+            // Auto-Delta Erkennung:
+            if (AutoRecordWalletDelta && oldBalance > 0 && oldSetAt.HasValue)
+            {
+                long deltaKnown = 0;
+                for (int i = 0; i < Events.Count; i++)
+                {
+                    var ev = Events[i];
+                    if (!IsMoney(ev.Kind)) continue;
+                    if (ev.Time > oldSetAt.Value)
+                    {
+                        deltaKnown += ev.Amount;
+                    }
+                }
+
+                long expectedBalance = oldBalance + deltaKnown;
+                long unloggedDiff = expectedBalance - balance; // Positiv = Geld ging ungeloggt raus (z.B. Wartung/Tanken)
+
+                // Wenn mehr als 100 aUEC ungeloggt abgebucht wurden:
+                if (unloggedDiff >= 100 && unloggedDiff <= 50_000_000)
+                {
+                    string loc = !string.IsNullOrWhiteSpace(CurrentLocation) ? CurrentLocation : "Hangar/Pad";
+                    RecordExpense(
+                        category: "Schiffswartung & Service",
+                        detail: "Wartung, Tanken oder Service (mobiGlas-Delta)",
+                        amount: unloggedDiff,
+                        location: loc,
+                        ship: CurrentShip != "—" ? CurrentShip : null,
+                        timestamp: DateTime.UtcNow
+                    );
+                    Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC (-{unloggedDiff:N0} aUEC Service/Wartung verbucht)";
+                }
+                else
+                {
+                    Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC";
+                }
+            }
+            else
+            {
+                Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC";
+            }
+
             _settings.Balance = balance;
             _settings.BalanceSetAt = DateTime.UtcNow;
             Settings.Save(_settings);
@@ -1271,7 +1343,6 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(ExpectedText));
             OnPropertyChanged(nameof(AccountText));
             _scanIndicator.FlashGreen();
-            Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC";
             OcrStatusText = $"✓ Zuletzt: {balance:N0} aUEC ({DateTime.Now:HH:mm:ss})";
         });
     }
@@ -2781,7 +2852,7 @@ public partial class MainViewModel : ObservableObject
         : $"≈ {ExpectedBalance:N0} aUEC";
 
     static bool IsMoney(EventKind k) => k is EventKind.TransferIn or EventKind.TransferOut
-        or EventKind.MissionReward or EventKind.Purchase or EventKind.Sale or EventKind.Trade or EventKind.Fine;
+        or EventKind.MissionReward or EventKind.Purchase or EventKind.Sale or EventKind.Trade or EventKind.Fine or EventKind.Maintenance;
 
     // Saldo-Verlauf neu berechnen. Saldo gibt es nur für Ereignisse NACH dem Kontostand-Eintrag —
     // davor ist er unbekannt (Historie lückenhaft), daher bewusst leer statt falsch.
@@ -2824,6 +2895,110 @@ public partial class MainViewModel : ObservableObject
             Database.SetMeta("current_wallet", b.ToString());
             Database.SetMeta("current_wallet_time", DateTime.UtcNow.ToString("o"));
         }
+    }
+
+    [RelayCommand]
+    public void QuickSelectExpenseType(string type)
+    {
+        SelectedExpenseCategory = type switch
+        {
+            "Wartung" or "Reparatur" => "🔧 Reparatur & Wartung",
+            "Tanken" or "Fuel" => "⛽ Tanken & Treibstoff",
+            "Munition" or "Rearm" => "🚀 Munition & Rearm",
+            "Expedite" or "Claim" => "⏱️ Schiffsrückholung (Expedite)",
+            "Autoload" or "Ladegebühr" => "📦 Ladegebühr (Auto-Load)",
+            "Klinik" or "Med" => "🏥 Medizinisch / Klinik",
+            _ => "🛒 Sonstige Ausgabe"
+        };
+    }
+
+    [RelayCommand]
+    public void BookManualExpense()
+    {
+        var raw = NewExpenseAmountText.Replace(".", "").Replace(",", "").Trim();
+        if (!long.TryParse(raw, out var amount) || amount <= 0)
+        {
+            Status = "Bitte einen gültigen Betrag in aUEC eingeben (z. B. 15000)";
+            return;
+        }
+
+        var fullCat = SelectedExpenseCategory ?? "🔧 Reparatur & Wartung";
+        var cleanCat = Regex.Replace(fullCat, @"^[\p{So}\p{Sk}\p{Cs}\p{Cn}\s]+", "").Trim();
+        var note = !string.IsNullOrWhiteSpace(NewExpenseNote) ? NewExpenseNote.Trim() : cleanCat;
+        var loc = !string.IsNullOrWhiteSpace(NewExpenseLocation) ? NewExpenseLocation.Trim() : (string.IsNullOrWhiteSpace(CurrentLocation) ? "—" : CurrentLocation);
+        var ship = CurrentShip != "—" ? CurrentShip : null;
+
+        RecordExpense(
+            category: cleanCat,
+            detail: note,
+            amount: amount,
+            location: loc,
+            ship: ship,
+            timestamp: DateTime.UtcNow
+        );
+
+        NewExpenseAmountText = "";
+        NewExpenseNote = "";
+        Status = $"✓ Ausgabe erfasst: {amount:N0} aUEC ({cleanCat}) @ {loc}";
+    }
+
+    public void RecordExpense(string category, string detail, long amount, string? location = null, string? ship = null, DateTime? timestamp = null)
+    {
+        if (amount <= 0) return;
+        var ts = timestamp ?? DateTime.UtcNow;
+        var loc = !string.IsNullOrWhiteSpace(location) ? location : (string.IsNullOrWhiteSpace(CurrentLocation) ? "—" : CurrentLocation);
+        var sh = !string.IsNullOrWhiteSpace(ship) ? ship : (CurrentShip != "—" ? CurrentShip : null);
+        var sessionName = Path.GetFileName(LogPath);
+        if (string.IsNullOrEmpty(sessionName)) sessionName = "Game.log";
+
+        // 1. ConfirmedPurchaseRecord hinzufügen (für Spending-Tab Aufschlüsselung & Charts)
+        var purchase = new ConfirmedPurchaseRecord
+        {
+            Timestamp = ts,
+            ItemName = detail,
+            Category = category,
+            Shop = $"{loc} (Service)",
+            Location = loc,
+            TotalPrice = amount,
+            Quantity = 1,
+            Confirmed = true
+        };
+        _parser.ConfirmedPurchases.Add(purchase);
+
+        // 2. LedgerRecord hinzufügen (für Journal / Saldo-Buch)
+        var ledger = new LedgerRecord
+        {
+            Timestamp = ts,
+            Kind = category,
+            What = !string.IsNullOrEmpty(sh) ? $"{detail} ({sh})" : detail,
+            Where = loc,
+            Shop = $"{loc} (Service)",
+            Amount = -amount,
+            Quantity = 1,
+            Confirmed = true
+        };
+        _parser.LedgerRecords.Add(ledger);
+
+        // 3. LogEntry anwenden
+        var logEntry = new LogEntry
+        {
+            Time = ts,
+            Kind = EventKind.Maintenance,
+            Amount = -amount,
+            Detail = !string.IsNullOrEmpty(sh) ? $"{detail} ({sh}) · {loc}" : $"{detail} · {loc}",
+            Location = loc,
+            Ship = sh
+        };
+        Apply(logEntry, isLive: true);
+
+        // 4. In SQLite persistieren
+        Database.InsertCustomEvent(sessionName, ts, EventKind.Maintenance, -amount, logEntry.Detail, sh);
+
+        // 5. Views & Saldo synchronisieren
+        SyncQuantumViewsFromParser();
+        RecomputeBalances();
+
+        Logger.Log($"[Ausgabe] {category}: {detail} -{amount:N0} aUEC @ {loc} verbucht.");
     }
 
     public MainViewModel()
@@ -3864,6 +4039,9 @@ public partial class MainViewModel : ObservableObject
                 case EventKind.Purchase:
                     TotalPurchases += -e.Amount;
                     ResolveItemName(e);
+                    break;
+                case EventKind.Maintenance:
+                    TotalPurchases += -e.Amount;
                     break;
                 case EventKind.Sale:
                     TotalSales += e.Amount;

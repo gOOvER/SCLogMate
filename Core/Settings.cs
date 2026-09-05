@@ -158,6 +158,9 @@ public class AppSettings
         "Salvage Panel"
     };
 
+    /// <summary>Automatische Erfassung ungeloggter Ausgaben (z.B. Wartung, Tanken, Reparatur) über mobiGlas OCR Kontostands-Differenzen.</summary>
+    public bool AutoRecordWalletDelta { get; set; } = true;
+
     /// <summary>VoiceAttack &amp; Aurora Log-Wächter Integration aktivieren.</summary>
     public bool AuroraIntegrationEnabled { get; set; } = true;
 

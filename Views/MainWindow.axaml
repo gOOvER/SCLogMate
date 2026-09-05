@@ -1033,12 +1033,12 @@
               <StackPanel>
                 <TextBlock Classes="label" Text="GESAMTAUSGABEN" />
                 <TextBlock Classes="value" Text="{Binding SpendingTotalAuecText}" Foreground="#F87171" />
-                <TextBlock Text="Bestätigte Einkäufe &amp; Ausgaben" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
+                <TextBlock Text="Käufe, Wartung, Tanken &amp; Services" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
               </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="card" Margin="5,0,5,0">
               <StackPanel>
-                <TextBlock Classes="label" Text="EINKÄUFE" />
+                <TextBlock Classes="label" Text="AUSGABEN-POSTEN" />
                 <TextBlock Classes="value" Text="{Binding SpendingCountText}" Foreground="#38BDF8" />
                 <TextBlock Text="Erfasste Transaktionen" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
               </StackPanel>
@@ -1047,10 +1047,75 @@
               <StackPanel>
                 <TextBlock Classes="label" Text="DURCHSCHNITT" />
                 <TextBlock Classes="value" Text="{Binding SpendingAverageText}" Foreground="#FBBF24" />
-                <TextBlock Text="Ø Ausgaben pro Einkauf" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
+                <TextBlock Text="Ø pro Ausgabe / Einkauf" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
               </StackPanel>
             </Border>
           </Grid>
+
+          <!-- ➕ Schnellerfassung: Wartung, Reparatur & Ausgaben manuell buchen -->
+          <Border Classes="card" Margin="0,0,0,4">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="➕  AUSGABE ERFASSEN (WARTUNG, TANKEN, REPARATUR &amp; SERVICES)" />
+                    <Border Background="#1E293B" BorderBrush="#475569" BorderThickness="1" CornerRadius="4" Padding="5,1">
+                      <TextBlock Text="CIG-Log-Bypass" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Text="Da Star Citizen Schiffswartung (Reparatur, Betankung, Munition) nicht ins Game.log schreibt, kannst du diese hier mit einem Klick verbuchen oder automatisch per mobiGlas-OCR abgleichen lassen." Foreground="#8B949E" FontSize="11" />
+                </StackPanel>
+                <CheckBox Grid.Column="1" IsChecked="{Binding AutoRecordWalletDelta}" VerticalAlignment="Center">
+                  <TextBlock Text="⚡ Auto-Erfassung via mobiGlas-OCR" FontSize="11" Foreground="#38BDF8" />
+                </CheckBox>
+              </Grid>
+
+              <!-- Eingabezeile -->
+              <Grid ColumnDefinitions="140,*,180,160,Auto" Margin="0,2,0,0">
+                <!-- Betrag -->
+                <StackPanel Grid.Column="0" Spacing="3" Margin="0,0,8,0">
+                  <TextBlock Text="Betrag (aUEC):" FontSize="10" Foreground="#64748B" />
+                  <TextBox Classes="path" Text="{Binding NewExpenseAmountText}" Watermark="z.B. 15000" Height="28" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                </StackPanel>
+
+                <!-- Kategorie / Art (Schnellauswahl) -->
+                <StackPanel Grid.Column="1" Spacing="3" Margin="0,0,8,0">
+                  <TextBlock Text="Kategorie / Service-Art:" FontSize="10" Foreground="#64748B" />
+                  <ComboBox ItemsSource="{Binding AvailableExpenseCategories}" SelectedItem="{Binding SelectedExpenseCategory}" Height="28" HorizontalAlignment="Stretch" />
+                </StackPanel>
+
+                <!-- Ort -->
+                <StackPanel Grid.Column="2" Spacing="3" Margin="0,0,8,0">
+                  <TextBlock Text="Ort / Station:" FontSize="10" Foreground="#64748B" />
+                  <TextBox Classes="path" Text="{Binding NewExpenseLocation}" Watermark="z.B. Port Tressler" Height="28" FontSize="11" />
+                </StackPanel>
+
+                <!-- Schiff / Notiz -->
+                <StackPanel Grid.Column="3" Spacing="3" Margin="0,0,8,0">
+                  <TextBlock Text="Schiff / Notiz (optional):" FontSize="10" Foreground="#64748B" />
+                  <TextBox Classes="path" Text="{Binding NewExpenseNote}" Watermark="z.B. C2 Hercules" Height="28" FontSize="11" />
+                </StackPanel>
+
+                <!-- Buchen-Button -->
+                <StackPanel Grid.Column="4" Spacing="3" VerticalAlignment="Bottom">
+                  <Button Classes="accent" Command="{Binding BookManualExpenseCommand}" Height="28" Padding="14,0" VerticalAlignment="Center">
+                    <TextBlock Text="✓ Ausgabe buchen" FontSize="11" FontWeight="Bold" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+
+              <!-- Schnellauswahl-Chips für Betrag und Art -->
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="Schnellwahl:" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Wartung" Content="🔧 Reparatur" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Tanken" Content="⛽ Tanken" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Munition" Content="🚀 Rearm" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Expedite" Content="⏱️ Schiffsclaim" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Autoload" Content="📦 Ladegebühr" />
+                <Button Classes="chip" Height="24" Padding="7,1" Command="{Binding QuickSelectExpenseTypeCommand}" CommandParameter="Klinik" Content="🏥 Klinik" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
 
           <!-- 3 Breakdown Spalten: Shop, Item, Kategorie -->
           <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
@@ -1111,9 +1176,9 @@
           <Border Classes="card" Padding="0">
             <StackPanel>
               <Grid ColumnDefinitions="*,Auto" Margin="14,10,14,8">
-                <TextBlock Classes="label" Text="BESTÄTIGTE EINKÄUFE (RM-SHOP-RESPONSES)" VerticalAlignment="Center" />
-                <Panel Grid.Column="1" Width="200" Height="28">
-                  <TextBox Classes="search" Text="{Binding SpendingSearchText}" Watermark="Einkäufe durchsuchen…" VerticalAlignment="Center" Height="28" />
+                <TextBlock Classes="label" Text="BESTÄTIGTE AUSGABEN, WARTUNG &amp; EINKÄUFE" VerticalAlignment="Center" />
+                <Panel Grid.Column="1" Width="220" Height="28">
+                  <TextBox Classes="search" Text="{Binding SpendingSearchText}" Watermark="Ausgaben &amp; Käufe suchen…" VerticalAlignment="Center" Height="28" />
                   <TextBlock Text="🔎" FontSize="11" Foreground="#7E97AD" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False" />
                 </Panel>
               </Grid>

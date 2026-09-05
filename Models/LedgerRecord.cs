@@ -30,6 +30,13 @@ public sealed record LedgerRecord
         "Item gekauft" => "#FB923C",
         "Strafe gezahlt" => "#F87171",
         "Belohnung" => "#38BDF8",
+        "Reparatur & Wartung" or "Schiffswartung" or "Wartung" or "Schiffswartung & Service" => "#FB923C",
+        "Tanken & Treibstoff" or "Betankung" => "#38BDF8",
+        "Munition & Rearm" or "Aufmunitionierung" => "#F87171",
+        "Schiffsrückholung" or "Expedite" => "#C084FC",
+        "Ladegebühr" => "#34D399",
+        "Medizinisch" or "Klinik" => "#F43F5E",
+        "Sonstige Ausgabe" or "Ausgabe" => "#FB923C",
         _ => "#8B949E"
     };
 
@@ -40,6 +47,13 @@ public sealed record LedgerRecord
         "Item gekauft" => "#2B1607",
         "Strafe gezahlt" => "#2E1114",
         "Belohnung" => "#0A2033",
+        "Reparatur & Wartung" or "Schiffswartung" or "Wartung" or "Schiffswartung & Service" => "#281705",
+        "Tanken & Treibstoff" or "Betankung" => "#082136",
+        "Munition & Rearm" or "Aufmunitionierung" => "#2E1114",
+        "Schiffsrückholung" or "Expedite" => "#220D38",
+        "Ladegebühr" => "#0A281A",
+        "Medizinisch" or "Klinik" => "#2B0B14",
+        "Sonstige Ausgabe" or "Ausgabe" => "#281705",
         _ => "#161B22"
     };
 

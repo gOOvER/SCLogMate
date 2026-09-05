@@ -703,7 +703,8 @@ public static class Database
                     case "Trade": a.Trade = sum; break;
                     case "TransferOut": a.Out += -sum; break;  // Beträge negativ -> positiv
                     case "Fine": a.Out += -sum; break;         // Bußgelder = aUEC raus
-                    case "Purchase": a.Purchases = -sum; break;
+                    case "Purchase": a.Purchases += -sum; break;
+                    case "Maintenance": a.Purchases += -sum; break;
                 }
             }
         }
@@ -1082,6 +1083,35 @@ public static class Database
             using var db = new SqliteConnection(Conn);
             db.Open();
             SetMeta(db, key, value);
+        }
+    }
+
+    /// <summary>
+    /// Speichert ein manuelles oder per mobiGlas-Delta erfasstes Ausgabe-/Wartungs-Ereignis persistent in der events-Tabelle.
+    /// </summary>
+    public static void InsertCustomEvent(string session, DateTime time, Models.EventKind kind, long amount, string detail, string? ship = null)
+    {
+        lock (_writeLock)
+        {
+            try
+            {
+                EnsureInitialized();
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh);";
+                cmd.Parameters.AddWithValue("$s", session);
+                cmd.Parameters.AddWithValue("$t", time.ToString("o", CultureInfo.InvariantCulture));
+                cmd.Parameters.AddWithValue("$k", kind.ToString());
+                cmd.Parameters.AddWithValue("$a", amount);
+                cmd.Parameters.AddWithValue("$d", detail);
+                cmd.Parameters.AddWithValue("$sh", (object?)ship ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Database.InsertCustomEvent", ex);
+            }
         }
     }
 
