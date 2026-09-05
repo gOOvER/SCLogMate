@@ -43,5 +43,6 @@ public static class Logger
         catch { /* ignore */ }
     }
 
-    public static void Error(string context, Exception ex) => Log($"[ERROR] {context}: {ex.GetType().Name}: {ex.Message}");
+    public static void Error(string context, Exception ex) =>
+        Log($"[ERROR] {context}: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}");
 }

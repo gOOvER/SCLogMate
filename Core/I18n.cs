@@ -196,6 +196,8 @@ public sealed class I18n : INotifyPropertyChanged
             ["SubTab_Cargo"] = "📦 Fracht",
             ["SubTab_ContractsHistory"] = "🎯 Aufträge (Contracts)",
             ["SubTab_Catalog"] = "📚 Katalog",
+            ["SubTab_ToolsMaintenance"] = "🧹 Wartung & System",
+            ["SubTab_ToolsBackups"] = "💾 Backups & Tresor",
 
             // Filter Chips
             ["Filter_All"] = "Alle",
@@ -376,6 +378,8 @@ public sealed class I18n : INotifyPropertyChanged
             ["SubTab_Cargo"] = "📦 Cargo",
             ["SubTab_ContractsHistory"] = "🎯 Contracts",
             ["SubTab_Catalog"] = "📚 Catalog",
+            ["SubTab_ToolsMaintenance"] = "🧹 Maintenance & System",
+            ["SubTab_ToolsBackups"] = "💾 Backups & Vault",
 
             // Filter Chips
             ["Filter_All"] = "All",

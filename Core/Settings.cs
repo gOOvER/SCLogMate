@@ -27,7 +27,7 @@ public class AppSettings
     /// <summary>Vom Nutzer ausgewählter mobiGlas Auftragsmanager-Bereich (Contract Manager).</summary>
     public ScanRegion? ContractRegion { get; set; }
 
-    /// <summary>Optionaler UEX Corp API-Schlüssel für erweiterte Abfragen & Kontoverknüpfung.</summary>
+    /// <summary>Optionaler UEX Corp API-Schlüssel für erweiterte Abfragen &amp; Kontoverknüpfung.</summary>
     [JsonIgnore]
     public string? UexApiKey { get; set; }
 
@@ -49,7 +49,7 @@ public class AppSettings
     /// <summary>Deckkraft des Mini-HUD Overlays (0.3 bis 1.0).</summary>
     public double OverlayOpacity { get; set; } = 0.92;
 
-    /// <summary>In-Game Achievement & Reward Toast Banner aktivieren.</summary>
+    /// <summary>In-Game Achievement &amp; Reward Toast Banner aktivieren.</summary>
     public bool ToastEnabled { get; set; } = true;
 
     /// <summary>Toast bei erlernten Bauplänen anzeigen.</summary>
@@ -115,10 +115,10 @@ public class AppSettings
     /// <summary>aUEC-Finanzsaldo ab Wipe-Datum filtern.</summary>
     public bool WipeFilterMoney { get; set; } = true;
 
-    /// <summary>Auftrags- & Missionsstatistiken ab Wipe-Datum filtern.</summary>
+    /// <summary>Auftrags- &amp; Missionsstatistiken ab Wipe-Datum filtern.</summary>
     public bool WipeFilterContracts { get; set; } = true;
 
-    /// <summary>Flotte & Schiffsaktivitäten ab Wipe-Datum filtern.</summary>
+    /// <summary>Flotte &amp; Schiffsaktivitäten ab Wipe-Datum filtern.</summary>
     public bool WipeFilterFleet { get; set; } = false;
 
     /// <summary>Erlernte Baupläne ab Wipe-Datum filtern.</summary>
@@ -139,7 +139,26 @@ public class AppSettings
     /// <summary>Vom Nutzer ausgewählter RS Scan-Bereich auf dem Bildschirm.</summary>
     public ScanRegion? RsScanRegion { get; set; }
 
-    /// <summary>VoiceAttack & Aurora Log-Wächter Integration aktivieren.</summary>
+    /// <summary>Zielsuchliste &amp; Alarm für gesuchte Erze/Salvage aktivieren.</summary>
+    public bool RsTargetAlertEnabled { get; set; } = true;
+
+    /// <summary>Akustischen Sonar-Ping bei Zieltreffer abspielen.</summary>
+    public bool RsTargetSoundEnabled { get; set; } = true;
+
+    /// <summary>Windows Text-to-Speech (TTS) Sprachansage bei Zieltreffer aktivieren.</summary>
+    public bool RsTargetTtsEnabled { get; set; } = false;
+
+    /// <summary>Vom Nutzer aktivierte Material-Namen in der Zielsuchliste.</summary>
+    public System.Collections.Generic.List<string> RsTargetList { get; set; } = new()
+    {
+        "Quantanium",
+        "Bexalite",
+        "Taranite",
+        "Gold",
+        "Salvage Panel"
+    };
+
+    /// <summary>VoiceAttack &amp; Aurora Log-Wächter Integration aktivieren.</summary>
     public bool AuroraIntegrationEnabled { get; set; } = true;
 
     /// <summary>Benutzerdefinierter Pfad zu Aurora Log-Wächter (optional, sonst Auto-Erkennung).</summary>
@@ -176,7 +195,7 @@ public class AppSettings
     public bool AuroraServerErrors { get; set; } = true;
 
     /// <summary>
-    /// Aktiviert den Entwickler- & Debug-Modus.
+    /// Aktiviert den Entwickler- &amp; Debug-Modus.
     /// In lokalen Debug-Builds standardmäßig true, in Release-Builds standardmäßig false.
     /// Kann im Release-Build ausschließlich manuell per "DebugMode": true in settings.json aktiviert werden.
     /// </summary>

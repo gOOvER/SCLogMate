@@ -35,7 +35,7 @@ public sealed class OcrEngineService : IDisposable
 
     /// <summary>Führt Dual-Pass OCR (invertiert + normal) über einem BGRA-Puffer aus.</summary>
     public async Task<(string? InvertedText, string? PlainText)> RecognizeDualPassAsync(
-        byte[] bgra, int w, int h, int scale = 2, int padding = 8)
+        byte[] bgra, int w, int h, int scale = 2, int padding = 8, bool boostContrast = true)
     {
         if (!IsAvailable || _engine == null || bgra.Length == 0)
             return (null, null);
@@ -45,8 +45,8 @@ public sealed class OcrEngineService : IDisposable
         {
             if (_engine == null) return (null, null);
 
-            var invBuf = Preprocess(bgra, w, h, scale, padding, invert: true, out int iw, out int ih);
-            var plainBuf = Preprocess(bgra, w, h, scale, padding, invert: false, out int pw, out int ph);
+            var invBuf = Preprocess(bgra, w, h, scale, padding, invert: true, boostContrast: boostContrast, out int iw, out int ih);
+            var plainBuf = Preprocess(bgra, w, h, scale, padding, invert: false, boostContrast: boostContrast, out int pw, out int ph);
 
             using var invBmp = ToSoftwareBitmap(invBuf, iw, ih);
             using var plainBmp = ToSoftwareBitmap(plainBuf, pw, ph);
@@ -78,7 +78,7 @@ public sealed class OcrEngineService : IDisposable
         {
             if (_engine == null) return null;
 
-            var buf = Preprocess(bgra, w, h, scale, padding, invert: true, out int outW, out int outH);
+            var buf = Preprocess(bgra, w, h, scale, padding, invert: true, boostContrast: true, out int outW, out int outH);
             using var bmp = ToSoftwareBitmap(buf, outW, outH);
             var result = await _engine.RecognizeAsync(bmp);
             return result?.Text;
@@ -94,7 +94,7 @@ public sealed class OcrEngineService : IDisposable
         }
     }
 
-    private static byte[] Preprocess(byte[] bgra, int w, int h, int scale, int padding, bool invert, out int outW, out int outH)
+    private static byte[] Preprocess(byte[] bgra, int w, int h, int scale, int padding, bool invert, bool boostContrast, out int outW, out int outH)
     {
         int origW = w;
         int origH = h;
@@ -135,30 +135,39 @@ public sealed class OcrEngineService : IDisposable
             {
                 int src = srcRow + ((sx * step) * 4);
 
-                // Farbiger Star Citizen HUD-Text (Bernstein, Orange, Cyan, Grün, Weiß)
-                // Nutze maximale Farbkanalintensität für optimalen Signal-Rausch-Abstand
-                int maxColor = Math.Max(bgra[src], Math.Max(bgra[src + 1], bgra[src + 2]));
-
-                byte v;
-                if (invert)
+                byte ib, ig, ir;
+                if (!boostContrast)
                 {
-                    // Invertieren: Dunkler Text auf reinem Weiß
-                    // Text (maxColor > 60) wird tiefschwarz (0..20), dunkler Weltraum (<45) wird reinweiß (255)
-                    v = (byte)Math.Clamp(255 - (maxColor - 45) * 3, 0, 255);
+                    // Clean invert/plain without contrast saturation (NexusApp calibrated for mobiGlas text)
+                    ib = invert ? (byte)(255 - bgra[src]) : bgra[src];
+                    ig = invert ? (byte)(255 - bgra[src + 1]) : bgra[src + 1];
+                    ir = invert ? (byte)(255 - bgra[src + 2]) : bgra[src + 2];
                 }
                 else
                 {
-                    // Plain: Heller Text auf reinem Schwarz
-                    // Text (maxColor > 60) wird reinweiß (235..255), dunkler Weltraum (<45) wird pechschwarz (0)
-                    v = (byte)Math.Clamp((maxColor - 45) * 3, 0, 255);
+                    // NexusApp Standard: Invert/boost contrast ×1.4 so ambiguous mid-gray pixels
+                    // are pushed cleanly toward white/black while preserving smooth anti-aliasing
+                    // (vital for Windows OCR to recognize 6/8/9/0 correctly).
+                    if (invert)
+                    {
+                        ib = (byte)Math.Min(255, (255 - bgra[src]) * 14 / 10);
+                        ig = (byte)Math.Min(255, (255 - bgra[src + 1]) * 14 / 10);
+                        ir = (byte)Math.Min(255, (255 - bgra[src + 2]) * 14 / 10);
+                    }
+                    else
+                    {
+                        ib = (byte)Math.Min(255, bgra[src] * 14 / 10);
+                        ig = (byte)Math.Min(255, bgra[src + 1] * 14 / 10);
+                        ir = (byte)Math.Min(255, bgra[src + 2] * 14 / 10);
+                    }
                 }
 
                 if (scale == 1)
                 {
                     int dst = ((sy + padding) * outW + (sx + padding)) * 4;
-                    output[dst] = v;
-                    output[dst + 1] = v;
-                    output[dst + 2] = v;
+                    output[dst] = ib;
+                    output[dst + 1] = ig;
+                    output[dst + 2] = ir;
                     output[dst + 3] = 255;
                 }
                 else
@@ -169,9 +178,9 @@ public sealed class OcrEngineService : IDisposable
                         for (int dx = 0; dx < scale; dx++)
                         {
                             int dst = dstRow + ((sx * scale + dx) * 4);
-                            output[dst] = v;
-                            output[dst + 1] = v;
-                            output[dst + 2] = v;
+                            output[dst] = ib;
+                            output[dst + 1] = ig;
+                            output[dst + 2] = ir;
                             output[dst + 3] = 255;
                         }
                     }

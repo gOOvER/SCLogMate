@@ -13,10 +13,10 @@ namespace SCLogMate.Core.Ocr;
 public sealed class WalletCapture : IDisposable
 {
     public static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(300); // Warten auf mobiGlas UI Fade-In
-    public static readonly TimeSpan GrabSpacing = TimeSpan.FromMilliseconds(150);
+    public static readonly TimeSpan GrabSpacing = TimeSpan.FromMilliseconds(250);
     public static readonly TimeSpan RetrySpacing = TimeSpan.FromMilliseconds(100);
-    public static readonly TimeSpan BurstBudget = TimeSpan.FromSeconds(4);
-    public const int MaxGrabs = 10;
+    public static readonly TimeSpan BurstBudget = TimeSpan.FromSeconds(5);
+    public const int MaxGrabs = 12;
 
     private readonly OcrEngineService _ocrEngine;
     private readonly Func<ScanRegion?> _regionProvider;
@@ -54,15 +54,15 @@ public sealed class WalletCapture : IDisposable
         var region = _regionProvider() ?? ScreenCapture.GetDefaultWalletRegion();
         if (!region.IsValid) return null;
 
-        int capX = Math.Max(0, region.X - 25);
-        int capY = Math.Max(0, region.Y - 5);
-        int capW = region.Width + 50;
-        int capH = region.Height + 10;
+        int capX = Math.Max(0, region.X);
+        int capY = Math.Max(0, region.Y);
+        int capW = region.Width;
+        int capH = region.Height;
 
         var raw = ScreenCapture.Capture(capX, capY, capW, capH);
         if (raw == null) return null;
 
-        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 2, padding: 8).ConfigureAwait(false);
+        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 6, padding: 24, boostContrast: false).ConfigureAwait(false);
         var bestText = WalletOcrTrigger.BestRead(invText, plainText);
         var balance = WalletOcrTrigger.ExtractBalance(bestText);
 
@@ -120,10 +120,10 @@ public sealed class WalletCapture : IDisposable
                     return;
                 }
 
-                int capX = Math.Max(0, region.X - 25);
-                int capY = Math.Max(0, region.Y - 5);
-                int capW = region.Width + 50;
-                int capH = region.Height + 10;
+                int capX = Math.Max(0, region.X);
+                int capY = Math.Max(0, region.Y);
+                int capW = region.Width;
+                int capH = region.Height;
 
                 var raw = ScreenCapture.Capture(capX, capY, capW, capH);
                 if (raw == null)
@@ -132,7 +132,7 @@ public sealed class WalletCapture : IDisposable
                     continue;
                 }
 
-                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 2, padding: 8).ConfigureAwait(false);
+                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 6, padding: 24, boostContrast: false).ConfigureAwait(false);
                 var bestText = WalletOcrTrigger.BestRead(invText, plainText);
                 var balance = WalletOcrTrigger.ExtractBalance(bestText);
 

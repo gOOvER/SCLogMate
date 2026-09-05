@@ -101,6 +101,9 @@ public partial class LogParser
     [GeneratedRegex(@"Added notification ""(?<full>(?:Neuer Auftrag|Auftrag (?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|Contract (?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|New Contract Available|New Objective)[^""]*)")]
     private static partial Regex MissionLineRegex();
 
+    [GeneratedRegex(@"MissionId:\s*\[(?<id>[0-9a-fA-F-]+)\]")]
+    private static partial Regex NotificationMissionIdRegex();
+
     // Blaupause / Crafting Blueprint / Belohnung erhalten - unterstützt alle SC-Varianten & Missions-Drops
     private static readonly string[] BlueprintMarkers = {
         "Received Blueprint:",
@@ -247,6 +250,10 @@ public partial class LogParser
     [GeneratedRegex(@"missionId \[(?<id>[0-9a-f-]+)\], generator name \[(?<gen>[A-Za-z0-9_]+)\], contract \[(?<con>[A-Za-z0-9_]+)\]")]
     private static partial Regex MissionMarkerRegex();
 
+    // Comms-Benachrichtigung für Missionsannahme mit Auftraggeber & Fraktion (SC 4.x)
+    [GeneratedRegex(@"<CommsNotifications>\s+SendCommsNotification\s+\+Missions\.Organization\.(?:MissionGiver\.)?(?<giver>[A-Za-z0-9_]+)(?:,AI\.Faction\.(?<faction>[A-Za-z0-9_]+))?.*?Mission:\s+\[(?<id>[0-9a-fA-F-]+)\]")]
+    private static partial Regex CommsNotificationRegex();
+
     // Standorte, Zonen & Schutzzonen
     [GeneratedRegex(@"Added notification ""(?<text>[^""]+)""")]
     private static partial Regex GenericNotificationRegex();
@@ -355,6 +362,7 @@ public partial class LogParser
 
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string Giver, string Faction)> _missionComms = new(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyCollection<ContractRecord> ContractsList => _contracts.Values;
 
     public string PlaceAt(DateTime at)
@@ -398,11 +406,16 @@ public partial class LogParser
 
     public LogEntry? Feed(string line)
     {
-        var mTs = TsRegex().Match(line);
-        if (mTs.Success && DateTime.TryParse(mTs.Groups["ts"].Value, CultureInfo.InvariantCulture,
-                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dtParsed))
+        if (string.IsNullOrEmpty(line)) return null;
+
+        if (line.Length >= 25 && line[0] == '<')
         {
-            _lastSeenTime = dtParsed;
+            var mTs = TsRegex().Match(line);
+            if (mTs.Success && DateTime.TryParse(mTs.Groups["ts"].Value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dtParsed))
+            {
+                _lastSeenTime = dtParsed;
+            }
         }
 
         CaptureMeta(line);
@@ -567,20 +580,11 @@ public partial class LogParser
         {
             _pendingQtDestination = qr.Groups["dest"].Value;
             var origin = qr.Groups["origin"].Value;
-            if (origin.Contains("Nyx", StringComparison.OrdinalIgnoreCase))
+            var resOrigin = Locations.ResolveLocation(origin);
+            if (resOrigin.SystemName is "Stanton" or "Pyro" or "Nyx")
             {
-                _currentSystem = "Nyx";
-                Locations.ActiveSystem = "Nyx";
-            }
-            else if (origin.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Pyro";
-                Locations.ActiveSystem = "Pyro";
-            }
-            else if (origin.Contains("Stanton", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Stanton";
-                Locations.ActiveSystem = "Stanton";
+                _currentSystem = resOrigin.SystemName;
+                Locations.ActiveSystem = resOrigin.SystemName;
             }
         }
         else
@@ -602,22 +606,11 @@ public partial class LogParser
 
         if (!string.IsNullOrEmpty(_pendingQtDestination))
         {
-            if (_pendingQtDestination.Contains("nyx", StringComparison.OrdinalIgnoreCase)
-                || _pendingQtDestination.Contains("levski", StringComparison.OrdinalIgnoreCase)
-                || _pendingQtDestination.Contains("delamar", StringComparison.OrdinalIgnoreCase))
+            var resDest = Locations.ResolveLocation(_pendingQtDestination);
+            if (resDest.SystemName is "Stanton" or "Pyro" or "Nyx")
             {
-                _currentSystem = "Nyx";
-                Locations.ActiveSystem = "Nyx";
-            }
-            else if (_pendingQtDestination.Contains("pyro", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Pyro";
-                Locations.ActiveSystem = "Pyro";
-            }
-            else if (_pendingQtDestination.Contains("stanton", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Stanton";
-                Locations.ActiveSystem = "Stanton";
+                _currentSystem = resDest.SystemName;
+                Locations.ActiveSystem = resDest.SystemName;
             }
         }
 
@@ -1153,15 +1146,47 @@ public partial class LogParser
             if (full == _lastNotif) return null;
             _lastNotif = full;
 
+            var midMatch = NotificationMissionIdRegex().Match(line);
+            string mId = midMatch.Success && midMatch.Groups["id"].Value != "00000000-0000-0000-0000-000000000000"
+                ? midMatch.Groups["id"].Value
+                : "";
+
+            var cleanTitle = Regex.Replace(full, @"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", "", RegexOptions.IgnoreCase).Trim(' ', ':');
+            cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
+            var normTitle = cleanTitle.ToLowerInvariant().Trim();
+
+            if (string.IsNullOrEmpty(mId))
+            {
+                mId = "contract_" + normTitle;
+            }
+
+            var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
+
             bool isComplete = full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
                               full.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
                               full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase);
 
+            bool isAbandoned = full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
+                               full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase);
+
+            bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase);
+
+            bool isAccepted = full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
+                              full.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
+                              full.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
+                              full.Contains("geteilt", StringComparison.OrdinalIgnoreCase) ||
+                              full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
+                              full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase);
+
             long reward = 0;
             if (isComplete)
             {
-                var cleanTitle = Regex.Replace(full, @"^(Contract|Mission|Objective)\s+(Complete|Completed|Accepted|Finished|Erfolgreich):\s*", "", RegexOptions.IgnoreCase).Trim();
-                var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
                 if (cat != null && cat.BaseReward > 0)
                 {
                     reward = cat.BaseReward;
@@ -1178,6 +1203,142 @@ public partial class LogParser
                 {
                     reward = 25000; // Standard aUEC für Belohnungs-Events, damit kein 0-Betrag angezeigt wird
                 }
+
+                // In _contracts aktualisieren
+                string? targetKey = null;
+                if (_contracts.ContainsKey(mId)) targetKey = mId;
+                else
+                {
+                    targetKey = _contracts.Keys.FirstOrDefault(k =>
+                        _contracts[k].Outcome == ContractOutcome.InProgress &&
+                        (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                         normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                }
+
+                if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                {
+                    _contracts[targetKey] = existing with
+                    {
+                        Outcome = ContractOutcome.Completed,
+                        CompletedAt = existing.CompletedAt ?? ParseTs(line),
+                        StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
+                        Reward = reward > 0 ? reward : existing.Reward
+                    };
+                }
+                else
+                {
+                    var issuer = ResolveIssuer(cat, mId);
+                    var sys = ResolveMissionSystem(cat, issuer);
+                    _contracts[mId] = new ContractRecord
+                    {
+                        MissionId = mId,
+                        AcceptedAt = ParseTs(line),
+                        CompletedAt = ParseTs(line),
+                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                        Issuer = issuer,
+                        Type = cat?.MissionType ?? "Auftrag",
+                        Difficulty = "k.A.",
+                        System = sys,
+                        StepsTotal = 1,
+                        StepsDone = 1,
+                        Reward = reward,
+                        Outcome = ContractOutcome.Completed
+                    };
+                }
+                _missionsDone.Add(mId);
+            }
+            else if (isAbandoned)
+            {
+                string? targetKey = null;
+                if (_contracts.ContainsKey(mId)) targetKey = mId;
+                else
+                {
+                    targetKey = _contracts.Keys.FirstOrDefault(k =>
+                        _contracts[k].Outcome == ContractOutcome.InProgress &&
+                        (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                         normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                }
+
+                if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                {
+                    _contracts[targetKey] = existing with
+                    {
+                        Outcome = ContractOutcome.Abandoned,
+                        CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                    };
+                }
+                else
+                {
+                    var issuer = ResolveIssuer(cat, mId);
+                    var sys = ResolveMissionSystem(cat, issuer);
+                    _contracts[mId] = new ContractRecord
+                    {
+                        MissionId = mId,
+                        AcceptedAt = ParseTs(line),
+                        CompletedAt = ParseTs(line),
+                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                        Issuer = issuer,
+                        Type = cat?.MissionType ?? "Auftrag",
+                        Difficulty = "k.A.",
+                        System = sys,
+                        StepsTotal = 1,
+                        StepsDone = 0,
+                        Reward = cat?.BaseReward ?? 0,
+                        Outcome = ContractOutcome.Abandoned
+                    };
+                }
+            }
+            else if (isObjective)
+            {
+                if (_contracts.TryGetValue(mId, out var existing))
+                {
+                    _contracts[mId] = existing with { StepsTotal = existing.StepsTotal + 1 };
+                }
+                else
+                {
+                    var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
+                    if (activeKey != null)
+                    {
+                        _contracts[activeKey] = _contracts[activeKey] with { StepsTotal = _contracts[activeKey].StepsTotal + 1 };
+                    }
+                }
+            }
+            else if (isAccepted)
+            {
+                var finalReward = cat?.BaseReward ?? 0;
+                var finalIssuer = ResolveIssuer(cat, mId);
+                var finalType = cat?.MissionType ?? (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ? "Person/Bergung" : "Auftrag");
+                var finalSystem = ResolveMissionSystem(cat, finalIssuer);
+
+                if (!_contracts.TryGetValue(mId, out var existing))
+                {
+                    _contracts[mId] = new ContractRecord
+                    {
+                        MissionId = mId,
+                        AcceptedAt = ParseTs(line),
+                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                        Issuer = finalIssuer,
+                        Type = finalType,
+                        Difficulty = "k.A.",
+                        System = finalSystem,
+                        StepsTotal = 1,
+                        StepsDone = 0,
+                        Reward = finalReward,
+                        Outcome = ContractOutcome.InProgress
+                    };
+                }
+                else
+                {
+                    _contracts[mId] = existing with
+                    {
+                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : existing.Title,
+                        Issuer = finalIssuer != "Unbekannt" ? finalIssuer : (existing.Issuer != "mobiGlas" ? existing.Issuer : "Unbekannt"),
+                        Type = finalType != "Auftrag" ? finalType : existing.Type,
+                        Reward = finalReward > 0 ? finalReward : existing.Reward,
+                        System = finalSystem != "Stanton" ? finalSystem : existing.System
+                    };
+                }
+                _missionsTaken.Add(mId);
             }
 
             return new LogEntry
@@ -1228,6 +1389,26 @@ public partial class LogParser
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
         }
 
+        // Comms-Benachrichtigung für Missionsannahme mit Auftraggeber & Fraktion (SC 4.x)
+        var commsMatch = CommsNotificationRegex().Match(line);
+        if (commsMatch.Success)
+        {
+            var id = commsMatch.Groups["id"].Value;
+            var giver = FormatMissionGiver(commsMatch.Groups["giver"].Value);
+            var faction = FormatFaction(commsMatch.Groups["faction"].Value);
+            _missionComms[id] = (giver, faction);
+
+            if (_contracts.TryGetValue(id, out var existingContract))
+            {
+                var resolved = giver != "Unbekannt" ? giver : (faction != "Unbekannt" ? faction : existingContract.Issuer);
+                if (resolved != "Unbekannt" && (existingContract.Issuer == "Unbekannt" || existingContract.Issuer == "mobiGlas"))
+                {
+                    var sys = (resolved.Contains("Recco", StringComparison.OrdinalIgnoreCase) || resolved.Contains("Battaglia", StringComparison.OrdinalIgnoreCase)) ? "Nyx" : existingContract.System;
+                    _contracts[id] = existingContract with { Issuer = resolved, System = sys };
+                }
+            }
+        }
+
         // Ausrüstung/Item defekt – jedes Item nur EINMAL (Warnung feuert sonst im Sekundentakt)
         var gb = GearBrokeRegex().Match(line);
         if (gb.Success)
@@ -1261,6 +1442,16 @@ public partial class LogParser
                     StepsTotal = 1,
                     StepsDone = 0,
                     Outcome = ContractOutcome.InProgress
+                };
+            }
+            else
+            {
+                _contracts[mId] = existing with
+                {
+                    Issuer = info.Faction != "Unbekannt" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas") ? info.Faction : existing.Issuer,
+                    Type = info.Type != "Sonstige" ? info.Type : existing.Type,
+                    Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
+                    System = info.System != "k.A." ? info.System : existing.System
                 };
             }
 
@@ -1621,4 +1812,114 @@ public partial class LogParser
 
         return (LoadoutSlotType.Primary2, "Ausrüstung", "🛡️");
     }
+
+    private string ResolveIssuer(MissionInfo? cat, string mId)
+    {
+        if (_missionComms.TryGetValue(mId, out var comms))
+        {
+            if (!string.IsNullOrWhiteSpace(comms.Giver) && comms.Giver != "Unbekannt")
+                return comms.Giver;
+            if (!string.IsNullOrWhiteSpace(comms.Faction) && comms.Faction != "Unbekannt")
+                return comms.Faction;
+        }
+
+        if (cat != null)
+        {
+            if (!string.IsNullOrWhiteSpace(cat.Contractor))
+                return cat.Contractor;
+            if (!string.IsNullOrWhiteSpace(cat.Faction))
+                return cat.Faction;
+        }
+
+        return "Unbekannt";
+    }
+
+    private string ResolveMissionSystem(MissionInfo? cat, string issuer)
+    {
+        if (cat != null && !string.IsNullOrWhiteSpace(cat.StarSystems) && cat.StarSystems != "k.A.")
+            return cat.StarSystems;
+
+        if (!string.IsNullOrWhiteSpace(issuer))
+        {
+            if (issuer.Contains("Recco", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Battaglia", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Levski", StringComparison.OrdinalIgnoreCase))
+                return "Nyx";
+
+            if (issuer.Contains("Pyro", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Rough Cut", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Citizens for Pyro", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Fire Rats", StringComparison.OrdinalIgnoreCase))
+                return "Pyro";
+
+            if (issuer.Contains("Hurston", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Crusader", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("microTech", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Red Wind", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Northrock", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Clovus", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Miles", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Wallace", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Tecia", StringComparison.OrdinalIgnoreCase) ||
+                issuer.Contains("Twitch", StringComparison.OrdinalIgnoreCase))
+                return "Stanton";
+        }
+
+        if (!string.IsNullOrWhiteSpace(_currentSystem))
+            return _currentSystem;
+
+        return "Stanton";
+    }
+
+    private static string FormatMissionGiver(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "Unbekannt";
+        var clean = raw.Trim();
+        return clean switch
+        {
+            "ReccoBattaglia" => "Recco Battaglia",
+            "MilesEckhart" => "Miles Eckhart",
+            "ClovusDarneely" => "Clovus Darneely",
+            "ConstantineHurston" => "Constantine Hurston",
+            "TeciaPacheco" => "Tecia Pacheco",
+            "WallaceKlim" => "Wallace Klim",
+            "Ruto" => "Ruto",
+            "Vaughn" => "Vaughn",
+            "RedWind" => "Red Wind Line",
+            "NorthRock" => "Northrock Service Group",
+            "LingBiotechnology" => "Ling Biotechnology",
+            "MicroTechLogistics" => "microTech Logistics",
+            "CrusaderIndustries" => "Crusader Industries",
+            "HurstonDynamics" => "Hurston Dynamics",
+            "ArcCorp" => "ArcCorp",
+            _ => SplitCamelCase(clean)
+        };
+    }
+
+    private static string FormatFaction(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "Unbekannt";
+        var clean = raw.Trim();
+        return clean switch
+        {
+            "PeopleAlliance" => "People's Alliance",
+            "CitizensForPyrosFuture" => "Citizens for Pyro's Future",
+            "RoughCut" => "Rough Cut",
+            "FireRats" => "Fire Rats",
+            "NineTails" => "Nine Tails",
+            "XenoThreat" => "XenoThreat",
+            "Dusters" => "Dusters",
+            "Overlords" => "Overlords",
+            _ => SplitCamelCase(clean)
+        };
+    }
+
+    private static string SplitCamelCase(string str)
+    {
+        if (string.IsNullOrEmpty(str)) return str;
+        return Regex.Replace(str, @"(\B[A-Z])", " $1").Trim();
+    }
 }
+

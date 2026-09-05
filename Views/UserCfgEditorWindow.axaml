@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SCLogMate.ViewModels"
         xmlns:core="using:SCLogMate.Core"
-        xmlns:conv="using:SCLogMate.Converters"
         x:Class="SCLogMate.Views.UserCfgEditorWindow"
         x:DataType="vm:MainViewModel"
         Title="Star Citizen user.cfg Tuning-Studio &amp; Versions-Archiv — SCLogMate"
@@ -11,15 +10,6 @@
         Background="#050811" Foreground="#E6EDF3"
         Icon="/SCLogMate.ico"
         FontFamily="{Binding CurrentFontFamily}">
-
-  <Window.Resources>
-    <conv:FilterActiveConverter x:Key="FilterBg" />
-    <conv:AmountToBrushConverter x:Key="AmountBrush" />
-    <conv:KindToBrushConverter x:Key="KindBrush" />
-    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
-    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
-    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
-  </Window.Resources>
 
   <DockPanel Margin="14">
 

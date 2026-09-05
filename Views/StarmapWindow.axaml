@@ -12,11 +12,6 @@
 
   <Window.Resources>
     <conv:FilterActiveConverter x:Key="FilterBg" />
-    <conv:AmountToBrushConverter x:Key="AmountBrush" />
-    <conv:KindToBrushConverter x:Key="KindBrush" />
-    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
-    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
-    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
   </Window.Resources>
 
   <DockPanel>

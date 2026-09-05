@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCLogMate.Core;
+using SCLogMate.Core.Ocr;
 using SCLogMate.Models;
 
 namespace SCLogMate.ViewModels;
@@ -192,6 +193,33 @@ public partial class MainViewModel
 
         // 1. Rohdaten aus dem Parser übernehmen
         _rawContracts = _parser.ContractsList.OrderByDescending(c => c.AcceptedAt).ToList();
+
+        // Aktive Aufträge aus ActiveContracts (z. B. via OCR / DB) einbinden, falls noch nicht enthalten
+        foreach (var ac in ActiveContracts)
+        {
+            var normAc = ContractParser.NormalizeTitle(ac.Title);
+            if (!string.IsNullOrEmpty(normAc) && !_rawContracts.Any(c => ContractParser.NormalizeTitle(c.Title).Contains(normAc) || normAc.Contains(ContractParser.NormalizeTitle(c.Title))))
+            {
+                var cat = MissionCatalog.FuzzyLookup(ac.Title);
+                _rawContracts.Insert(0, new ContractRecord
+                {
+                    MissionId = "active_" + normAc,
+                    AcceptedAt = ac.ScannedAt != default ? ac.ScannedAt : DateTime.UtcNow,
+                    Title = ac.Title,
+                    Issuer = !string.IsNullOrEmpty(ac.ContractedBy) && !ac.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase)
+                        ? ac.ContractedBy
+                        : (!string.IsNullOrEmpty(cat?.Contractor) ? cat.Contractor : (!string.IsNullOrEmpty(cat?.Faction) ? cat.Faction : "Unbekannt")),
+                    Type = cat?.MissionType ?? "Auftrag",
+                    Difficulty = "k.A.",
+                    System = cat?.StarSystems ?? (SelectedStarmapSystem ?? "Stanton"),
+                    StepsTotal = 1,
+                    StepsDone = 0,
+                    Reward = ac.Reward,
+                    Outcome = ContractOutcome.InProgress
+                });
+            }
+        }
+
         _rawPurchases = _parser.ConfirmedPurchases.OrderByDescending(p => p.Timestamp).ToList();
         _rawCargoTrades = _parser.CargoTrades.OrderByDescending(t => t.Timestamp).ToList();
         _rawLedgerRecords = _parser.LedgerRecords.OrderBy(l => l.Timestamp).ToList(); // chronologisch für Saldo

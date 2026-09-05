@@ -1,0 +1,187 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SCLogMate.ViewModels"
+        xmlns:core="using:SCLogMate.Core"
+        x:Class="SCLogMate.Views.CloudBackupWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Star Citizen Cloud-Speicher &amp; Log-Archivierung — SCLogMate"
+        Width="900" Height="580" MinWidth="740" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#050811" Foreground="#E6EDF3"
+        Icon="/SCLogMate.ico"
+        FontFamily="{Binding CurrentFontFamily}">
+
+  <DockPanel Margin="14">
+
+    <!-- ══ Sci-Fi Top Header Bar ══ -->
+    <Border DockPanel.Dock="Top" Background="#0A1422" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        
+        <!-- Left: Branding & Subtitle -->
+        <StackPanel Spacing="3" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Border Background="#0C1B2E" BorderBrush="#1C4872" BorderThickness="1" CornerRadius="5" Width="26" Height="26" VerticalAlignment="Center">
+              <Path Data="M 13.5,6.5 C 13.1,4 10.9,2.2 8.3,2.2 C 6.2,2.2 4.4,3.4 3.5,5.1 C 1.5,5.3 0,7 0,9 C 0,11.2 1.8,13 4,13 L 13.5,13 C 15.4,13 17,11.4 17,9.5 C 17,7.8 15.4,6.5 13.5,6.5 Z"
+                    Fill="#38BDF8" Width="14" Height="11" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="CLOUD-SPEICHER &amp; LOG-ARCHIVIERUNG" FontSize="14" FontWeight="Bold" Foreground="#38BDF8" LetterSpacing="0.8" />
+            <Border Background="#061220" BorderBrush="#1A3B60" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="6,0,0,0">
+              <TextBlock Text="OneDrive / Dropbox / Nextcloud" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="Automatische Synchronisation deiner Star Citizen Log-Archive, Steuerungsbelegungen und user.cfg Snapshots."
+                     FontSize="10.5" Foreground="#7E97AD" />
+        </StackPanel>
+
+        <!-- Right: Actions -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                  Command="{Binding OpenCloudFolderCommand}" ToolTip.Tip="Öffnet das konfigurierte Cloud-Verzeichnis im Windows Explorer">
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Path Data="M 13.5,6.5 C 13.1,4 10.9,2.2 8.3,2.2 C 6.2,2.2 4.4,3.4 3.5,5.1 C 1.5,5.3 0,7 0,9 C 0,11.2 1.8,13 4,13 L 13.5,13 C 15.4,13 17,11.4 17,9.5 C 17,7.8 15.4,6.5 13.5,6.5 Z"
+                    Fill="#38BDF8" Width="13" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="Cloud-Ordner" FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- ══ Bottom Status Bar ══ -->
+    <Border DockPanel.Dock="Bottom" Background="#071320" BorderBrush="#162E48" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ToolsStatusMessage, FallbackValue='Bereit. Konfiguriere deinen Cloud-Pfad oder starte eine Sicherung.'}"
+                     Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Text="Replikations-Modus: On-Demand &amp; Auto-Save" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ══ Content ══ -->
+    <StackPanel Spacing="12">
+
+      <!-- Karte 1: Cloud-Stammverzeichnis -->
+      <Border Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="📁" FontSize="12" Foreground="#38BDF8" />
+            <TextBlock Text="CLOUD-STAMMVERZEICHNIS KONFIGURIEREN" Classes="label" Foreground="#38BDF8" />
+          </StackPanel>
+
+          <TextBlock Text="Wähle das Stammverzeichnis deines Cloud-Dienstes (z. B. OneDrive, Dropbox, Nextcloud oder Google Drive Sync). Backups werden dort automatisch in einer sauberen Unterordner-Struktur abgelegt."
+                     FontSize="10.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+
+          <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,4,0,0">
+            <TextBox Grid.Column="0" Text="{Binding ToolsCloudStoragePath}" Height="32" FontSize="11.5"
+                     Watermark="z. B. C:\Users\DeinName\OneDrive\StarCitizen"
+                     Background="#050B14" BorderBrush="#14263B" />
+            
+            <Button Grid.Column="1" Classes="ghost" Height="32" Padding="12,0" Margin="6,0,0,0" CornerRadius="5" Background="#0C1B2E" BorderBrush="#1C4B78" BorderThickness="1"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding BrowseCloudStoragePathCommand}" ToolTip.Tip="Cloud-Ordner über Dateidialog auswählen">
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Path Data="M 1,2 L 6,2 L 8,4 L 15,4 C 15.6,4 16,4.4 16,5 L 16,13 C 16,13.6 15.6,14 15,14 L 1,14 C 0.4,14 0,13.6 0,13 L 0,3 C 0,2.4 0.4,2 1,2 Z"
+                      Fill="#38BDF8" Width="13" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="Durchsuchen..." FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+
+            <Button Grid.Column="2" Classes="ghost" Height="32" Padding="12,0" Margin="4,0,0,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding SaveCloudStoragePathCommand}" ToolTip.Tip="Pfad dauerhaft in den Einstellungen speichern">
+              <TextBlock Text="Speichern" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+
+            <Button Grid.Column="3" Classes="ghost" Height="32" Width="36" Margin="4,0,0,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding OpenCloudFolderCommand}" ToolTip.Tip="Cloud-Ordner im Windows Explorer öffnen">
+              <TextBlock Text="↗" FontSize="12" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Karte 2: Log-Archivierung & Export-Aktionen -->
+      <Border Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="📦" FontSize="12" Foreground="#38BDF8" />
+            <TextBlock Text="LOG-ARCHIVIERUNG &amp; SYNCHRONISATION" Classes="label" Foreground="#38BDF8" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="*,*">
+            
+            <!-- Kachel A: ZIP-Export -->
+            <Border Grid.Column="0" Background="#050B14" BorderBrush="#132338" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,6,0">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Universelles ZIP-Archiv" FontWeight="SemiBold" Foreground="#F0F6FC" FontSize="12" />
+                <TextBlock Text="Komprimiert alle Star Citizen Sessions &amp; Backups in eine einzige handliche .zip-Datei (perfekt für Support, Discord oder Umzug)."
+                           FontSize="10.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+                <Button Classes="ghost" Height="32" Margin="0,4,0,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                        Command="{Binding ExportLogsZipCommand}" ToolTip.Tip="Erstellt ZIP-Datei auf Desktop oder im Cloud-Ordner">
+                  <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="⤓" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center" />
+                    <TextBlock Text="Logs als ZIP packen" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Border>
+
+            <!-- Kachel B: Cloud-Sync -->
+            <Border Grid.Column="1" Background="#050B14" BorderBrush="#132338" BorderThickness="1" CornerRadius="6" Padding="12" Margin="6,0,0,0">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Direkte Cloud-Synchronisation" FontWeight="SemiBold" Foreground="#F0F6FC" FontSize="12" />
+                <TextBlock Text="Kopiert neue Log-Backups aus dem Star Citizen logbackups-Verzeichnis sofort in das konfigurierte Cloud-Stammverzeichnis."
+                           FontSize="10.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+                <Button Classes="ghost" Height="32" Margin="0,4,0,0" CornerRadius="5" Background="#0C1B2E" BorderBrush="#1C4B78" BorderThickness="1"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                        Command="{Binding SyncLogsCloudCommand}" ToolTip.Tip="Synchronisiert Logs jetzt mit der Cloud">
+                  <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Path Data="M 13.5,6.5 C 13.1,4 10.9,2.2 8.3,2.2 C 6.2,2.2 4.4,3.4 3.5,5.1 C 1.5,5.3 0,7 0,9 C 0,11.2 1.8,13 4,13 L 13.5,13 C 15.4,13 17,11.4 17,9.5 C 17,7.8 15.4,6.5 13.5,6.5 Z"
+                          Fill="#38BDF8" Width="13" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                    <TextBlock Text="Jetzt in Cloud sichern" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Border>
+
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Karte 3: Verknüpfte Tresore -->
+      <Border Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Text="WEITERE TRESOR-MODULE" Classes="label" Foreground="#64748B" />
+            <TextBlock Text="Verwalte Tastenbelegungen und Engine-Konfigurationen in ihren spezialisierten Fenstern." FontSize="10.5" Foreground="#7E97AD" />
+          </StackPanel>
+
+          <Button Grid.Column="1" Classes="ghost" Height="30" Padding="12,0" Margin="8,0,0,0" CornerRadius="5" Background="#141026" BorderBrush="#3B256B" BorderThickness="1"
+                  Command="{Binding OpenKeybindPopoutCommand}" ToolTip.Tip="Öffnet den Keybind-Tresor für actionmaps.xml">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="🎮" FontSize="11" />
+              <TextBlock Text="Keybind-Tresor" FontSize="10.5" FontWeight="SemiBold" Foreground="#A78BFA" />
+            </StackPanel>
+          </Button>
+
+          <Button Grid.Column="2" Classes="ghost" Height="30" Padding="12,0" Margin="6,0,0,0" CornerRadius="5" Background="#0C253F" BorderBrush="#1F5A94" BorderThickness="1"
+                  Command="{Binding OpenUserCfgPopoutCommand}" ToolTip.Tip="Öffnet das user.cfg Tuning-Studio">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="⚙️" FontSize="11" />
+              <TextBlock Text="Tuning-Studio" FontSize="10.5" FontWeight="SemiBold" Foreground="#38BDF8" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
+
+    </StackPanel>
+
+  </DockPanel>
+</Window>

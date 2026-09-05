@@ -64,7 +64,7 @@ public class RsMatch
 
     public string DisplayTitle => Resource.Method switch
     {
-        "salvage" => $"{Nodes}x Salvage Panel(s)",
+        "salvage" => Nodes == 1 ? "1x Salvage Panel" : $"{Nodes}x Salvage Panels",
         "fps" or "fps+vehicle" => $"{Nodes}x {Resource.Name} (Hand-Gem)",
         "vehicle" => $"{Nodes}x {Resource.Name} (Fahrzeug-Gem)",
         _ => $"{Nodes}x {Resource.Name}"
@@ -88,13 +88,38 @@ public class RsMatch
         }
     }
 
+    public bool HasRefinery => Resource.Refineries.Count > 0;
+
+    public string BestRefineryCompact => Resource.Refineries.Count > 0
+        ? $"{Resource.Refineries[0].Station.Split(' ')[0]} (+{Resource.Refineries[0].ModifierPct}%)"
+        : "";
+
     public double EstimatedYieldAuec => Resource.EstimatedPricePerScu > 0 
-        ? Resource.EstimatedPricePerScu * Nodes * 32.0 
+        ? (Resource.Method == "salvage" ? Nodes * 25000.0 : Resource.EstimatedPricePerScu)
         : 0;
 
-    public string EstimatedValueText => EstimatedYieldAuec > 0
-        ? $"ca. {EstimatedYieldAuec:N0} aUEC"
-        : "—";
+    public string EstimatedValueText
+    {
+        get
+        {
+            if (Resource.EstimatedPricePerScu <= 0) return "—";
+
+            if (Resource.Method == "salvage")
+            {
+                long panelVal = Nodes * 25000L;
+                return $"ca. {panelVal:N0} aUEC";
+            }
+
+            return $"{Resource.EstimatedPricePerScu:N0} aUEC / SCU";
+        }
+    }
+
+    public string CompactValueText => Resource.Method == "salvage"
+        ? $"ca. {Nodes * 25000:N0} aUEC"
+        : $"{Resource.EstimatedPricePerScu:N0} aUEC/SCU";
 
     public string BadgeColor => Resource.TierColor;
+    public bool IsTargetMatch { get; set; }
+    public string TargetAlertBorder => IsTargetMatch ? "#F59E0B" : "#0284C7";
+    public string TargetAlertTitleColor => IsTargetMatch ? "#FBBF24" : "#38BDF8";
 }

@@ -16,16 +16,17 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 10; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 25; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 11; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 27; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
     static string DbPath => Path.Combine(Settings.Dir, "sessions.db");
 
-    static string Conn => $"Data Source={DbPath}";
+    static string Conn => $"Data Source={DbPath};Default Timeout=60;";
 
     private static readonly object _initLock = new();
+    private static readonly object _writeLock = new();
     private static bool _isInitialized;
 
     public static void EnsureInitialized()
@@ -41,20 +42,23 @@ public static class Database
 
     public static void Init()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(DbPath)!);
-        using var db = new SqliteConnection(Conn);
-        db.Open();
+        lock (_writeLock)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DbPath)!);
+            using var db = new SqliteConnection(Conn);
+            db.Open();
 
-        Exec(db, @"PRAGMA journal_mode = WAL;
-                   PRAGMA synchronous = NORMAL;
-                   PRAGMA busy_timeout = 5000;");
+            Exec(db, @"PRAGMA journal_mode = WAL;
+                       PRAGMA synchronous = NORMAL;
+                       PRAGMA busy_timeout = 60000;");
 
-        // 1. Schema-Migrationen anwenden (PRAGMA user_version)
-        ApplySchemaMigrations(db);
+            // 1. Schema-Migrationen anwenden (PRAGMA user_version)
+            ApplySchemaMigrations(db);
 
-        // 2. Parser-Version prüfen -> bei Änderung Cache leeren & neu indexieren
-        CheckParserVersion(db);
-        _isInitialized = true;
+            // 2. Parser-Version prüfen -> bei Änderung Cache leeren & neu indexieren
+            CheckParserVersion(db);
+            _isInitialized = true;
+        }
     }
 
     /// <summary>
@@ -210,6 +214,18 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v10 (Bereinigung von Spawns/Logins aus Locations) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 11)
+        {
+            Exec(db, @"
+                UPDATE contracts 
+                SET contracted_by = '' 
+                WHERE contracted_by = 'mobiGlas' OR contracted_by LIKE '%mobiGlas%';
+            ");
+            Exec(db, "PRAGMA user_version = 11;");
+            dbSchemaVersion = 11;
+            Logger.Log("DB Schema: Migration auf v11 (Bereinigung von 'mobiGlas' als Auftraggeber in contracts) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -261,61 +277,166 @@ public static class Database
     /// <summary>Parst und speichert alle Logs, die noch nicht in der DB sind. Liefert Anzahl neuer.</summary>
     public static int IndexNew(IEnumerable<string> logFiles, Action<int, int, string>? onProgress = null)
     {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-
-        Exec(db, @"PRAGMA synchronous = OFF;
-                   PRAGMA journal_mode = WAL;
-                   PRAGMA cache_size = -64000;
-                   PRAGMA temp_store = MEMORY;");
-
-        int added = 0;
-        var filesList = logFiles
-            .GroupBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
-
-        // 1. Zuerst exakt ermitteln, welche Logs noch fehlen
-        var pending = new List<(string file, string name, string fingerprint)>();
-        foreach (var file in filesList)
+        lock (_writeLock)
         {
-            var name = Path.GetFileName(file);
-            var fingerprint = GetFileFingerprint(file);
-            if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n AND fingerprint=$f LIMIT 1;", ("$n", name), ("$f", fingerprint)) == null)
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+
+            Exec(db, @"PRAGMA synchronous = OFF;
+                       PRAGMA journal_mode = WAL;
+                       PRAGMA cache_size = -64000;
+                       PRAGMA temp_store = MEMORY;
+                       PRAGMA busy_timeout = 60000;");
+
+            int added = 0;
+            var filesList = logFiles
+                .GroupBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            // 1. Zuerst exakt ermitteln, welche Logs noch fehlen
+            var pending = new List<(string file, string name, string fingerprint)>();
+            foreach (var file in filesList)
             {
-                pending.Add((file, name, fingerprint));
-            }
-        }
-
-        int total = pending.Count;
-        if (total == 0)
-        {
-            Exec(db, "PRAGMA synchronous = NORMAL;");
-            return 0;
-        }
-
-        // 2. Nur die tatsächlich fehlenden Logs indexieren
-        for (int i = 0; i < total; i++)
-        {
-            var (file, name, fingerprint) = pending[i];
-            onProgress?.Invoke(i + 1, total, name);
-
-            try
-            {
-                var parser = new LogParser();
-                DateTime? first = null, last = null;
-                using var tx = db.BeginTransaction();
-
-                using (var del = db.CreateCommand())
+                var name = Path.GetFileName(file);
+                var fingerprint = GetFileFingerprint(file);
+                if (Scalar(db, "SELECT 1 FROM sessions WHERE name=$n AND fingerprint=$f LIMIT 1;", ("$n", name), ("$f", fingerprint)) == null)
                 {
-                    del.Transaction = tx;
-                    del.CommandText = "DELETE FROM events WHERE session=$n; DELETE FROM sessions WHERE name=$n;";
-                    del.Parameters.AddWithValue("$n", name);
-                    del.ExecuteNonQuery();
+                    pending.Add((file, name, fingerprint));
                 }
+            }
 
-                using (var cmd = db.CreateCommand())
+            int total = pending.Count;
+            if (total == 0)
+            {
+                Exec(db, "PRAGMA synchronous = NORMAL;");
+                return 0;
+            }
+
+            // 2. Nur die tatsächlich fehlenden Logs indexieren
+            for (int i = 0; i < total; i++)
+            {
+                var (file, name, fingerprint) = pending[i];
+                onProgress?.Invoke(i + 1, total, name);
+
+                try
                 {
+                    var parser = new LogParser();
+                    DateTime? first = null, last = null;
+                    using var tx = db.BeginTransaction();
+
+                    using (var del = db.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = "DELETE FROM events WHERE session=$n; DELETE FROM sessions WHERE name=$n;";
+                        del.Parameters.AddWithValue("$n", name);
+                        del.ExecuteNonQuery();
+                    }
+
+                    using (var cmd = db.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
+                        var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
+                        var pt = cmd.Parameters.Add("$t", SqliteType.Text);
+                        var pk = cmd.Parameters.Add("$k", SqliteType.Text);
+                        var pa = cmd.Parameters.Add("$a", SqliteType.Integer);
+                        var pd = cmd.Parameters.Add("$d", SqliteType.Text);
+                        var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
+
+                        foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
+                        {
+                            var e = parser.Feed(line);
+                            if (e == null) continue;
+                            if (first == null || e.Time < first) first = e.Time;
+                            if (last == null || e.Time > last) last = e.Time;
+                            pt.Value = e.Time.ToString("o", CultureInfo.InvariantCulture);
+                            pk.Value = e.Kind.ToString();
+                            pa.Value = e.Amount;
+                            pd.Value = e.Detail ?? "";
+                            psh.Value = (object?)e.Ship ?? DBNull.Value;
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    using (var s = db.CreateCommand())
+                    {
+                        s.Transaction = tx;
+                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
+                        s.Parameters.AddWithValue("$n", name);
+                        s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$f", fingerprint);
+                        s.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                    added++;
+                }
+                catch (Exception ex) { Logger.Error("Index " + name, ex); }
+            }
+
+            Exec(db, @"PRAGMA synchronous = NORMAL;
+                       PRAGMA wal_checkpoint(PASSIVE);");
+            return added;
+        }
+    }
+
+    /// <summary>Leert die Datenbank vollständig (Events + Sessions).</summary>
+    public static void ClearAll()
+    {
+        lock (_writeLock)
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            Exec(db, "DELETE FROM events; DELETE FROM sessions;");
+            Exec(db, "PRAGMA wal_checkpoint(PASSIVE);");
+            Logger.Log("DB: Alle Events und Sessions vollständig zurückgesetzt.");
+        }
+    }
+
+    /// <summary>Führt eine vollständige Neu-Indexierung aller Logs durch (Re-Scan).</summary>
+    public static (int indexedSessions, int totalEvents) RescanAll(IEnumerable<string> logFiles, Action<int, int, string>? onProgress = null)
+    {
+        lock (_writeLock)
+        {
+            ClearAll();
+            var files = logFiles
+                .GroupBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+            int totalFiles = files.Count;
+            int sessionCount = 0;
+            int eventCount = 0;
+
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+
+            // High-Speed Konfiguration für Bulk-Import
+            Exec(db, @"PRAGMA synchronous = OFF;
+                       PRAGMA journal_mode = WAL;
+                       PRAGMA cache_size = -64000;
+                       PRAGMA temp_store = MEMORY;
+                       PRAGMA busy_timeout = 60000;");
+
+            // Alle Indizes temporär entfernen für maximale sequentielle Schreibgeschwindigkeit
+            Exec(db, @"DROP INDEX IF EXISTS ix_events_session;
+                       DROP INDEX IF EXISTS ix_events_kind;
+                       DROP INDEX IF EXISTS ix_events_time;
+                       DROP INDEX IF EXISTS ix_events_session_kind;
+                       DROP INDEX IF EXISTS ix_events_kind_time;");
+
+            for (int i = 0; i < totalFiles; i++)
+            {
+                var file = files[i];
+                var name = Path.GetFileName(file);
+                onProgress?.Invoke(i + 1, totalFiles, name);
+
+                try
+                {
+                    var parser = new LogParser();
+                    DateTime? first = null, last = null;
+                    using var tx = db.BeginTransaction();
+                    using var cmd = db.CreateCommand();
                     cmd.Transaction = tx;
                     cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
                     var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
@@ -325,6 +446,7 @@ public static class Database
                     var pd = cmd.Parameters.Add("$d", SqliteType.Text);
                     var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
 
+                    int sessionEvents = 0;
                     foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
                     {
                         var e = parser.Feed(line);
@@ -337,169 +459,81 @@ public static class Database
                         pd.Value = e.Detail ?? "";
                         psh.Value = (object?)e.Ship ?? DBNull.Value;
                         cmd.ExecuteNonQuery();
+                        sessionEvents++;
                     }
-                }
 
-                using (var s = db.CreateCommand())
-                {
-                    s.Transaction = tx;
-                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
-                    s.Parameters.AddWithValue("$n", name);
-                    s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                    s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                    s.Parameters.AddWithValue("$f", fingerprint);
-                    s.ExecuteNonQuery();
+                    using (var s = db.CreateCommand())
+                    {
+                        s.Transaction = tx;
+                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
+                        s.Parameters.AddWithValue("$n", name);
+                        s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
+                        s.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                    sessionCount++;
+                    eventCount += sessionEvents;
                 }
-                tx.Commit();
-                added++;
+                catch (Exception ex)
+                {
+                    Logger.Error("Rescan " + name, ex);
+                }
             }
-            catch (Exception ex) { Logger.Error("Index " + name, ex); }
+
+            // Indizes neu aufbauen & Normalzustand wiederherstellen
+            Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                       CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                       CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
+                       CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
+                       CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
+                       PRAGMA synchronous = NORMAL;
+                       PRAGMA wal_checkpoint(PASSIVE);");
+
+            Logger.Log($"DB: Re-Scan beendet: {sessionCount} Sessions, {eventCount} Events.");
+            return (sessionCount, eventCount);
         }
-
-        Exec(db, @"PRAGMA synchronous = NORMAL;
-                   PRAGMA wal_checkpoint(PASSIVE);");
-        return added;
-    }
-
-    /// <summary>Leert die Datenbank vollständig (Events + Sessions) und komprimiert per VACUUM.</summary>
-    public static void ClearAll()
-    {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        Exec(db, "DELETE FROM events; DELETE FROM sessions;");
-        Exec(db, "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
-        Logger.Log("DB: Alle Events und Sessions vollständig zurückgesetzt.");
-    }
-
-    /// <summary>Führt eine vollständige Neu-Indexierung aller Logs durch (Re-Scan).</summary>
-    public static (int indexedSessions, int totalEvents) RescanAll(IEnumerable<string> logFiles, Action<int, int, string>? onProgress = null)
-    {
-        ClearAll();
-        var files = logFiles
-            .GroupBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
-        int totalFiles = files.Count;
-        int sessionCount = 0;
-        int eventCount = 0;
-
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-
-        // High-Speed Konfiguration für Bulk-Import
-        Exec(db, @"PRAGMA synchronous = OFF;
-                   PRAGMA journal_mode = WAL;
-                   PRAGMA cache_size = -64000;
-                   PRAGMA temp_store = MEMORY;");
-
-        // Indizes temporär entfernen für maximale sequentielle Schreibgeschwindigkeit
-        Exec(db, @"DROP INDEX IF EXISTS ix_events_session;
-                   DROP INDEX IF EXISTS ix_events_kind;
-                   DROP INDEX IF EXISTS ix_events_time;");
-
-        for (int i = 0; i < totalFiles; i++)
-        {
-            var file = files[i];
-            var name = Path.GetFileName(file);
-            onProgress?.Invoke(i + 1, totalFiles, name);
-
-            try
-            {
-                var parser = new LogParser();
-                DateTime? first = null, last = null;
-                using var tx = db.BeginTransaction();
-                using var cmd = db.CreateCommand();
-                cmd.Transaction = tx;
-                cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
-                var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
-                var pt = cmd.Parameters.Add("$t", SqliteType.Text);
-                var pk = cmd.Parameters.Add("$k", SqliteType.Text);
-                var pa = cmd.Parameters.Add("$a", SqliteType.Integer);
-                var pd = cmd.Parameters.Add("$d", SqliteType.Text);
-                var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
-
-                int sessionEvents = 0;
-                foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
-                {
-                    var e = parser.Feed(line);
-                    if (e == null) continue;
-                    if (first == null || e.Time < first) first = e.Time;
-                    if (last == null || e.Time > last) last = e.Time;
-                    pt.Value = e.Time.ToString("o", CultureInfo.InvariantCulture);
-                    pk.Value = e.Kind.ToString();
-                    pa.Value = e.Amount;
-                    pd.Value = e.Detail ?? "";
-                    psh.Value = (object?)e.Ship ?? DBNull.Value;
-                    cmd.ExecuteNonQuery();
-                    sessionEvents++;
-                }
-
-                using (var s = db.CreateCommand())
-                {
-                    s.Transaction = tx;
-                    s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
-                    s.Parameters.AddWithValue("$n", name);
-                    s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                    s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                    s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
-                    s.ExecuteNonQuery();
-                }
-                tx.Commit();
-                sessionCount++;
-                eventCount += sessionEvents;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Rescan " + name, ex);
-            }
-        }
-
-        // Indizes neu aufbauen & Normalzustand wiederherstellen
-        Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
-                   CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
-                   CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
-                   PRAGMA synchronous = NORMAL;
-                   PRAGMA wal_checkpoint(PASSIVE);");
-
-        Logger.Log($"DB: Re-Scan beendet: {sessionCount} Sessions, {eventCount} Events.");
-        return (sessionCount, eventCount);
     }
 
     /// <summary>Bereinigt verwaiste Einträge, optimiert Indizes und führt VACUUM aus.</summary>
     public static (int cleanedEvents, int cleanedSessions, long sizeBefore, long sizeAfter) Cleanup()
     {
-        long sizeBefore = GetDatabaseSizeBytes();
-        int cleanedEvents = 0;
-        int cleanedSessions = 0;
-
-        using (var db = new SqliteConnection(Conn))
+        lock (_writeLock)
         {
-            db.Open();
-            using (var tx = db.BeginTransaction())
+            long sizeBefore = GetDatabaseSizeBytes();
+            int cleanedEvents = 0;
+            int cleanedSessions = 0;
+
+            using (var db = new SqliteConnection(Conn))
             {
-                // Ungültige/leere Datensätze entfernen
-                using var c1 = db.CreateCommand();
-                c1.Transaction = tx;
-                c1.CommandText = "DELETE FROM events WHERE time IS NULL OR kind IS NULL OR trim(time) = ''";
-                cleanedEvents += c1.ExecuteNonQuery();
+                db.Open();
+                using (var tx = db.BeginTransaction())
+                {
+                    // Ungültige/leere Datensätze entfernen
+                    using var c1 = db.CreateCommand();
+                    c1.Transaction = tx;
+                    c1.CommandText = "DELETE FROM events WHERE time IS NULL OR kind IS NULL OR trim(time) = ''";
+                    cleanedEvents += c1.ExecuteNonQuery();
 
-                // Verwaiste Sessions ohne Events entfernen
-                using var c2 = db.CreateCommand();
-                c2.Transaction = tx;
-                c2.CommandText = "DELETE FROM sessions WHERE name NOT IN (SELECT DISTINCT session FROM events WHERE session IS NOT NULL)";
-                cleanedSessions += c2.ExecuteNonQuery();
+                    // Verwaiste Sessions ohne Events entfernen
+                    using var c2 = db.CreateCommand();
+                    c2.Transaction = tx;
+                    c2.CommandText = "DELETE FROM sessions WHERE name NOT IN (SELECT DISTINCT session FROM events WHERE session IS NOT NULL)";
+                    cleanedSessions += c2.ExecuteNonQuery();
 
-                tx.Commit();
+                    tx.Commit();
+                }
+
+                Exec(db, "PRAGMA optimize;");
+                Exec(db, "PRAGMA wal_checkpoint(TRUNCATE);");
+                Exec(db, "VACUUM;");
             }
 
-            Exec(db, "PRAGMA optimize;");
-            Exec(db, "PRAGMA wal_checkpoint(TRUNCATE);");
-            Exec(db, "VACUUM;");
+            long sizeAfter = GetDatabaseSizeBytes();
+            Logger.Log($"DB: Cleanup abgeschlossen. Vorher: {FormatBytes(sizeBefore)}, Nachher: {FormatBytes(sizeAfter)}.");
+            return (cleanedEvents, cleanedSessions, sizeBefore, sizeAfter);
         }
-
-        long sizeAfter = GetDatabaseSizeBytes();
-        Logger.Log($"DB: Cleanup abgeschlossen. Vorher: {FormatBytes(sizeBefore)}, Nachher: {FormatBytes(sizeAfter)}.");
-        return (cleanedEvents, cleanedSessions, sizeBefore, sizeAfter);
     }
 
     public static long GetDatabaseSizeBytes()
@@ -546,6 +580,33 @@ public static class Database
                 Ship = r.IsDBNull(4) ? null : r.GetString(4)
             };
         }
+    }
+
+    /// <summary>Liefert die neuesten gespeicherten Events (neueste zuerst, bis maxEntries), chronologisch sortiert.</summary>
+    public static List<LogEntry> LoadRecentEvents(int maxEntries = 15000)
+    {
+        var list = new List<LogEntry>(Math.Min(maxEntries, 2000));
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = $"SELECT time,kind,amount,detail,ship FROM events ORDER BY time DESC LIMIT {maxEntries}";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        list.Reverse(); // In chronologische Reihenfolge bringen
+        return list;
     }
 
     /// <summary>Alle Fracht-Verkäufe (Kind=Trade) für die „Handel je Ware"-Übersicht.</summary>
@@ -596,13 +657,6 @@ public static class Database
             list.Add(new LogEntry { Time = t, Kind = EventKind.Blueprint, Detail = detail });
         }
         return list;
-    }
-
-    public static int SessionCount()
-    {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        return Convert.ToInt32(Scalar(db, "SELECT COUNT(*) FROM sessions") ?? 0);
     }
 
     public class Agg
@@ -969,31 +1023,11 @@ public static class Database
         return list;
     }
 
-    /// <summary>Neueste N Events (für die Tabelle), chronologisch.</summary>
-    public static List<LogEntry> RecentEvents(int n)
-    {
-        var list = new List<LogEntry>();
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var c = db.CreateCommand();
-        c.CommandText = "SELECT time,kind,amount,detail,ship FROM events ORDER BY time DESC LIMIT $n";
-        c.Parameters.AddWithValue("$n", n);
-        using var r = c.ExecuteReader();
-        while (r.Read())
-        {
-            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
-            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
-            list.Add(new LogEntry { Time = t, Kind = kind, Amount = r.GetInt64(2), Detail = r.IsDBNull(3) ? "" : r.GetString(3), Ship = r.IsDBNull(4) ? null : r.GetString(4) });
-        }
-        list.Reverse();
-        return list;
-    }
-
     // ---- Helfer ----
     static IEnumerable<string> ReadShared(string file)
     {
-        using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        using var sr = new StreamReader(fs);
+        using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 65536);
+        using var sr = new StreamReader(fs, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 65536);
         string? l;
         while ((l = sr.ReadLine()) != null) yield return l;
     }
@@ -1032,21 +1066,43 @@ public static class Database
         c.ExecuteNonQuery();
     }
 
-    public static void SaveContract(Models.ContractDetails contract)
+    public static string? GetMeta(string key)
     {
         EnsureInitialized();
         using var db = new SqliteConnection(Conn);
         db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = @"
-            INSERT OR REPLACE INTO contracts (id, title, reward, contracted_by, scanned_at, status)
-            VALUES ($id, $title, $reward, $org, $time, 'Active');";
-        cmd.Parameters.AddWithValue("$id", $"{contract.Title.Trim()}:{contract.Reward}");
-        cmd.Parameters.AddWithValue("$title", contract.Title);
-        cmd.Parameters.AddWithValue("$reward", contract.Reward);
-        cmd.Parameters.AddWithValue("$org", contract.ContractedBy ?? "");
-        cmd.Parameters.AddWithValue("$time", contract.ScannedAt.ToString("o"));
-        cmd.ExecuteNonQuery();
+        return GetMeta(db, key);
+    }
+
+    public static void SetMeta(string key, string value)
+    {
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            SetMeta(db, key, value);
+        }
+    }
+
+    public static void SaveContract(Models.ContractDetails contract)
+    {
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT OR REPLACE INTO contracts (id, title, reward, contracted_by, scanned_at, status)
+                VALUES ($id, $title, $reward, $org, $time, 'Active');";
+            cmd.Parameters.AddWithValue("$id", $"{contract.Title.Trim()}:{contract.Reward}");
+            cmd.Parameters.AddWithValue("$title", contract.Title);
+            cmd.Parameters.AddWithValue("$reward", contract.Reward);
+            cmd.Parameters.AddWithValue("$org", contract.ContractedBy ?? "");
+            cmd.Parameters.AddWithValue("$time", contract.ScannedAt.ToString("o"));
+            cmd.ExecuteNonQuery();
+        }
     }
 
     public static List<Models.ContractDetails> GetActiveContracts()
@@ -1074,24 +1130,30 @@ public static class Database
 
     public static void ClearActiveContracts()
     {
-        EnsureInitialized();
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = "DELETE FROM contracts;";
-        cmd.ExecuteNonQuery();
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM contracts;";
+            cmd.ExecuteNonQuery();
+        }
     }
 
     public static void RemoveContract(string title, int reward)
     {
-        EnsureInitialized();
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = "DELETE FROM contracts WHERE title=$t OR (reward=$r AND $r > 0 AND instr(lower($t), lower(title)) > 0) OR instr(lower(title), lower($t)) > 0;";
-        cmd.Parameters.AddWithValue("$t", title);
-        cmd.Parameters.AddWithValue("$r", reward);
-        cmd.ExecuteNonQuery();
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM contracts WHERE title=$t OR (reward=$r AND $r > 0 AND instr(lower($t), lower(title)) > 0) OR instr(lower(title), lower($t)) > 0;";
+            cmd.Parameters.AddWithValue("$t", title);
+            cmd.Parameters.AddWithValue("$r", reward);
+            cmd.ExecuteNonQuery();
+        }
     }
 
     public static List<UserPoi> GetUserPois(string? system = null)
@@ -1131,52 +1193,58 @@ public static class Database
 
     public static int SaveUserPoi(UserPoi poi)
     {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        if (poi.Id > 0)
+        lock (_writeLock)
         {
-            cmd.CommandText = @"
-                UPDATE user_pois SET system=$sys, body=$body, name=$name, notes=$notes, category=$cat, color=$col
-                WHERE id=$id;";
-            cmd.Parameters.AddWithValue("$id", poi.Id);
-        }
-        else
-        {
-            cmd.CommandText = @"
-                INSERT INTO user_pois (system, body, name, notes, category, color, created_at)
-                VALUES ($sys, $body, $name, $notes, $cat, $col, $created);
-                SELECT last_insert_rowid();";
-            cmd.Parameters.AddWithValue("$created", poi.CreatedAt.ToString("o"));
-        }
-        cmd.Parameters.AddWithValue("$sys", poi.System);
-        cmd.Parameters.AddWithValue("$body", poi.Body);
-        cmd.Parameters.AddWithValue("$name", poi.Name);
-        cmd.Parameters.AddWithValue("$notes", poi.Notes);
-        cmd.Parameters.AddWithValue("$cat", poi.Category);
-        cmd.Parameters.AddWithValue("$col", poi.Color);
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            if (poi.Id > 0)
+            {
+                cmd.CommandText = @"
+                    UPDATE user_pois SET system=$sys, body=$body, name=$name, notes=$notes, category=$cat, color=$col
+                    WHERE id=$id;";
+                cmd.Parameters.AddWithValue("$id", poi.Id);
+            }
+            else
+            {
+                cmd.CommandText = @"
+                    INSERT INTO user_pois (system, body, name, notes, category, color, created_at)
+                    VALUES ($sys, $body, $name, $notes, $cat, $col, $created);
+                    SELECT last_insert_rowid();";
+                cmd.Parameters.AddWithValue("$created", poi.CreatedAt.ToString("o"));
+            }
+            cmd.Parameters.AddWithValue("$sys", poi.System);
+            cmd.Parameters.AddWithValue("$body", poi.Body);
+            cmd.Parameters.AddWithValue("$name", poi.Name);
+            cmd.Parameters.AddWithValue("$notes", poi.Notes);
+            cmd.Parameters.AddWithValue("$cat", poi.Category);
+            cmd.Parameters.AddWithValue("$col", poi.Color);
 
-        if (poi.Id > 0)
-        {
-            cmd.ExecuteNonQuery();
-            return poi.Id;
-        }
-        else
-        {
-            var newId = Convert.ToInt32(cmd.ExecuteScalar());
-            poi.Id = newId;
-            return newId;
+            if (poi.Id > 0)
+            {
+                cmd.ExecuteNonQuery();
+                return poi.Id;
+            }
+            else
+            {
+                var newId = Convert.ToInt32(cmd.ExecuteScalar());
+                poi.Id = newId;
+                return newId;
+            }
         }
     }
 
     public static void DeleteUserPoi(int id)
     {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = "DELETE FROM user_pois WHERE id=$id;";
-        cmd.Parameters.AddWithValue("$id", id);
-        cmd.ExecuteNonQuery();
+        lock (_writeLock)
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM user_pois WHERE id=$id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
     }
 
     #region Faction Reputation Tracking
@@ -1205,30 +1273,37 @@ public static class Database
     public static void AddFactionReputationXp(string factionId, int xpDelta, DateTime time)
     {
         if (string.IsNullOrWhiteSpace(factionId) || xpDelta <= 0) return;
-        EnsureInitialized();
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = @"
-            INSERT INTO reputation (faction_id, xp, completed_missions, last_updated)
-            VALUES ($fid, $xp, 1, $last)
-            ON CONFLICT(faction_id) DO UPDATE SET
-                xp = xp + $xp,
-                completed_missions = completed_missions + 1,
-                last_updated = $last;";
-        cmd.Parameters.AddWithValue("$fid", factionId);
-        cmd.Parameters.AddWithValue("$xp", xpDelta);
-        cmd.Parameters.AddWithValue("$last", time.ToString("o"));
-        cmd.ExecuteNonQuery();
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO reputation (faction_id, xp, completed_missions, last_updated)
+                VALUES ($fid, $xp, 1, $last)
+                ON CONFLICT(faction_id) DO UPDATE SET
+                    xp = xp + $xp,
+                    completed_missions = completed_missions + 1,
+                    last_updated = $last;";
+            cmd.Parameters.AddWithValue("$fid", factionId);
+            cmd.Parameters.AddWithValue("$xp", xpDelta);
+            cmd.Parameters.AddWithValue("$last", time.ToString("o"));
+            cmd.ExecuteNonQuery();
+        }
     }
 
     public static void ResetFactionReputations()
     {
-        using var db = new SqliteConnection(Conn);
-        db.Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = "DELETE FROM reputation;";
-        cmd.ExecuteNonQuery();
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM reputation;";
+            cmd.ExecuteNonQuery();
+        }
     }
 
     #endregion
@@ -1270,34 +1345,37 @@ public static class Database
     public static void SaveFleetShipCustomData(string name, bool inHangar, bool isPledge, int pledgeUsd, string insurance, string acquisition, string notes)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
-        EnsureInitialized();
-        try
+        lock (_writeLock)
         {
-            using var db = new SqliteConnection(Conn);
-            db.Open();
-            using var cmd = db.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO fleet_user_ships(name, in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes)
-                VALUES($n, $ih, $p, $u, $i, $a, $nt)
-                ON CONFLICT(name) DO UPDATE SET
-                    in_hangar = excluded.in_hangar,
-                    is_pledge = excluded.is_pledge,
-                    pledge_usd = excluded.pledge_usd,
-                    insurance = excluded.insurance,
-                    acquisition = excluded.acquisition,
-                    notes = excluded.notes;";
-            cmd.Parameters.AddWithValue("$n", name);
-            cmd.Parameters.AddWithValue("$ih", inHangar ? 1 : 0);
-            cmd.Parameters.AddWithValue("$p", isPledge ? 1 : 0);
-            cmd.Parameters.AddWithValue("$u", pledgeUsd);
-            cmd.Parameters.AddWithValue("$i", insurance);
-            cmd.Parameters.AddWithValue("$a", acquisition);
-            cmd.Parameters.AddWithValue("$nt", notes);
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("SaveFleetShipCustomData", ex);
+            EnsureInitialized();
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO fleet_user_ships(name, in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes)
+                    VALUES($n, $ih, $p, $u, $i, $a, $nt)
+                    ON CONFLICT(name) DO UPDATE SET
+                        in_hangar = excluded.in_hangar,
+                        is_pledge = excluded.is_pledge,
+                        pledge_usd = excluded.pledge_usd,
+                        insurance = excluded.insurance,
+                        acquisition = excluded.acquisition,
+                        notes = excluded.notes;";
+                cmd.Parameters.AddWithValue("$n", name);
+                cmd.Parameters.AddWithValue("$ih", inHangar ? 1 : 0);
+                cmd.Parameters.AddWithValue("$p", isPledge ? 1 : 0);
+                cmd.Parameters.AddWithValue("$u", pledgeUsd);
+                cmd.Parameters.AddWithValue("$i", insurance);
+                cmd.Parameters.AddWithValue("$a", acquisition);
+                cmd.Parameters.AddWithValue("$nt", notes);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SaveFleetShipCustomData", ex);
+            }
         }
     }
 

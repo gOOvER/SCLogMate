@@ -155,10 +155,12 @@ public static class ScreenCapture
     public static ScanRegion GetDefaultRsRegion()
     {
         var (sw, sh) = GetPrimaryScreenSize();
-        int w = Math.Min(960, (int)(sw * 0.48));
-        int h = Math.Min(560, (int)(sh * 0.45));
+        // Fokussierter Bereich um das Fadenkreuz/Scanner-Retikel (ca. 480x160 px),
+        // verhindert das Erfassen irrelevanter HUD-Meldungen wie "TOO CLOSE" oder "ASTEROID PREVIOUSLY IDENTIFIED"
+        int w = Math.Min(480, (int)(sw * 0.25));
+        int h = Math.Min(160, (int)(sh * 0.14));
         int x = (sw - w) / 2;
-        int y = (int)(sh * 0.25);
+        int y = (int)(sh * 0.43);
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }
 }

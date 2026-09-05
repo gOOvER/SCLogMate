@@ -73,7 +73,11 @@ public partial class MainViewModel
     public string ToolsCrashDumpsStatusText => ToolsCrashDumpsMb > 0 ? $"{ToolsCrashDumpsMb:F1} MB belegt" : "0 MB (Sauber)";
     public string ToolsCrashDumpsStatusColor => ToolsCrashDumpsMb > 0 ? "#F87171" : "#4ADE80";
 
+    [ObservableProperty] private int _toolsSubTabIndex;
+
     private Views.UserCfgEditorWindow? _userCfgWindow;
+    private Views.KeybindBackupWindow? _keybindWindow;
+    private Views.CloudBackupWindow? _cloudBackupWindow;
 
     partial void OnToolsShaderCacheMbChanged(double value)
     {
@@ -508,6 +512,34 @@ public partial class MainViewModel
         _userCfgWindow = new Views.UserCfgEditorWindow(this);
         _userCfgWindow.Closed += (_, _) => _userCfgWindow = null;
         _userCfgWindow.Show();
+    }
+
+    [RelayCommand]
+    public void OpenKeybindPopout()
+    {
+        if (_keybindWindow != null && _keybindWindow.IsVisible)
+        {
+            _keybindWindow.Activate();
+            return;
+        }
+
+        _keybindWindow = new Views.KeybindBackupWindow(this);
+        _keybindWindow.Closed += (_, _) => _keybindWindow = null;
+        _keybindWindow.Show();
+    }
+
+    [RelayCommand]
+    public void OpenCloudPopout()
+    {
+        if (_cloudBackupWindow != null && _cloudBackupWindow.IsVisible)
+        {
+            _cloudBackupWindow.Activate();
+            return;
+        }
+
+        _cloudBackupWindow = new Views.CloudBackupWindow(this);
+        _cloudBackupWindow.Closed += (_, _) => _cloudBackupWindow = null;
+        _cloudBackupWindow.Show();
     }
 
     [RelayCommand]

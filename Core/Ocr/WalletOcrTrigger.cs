@@ -12,12 +12,16 @@ public static partial class WalletOcrTrigger
     public const long MaxPlausibleBalance = 99_999_999_999;
     public const long MinPlausibleBalance = 0;
 
-    // Unterstützt alle Tausendertrennzeichen (Komma, Punkt, Leerzeichen wie "2 463 039", "12.714.118", "2,463,039" oder "2463039")
-    [GeneratedRegex(@"(?:\b|(?<=\s|[^\w.]))(?>[0-9]{1,3}(?:[.,\s][0-9]{3})+|[0-9]{3,11})(?:\b|(?=\s|[^\w.]))")]
-    private static partial Regex StrictBalanceRegex();
+    // Atomare Gruppe: bricht komplett ab, wenn Ziffern von Buchstaben oder Quotes berührt werden (PL4Y3R, 5,101.94B, 2.349.æ).
+    // Kein Backtracking in Teilzahlen!
+    [GeneratedRegex(@"(?<![\p{L}0-9""'])(?>[0-9][0-9.,]*)(?![\p{L}0-9""'])")]
+    private static partial Regex CandidateNumberRegex();
 
-    [GeneratedRegex(@"[0-9]{3,12}")]
-    private static partial Regex FallbackDigitsRegex();
+    [GeneratedRegex(@"\b\d{1,2}:\d{2}(?::\d{2})?\b")]
+    private static partial Regex ClockRegex();
+
+    [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥]")]
+    private static partial Regex CurrencyLabelRegex();
 
     /// <summary>Prüft, ob die Logzeile das Öffnen des mobiGlas oder Inventorys signalisiert.</summary>
     public static bool IsMobiGlasOpenSignal(string raw)
@@ -42,9 +46,7 @@ public static partial class WalletOcrTrigger
         var va = a is null ? null : ExtractBalance(a);
         var vb = b is null ? null : ExtractBalance(b);
 
-        // Beide Passes lesen divergierende Werte → Misread erkannt, verwerfen
-        if (va is not null && vb is not null && va != vb) return null;
-
+        if (va is not null && vb is not null) return va == vb ? a : null;
         if (va is not null) return a;
         if (vb is not null) return b;
         return null;
@@ -55,55 +57,76 @@ public static partial class WalletOcrTrigger
     {
         if (string.IsNullOrWhiteSpace(ocrText)) return null;
 
-        // Vorverarbeitung: Trennt Buchstaben/Präfixe sauber von Ziffern (z.B. "aUEC12.714.118" -> "aUEC 12.714.118")
-        var normalized = ocrText;
-        normalized = Regex.Replace(normalized, @"([a-zA-Z\u00A4\u00A7\u00A9\u00AE\$€£¥])([0-9])", "$1 $2");
-        normalized = Regex.Replace(normalized, @"([0-9])([a-zA-Z\u00A4\u00A7\u00A9\u00AE\$€£¥])", "$1 $2");
-        // Ersetzt führende OCR-Artefakte wie '|' vor Zahlen
-        normalized = Regex.Replace(normalized, @"[\|\/\(\)\[\]\{\}]", " ");
+        // 1. Uhrzeiten entfernen (z.B. "14:02 1,067,200 aUEC" -> "  1,067,200 aUEC")
+        var normalized = ClockRegex().Replace(ocrText, " ");
 
-        // 1. Strikte Suche nach Tausender-Gruppierungen oder >= 3-stelligen Zahlen
-        string? best = null;
+        // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289")
+        normalized = CurrencyLabelRegex().Replace(normalized, " ");
+
+        // 3. Führende Vorzeichen / OCR-Störzeichen entfernen
+        normalized = Regex.Replace(normalized, @"[+*~|/\\()\[\]{}]", " ");
+
+        // 4. Leerzeichen als Tausendertrennzeichen zwischen Zifferngruppen normalisieren ("2 463 039" -> "2.463.039")
+        normalized = Regex.Replace(normalized, @"(?<=\b\d{1,3})\s+(?=\d{3}(?:\s+\d{3})*\b)", ".");
+
+        long? bestValue = null;
         var bestDigits = 0;
 
-        foreach (Match m in StrictBalanceRegex().Matches(normalized))
+        foreach (Match m in CandidateNumberRegex().Matches(normalized))
         {
+            var raw = m.Value.Trim();
+            if (raw.Length == 0) continue;
+
+            // Darf nicht mit Trennzeichen beginnen oder enden (z.B. "2.349." ist abgeschnitten)
+            if (raw.StartsWith('.') || raw.StartsWith(',') || raw.EndsWith('.') || raw.EndsWith(','))
+                continue;
+
+            var parts = raw.Split(new[] { '.', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
+
+            if (parts.Length > 1)
+            {
+                // Tausender-Gruppierung: erste Gruppe 1-3 Ziffern, alle folgenden MÜSSEN genau 3 Ziffern haben
+                if (parts[0].Length < 1 || parts[0].Length > 3) continue;
+
+                bool validGrouping = true;
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    if (parts[i].Length != 3)
+                    {
+                        validGrouping = false;
+                        break;
+                    }
+                }
+
+                if (!validGrouping) continue;
+            }
+            else
+            {
+                // Unformatierte Ziffernfolge (z.B. "0", "846", "5105256")
+                if (parts[0].Length < 1 || parts[0].Length > 11) continue;
+            }
+
             var digits = 0;
-            foreach (var c in m.Value)
+            foreach (var c in raw)
             {
                 if (c is >= '0' and <= '9') digits++;
             }
 
-            if (digits >= 3 && digits > bestDigits)
+            var cleaned = raw.Replace(".", "").Replace(",", "").Replace(" ", "");
+            if (!long.TryParse(cleaned, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+                continue;
+
+            if (value < MinPlausibleBalance || value > MaxPlausibleBalance)
+                continue;
+
+            if (digits > bestDigits)
             {
                 bestDigits = digits;
-                best = m.Value;
+                bestValue = value;
             }
         }
 
-        // 2. Fallback nur wenn aUEC im Text steht
-        if (best is null && (normalized.Contains("aUEC", StringComparison.OrdinalIgnoreCase) || normalized.Contains("UEC", StringComparison.OrdinalIgnoreCase)))
-        {
-            foreach (Match m in FallbackDigitsRegex().Matches(normalized))
-            {
-                var digits = m.Value.Length;
-                if (digits > bestDigits)
-                {
-                    bestDigits = digits;
-                    best = m.Value;
-                }
-            }
-        }
-
-        if (best is null || bestDigits == 0) return null;
-
-        var cleaned = best.Replace(",", "").Replace(".", "").Replace(" ", "").Trim();
-        if (!long.TryParse(cleaned, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
-            return null;
-
-        if (value < MinPlausibleBalance || value > MaxPlausibleBalance)
-            return null;
-
-        return value;
+        return bestValue;
     }
 }

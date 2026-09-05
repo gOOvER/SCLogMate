@@ -15,12 +15,6 @@ namespace SCLogMate.Core;
 
 public class AuroraVoiceService : IDisposable
 {
-    private static class NativeAudio
-    {
-        [DllImport("winmm.dll", CharSet = CharSet.Auto)]
-        public static extern int mciSendString(string command, StringBuilder? returnValue, int returnLength, IntPtr callback);
-    }
-
     private readonly object _lock = new();
     private readonly Random _rand = new();
     private string? _auroraDir;
@@ -39,17 +33,27 @@ public class AuroraVoiceService : IDisposable
     public bool PlayerDeathEnabled { get; set; } = true;
     public bool ServerErrorsEnabled { get; set; } = true;
 
-    private DateTime _lastStationActivity = DateTime.MinValue;
     private bool _isAtStation;
 
     private readonly HashSet<string> _greetedShipsAtCurrentStation = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastCrashOrDeathTime = DateTime.MinValue;
     private DateTime _lastSessionOrLoginTime = DateTime.UtcNow;
 
+    // Sequential audio queue to prevent overlapping and audio cutting off
+    private readonly System.Threading.Channels.Channel<(string FilePath, int DelayMs)> _audioChannel =
+        System.Threading.Channels.Channel.CreateUnbounded<(string FilePath, int DelayMs)>(
+            new System.Threading.Channels.UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _playbackTask;
+
     /// <summary>Gibt an, ob sich der Spieler aktuell auf einer Raumstation, im Hangar oder in einer Landezone befindet.</summary>
     public bool IsAtStation
     {
-        get => _isAtStation || (DateTime.UtcNow - _lastStationActivity).TotalMinutes < 15;
+        get => _isAtStation;
         set
         {
             if (_isAtStation && !value)
@@ -58,8 +62,6 @@ public class AuroraVoiceService : IDisposable
                 _greetedShipsAtCurrentStation.Clear();
             }
             _isAtStation = value;
-            if (value) _lastStationActivity = DateTime.UtcNow;
-            else _lastStationActivity = DateTime.MinValue;
         }
     }
 
@@ -187,6 +189,7 @@ public class AuroraVoiceService : IDisposable
 
     public AuroraVoiceService(string? customPath = null)
     {
+        _playbackTask = Task.Run(() => ProcessAudioQueueAsync(_cts.Token));
         Initialize(customPath);
     }
 
@@ -327,7 +330,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 4. Nyx & Pyro
-        var nyxPyroDir = Path.Combine(baseDir, "nyx und pyro");
+        var nyxPyroDir = Directory.GetDirectories(baseDir, "*nyx*").FirstOrDefault() ?? Path.Combine(baseDir, "nyx und pyro");
         if (Directory.Exists(nyxPyroDir))
         {
             var files = Directory.GetFiles(nyxPyroDir, "*.mp3").OrderBy(f => f).ToList();
@@ -336,7 +339,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 5. People's Alliance
-        var paDir = Path.Combine(baseDir, "peoples alliance");
+        var paDir = Directory.GetDirectories(baseDir, "*people*").FirstOrDefault() ?? Path.Combine(baseDir, "peoples alliance");
         if (Directory.Exists(paDir))
         {
             var files = Directory.GetFiles(paDir, "*.mp3").OrderBy(f => f).ToList();
@@ -344,7 +347,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 6. Safety Zones (Armistice)
-        var safetyDir = Path.Combine(baseDir, "sicherheitszone verlassen betreten");
+        var safetyDir = Directory.GetDirectories(baseDir, "*sicherheitszone*").FirstOrDefault() ?? Path.Combine(baseDir, "sicherheitszone verlassen betreten");
         if (Directory.Exists(safetyDir))
         {
             var allMp3 = Directory.GetFiles(safetyDir, "*.mp3");
@@ -359,7 +362,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 7. Restricted Area Entry (Sperrzone)
-        var restrictedDir = Path.Combine(baseDir, "sperrzone");
+        var restrictedDir = Directory.GetDirectories(baseDir, "*sperrzone*").FirstOrDefault() ?? Path.Combine(baseDir, "sperrzone");
         if (Directory.Exists(restrictedDir))
         {
             var allMp3 = Directory.GetFiles(restrictedDir, "*.mp3");
@@ -371,7 +374,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 8. Blueprints
-        var bpDir = Path.Combine(baseDir, "blueprint");
+        var bpDir = Directory.GetDirectories(baseDir, "*blueprint*").FirstOrDefault() ?? Path.Combine(baseDir, "blueprint");
         if (Directory.Exists(bpDir))
         {
             var files = Directory.GetFiles(bpDir, "*.mp3").OrderBy(f => f).ToList();
@@ -379,7 +382,7 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 9. Killcounter / Player Death
-        var kcDir = Path.Combine(baseDir, "killcounter");
+        var kcDir = Directory.GetDirectories(baseDir, "*kill*").FirstOrDefault() ?? Path.Combine(baseDir, "killcounter");
         if (Directory.Exists(kcDir))
         {
             var files = Directory.GetFiles(kcDir, "*.mp3").OrderBy(f => f).ToList();
@@ -387,12 +390,19 @@ public class AuroraVoiceService : IDisposable
         }
 
         // 10. Server Error (30k)
-        var seDir = Path.Combine(baseDir, "server error");
+        var seDir = Directory.GetDirectories(baseDir, "*server*error*").FirstOrDefault() ?? Path.Combine(baseDir, "server error");
         if (Directory.Exists(seDir))
         {
             var files = Directory.GetFiles(seDir, "*.mp3").OrderBy(f => f).ToList();
             _serverErrorSounds.AddRange(files);
         }
+
+        Logger.Log($"[AuroraVoiceService] Kataloge geladen: Schiffe={_shipSoundsByFamily.Count} Familien, " +
+                   $"Sicherheit(Enter/Leave)={_safetyZoneEnterSounds.Count}/{_safetyZoneLeaveSounds.Count}, " +
+                   $"Monitored(Enter/Leave)={_monitoredSpaceEnterSounds.Count}/{_monitoredSpaceLeaveSounds.Count}, " +
+                   $"Sperrzone(Enter/Leave)={_restrictedZoneEnterSounds.Count}/{_restrictedZoneLeaveSounds.Count}, " +
+                   $"Rechtsgebiete={_jurisdictionSounds.Count} Zonen, Quantum={_quantumArrivalSounds.Count}, " +
+                   $"Blueprints={_blueprintSounds.Count}, Death={_playerDeathSounds.Count}, 30k={_serverErrorSounds.Count}");
     }
 
     private void AddJurisdictionSound(string key, Dictionary<int, string> map, int index)
@@ -430,37 +440,23 @@ public class AuroraVoiceService : IDisposable
 
         // Erkennung von Stationsaktivitäten / Hangar / Landung / Docking / Spawnen
         if (line.Contains("Hangaranfrage", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("DockingTube", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("LoadingPlatformManager", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Pad ", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("DockingTube", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("LoadingPlatformManager", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("OnClientSpawned", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("PlayerSpawnZone", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Spawned!", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Habitation", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("EZ_Hab", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("RestStop", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("SpaceStation", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("LandingZone", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Hospital", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Clinic", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Tressler", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Everus", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Baijini", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Seraphim", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Area18", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Lorville", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Orison", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("New Babbage", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Grim HEX", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Gateway", StringComparison.OrdinalIgnoreCase))
+            line.Contains("Clinic", StringComparison.OrdinalIgnoreCase))
         {
             IsAtStation = true;
         }
 
-        // Login / Spawnen Erkennung: Setzt Login-Cooldown (60s) und markiert sofort als Station
+        // Login / Spawnen Erkennung: Setzt Login-Cooldown (45s) und markiert sofort als Station
         if (line.Contains("OnClientSpawned", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Spawned!", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Loading screen", StringComparison.OrdinalIgnoreCase) ||
@@ -474,16 +470,10 @@ public class AuroraVoiceService : IDisposable
             IsAtStation = true;
         }
 
-        // Crash- / Tod- / Zerstörungs-Erkennung: Sofortige Sperre für Schiffsbegrüßungen
-        if (line.Contains("VehicleDestruction", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("CSCActorCorpseUtils", StringComparison.OrdinalIgnoreCase) ||
+        // Echte Zerstörungs- & Tod-Erkennung (KEIN generisches "ClearDriver", "Collision", "Destroyed" oder "Crash"!)
+        if (line.Contains("CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Standby, Local Emergency Services Are En Route", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Kollision", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Collision", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Crash", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Versicherungs-Claim", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("ClearDriver", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Destroyed", StringComparison.OrdinalIgnoreCase))
+            line.Contains("<Vehicle Destruction Flow>", StringComparison.OrdinalIgnoreCase))
         {
             _lastCrashOrDeathTime = DateTime.UtcNow;
             _greetedShipsAtCurrentStation.Clear();
@@ -633,9 +623,19 @@ public class AuroraVoiceService : IDisposable
         {
             OnBlueprintLearned(e.Detail);
         }
-        else if (e.Kind == EventKind.Jurisdiction && JurisdictionsEnabled)
+        else if (e.Kind == EventKind.Jurisdiction)
         {
-            OnJurisdictionChanged(e.Detail);
+            if (e.Detail.Contains("Schutzzone", StringComparison.OrdinalIgnoreCase) ||
+                e.Detail.Contains("Armistice", StringComparison.OrdinalIgnoreCase))
+            {
+                bool entering = !e.Detail.Contains("verlassen", StringComparison.OrdinalIgnoreCase) &&
+                                !e.Detail.Contains("leaving", StringComparison.OrdinalIgnoreCase);
+                OnSafetyZoneChanged(entering);
+            }
+            else if (JurisdictionsEnabled)
+            {
+                OnJurisdictionChanged(e.Detail);
+            }
         }
     }
 
@@ -651,15 +651,15 @@ public class AuroraVoiceService : IDisposable
             return;
         }
 
-        // Nach einem Crash, Spielertod oder Schiffsverlust keine Begrüßung (Sperre für 120 Sekunden)
-        if ((DateTime.UtcNow - _lastCrashOrDeathTime).TotalSeconds < 120)
+        // Nach einem echten Crash, Spielertod oder Schiffsverlust keine Begrüßung (Sperre für 60 Sekunden)
+        if ((DateTime.UtcNow - _lastCrashOrDeathTime).TotalSeconds < 60)
         {
             Logger.Log($"[AuroraVoiceService] Schiffsbegrüßung für '{shipName}' ignoriert: Kürzlicher Crash / Spielertod vor {(DateTime.UtcNow - _lastCrashOrDeathTime).TotalSeconds:F0}s.");
             return;
         }
 
-        // Während der Login-/Ladephase keine Schiffsbegrüßung (Sperre für 30 Sekunden nach Login/Spawn)
-        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 30)
+        // Während der Login-/Ladephase keine Schiffsbegrüßung (Sperre für 25 Sekunden nach Login/Spawn)
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 25)
         {
             Logger.Log($"[AuroraVoiceService] Schiffsbegrüßung für '{shipName}' ignoriert: Login-Phase aktiv.");
             return;
@@ -681,61 +681,68 @@ public class AuroraVoiceService : IDisposable
             Logger.Log($"[AuroraVoiceService] Schiffsbegrüßung im Hangar/Station für '{family}' ausgelöst.");
             PlaySoundWithCooldown($"ship_{family}", sounds, delayMs: 1000);
         }
+        else
+        {
+            Logger.Log($"[AuroraVoiceService] Kein Soundkatalog gefunden für Schiff: '{shipName}' (Familie: '{family ?? "unbekannt"}').");
+        }
     }
 
     public void OnSafetyZoneChanged(bool entering)
     {
         if (!_isEnabled || !_isInstalled || !SafetyZonesEnabled) return;
 
-        // Beim Login oder auf Stationen / Hangars NIEMALS Schutzzonen-Ansagen abspielen
-        if (IsAtStation || (DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 60)
+        // Während Login-/Ladephase unterdrücken
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
         {
-            Logger.Log("[AuroraVoiceService] Schutzzonen-Audio unterdrückt (Station/Hangar aktiv oder Login-Phase).");
-            IsAtStation = true;
+            Logger.Log("[AuroraVoiceService] Schutzzonen-Audio unterdrückt (Login-Phase aktiv).");
+            if (entering) IsAtStation = true;
             return;
         }
-
-        var sounds = entering ? _safetyZoneEnterSounds : _safetyZoneLeaveSounds;
-        if (sounds.Count > 0)
-            PlaySoundWithCooldown("safety_zone", sounds, minCooldownSeconds: 120);
 
         if (entering)
         {
             IsAtStation = true;
         }
-    }
+        else
+        {
+            IsAtStation = false;
+        }
 
+        var sounds = entering ? _safetyZoneEnterSounds : _safetyZoneLeaveSounds;
+        if (sounds.Count > 0)
+            PlaySoundWithCooldown(entering ? "safety_enter" : "safety_leave", sounds, minCooldownSeconds: 30);
+    }
 
     public void OnMonitoredSpaceChanged(bool entering)
     {
         if (!_isEnabled || !_isInstalled || !MonitoredSpaceEnabled) return;
 
-        // Auf Stationen oder während Login-Phase unterdrücken
-        if (IsAtStation || (DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 60)
+        // Während Login-Phase unterdrücken
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
         {
-            Logger.Log("[AuroraVoiceService] MonitoredSpace-Audio unterdrückt (Station/Hangar aktiv oder Login-Phase).");
+            Logger.Log("[AuroraVoiceService] MonitoredSpace-Audio unterdrückt (Login-Phase aktiv).");
             return;
         }
 
         var sounds = entering ? _monitoredSpaceEnterSounds : _monitoredSpaceLeaveSounds;
         if (sounds.Count > 0)
-            PlaySoundWithCooldown(entering ? "monitored_enter" : "monitored_leave", sounds);
+            PlaySoundWithCooldown(entering ? "monitored_enter" : "monitored_leave", sounds, minCooldownSeconds: 30);
     }
 
     public void OnRestrictedZoneChanged(bool entering)
     {
         if (!_isEnabled || !_isInstalled || !RestrictedZonesEnabled) return;
 
-        // Auf Stationen oder während Login-Phase unterdrücken
-        if (IsAtStation || (DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 60)
+        // Während Login-Phase unterdrücken
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
         {
-            Logger.Log("[AuroraVoiceService] RestrictedZone-Audio unterdrückt (Station/Hangar aktiv oder Login-Phase).");
+            Logger.Log("[AuroraVoiceService] RestrictedZone-Audio unterdrückt (Login-Phase aktiv).");
             return;
         }
 
         var sounds = entering ? _restrictedZoneEnterSounds : _restrictedZoneLeaveSounds;
         if (sounds.Count > 0)
-            PlaySoundWithCooldown(entering ? "restricted_enter" : "restricted_leave", sounds);
+            PlaySoundWithCooldown(entering ? "restricted_enter" : "restricted_leave", sounds, minCooldownSeconds: 30);
     }
 
     public void OnJurisdictionChanged(string jurisdiction)
@@ -743,10 +750,20 @@ public class AuroraVoiceService : IDisposable
         if (!_isEnabled || !_isInstalled || !JurisdictionsEnabled) return;
         if (string.IsNullOrWhiteSpace(jurisdiction)) return;
 
-        // Auf Stationen oder während Login-Phase unterdrücken
-        if (IsAtStation || (DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 60)
+        // Falls Schutzzonen-Detail im Event, an OnSafetyZoneChanged weiterleiten
+        if (jurisdiction.Contains("Schutzzone", StringComparison.OrdinalIgnoreCase) ||
+            jurisdiction.Contains("Armistice", StringComparison.OrdinalIgnoreCase))
         {
-            Logger.Log($"[AuroraVoiceService] Jurisdiction-Audio für '{jurisdiction}' unterdrückt (Station/Hangar aktiv oder Login-Phase).");
+            bool entering = !jurisdiction.Contains("verlassen", StringComparison.OrdinalIgnoreCase) &&
+                            !jurisdiction.Contains("leaving", StringComparison.OrdinalIgnoreCase);
+            OnSafetyZoneChanged(entering);
+            return;
+        }
+
+        // Während Login-Phase unterdrücken
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
+        {
+            Logger.Log($"[AuroraVoiceService] Jurisdiction-Audio für '{jurisdiction}' unterdrückt (Login-Phase aktiv).");
             return;
         }
 
@@ -754,7 +771,7 @@ public class AuroraVoiceService : IDisposable
         {
             if (jurisdiction.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase) && kvp.Value.Count > 0)
             {
-                PlaySoundWithCooldown($"jurisdiction_{kvp.Key}", kvp.Value);
+                PlaySoundWithCooldown($"jurisdiction_{kvp.Key}", kvp.Value, minCooldownSeconds: 60);
                 return;
             }
         }
@@ -849,27 +866,98 @@ public class AuroraVoiceService : IDisposable
 
     private void PlayFileAsync(string filePath, int delayMs)
     {
-        Task.Run(async () =>
-        {
-            if (delayMs > 0)
-                await Task.Delay(delayMs);
+        _audioChannel.Writer.TryWrite((filePath, delayMs));
+    }
 
-            lock (_lock)
+    private async Task ProcessAudioQueueAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
             {
-                try
-                {
-                    _mediaPlayer ??= new Windows.Media.Playback.MediaPlayer();
-                    _mediaPlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(filePath));
-                    _mediaPlayer.Volume = Math.Clamp(_volume / 100.0, 0.0, 1.0);
-                    _mediaPlayer.Play();
-                    Logger.Log($"[AuroraVoiceService] Audio abgespielt: {Path.GetFileName(filePath)} (Lautstärke: {_volume}%)");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error("Aurora Audio Playback", ex);
-                }
+                var item = await _audioChannel.Reader.ReadAsync(ct);
+                if (item.DelayMs > 0)
+                    await Task.Delay(item.DelayMs, ct);
+
+                await PlayAudioFileCoreAsync(item.FilePath, ct);
             }
-        });
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                Logger.Error("Aurora Audio Queue", ex);
+            }
+        }
+    }
+
+    private async Task PlayAudioFileCoreAsync(string filePath, CancellationToken ct)
+    {
+        if (!File.Exists(filePath))
+        {
+            Logger.Log($"[AuroraVoiceService] Audiodatei existiert nicht: {filePath}");
+            return;
+        }
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        lock (_lock)
+        {
+            try
+            {
+                _mediaPlayer ??= new Windows.Media.Playback.MediaPlayer();
+
+                Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, object>? endedHandler = null;
+                Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, Windows.Media.Playback.MediaPlayerFailedEventArgs>? failedHandler = null;
+
+                endedHandler = (s, e) =>
+                {
+                    try
+                    {
+                        s.MediaEnded -= endedHandler;
+                        s.MediaFailed -= failedHandler;
+                    }
+                    catch { }
+                    tcs.TrySetResult(true);
+                };
+
+                failedHandler = (s, e) =>
+                {
+                    try
+                    {
+                        s.MediaEnded -= endedHandler;
+                        s.MediaFailed -= failedHandler;
+                    }
+                    catch { }
+                    Logger.Log($"[AuroraVoiceService] MediaPlayer Fehler: {e.ErrorMessage} ({e.ExtendedErrorCode?.Message})");
+                    tcs.TrySetResult(false);
+                };
+
+                _mediaPlayer.MediaEnded += endedHandler;
+                _mediaPlayer.MediaFailed += failedHandler;
+
+                _mediaPlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(filePath));
+                _mediaPlayer.Volume = Math.Clamp(_volume / 100.0, 0.0, 1.0);
+                _mediaPlayer.Play();
+                Logger.Log($"[AuroraVoiceService] Audio abgespielt: {Path.GetFileName(filePath)} (Lautstärke: {_volume}%)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Aurora Audio Playback", ex);
+                tcs.TrySetResult(false);
+            }
+        }
+
+        try
+        {
+            // Max 8 Sekunden warten, falls MediaEnded ausbleibt
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            linked.Token.Register(() => tcs.TrySetResult(false));
+
+            await tcs.Task;
+            // 200 ms natürliche Pause zwischen zwei Sprachansagen
+            await Task.Delay(200, ct);
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void ApplyCurrentVolume()
@@ -889,6 +977,12 @@ public class AuroraVoiceService : IDisposable
 
     public void Dispose()
     {
+        try
+        {
+            _cts.Cancel();
+        }
+        catch { }
+
         lock (_lock)
         {
             try
@@ -898,6 +992,12 @@ public class AuroraVoiceService : IDisposable
             }
             catch { /* ignore */ }
         }
+
+        try
+        {
+            _cts.Dispose();
+        }
+        catch { }
     }
 }
 

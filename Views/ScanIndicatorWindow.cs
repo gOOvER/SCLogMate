@@ -19,7 +19,6 @@ public class ScanIndicatorWindow : Window
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
-    private static readonly IBrush CyanBrush = new SolidColorBrush(Color.Parse("#22D3EE"));
     private static readonly IBrush GreenBrush = new SolidColorBrush(Color.Parse("#4ADE80"));
 
     private readonly string _title;
@@ -74,6 +73,20 @@ public class ScanIndicatorWindow : Window
 
         Content = _border;
         Opened += OnOpened;
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            Hide();
+        };
+    }
+
+    public new void Show()
+    {
+        base.Show();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ApplyPhysicalBounds();
+        }
     }
 
     private void OnOpened(object? sender, EventArgs e)
@@ -105,7 +118,7 @@ public class ScanIndicatorWindow : Window
         Width = _pw / scaling;
         Height = _ph / scaling;
 
-        if (IsVisible)
+        if (IsVisible && _hwnd != IntPtr.Zero)
         {
             ApplyPhysicalBounds();
         }

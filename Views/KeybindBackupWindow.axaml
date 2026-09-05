@@ -1,0 +1,197 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SCLogMate.ViewModels"
+        xmlns:core="using:SCLogMate.Core"
+        x:Class="SCLogMate.Views.KeybindBackupWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Star Citizen Keybind-Tresor &amp; Steuerungs-Backups — SCLogMate"
+        Width="920" Height="620" MinWidth="760" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        Background="#050811" Foreground="#E6EDF3"
+        Icon="/SCLogMate.ico"
+        FontFamily="{Binding CurrentFontFamily}">
+
+  <DockPanel Margin="14">
+
+    <!-- ══ Sci-Fi Top Header Bar ══ -->
+    <Border DockPanel.Dock="Top" Background="#0A1422" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        
+        <!-- Left: Branding & Subtitle -->
+        <StackPanel Spacing="3" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Border Background="#16122C" BorderBrush="#3B2A6B" BorderThickness="1" CornerRadius="5" Width="26" Height="26" VerticalAlignment="Center">
+              <TextBlock Text="🎮" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="KEYBIND-TRESOR &amp; STEUERUNGS-ARCHIV" FontSize="14" FontWeight="Bold" Foreground="#A78BFA" LetterSpacing="0.8" />
+            <Border Background="#0C1B2E" BorderBrush="#1C4872" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="6,0,0,0">
+              <TextBlock Text="{Binding ToolsKeybindBackups.Count, StringFormat='{}{0} Gesichert'}" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="Sichert alle Steuerungsbelegungen, Joystick-Profile und HOTAS/HOSAS Mappings (actionmaps.xml) sicher vor Patches."
+                     FontSize="10.5" Foreground="#7E97AD" />
+        </StackPanel>
+
+        <!-- Right: Actions -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                  Command="{Binding RefreshToolsDataCommand}" ToolTip.Tip="Liest Backups von der Festplatte und aus der Cloud neu ein">
+            <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="🔄" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" />
+              <TextBlock Text="Aktualisieren" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Button Classes="ghost" Height="30" Padding="10,0" CornerRadius="5" Background="#091422" BorderBrush="#162E48" BorderThickness="1"
+                  Command="{Binding OpenLiveFolderCommand}" ToolTip.Tip="Öffnet den Star Citizen LIVE Ordner">
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Path Data="M 1,2 L 6,2 L 8,4 L 15,4 C 15.6,4 16,4.4 16,5 L 16,13 C 16,13.6 15.6,14 15,14 L 1,14 C 0.4,14 0,13.6 0,13 L 0,3 C 0,2.4 0.4,2 1,2 Z"
+                    Fill="#38BDF8" Width="13" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="LIVE Ordner" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- ══ Bottom Status Bar ══ -->
+    <Border DockPanel.Dock="Bottom" Background="#071320" BorderBrush="#162E48" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="ℹ" FontSize="12" Foreground="#A78BFA" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ToolsStatusMessage, FallbackValue='Bereit. Wähle ein Backup zur Wiederherstellung oder lege ein neues an.'}"
+                     Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Text="Dual-Replikation: Lokal &amp; Cloud" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ══ 2-Column Main Layout ══ -->
+    <Grid ColumnDefinitions="330,*">
+
+      <!-- ── Linke Spalte: Neues Backup & Cloud-Replikation ── -->
+      <StackPanel Grid.Column="0" Spacing="12" Margin="0,0,10,0">
+
+        <!-- Karte: Neues Backup anlegen -->
+        <Border Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+          <StackPanel Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="✦" FontSize="12" Foreground="#A78BFA" />
+              <TextBlock Text="NEUES BACKUP ANLEGEN" Classes="label" Foreground="#A78BFA" />
+            </StackPanel>
+            
+            <TextBlock Text="Sichert die aktuelle actionmaps.xml mit einem Zeitstempel und optionaler Beschreibung."
+                       FontSize="10.5" Foreground="#7E97AD" TextWrapping="Wrap" />
+
+            <StackPanel Spacing="4" Margin="0,4,0,0">
+              <TextBlock Text="Versions-Notiz (optional):" FontSize="10" Foreground="#94A3B8" />
+              <TextBox Text="{Binding ToolsNewKeybindBackupNote}" Height="32" FontSize="11"
+                       Watermark="z. B. HOSAS VKB Patch 4.0 oder Vor-Update"
+                       Background="#050B14" BorderBrush="#14263B" />
+            </StackPanel>
+
+            <Button Classes="ghost" Height="34" CornerRadius="5" Background="#141026" BorderBrush="#3B256B" BorderThickness="1"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Margin="0,6,0,0" Command="{Binding BackupKeybindsCommand}"
+                    ToolTip.Tip="Kopiert die aktuelle actionmaps.xml in den Tresor (lokal &amp; Cloud)">
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="✦" FontSize="11" Foreground="#A78BFA" VerticalAlignment="Center" />
+                <TextBlock Text="Jetzt sichern" FontSize="11.5" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Border>
+
+        <!-- Karte: Tresor-Informationen -->
+        <Border Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+          <StackPanel Spacing="10">
+            <TextBlock Text="TRESOR-DETAILS &amp; SPEICHERORTE" Classes="label" Foreground="#38BDF8" />
+            
+            <StackPanel Spacing="6">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Lokaler Tresor:" FontSize="9.5" Foreground="#64748B" />
+                <TextBlock Text="%APPDATA%\SCLogMate\Backups\Keybinds" FontSize="10.5" FontWeight="SemiBold" Foreground="#C9D6E2" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+
+              <StackPanel Spacing="1">
+                <TextBlock Text="Cloud-Replikation:" FontSize="9.5" Foreground="#64748B" />
+                <TextBlock Text="{Binding ToolsCloudStoragePath, FallbackValue='Nicht konfiguriert'}" FontSize="10.5" FontWeight="SemiBold" Foreground="#38BDF8" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </StackPanel>
+
+            <Border Background="#071810" BorderBrush="#184D2B" BorderThickness="1" CornerRadius="5" Padding="8,6" Margin="0,4,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="🛡" FontSize="12" Foreground="#4ADE80" VerticalAlignment="Center" />
+                <TextBlock Text="Wiederhergestellte Tastenbelegungen sind sofort beim nächsten SC-Start aktiv."
+                           FontSize="10" Foreground="#86EFAC" TextWrapping="Wrap" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+
+      <!-- ── Rechte Spalte: Gesicherte Backups & Wiederherstellen ── -->
+      <Border Grid.Column="1" Classes="card" Background="#08101C" BorderBrush="#1A2D44" BorderThickness="1" CornerRadius="8" Padding="14">
+        <Grid RowDefinitions="Auto,*,Auto">
+          
+          <!-- Header -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="📋" FontSize="13" Foreground="#38BDF8" />
+              <TextBlock Text="GESICHERTE VERSIONEN &amp; PROFILE" Classes="label" Foreground="#38BDF8" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="#0C1B2E" BorderBrush="#1C4872" BorderThickness="1" CornerRadius="3" Padding="6,2">
+              <TextBlock Text="{Binding ToolsKeybindBackups.Count, StringFormat='{}{0} Versionen'}" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+            </Border>
+          </Grid>
+
+          <!-- ListBox -->
+          <Border Grid.Row="1" Background="#050B14" BorderBrush="#132338" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10">
+            <ListBox ItemsSource="{Binding ToolsKeybindBackups}" SelectedItem="{Binding ToolsSelectedKeybindBackup}"
+                     Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="4,3">
+                    <TextBlock Grid.Column="0" Text="🎮" FontSize="13" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding CreatedAt, StringFormat='{}Erstellt: {0:dd.MM.yyyy HH:mm}'}" FontSize="9.5" Foreground="#64748B" />
+                    </StackPanel>
+                    <Border Grid.Column="2" Background="#0A1626" BorderBrush="#1C3857" BorderThickness="1" CornerRadius="3" Padding="6,2" Margin="8,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding LocationType}" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" />
+                    </Border>
+                    <TextBlock Grid.Column="3" Text="{Binding SizeFormatted}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="4,0,4,0" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
+
+          <!-- Action Bar: Wiederherstellen -->
+          <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding ToolsSelectedKeybindBackup.Name, FallbackValue='Kein Profil ausgewählt', StringFormat='Ausgewählt: {0}'}"
+                         FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <Button Grid.Column="1" Classes="ghost" Height="32" Padding="14,0" CornerRadius="5" Background="#0C1B2E" BorderBrush="#1C4B78" BorderThickness="1"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding RestoreSelectedKeybindCommand}" ToolTip.Tip="Kopiert das gewählte Backup zurück in den Star Citizen LIVE Ordner (actionmaps.xml)">
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="↺" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center" />
+                <TextBlock Text="Profil wiederherstellen" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
+
+        </Grid>
+      </Border>
+
+    </Grid>
+
+  </DockPanel>
+</Window>

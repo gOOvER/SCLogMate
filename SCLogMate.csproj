@@ -13,7 +13,7 @@
     <Product>SCLogMate</Product>
     <Title>SCLogMate</Title>
     <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
-    <Version>1.0.0-beta5</Version>
+    <Version>1.0.0-beta6</Version>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
     <ApplicationIcon>SCLogMate.ico</ApplicationIcon>
@@ -41,6 +41,7 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.2" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.10" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+    <!-- Transitive vulnerability override for Avalonia.Desktop -> Avalonia.FreeDesktop (GHSA-xrw6-gwf8-vvr9) -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.0" />
   </ItemGroup>
 

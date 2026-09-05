@@ -4,16 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace SCLogMate.Core;
 
-public enum RefineryMethod
-{
-    DinyxSolventation,
-    FerronExchange,
-    GaskinProcess,
-    PyrometricChromaglyphy,
-    CormackMethod,
-    ElectroCatalytic
-}
-
 public partial class RefineryJob : ObservableObject
 {
     [ObservableProperty] private string id = Guid.NewGuid().ToString("N");

@@ -32,6 +32,8 @@ Every code change **must** update `CHANGELOG.md` under the `[Unreleased]`
 section in the same commit. Use the Keep a Changelog categories:
 `Added`, `Changed`, `Fixed`, `Removed`, `Security`.
 
+**CRITICAL RULE**: `CHANGELOG.md` **MUST ALWAYS BE WRITTEN IN ENGLISH**! Never write changelog entries in German or any other language.
+
 ### 2. Test-build
 
 After making changes, always build to verify. **Before building**, check

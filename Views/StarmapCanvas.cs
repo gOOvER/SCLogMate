@@ -402,20 +402,38 @@ public sealed class StarmapCanvas : Control
             }
         }
 
-        // 6. Spieler-Standort ermitteln
-        StarmapObject? playerObj = objects.FirstOrDefault(obj =>
-            !string.IsNullOrEmpty(PlayerLocationName) &&
-            (obj.Name.Contains(PlayerLocationName, StringComparison.OrdinalIgnoreCase) ||
-             PlayerLocationName.Contains(obj.Name, StringComparison.OrdinalIgnoreCase) ||
-             obj.Id.Contains(PlayerLocationName, StringComparison.OrdinalIgnoreCase)));
-
-        if (playerObj == null && !string.IsNullOrEmpty(PlayerLocationName))
+        // 6. Spieler-Standort ermitteln (nur wenn Spieler sich im aktuell angezeigten System befindet)
+        StarmapObject? playerObj = null;
+        if (!string.IsNullOrEmpty(PlayerLocationName) && PlayerLocationName != "—")
         {
             var res = StarmapData.Resolve(PlayerLocationName);
-            if (!string.IsNullOrEmpty(res.DisplayName))
+            bool systemMatches = string.IsNullOrEmpty(res.SystemName) ||
+                                 res.SystemName.Equals(SystemName, StringComparison.OrdinalIgnoreCase);
+
+            if (systemMatches)
             {
-                playerObj = objects.FirstOrDefault(o => o.Name.Equals(res.DisplayName, StringComparison.OrdinalIgnoreCase) ||
-                                                        (!string.IsNullOrEmpty(res.ParentBody) && o.Name.Equals(res.ParentBody, StringComparison.OrdinalIgnoreCase)));
+                // 1. Direkter Match auf Name / ID des Starmap-Objekts
+                playerObj = objects.FirstOrDefault(obj =>
+                    obj.Name.Equals(PlayerLocationName, StringComparison.OrdinalIgnoreCase) ||
+                    obj.Id.Equals(PlayerLocationName, StringComparison.OrdinalIgnoreCase) ||
+                    obj.Name.Equals(res.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                    obj.Id.Equals(res.DisplayName, StringComparison.OrdinalIgnoreCase));
+
+                // 2. Fallback: Elternkörper (Planet / Mond / Station)
+                if (playerObj == null && !string.IsNullOrEmpty(res.ParentBody) && res.ParentBody != "—")
+                {
+                    playerObj = objects.FirstOrDefault(o =>
+                        o.Name.Equals(res.ParentBody, StringComparison.OrdinalIgnoreCase) ||
+                        o.Id.Equals(res.ParentBody, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // 3. Substring-Match auf bekannte Namen
+                if (playerObj == null && !string.IsNullOrEmpty(res.DisplayName) && res.DisplayName != "Unbekannt")
+                {
+                    playerObj = objects.FirstOrDefault(obj =>
+                        obj.Name.Contains(res.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                        res.DisplayName.Contains(obj.Name, StringComparison.OrdinalIgnoreCase));
+                }
             }
         }
 
@@ -697,6 +715,24 @@ public sealed class StarmapCanvas : Control
             new SolidColorBrush(Color.Parse("#38BDF8"))
         );
         context.DrawText(ftSys, new Point(16, 16));
+
+        // Spieler-System-Indikator, falls Spieler in anderem System ist
+        if (!string.IsNullOrEmpty(PlayerLocationName) && PlayerLocationName != "—")
+        {
+            var res = StarmapData.Resolve(PlayerLocationName);
+            if (!string.IsNullOrEmpty(res.SystemName) && !res.SystemName.Equals(SystemName, StringComparison.OrdinalIgnoreCase))
+            {
+                var ftOther = new FormattedText(
+                    $"📍 SPIELER IST IM {res.SystemName.ToUpperInvariant()}-SYSTEM ({res.DisplayName})",
+                    CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold),
+                    10.5,
+                    new SolidColorBrush(Color.Parse("#FFB23E"))
+                );
+                context.DrawText(ftOther, new Point(16, 36));
+            }
+        }
 
         // 2. Zoom & Maßstab unten links
         double scaleKm = (100 / _zoom) * 150000.0;

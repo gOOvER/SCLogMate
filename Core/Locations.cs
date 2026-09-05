@@ -83,10 +83,13 @@ public static partial class Locations
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["NewBabbage"] = "New Babbage",
+            ["New Babbage"] = "New Babbage",
             ["Lorville"] = "Lorville",
             ["Orison"] = "Orison",
             ["Area18"] = "Area 18",
+            ["Area 18"] = "Area 18",
             ["Area061"] = "Area 061",
+            ["Area 061"] = "Area 061",
             ["Levski"] = "Levski"
         };
 
@@ -126,6 +129,7 @@ public static partial class Locations
             // Pyro
             ["Checkmate"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
             ["CheckmateStation"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
+            ["Checkmate Station"] = ("Checkmate Station", "Pyro", "Monox", StarmapObjectType.SpaceStation, false),
             ["Orbituary"] = ("Orbituary", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
             ["Starlight"] = ("Starlight Station", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
             ["StarlightStation"] = ("Starlight Station", "Pyro", "Bloom", StarmapObjectType.SpaceStation, false),
@@ -320,7 +324,12 @@ public static partial class Locations
 
     private static ResolvedLocation? TryNyx(string rawId, string id)
     {
-        bool isNyx = id.Contains("Nyx", StringComparison.OrdinalIgnoreCase)
+        // "Onyx" darf niemals als Nyx gematcht werden (Onyx Facilities liegen in Stanton)
+        if (id.StartsWith("Onyx", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // Nyx-Standorte fangen entweder mit Nyx an oder sind bekannte Nyx-Orte/Körper
+        bool isNyx = id.StartsWith("Nyx", StringComparison.OrdinalIgnoreCase)
             || id.Contains("Levski", StringComparison.OrdinalIgnoreCase)
             || id.Contains("Delamar", StringComparison.OrdinalIgnoreCase)
             || id.Contains("Glaciem", StringComparison.OrdinalIgnoreCase)
@@ -329,6 +338,14 @@ public static partial class Locations
             || NyxGatewayRegex.IsMatch(id);
 
         if (!isNyx) return null;
+
+        // Bestimmte Nyx-IDs sind keine Orte, sondern Stern/Transit
+        if (id.Equals("Nyx_Star", StringComparison.OrdinalIgnoreCase)
+            || id.Equals("Nyx2", StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith("nyx_transit_", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
 
         ActiveSystem = "Nyx";
 
@@ -585,10 +602,10 @@ public static partial class Locations
             {
                 var pBody = code switch
                 {
-                    "NewBabbage" => "microTech",
+                    "NewBabbage" or "New Babbage" => "microTech",
                     "Lorville" => "Hurston",
                     "Orison" => "Crusader",
-                    "Area18" or "Area061" => "ArcCorp",
+                    "Area18" or "Area 18" or "Area061" or "Area 061" => "ArcCorp",
                     "Levski" => "Delamar",
                     _ => "Stanton"
                 };
@@ -645,6 +662,12 @@ public static partial class Locations
             return ($"Shubin {site}", StarmapObjectType.Outpost);
         }
 
+        // Onyx Facilities / Untergrund-Anlagen (Delving) in Stanton
+        if (rest.Contains("Onyx", StringComparison.OrdinalIgnoreCase) || rest.Contains("Delving", StringComparison.OrdinalIgnoreCase))
+        {
+            return (Spaced(rest), StarmapObjectType.Outpost);
+        }
+
         // Wikelo Sammler
         if (rest.Contains("TheCollectorsAsteriod", StringComparison.OrdinalIgnoreCase))
         {
@@ -698,7 +721,7 @@ public static partial class Locations
     [GeneratedRegex(@"_(?<system>Stanton|Pyro)(?<body>\d[a-z]?)(?=_|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex EmbeddedSystemRegex { get; }
 
-    [GeneratedRegex(@"^(?:Stanton|Pyro)_(?:Nyx_JPStation|JumpPoint_Nyx)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"^Nyx_(?:(?:Stanton|Pyro)_JPStation|JumpPoint_(?:Stanton|Pyro))", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NyxGatewayRegex { get; }
 
     [GeneratedRegex(@"^NavPoint_.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]

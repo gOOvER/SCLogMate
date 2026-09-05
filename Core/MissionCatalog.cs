@@ -27,7 +27,7 @@ public sealed class MissionInfo
 }
 
 /// <summary>
-/// Vollständige Master-Missionsdatenbank basierend auf Star Citizen Spieldaten (scunpacked-data & StarCitizenWiki).
+/// Vollständige Master-Missionsdatenbank basierend auf Star Citizen Spieldaten (scunpacked-data &amp; StarCitizenWiki).
 /// Bietet exakte und fehlertolerante (Fuzzy) Suche für Logfile- und OCR-Missionsabgleiche.
 /// </summary>
 public static class MissionCatalog
@@ -727,6 +727,140 @@ public static class MissionCatalog
             StarSystems = "Stanton, Nyx",
             Blueprints = new[] { "Killshot Rifle", "Deadrig Shotgun", "Overlord Core Supernova" },
             Description = "Hochbezahlter Attentatsauftrag im Asteroidenfeld. Schalte die Zielperson und ihre Leibwache aus."
+        });
+
+        // ── RECCO BATTAGLIA (LEVSKI / PEOPLE'S ALLIANCE - NYX) ───────────────
+        Add(new MissionInfo
+        {
+            Id = "recco_extra_special_job",
+            Title = "Extra Special Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergbau / Bergung",
+            BaseReward = 32000,
+            ReputationGain = 350,
+            StarSystems = "Nyx",
+            Description = "Spezialauftrag von Recco Battaglia in den Asteroidenfeldern rund um Levski (Delamar / Nyx)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_missing_persons",
+            Title = "Missing Persons",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Person/Bergung",
+            BaseReward = 24000,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Description = "Finde vermisste Bergleute oder Kundschafter im Nyx-System und sichere ihre Kennungen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_missing_mining_team",
+            Title = "Missing Mining Team",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Person/Bergung",
+            BaseReward = 28000,
+            ReputationGain = 300,
+            StarSystems = "Nyx",
+            Description = "Ein Bergbauteam der People's Alliance antwortet nicht mehr. Lokalisiere den Einsatzort in den Minen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_minor_mining_job",
+            Title = "Minor Mining Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergbau",
+            BaseReward = 19000,
+            ReputationGain = 200,
+            StarSystems = "Nyx",
+            Description = "Gewinne und liefere benötigte Erze oder Rohstoffe für die Reparaturarbeiten an Levski."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_blackbox_retrieval",
+            Title = "Blackbox Retrieval",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten/Bergung",
+            BaseReward = 22500,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Description = "Fliege zum gemeldeten Wrack im Nyx-System und berge den Flugschreiber für Recco Battaglia."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_blackbox_retrieval_dangerous",
+            Title = "Blackbox Retrieval Very Dangerous",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten/Bergung",
+            BaseReward = 38000,
+            ReputationGain = 400,
+            StarSystems = "Nyx",
+            Description = "Gefährliche Flugschreiber-Bergung in umkämpftem Gebiet mit potenzieller Piraten-Präsenz."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_crew_hasnt_checked_in",
+            Title = "Crew Hasn’t Checked In",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Person/Bergung",
+            BaseReward = 26000,
+            ReputationGain = 280,
+            StarSystems = "Nyx",
+            Description = "Eine Fracht- oder Schürfcrew hat sich nicht termingerecht gemeldet. Prüfe die letzte bekannte Position."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_moraine_data",
+            Title = "Moraine Data Retrieval",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten",
+            BaseReward = 25000,
+            ReputationGain = 270,
+            StarSystems = "Nyx",
+            Description = "Sichere vertrauliche Messdaten und Bergbauberichte aus verlassenen Depots."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_salvage_job",
+            Title = "Salvage Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergung",
+            BaseReward = 27000,
+            ReputationGain = 300,
+            StarSystems = "Nyx",
+            Description = "Sichere wertvolle Komponenten und Hüllenteile von einem aufgegebenen Schiffswrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_ship_in_distress",
+            Title = "Ship In Distress",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Rettung",
+            BaseReward = 30000,
+            ReputationGain = 320,
+            StarSystems = "Nyx",
+            Description = "Ein Notsignal eines verbündeten Schiffs wurde empfangen. Leiste Unterstützung und sichere das Überleben der Besatzung."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_emergency",
+            Title = "Emergency",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Notfall",
+            BaseReward = 35000,
+            ReputationGain = 380,
+            StarSystems = "Nyx",
+            Description = "Dringender Noteinsatz für die People's Alliance bei Levski."
         });
     }
 }

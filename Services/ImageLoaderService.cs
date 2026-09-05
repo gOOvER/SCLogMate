@@ -11,7 +11,7 @@ using SCLogMate.Core;
 namespace SCLogMate.Services;
 
 /// <summary>
-/// Lädt Bilder asynchron aus dem Web (mit In-Memory & Disk-Caching) für die Wiki- und Schiffsanzeigen.
+/// Lädt Bilder asynchron aus dem Web (mit In-Memory &amp; Disk-Caching) für die Wiki- und Schiffsanzeigen.
 /// </summary>
 public static class ImageLoaderService
 {

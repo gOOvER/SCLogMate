@@ -4,12 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:SCLogMate.ViewModels"
         xmlns:m="using:SCLogMate.Models"
-        xmlns:conv="using:SCLogMate.Converters"
         mc:Ignorable="d"
         x:Class="SCLogMate.Views.RsScanOverlayWindow"
         x:DataType="vm:MainViewModel"
         Title="SCLogMate RS Signal Scanner"
-        Width="450" Height="192"
+        Width="415" SizeToContent="Height"
         SystemDecorations="None"
         Topmost="True"
         ShowInTaskbar="False"
@@ -17,154 +16,153 @@
         Background="Transparent"
         WindowStartupLocation="Manual">
 
-  <Window.Resources>
-    <conv:FilterActiveConverter x:Key="FilterBg" />
-    <conv:AmountToBrushConverter x:Key="AmountBrush" />
-    <conv:KindToBrushConverter x:Key="KindBrush" />
-    <conv:BoolToActiveBrushConverter x:Key="ActiveBrush" />
-    <conv:BoolToGreenRedBrushConverter x:Key="GreenRedBrush" />
-    <conv:BoolToGreenRedBgConverter x:Key="GreenRedBg" />
-  </Window.Resources>
+  <Border Margin="3"
+          Background="#F2050B16"
+          BorderBrush="{Binding RsOverlayBorderBrush}"
+          BorderThickness="1.4"
+          CornerRadius="10"
+          BoxShadow="{Binding RsOverlayBoxShadow}">
+    <Grid Margin="13,9" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 
-  <Border Margin="4"
-          Background="#F2081120"
-          BorderBrush="#0284C7"
-          BorderThickness="1.2"
-          CornerRadius="9"
-          BoxShadow="0 6 24 #B0000000">
-    <Grid Margin="10,8" RowDefinitions="Auto,*,Auto">
-
-      <!-- Header: Drag-Griff, Titel, Steuerungsbuttons & Schließen -->
-      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+      <!-- Header: Drag-Griff, Titel & Micro-Buttons -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,7">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                     Background="Transparent" Cursor="SizeAll"
                     PointerPressed="OnTitlePointerPressed">
-          <TextBlock Text="⋮⋮" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" ToolTip.Tip="Klicken &amp; Ziehen zum Verschieben" />
+          <TextBlock Text="⠿" FontSize="11" Foreground="#475569" VerticalAlignment="Center" ToolTip.Tip="Klicken &amp; Ziehen zum Verschieben" />
           <TextBlock Text="🛰" FontSize="11" VerticalAlignment="Center" />
-          <TextBlock Text="RS DECODER" FontSize="10.5" Foreground="#38BDF8" FontWeight="Bold" LetterSpacing="0.6" VerticalAlignment="Center" />
+          <TextBlock Text="RS RADAR" FontSize="10" Foreground="#38BDF8" FontWeight="Bold" LetterSpacing="1" VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- Steuerung: Box, Bereich, Reset, Auto-Scan & Schließen -->
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-          <!-- Scan-Box Rahmen anzeigen/verstecken -->
-          <Button Classes="ghost" Padding="5,2" CornerRadius="4"
+        <!-- Steuerung: Micro-Buttons mit feiner Kapselform -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+          <!-- Ziel-Alarm Toggle Pill -->
+          <Button Classes="ghost" Padding="6,2.5" CornerRadius="4"
+                  Background="{Binding RsTargetAlertBadgeBg}"
+                  BorderBrush="{Binding RsTargetAlertBadgeBorder}"
+                  BorderThickness="1"
+                  Command="{Binding ToggleRsTargetAlertCommand}"
+                  ToolTip.Tip="Zielsuchliste &amp; Alarm ein-/ausschalten">
+            <TextBlock Text="🎯" FontSize="9.5" Foreground="{Binding RsTargetAlertBadgeFg}" />
+          </Button>
+
+          <!-- Scan-Box Rahmen -->
+          <Button Classes="ghost" Padding="6,2.5" CornerRadius="4"
                   Background="{Binding RsScanBoxButtonBg}"
                   BorderBrush="{Binding RsScanBoxButtonBorder}"
                   BorderThickness="1"
                   Command="{Binding ToggleRsScanBoxCommand}"
                   ToolTip.Tip="Scan-Rahmen (rosa Box) auf dem Bildschirm ein-/ausblenden">
-            <StackPanel Orientation="Horizontal" Spacing="3">
-              <TextBlock Text="👁" FontSize="9" Foreground="{Binding RsScanBoxButtonFg}" />
-              <TextBlock Text="Box" FontSize="9" FontWeight="Bold" Foreground="{Binding RsScanBoxButtonFg}" />
-            </StackPanel>
+            <TextBlock Text="👁" FontSize="9.5" Foreground="{Binding RsScanBoxButtonFg}" />
           </Button>
 
-          <!-- Bereich einrichten (Maus ziehen) -->
-          <Button Classes="ghost" Padding="5,2" CornerRadius="4"
-                  Background="#132337" BorderBrush="#254363" BorderThickness="1"
+          <!-- Bereich einrichten -->
+          <Button Classes="ghost" Padding="6,2.5" CornerRadius="4"
+                  Background="#0F1E33" BorderBrush="#1E3A5F" BorderThickness="1"
                   Command="{Binding CalibrateRsScanRegionCommand}"
-                  ToolTip.Tip="Scan-Bereich auf dem Bildschirm per Maus aufziehen">
-            <StackPanel Orientation="Horizontal" Spacing="3">
-              <TextBlock Text="🎯" FontSize="9" Foreground="#38BDF8" />
-              <TextBlock Text="Bereich" FontSize="9" FontWeight="SemiBold" Foreground="#E2E8F0" />
-            </StackPanel>
+                  ToolTip.Tip="Scan-Bereich per Maus aufziehen">
+            <TextBlock Text="⛶" FontSize="9.5" Foreground="#38BDF8" />
           </Button>
 
-          <!-- Reset Standard -->
-          <Button Classes="ghost" Padding="5,2" CornerRadius="4"
-                  Background="#132337" BorderBrush="#254363" BorderThickness="1"
-                  Command="{Binding ResetRsScanRegionCommand}"
-                  ToolTip.Tip="Scan-Bereich auf Standard zurücksetzen">
-            <TextBlock Text="↺" FontSize="9.5" Foreground="#94A3B8" />
-          </Button>
-
-          <!-- Auto-Scan Toggle Button -->
-          <Button Classes="ghost" Padding="6,2" CornerRadius="4"
+          <!-- Auto-Scan Toggle Status Pill -->
+          <Button Classes="ghost" Padding="7,2.5" CornerRadius="4"
                   Background="{Binding RsAutoScanBadgeBg}"
                   BorderBrush="{Binding RsAutoScanBadgeBorder}"
                   BorderThickness="1"
                   Command="{Binding ToggleRsAutoScanCommand}"
-                  ToolTip.Tip="Auto-Scan ein- oder ausschalten (150ms Loop)">
-            <TextBlock Text="{Binding RsAutoScanStatusText}" FontSize="9" FontWeight="Bold" Foreground="{Binding RsAutoScanBadgeFg}" />
+                  ToolTip.Tip="Auto-Scan ein- oder ausschalten (200ms Loop)">
+            <TextBlock Text="{Binding RsAutoScanStatusText}" FontSize="8.5" FontWeight="Bold" Foreground="{Binding RsAutoScanBadgeFg}" LetterSpacing="0.5" />
           </Button>
 
           <!-- Schließen -->
-          <Button Classes="ghost" Padding="5,2" CornerRadius="4" Background="#132337" BorderBrush="#254363" BorderThickness="1" Click="OnCloseClicked" ToolTip.Tip="Overlay schließen">
-            <TextBlock Text="✕" FontSize="9" Foreground="#94A3B8" />
+          <Button Classes="ghost" Padding="6,2.5" CornerRadius="4" Background="#0F1E33" BorderBrush="#1E3A5F" BorderThickness="1" Click="OnCloseClicked" ToolTip.Tip="Overlay schließen">
+            <TextBlock Text="✕" FontSize="9.5" Foreground="#94A3B8" />
           </Button>
         </StackPanel>
       </Grid>
 
-      <!-- Mitte: Gescannter RS-Wert + Bester Treffer Hero Card -->
-      <Border Grid.Row="1" Background="#D00B1728" BorderBrush="#1E3A8A" BorderThickness="1" CornerRadius="7" Padding="10,8" Margin="0,6,0,6">
-        <Grid>
-          
-          <!-- Standby-Ansicht (wenn noch kein Treffer da ist) -->
-          <Grid RowDefinitions="Auto,Auto" VerticalAlignment="Center" HorizontalAlignment="Center"
-                IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNull}}">
-            <TextBlock Grid.Row="0" Text="{Binding CurrentRsDisplayValue}" FontSize="16" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" HorizontalAlignment="Center" />
-            <TextBlock Grid.Row="1" Text="{Binding RsStandbyText}" FontSize="10.5" Foreground="#8B949E" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
-          </Grid>
+      <!-- Subtiler Trennstrich Header -->
+      <Rectangle Grid.Row="1" Height="1" Fill="#1E3A5F" Opacity="0.4" Margin="0,0,0,7" />
 
-          <!-- Aktiver Treffer: 4 saubere Zeilen mit festen Grid-Grenzen (kein Text-Überlauf!) -->
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto" VerticalAlignment="Center"
-                IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
-            
-            <!-- Zeile 1: Signal & Tier Badge -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <TextBlock Text="SIGNAL:" FontSize="9" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center" LetterSpacing="0.5" />
-                <TextBlock Text="{Binding CurrentRsDisplayValue}" FontSize="13" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
-              </StackPanel>
-              
-              <!-- Tier Badge -->
-              <Border Grid.Column="1" Background="{Binding BestRsMatch.BadgeColor, FallbackValue='#334155'}" CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center">
-                <TextBlock Text="{Binding BestRsMatch.Resource.Tier, StringFormat='Tier {0}'}" FontSize="9.5" FontWeight="Bold" Foreground="#FFFFFF" />
-              </Border>
-            </Grid>
+      <!-- Mitte: Standby oder Aktiver Treffer (HERO: GROSSER NAME!) -->
+      <Grid Grid.Row="2" Margin="0,2,0,7">
 
-            <!-- Zeile 2: Hauptressource / Titel (Groß & Klar auf eigener Zeile) -->
-            <TextBlock Grid.Row="1" Margin="0,3,0,0"
+        <!-- Standby-Ansicht -->
+        <StackPanel Orientation="Vertical" Spacing="3" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,8"
+                    IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNull}}">
+          <TextBlock Text="{Binding CurrentRsDisplayValue}" FontSize="17" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding RsStandbyText}" FontSize="11" Foreground="#818CF8" FontStyle="Italic" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <!-- Aktiver Treffer -->
+        <StackPanel Orientation="Vertical" Spacing="7"
+                    IsVisible="{Binding BestRsMatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+          <!-- ZEILE 1 (HERO): WAS ES IST (Groß 22px, leuchtend, viel Raum) + ZIEL-BADGE + TIER BADGE -->
+          <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+            <TextBlock Grid.Column="0"
                        Text="{Binding BestRsMatch.DisplayTitle}"
-                       FontSize="15" FontWeight="Bold" Foreground="#38BDF8"
-                       TextTrimming="CharacterEllipsis" />
+                       FontSize="22" FontWeight="Heavy"
+                       Foreground="{Binding BestRsMatch.TargetAlertTitleColor, FallbackValue='#38BDF8'}"
+                       LetterSpacing="0.4"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
 
-            <!-- Zeile 3: Untertitel / Seltenheit & Base-RS (Eigene Zeile mit sicherem CharacterEllipsis) -->
-            <TextBlock Grid.Row="2" Margin="0,1,0,3"
-                       Text="{Binding BestRsMatch.Subtitle}"
-                       FontSize="10.5" Foreground="#94A3B8"
-                       TextTrimming="CharacterEllipsis" />
+            <!-- ZIEL ERFASST Kapsel (nur bei Match mit Suchliste) -->
+            <Border Grid.Column="1" Background="#B45309" BorderBrush="#FBBF24" BorderThickness="1"
+                    CornerRadius="10" Padding="8,2.5" VerticalAlignment="Center" Margin="6,0,0,0"
+                    IsVisible="{Binding BestRsMatch.IsTargetMatch, FallbackValue=False}">
+              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="🎯" FontSize="9" VerticalAlignment="Center" />
+                <TextBlock Text="ZIEL" FontSize="9.5" FontWeight="Bold" Foreground="#FFFFFF" LetterSpacing="0.4" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
 
-            <!-- Zeile 4: Raffinerie & Wert (Säuberlich aufgeteilt in Pills) -->
-            <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,2,0,0">
-              <Border Grid.Column="0" Background="#111E33" BorderBrush="#1C3252" BorderThickness="1" CornerRadius="4" Padding="6,2.5" Margin="0,0,6,0">
-                <Grid ColumnDefinitions="Auto,*">
-                  <TextBlock Grid.Column="0" Text="🏭 " FontSize="9.5" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="{Binding BestRsMatch.BestRefineryText}" FontSize="9.5" Foreground="#4ADE80" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                </Grid>
-              </Border>
-
-              <Border Grid.Column="1" Background="#1E1928" BorderBrush="#3D2B54" BorderThickness="1" CornerRadius="4" Padding="6,2.5">
-                <TextBlock Text="{Binding BestRsMatch.EstimatedValueText}" FontSize="10" FontWeight="Bold" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
-              </Border>
-            </Grid>
-
+            <!-- Tier Badge Kapsel -->
+            <Border Grid.Column="2" Background="{Binding BestRsMatch.BadgeColor, FallbackValue='#334155'}" CornerRadius="10" Padding="9,2.5" VerticalAlignment="Center" Margin="6,0,0,0">
+              <TextBlock Text="{Binding BestRsMatch.Resource.Tier, StringFormat='Tier {0}'}" FontSize="10" FontWeight="Bold" Foreground="#FFFFFF" LetterSpacing="0.3" />
+            </Border>
           </Grid>
 
-        </Grid>
-      </Border>
+          <!-- ZEILE 2: DETAILS CHIPS (Im Grid begrenzt, kein Überlauf mehr!) -->
+          <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <!-- Signal Badge -->
+              <Border Background="#0E1E33" BorderBrush="#1E40AF" BorderThickness="1" CornerRadius="5" Padding="7,3.5" VerticalAlignment="Center">
+                <TextBlock Text="{Binding CurrentRsDisplayValue}" FontSize="11.5" FontWeight="Bold" Foreground="#F59E0B" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
+              </Border>
+
+              <!-- Raffinerie Chip (nur sichtbar wenn Veredelung existiert) -->
+              <Border Background="#062419" BorderBrush="#059669" BorderThickness="1" CornerRadius="5" Padding="7,3.5" VerticalAlignment="Center"
+                      IsVisible="{Binding BestRsMatch.HasRefinery, FallbackValue=False}">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <TextBlock Text="🏭" FontSize="9.5" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding BestRsMatch.BestRefineryCompact}" FontSize="10.5" Foreground="#34D399" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <!-- Wert Chip (Rechtsbündig) -->
+            <Border Grid.Column="2" Background="#241407" BorderBrush="#D97706" BorderThickness="1" CornerRadius="5" Padding="8,3.5" VerticalAlignment="Center" HorizontalAlignment="Right">
+              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="💰" FontSize="9.5" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding BestRsMatch.EstimatedValueText}" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </Grid>
+
+        </StackPanel>
+
+      </Grid>
+
+      <!-- Subtiler Trennstrich Footer -->
+      <Rectangle Grid.Row="3" Height="1" Fill="#1E3A5F" Opacity="0.35" Margin="0,0,0,6" />
 
       <!-- Footer: Sekundäre Treffer Quick-Ticker & 1-Klick Scan -->
-      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,1,0,0">
-        <Border Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center">
-          <TextBlock Text="{Binding SecondaryRsMatchesText}" FontSize="9.5" Foreground="#64748B" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-        </Border>
-        <Button Grid.Column="1" Classes="ghost" Padding="6,1.5" CornerRadius="4" Background="#132337" BorderBrush="#254363" BorderThickness="1"
-                Command="{Binding TriggerRsOcrScanCommand}" ToolTip.Tip="Jetzt manuellen OCR-Scan ausführen">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="⚡" FontSize="9" Foreground="#38BDF8" />
-            <TextBlock Text="Scan" FontSize="9" Foreground="#38BDF8" FontWeight="Bold" />
-          </StackPanel>
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding SecondaryRsMatchesText, StringFormat='◇ {0}'}" FontSize="10" Foreground="#64748B" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <Button Grid.Column="1" Classes="ghost" Padding="6,1.5" CornerRadius="4" Background="#0F1E33" BorderBrush="#1E3A5F" BorderThickness="1"
+                Command="{Binding TriggerRsOcrScanCommand}" ToolTip.Tip="Manuellen OCR-Scan auslösen">
+          <TextBlock Text="⚡" FontSize="9" Foreground="#38BDF8" />
         </Button>
       </Grid>
 

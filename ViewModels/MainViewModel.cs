@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool isAuroraServerErrorsEnabled = true;
     [ObservableProperty] private bool simulateAuroraNotInstalled;
 
-    /// <summary>Gibt an, ob der Entwickler- & Debug-Modus aktiv ist (über settings.json konfiguriert oder lokaler Debug-Build).</summary>
+    /// <summary>Gibt an, ob der Entwickler- &amp; Debug-Modus aktiv ist (über settings.json konfiguriert oder lokaler Debug-Build).</summary>
     public bool IsDebugModeActive => _settings.DebugMode;
 
     /// <summary>Kauf-Banner nur anzeigen, wenn Aurora nicht installiert ist (oder im Debug-Modus simuliert wird) UND Deutsch als Sprache aktiv ist.</summary>
@@ -273,6 +273,32 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool isRsAutoScanEnabled;
     [ObservableProperty] private string rsOcrStatusText = "OCR bereit";
     public ObservableCollection<RsMatch> CurrentRsMatches { get; } = new();
+
+    // RS Target Watchlist & Alarm
+    public ObservableCollection<RsTargetItem> RsTargetList { get; } = new();
+    public ObservableCollection<RsTargetItem> FilteredRsTargets { get; } = new();
+    [ObservableProperty] private string rsTargetSearchText = "";
+    [ObservableProperty] private string rsTargetCategoryFilter = "all";
+    [ObservableProperty] private bool isRsTargetAlertEnabled;
+    [ObservableProperty] private bool isRsTargetSoundEnabled;
+    [ObservableProperty] private bool isRsTargetTtsEnabled;
+    [ObservableProperty] private bool isRsTargetAlertActive;
+
+    public bool IsCatAllSelected => RsTargetCategoryFilter == "all";
+    public bool IsCatHighValueSelected => RsTargetCategoryFilter == "highvalue";
+    public bool IsCatShipSelected => RsTargetCategoryFilter == "ship";
+    public bool IsCatRocSelected => RsTargetCategoryFilter == "roc";
+    public bool IsCatFpsSelected => RsTargetCategoryFilter == "fps";
+    public bool IsCatSalvageSelected => RsTargetCategoryFilter == "salvage";
+    public bool IsCatActiveSelected => RsTargetCategoryFilter == "active";
+
+    public string RsTargetCountSummary => $"{RsTargetList.Count(t => t.IsEnabled)} / {RsTargetList.Count} aktiv";
+    public string RsTargetAlertStatusText => IsRsTargetAlertEnabled ? "🎯 ALARM AN" : "🎯 ALARM AUS";
+    public string RsTargetAlertBadgeBg => IsRsTargetAlertEnabled ? "#78350F" : "#1E293B";
+    public string RsTargetAlertBadgeBorder => IsRsTargetAlertEnabled ? "#F59E0B" : "#475569";
+    public string RsTargetAlertBadgeFg => IsRsTargetAlertEnabled ? "#FBBF24" : "#94A3B8";
+    public string RsOverlayBorderBrush => IsRsTargetAlertActive ? "#F59E0B" : "#0284C7";
+    public string RsOverlayBoxShadow => IsRsTargetAlertActive ? "0 8 32 #C0F59E0B" : "0 8 28 #A0000000";
 
     public string CurrentRsDisplayValue => CurrentRsValue.HasValue ? $"RS {CurrentRsValue.Value:N0}" : "—";
     public string RsAutoScanStatusText => IsRsAutoScanEnabled ? "⚡ AUTO" : "MANUELL";
@@ -693,7 +719,11 @@ public partial class MainViewModel : ObservableObject
                 _settings.WalletRegion = r;
                 Settings.Save(_settings);
                 UpdateOcrRegionText();
-                if (ShowScanBox) _scanIndicator.SetRegion(r);
+                if (ShowScanBox)
+                {
+                    _scanIndicator.SetRegion(r);
+                    _scanIndicator.Show();
+                }
                 Status = $"mobiGlas-Bereich gespeichert: {r.Width}x{r.Height} @ ({r.X},{r.Y})";
             });
         };
@@ -708,6 +738,7 @@ public partial class MainViewModel : ObservableObject
         {
             var region = _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion();
             _scanIndicator.SetRegion(region);
+            _scanIndicator.Show();
             Status = "Scan-Rahmen im Spiel eingeblendet";
         }
         else
@@ -987,6 +1018,8 @@ public partial class MainViewModel : ObservableObject
                         });
                     });
 
+                    Database.WasParserResetRequired = false;
+
                     Dispatcher.UIThread.Post(() =>
                     {
                         DatabaseStatusMessage = $"✓ Auto-Scan fertig: {result.indexedSessions} Sessions ({result.totalEvents:N0} Events) indexiert.";
@@ -996,6 +1029,7 @@ public partial class MainViewModel : ObservableObject
                         var wipeSince = GetEffectiveWipeDate();
                         RebuildFleet(Database.GetFleetStats(WipeFilterFleet ? wipeSince : null));
                         LoadIndependentFinancesAsync();
+                        if (SelectedSession?.IsAll == true) LoadAllSessions();
                     });
                 }
                 else if (unindexedCount > 0)
@@ -1028,16 +1062,27 @@ public partial class MainViewModel : ObservableObject
                         {
                             Status = $"✓ {added} neue Session(s) automatisch im Hintergrund indexiert.";
                         }
+                        if (SelectedSession?.IsAll == true) LoadAllSessions();
                     });
                 }
                 else
                 {
-                    Dispatcher.UIThread.Post(LoadIndependentFinancesAsync);
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        LoadIndependentFinancesAsync();
+                        if (SelectedSession?.IsAll == true) LoadAllSessions();
+                    });
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error("AutoSyncAndIndexDatabaseAsync", ex);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    IsDatabaseBusy = false;
+                    DatabaseStatusMessage = "Fehler bei Hintergrund-Indexierung – siehe Log.";
+                    if (SelectedSession?.IsAll == true) LoadAllSessions();
+                });
             }
         });
     }
@@ -1216,10 +1261,14 @@ public partial class MainViewModel : ObservableObject
             _settings.Balance = balance;
             _settings.BalanceSetAt = DateTime.UtcNow;
             Settings.Save(_settings);
+            Database.SetMeta("current_wallet", balance.ToString());
+            Database.SetMeta("current_wallet_time", DateTime.UtcNow.ToString("o"));
 
             ManualBalance = balance.ToString("N0");
             RecomputeBalances();
             OnPropertyChanged(nameof(LiveBalanceText));
+            OnPropertyChanged(nameof(ExpectedBalance));
+            OnPropertyChanged(nameof(ExpectedText));
             OnPropertyChanged(nameof(AccountText));
             _scanIndicator.FlashGreen();
             Status = $"⚡ Kontostand per mobiGlas synchronisiert: {balance:N0} aUEC";
@@ -1792,7 +1841,7 @@ public partial class MainViewModel : ObservableObject
     public string SessionSpendText => $"-{LiveSessionSpend:N0} aUEC";
     public string SessionNetText => $"{(LiveSessionNet >= 0 ? "+" : "")}{LiveSessionNet:N0} aUEC";
     public long SessionNetSign => LiveSessionNet;
-    public string LiveBalanceText => ExpectedBalance > 0 ? $"{ExpectedBalance:N0} aUEC" : StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
+    public string LiveBalanceText => _settings.Balance > 0 ? $"{_settings.Balance:N0} aUEC" : StartBalance() > 0 ? $"{StartBalance():N0} aUEC" : "— Nicht gesetzt —";
 
     // Geld-Statistik & Sci-Fi Vektor-Diagramme (eigener Tab)
     public ObservableCollection<StatItem> IncomeStats { get; } = new();
@@ -2024,28 +2073,11 @@ public partial class MainViewModel : ObservableObject
 
     public void LoadGlobalDataAsync()
     {
-        var liveLog = LogPath;
-        var dir = Path.GetDirectoryName(liveLog) ?? ".";
-        var backupDir = Path.Combine(dir, "logbackups");
-
         Task.Run(() =>
         {
             try
             {
-                var backups = Directory.Exists(backupDir)
-                    ? Directory.GetFiles(backupDir, "*.log")
-                    : System.Array.Empty<string>();
-
-                if (backups.Length > 0)
-                {
-                    var archived = LogArchive.Sync(backups);
-                    Database.Init();
-                    Database.IndexNew(archived);
-                }
-                else
-                {
-                    Database.Init();
-                }
+                Database.EnsureInitialized();
 
                 var wipeSince = GetEffectiveWipeDate();
                 var agg = Database.Aggregate(wipeSince, WipeFilterMoney, WipeFilterContracts, WipeFilterFleet);
@@ -2742,13 +2774,10 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public long ExpectedBalance => StartBalance() > 0 
-        ? (_settings.BalanceSetAt.HasValue ? StartBalance() + NetSinceBalance : StartBalance())
-        : 0;
+    public long ExpectedBalance => _settings.Balance > 0 ? _settings.Balance : StartBalance();
 
     public string ExpectedText =>
-        StartBalance() <= 0 ? "Kontostand eintragen"
-        : _settings.BalanceSetAt is null ? "≈ " + StartBalance().ToString("N0") + " aUEC (neu setzen für Verlauf)"
+        ExpectedBalance <= 0 ? "Kontostand eintragen"
         : $"≈ {ExpectedBalance:N0} aUEC";
 
     static bool IsMoney(EventKind k) => k is EventKind.TransferIn or EventKind.TransferOut
@@ -2782,13 +2811,18 @@ public partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(AccountText));
         OnPropertyChanged(nameof(LiveBalanceText));
+        OnPropertyChanged(nameof(ExpectedBalance));
+        OnPropertyChanged(nameof(ExpectedText));
         RecomputeBalances();
         if (!_ready) return;
         var b = StartBalance();
         if (b > 0)
         {
             _settings.Balance = b;
+            _settings.BalanceSetAt = DateTime.UtcNow;
             Settings.Save(_settings);
+            Database.SetMeta("current_wallet", b.ToString());
+            Database.SetMeta("current_wallet_time", DateTime.UtcNow.ToString("o"));
         }
     }
 
@@ -2801,6 +2835,17 @@ public partial class MainViewModel : ObservableObject
             EventsView?.Refresh();
         };
         _settings = Settings.Load();
+        if (_settings.Balance <= 0)
+        {
+            var dbWalletStr = Database.GetMeta("current_wallet");
+            if (long.TryParse(dbWalletStr, out var dbW) && dbW > 0)
+            {
+                _settings.Balance = dbW;
+                var dbTimeStr = Database.GetMeta("current_wallet_time");
+                if (DateTime.TryParse(dbTimeStr, out var dbT)) _settings.BalanceSetAt = dbT;
+                Settings.Save(_settings);
+            }
+        }
         if (_settings.Balance > 0)
         {
             manualBalance = _settings.Balance.ToString("N0");
@@ -2973,16 +3018,27 @@ public partial class MainViewModel : ObservableObject
         _rsScanner.RsValueDetected += val => Dispatcher.UIThread.Post(() => OnRsDetected(val));
         _rsScanner.StatusChanged += s => Dispatcher.UIThread.Post(() => RsOcrStatusText = s);
 
-        IsRsAutoScanEnabled = _settings.RsAutoScanEnabled;
-        if (IsRsAutoScanEnabled)
+        if (_settings.RsAutoScanEnabled)
         {
+            IsRsAutoScanEnabled = true;
             _rsScanner.Start();
+            RsOcrStatusText = "⚡ Auto-Scan aktiv";
+        }
+        else
+        {
+            IsRsAutoScanEnabled = false;
+            RsOcrStatusText = "Auto-Scan bereit";
         }
 
         if (_settings.RsOverlayEnabled)
         {
             IsRsOverlayActive = true;
         }
+
+        IsRsTargetAlertEnabled = _settings.RsTargetAlertEnabled;
+        IsRsTargetSoundEnabled = _settings.RsTargetSoundEnabled;
+        IsRsTargetTtsEnabled = _settings.RsTargetTtsEnabled;
+        InitRsTargetList();
 
         _auroraService = new AuroraVoiceService(_settings.AuroraCustomPath);
         IsAuroraInstalled = _auroraService.IsInstalled;
@@ -3148,8 +3204,8 @@ public partial class MainViewModel : ObservableObject
         _settings.LogPath = LogPath;
         Settings.Save(_settings);
 
-        // Standard: gleich alle Sessions laden
-        if (SelectedSession?.IsAll == true) LoadSession();
+        // Einzel-Session direkt laden; "Alle Sessions" wird nach DB-Sync automatisch via AutoSyncAndIndexDatabaseAsync geladen
+        if (SelectedSession?.IsAll != true) LoadSession();
 
         // Automatische DB-Synchronisation & Hintergrund-Indexierung
         _ = AutoSyncAndIndexDatabaseAsync();
@@ -3446,32 +3502,23 @@ public partial class MainViewModel : ObservableObject
         Running = true;
         Status = "lade Archiv…";
         var liveLog = LogPath;
-        var dir = Path.GetDirectoryName(liveLog) ?? ".";
-        var backupDir = Path.Combine(dir, "logbackups");
 
         Task.Run(() =>
         {
             try
             {
-                var backups = Directory.Exists(backupDir)
-                    ? Directory.GetFiles(backupDir, "*.log")
-                    : System.Array.Empty<string>();
-
-                // 1) Roh-Logs archivieren, 2) DB öffnen, 3) nur Neues indexieren
-                var archived = LogArchive.Sync(backups);
                 Database.Init();
-                int added = Database.IndexNew(archived);
 
-                // 4) Summen/Top per SQL + ALLE Events für die Tabelle (virtualisiert) mit Wipe-Filter
+                // Summen/Top per SQL + jüngste Events für die Tabelle (virtualisiert) mit Wipe-Filter
                 var wipeSince = GetEffectiveWipeDate();
                 var agg = Database.Aggregate(wipeSince, WipeFilterMoney, WipeFilterContracts, WipeFilterFleet);
                 var topDb = Database.TopMoney(40);
-                var recent = Database.LoadAllEvents().ToList();
+                var recent = Database.LoadRecentEvents(15000);
 
-                Logger.Log($"Alle Sessions: {agg.Sessions} in DB ({added} neu indexiert).");
+                Logger.Log($"Alle Sessions: {agg.Sessions} in DB.");
                 FlushUnknownNotifications();
 
-                // 5) Basis aus DB setzen, dann laufende Game.log LIVE oben drauf tailen
+                // Basis aus DB setzen, dann laufende Game.log LIVE oben drauf tailen
                 Dispatcher.UIThread.Post(() => ApplyAggregate(agg, topDb, recent, liveLog));
             }
             catch (System.Exception ex)
@@ -3533,16 +3580,29 @@ public partial class MainViewModel : ObservableObject
             CurrentLocation = qtEv?.Location ?? "—";
         }
 
-        var jurEv = Events.FirstOrDefault(e => e.Kind == EventKind.Jurisdiction && (e.Detail.Contains("Nyx") || e.Detail.Contains("People's Alliance") || e.Detail.Contains("Pyro")));
+        var jurEv = Events.FirstOrDefault(e => e.Kind == EventKind.Jurisdiction);
         if (jurEv != null)
         {
-            var sys = jurEv.Detail.Contains("Nyx") || jurEv.Detail.Contains("People's Alliance") ? "Nyx" : "Pyro";
-            Locations.ActiveSystem = sys;
-            ResolvedLocation.SystemName = sys;
-            SelectedStarmapSystem = sys;
-            OnPropertyChanged(nameof(LocationSystemBadge));
-            OnPropertyChanged(nameof(LocationBadgeColor));
-            OnPropertyChanged(nameof(LocationStatusSubline));
+            var detail = jurEv.Detail ?? "";
+            string? sys = detail.Contains("Nyx", StringComparison.OrdinalIgnoreCase) || detail.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase) ? "Nyx"
+                : detail.Contains("Pyro", StringComparison.OrdinalIgnoreCase) ? "Pyro"
+                : detail.Contains("Stanton", StringComparison.OrdinalIgnoreCase) || detail.Contains("UEE", StringComparison.OrdinalIgnoreCase) ? "Stanton"
+                : null;
+
+            if (sys != null)
+            {
+                Locations.ActiveSystem = sys;
+                ResolvedLocation.SystemName = sys;
+                SelectedStarmapSystem = sys;
+                OnPropertyChanged(nameof(LocationSystemBadge));
+                OnPropertyChanged(nameof(LocationBadgeColor));
+                OnPropertyChanged(nameof(LocationStatusSubline));
+            }
+        }
+        else if (ResolvedLocation.SystemName is "Stanton" or "Pyro" or "Nyx")
+        {
+            Locations.ActiveSystem = ResolvedLocation.SystemName;
+            SelectedStarmapSystem = ResolvedLocation.SystemName;
         }
 
         CurrentShip = Events.FirstOrDefault(e => e.Kind == EventKind.Vehicle)?.Detail ?? "—";
@@ -3970,6 +4030,18 @@ public partial class MainViewModel : ObservableObject
                     _running += e.Amount;
                     e.BalanceAfter = _running;
                     e.HasBalance = true;
+
+                    // Dauerhaft aktuellen Kontostand fortschreiben und persistieren
+                    if (_settings.Balance > 0)
+                    {
+                        _settings.Balance += e.Amount;
+                        _settings.BalanceSetAt = e.Time;
+                        Settings.Save(_settings);
+                        Database.SetMeta("current_wallet", _settings.Balance.ToString());
+                        Database.SetMeta("current_wallet_time", e.Time.ToString("o"));
+                        ManualBalance = _settings.Balance.ToString("N0");
+                        OnPropertyChanged(nameof(ManualBalance));
+                    }
                 }
                 else
                 {
@@ -4110,6 +4182,27 @@ public partial class MainViewModel : ObservableObject
             Status = $"★ Auftrag abgeschlossen: {completedTitle}";
         }
 
+        // In _rawContracts (SubTab 0 Aufträge-Tabelle) aktualisieren
+        var normComp = ContractParser.NormalizeTitle(completedTitle);
+        var rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
+            (!string.IsNullOrEmpty(normComp) && ContractParser.NormalizeTitle(c.Title).Contains(normComp) ||
+             normComp.Contains(ContractParser.NormalizeTitle(c.Title))));
+        if (rawMatch != null)
+        {
+            var idx = _rawContracts.IndexOf(rawMatch);
+            if (idx >= 0)
+            {
+                _rawContracts[idx] = rawMatch with
+                {
+                    Outcome = ContractOutcome.Completed,
+                    CompletedAt = DateTime.UtcNow,
+                    StepsDone = Math.Max(rawMatch.StepsTotal, rawMatch.StepsDone),
+                    Reward = reward > 0 ? reward : rawMatch.Reward
+                };
+            }
+        }
+        UpdateContractsView();
+
         // Fraktionsruf & XP automatisch verbuchen
         var fac = ReputationCatalog.MatchFaction(matchContract?.ContractedBy) ?? ReputationCatalog.MatchFaction(completedTitle);
         if (fac != null)
@@ -4204,6 +4297,25 @@ public partial class MainViewModel : ObservableObject
         {
             Status = $"✕ {detail}";
         }
+
+        // In _rawContracts (SubTab 0 Aufträge-Tabelle) aktualisieren
+        var normCanc = ContractParser.NormalizeTitle(missionTitle);
+        var rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
+            (!string.IsNullOrEmpty(normCanc) && ContractParser.NormalizeTitle(c.Title).Contains(normCanc) ||
+             normCanc.Contains(ContractParser.NormalizeTitle(c.Title))));
+        if (rawMatch != null)
+        {
+            var idx = _rawContracts.IndexOf(rawMatch);
+            if (idx >= 0)
+            {
+                _rawContracts[idx] = rawMatch with
+                {
+                    Outcome = ContractOutcome.Abandoned,
+                    CompletedAt = DateTime.UtcNow
+                };
+            }
+        }
+        UpdateContractsView();
     }
 
     private void HandleMissionAccepted(string? detail, long reward = 0)
@@ -4260,6 +4372,22 @@ public partial class MainViewModel : ObservableObject
             ActiveContractRewardText = existing.RewardText;
             ActiveContractOrg = existing.ContractedBy;
             ActiveContractTitle = existing.Title;
+
+            // Auch _rawContracts aktualisieren
+            var existingRawDupe = _rawContracts.FirstOrDefault(c => ContractParser.NormalizeTitle(c.Title) == norm && c.Outcome == ContractOutcome.InProgress);
+            if (existingRawDupe != null)
+            {
+                var idx = _rawContracts.IndexOf(existingRawDupe);
+                if (idx >= 0)
+                {
+                    _rawContracts[idx] = existingRawDupe with
+                    {
+                        Reward = finalReward > 0 ? finalReward : existingRawDupe.Reward,
+                        Issuer = !string.IsNullOrEmpty(org) ? org : existingRawDupe.Issuer
+                    };
+                }
+            }
+            UpdateContractsView();
             return;
         }
 
@@ -4278,6 +4406,29 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasActiveContracts));
         OnPropertyChanged(nameof(ActiveContractsCountText));
         Status = $"★ Auftrag angenommen: {contract.Title} · {contract.RewardText}";
+
+        // In _rawContracts (SubTab 0 Aufträge-Tabelle) einbinden/aktualisieren
+        var existingRaw = _rawContracts.FirstOrDefault(c => ContractParser.NormalizeTitle(c.Title) == norm && c.Outcome == ContractOutcome.InProgress);
+        if (existingRaw == null)
+        {
+            _rawContracts.Insert(0, new ContractRecord
+            {
+                MissionId = "active_" + norm,
+                AcceptedAt = DateTime.UtcNow,
+                Title = contract.Title,
+                Issuer = !string.IsNullOrEmpty(contract.ContractedBy) && !contract.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase)
+                    ? contract.ContractedBy
+                    : (!string.IsNullOrEmpty(cat?.Contractor) ? cat.Contractor : (!string.IsNullOrEmpty(cat?.Faction) ? cat.Faction : "Unbekannt")),
+                Type = cat?.MissionType ?? "Auftrag",
+                Difficulty = "k.A.",
+                System = cat?.StarSystems ?? (SelectedStarmapSystem ?? "Stanton"),
+                StepsTotal = 1,
+                StepsDone = 0,
+                Reward = contract.Reward,
+                Outcome = ContractOutcome.InProgress
+            });
+        }
+        UpdateContractsView();
     }
 
     [RelayCommand]
@@ -4293,6 +4444,25 @@ public partial class MainViewModel : ObservableObject
         ContractStatusText = ActiveContracts.Count == 0 ? "Kein aktiver Auftrag" : ActiveContracts.Count == 1 ? "1 aktiver Auftrag" : $"{ActiveContracts.Count} aktive Aufträge";
         OnPropertyChanged(nameof(HasActiveContracts));
         OnPropertyChanged(nameof(ActiveContractsCountText));
+
+        // In _rawContracts ebenfalls auf Abandoned setzen
+        var normRem = ContractParser.NormalizeTitle(contract.Title);
+        var rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
+            (!string.IsNullOrEmpty(normRem) && ContractParser.NormalizeTitle(c.Title).Contains(normRem) ||
+             normRem.Contains(ContractParser.NormalizeTitle(c.Title))));
+        if (rawMatch != null)
+        {
+            var idx = _rawContracts.IndexOf(rawMatch);
+            if (idx >= 0)
+            {
+                _rawContracts[idx] = rawMatch with
+                {
+                    Outcome = ContractOutcome.Abandoned,
+                    CompletedAt = DateTime.UtcNow
+                };
+            }
+        }
+        UpdateContractsView();
     }
 
 
@@ -4305,7 +4475,7 @@ public partial class MainViewModel : ObservableObject
         {
             Title = mission.Title,
             Reward = (int)mission.BaseReward,
-            ContractedBy = !string.IsNullOrEmpty(mission.Contractor) ? mission.Contractor : (!string.IsNullOrEmpty(mission.Faction) ? mission.Faction : "mobiGlas"),
+            ContractedBy = !string.IsNullOrEmpty(mission.Contractor) ? mission.Contractor : (!string.IsNullOrEmpty(mission.Faction) ? mission.Faction : "Unbekannt"),
             ScannedAt = DateTime.UtcNow
         };
 
@@ -5491,18 +5661,246 @@ public partial class MainViewModel : ObservableObject
         foreach (var m in matches) CurrentRsMatches.Add(m);
         BestRsMatch = matches.FirstOrDefault();
 
+        if (BestRsMatch != null)
+        {
+            bool isTarget = IsRsTargetAlertEnabled &&
+                            RsTargetList.Any(t => t.IsEnabled && t.Name.Equals(BestRsMatch.Resource.Name, StringComparison.OrdinalIgnoreCase));
+
+            BestRsMatch.IsTargetMatch = isTarget;
+            IsRsTargetAlertActive = isTarget;
+
+            if (isTarget)
+            {
+                RsAudioAlertService.TriggerTargetAlert(BestRsMatch, IsRsTargetSoundEnabled, IsRsTargetTtsEnabled);
+            }
+        }
+        else
+        {
+            IsRsTargetAlertActive = false;
+        }
+
         RsOcrStatusText = $"✓ Erkannt: {rs:N0} RS ({DateTime.Now:HH:mm:ss})";
         OnPropertyChanged(nameof(CurrentRsDisplayValue));
         OnPropertyChanged(nameof(SecondaryRsMatchesText));
         OnPropertyChanged(nameof(RsStandbyText));
+        OnPropertyChanged(nameof(RsOverlayBorderBrush));
+        OnPropertyChanged(nameof(RsOverlayBoxShadow));
         Status = BestRsMatch != null
-            ? $"🛰 RS Signal {rs:N0} erkannt: {BestRsMatch.DisplayTitle} ({BestRsMatch.Subtitle})"
+            ? (BestRsMatch.IsTargetMatch
+                ? $"🎯 ZIEL ERFASST! {rs:N0} RS: {BestRsMatch.DisplayTitle} ({BestRsMatch.Subtitle})"
+                : $"🛰 RS Signal {rs:N0} erkannt: {BestRsMatch.DisplayTitle} ({BestRsMatch.Subtitle})")
             : $"🛰 RS Signal {rs:N0} erkannt (Keine bekannte Signatur)";
+    }
+
+    partial void OnIsRsTargetAlertEnabledChanged(bool value)
+    {
+        _settings.RsTargetAlertEnabled = value;
+        Settings.Save(_settings);
+        OnPropertyChanged(nameof(RsTargetAlertStatusText));
+        OnPropertyChanged(nameof(RsTargetAlertBadgeBg));
+        OnPropertyChanged(nameof(RsTargetAlertBadgeBorder));
+        OnPropertyChanged(nameof(RsTargetAlertBadgeFg));
+    }
+
+    partial void OnIsRsTargetSoundEnabledChanged(bool value)
+    {
+        _settings.RsTargetSoundEnabled = value;
+        Settings.Save(_settings);
+    }
+
+    partial void OnIsRsTargetTtsEnabledChanged(bool value)
+    {
+        _settings.RsTargetTtsEnabled = value;
+        Settings.Save(_settings);
+    }
+
+    private void InitRsTargetList()
+    {
+        RsTargetList.Clear();
+        var savedList = new HashSet<string>(_settings.RsTargetList ?? new(), StringComparer.OrdinalIgnoreCase);
+
+        var all = RsDecoderCatalog.AllResources
+            .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(r => GetTierOrder(r.Tier))
+            .ThenBy(r => r.Name);
+
+        foreach (var r in all)
+        {
+            var item = new RsTargetItem
+            {
+                Name = r.Name,
+                Tier = r.Tier,
+                TierColor = r.TierColor,
+                Method = r.Method,
+                BaseRs = r.BaseRs,
+                IsEnabled = savedList.Contains(r.Name)
+            };
+            item.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(RsTargetItem.IsEnabled))
+                {
+                    SaveRsTargetList();
+                    OnPropertyChanged(nameof(RsTargetCountSummary));
+                    if (RsTargetCategoryFilter == "active")
+                    {
+                        UpdateFilteredRsTargets();
+                    }
+                }
+            };
+            RsTargetList.Add(item);
+        }
+
+        UpdateFilteredRsTargets();
+        OnPropertyChanged(nameof(RsTargetCountSummary));
+    }
+
+    partial void OnRsTargetSearchTextChanged(string value)
+    {
+        UpdateFilteredRsTargets();
+    }
+
+    partial void OnRsTargetCategoryFilterChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsCatAllSelected));
+        OnPropertyChanged(nameof(IsCatHighValueSelected));
+        OnPropertyChanged(nameof(IsCatShipSelected));
+        OnPropertyChanged(nameof(IsCatRocSelected));
+        OnPropertyChanged(nameof(IsCatFpsSelected));
+        OnPropertyChanged(nameof(IsCatSalvageSelected));
+        OnPropertyChanged(nameof(IsCatActiveSelected));
+        UpdateFilteredRsTargets();
+    }
+
+    [RelayCommand]
+    public void SetRsTargetCategory(string cat)
+    {
+        RsTargetCategoryFilter = cat;
+    }
+
+    [RelayCommand]
+    public void ClearRsTargetSearch()
+    {
+        RsTargetSearchText = "";
+        RsTargetCategoryFilter = "all";
+    }
+
+    public void UpdateFilteredRsTargets()
+    {
+        var query = RsTargetSearchText?.Trim().ToLowerInvariant() ?? "";
+        var cat = RsTargetCategoryFilter?.ToLowerInvariant() ?? "all";
+
+        var filtered = RsTargetList.Where(item =>
+        {
+            // Kategorie-Filter
+            bool catMatch = cat switch
+            {
+                "highvalue" => item.Tier is "S" or "A" or "Legendary" || item.Method == "salvage",
+                "ship" => item.Method == "ship",
+                "roc" => item.Method == "vehicle",
+                "fps" => item.Method is "fps" or "fps+vehicle",
+                "salvage" => item.Method == "salvage",
+                "active" => item.IsEnabled,
+                _ => true
+            };
+
+            if (!catMatch) return false;
+
+            // Volltextsuche
+            if (string.IsNullOrEmpty(query)) return true;
+
+            return item.Name.ToLowerInvariant().Contains(query) ||
+                   item.Tier.ToLowerInvariant().Contains(query) ||
+                   item.Method.ToLowerInvariant().Contains(query) ||
+                   item.MethodIcon.ToLowerInvariant().Contains(query) ||
+                   (item.BaseRs > 0 && item.BaseRs.ToString().Contains(query));
+        }).ToList();
+
+        FilteredRsTargets.Clear();
+        foreach (var itm in filtered)
+        {
+            FilteredRsTargets.Add(itm);
+        }
+    }
+
+    private static int GetTierOrder(string tier) => tier switch
+    {
+        "Legendary" => 0,
+        "S" => 1,
+        "A" => 2,
+        "B" => 3,
+        "C" => 4,
+        _ => 5
+    };
+
+    private void SaveRsTargetList()
+    {
+        _settings.RsTargetList = RsTargetList.Where(t => t.IsEnabled).Select(t => t.Name).ToList();
+        Settings.Save(_settings);
+    }
+
+    [RelayCommand]
+    public void ToggleRsTargetAlert()
+    {
+        IsRsTargetAlertEnabled = !IsRsTargetAlertEnabled;
+    }
+
+    [RelayCommand]
+    public void SelectHighValueTargets()
+    {
+        foreach (var t in RsTargetList)
+        {
+            t.IsEnabled = t.Tier is "S" or "A" or "Legendary" || t.Method == "salvage";
+        }
+        SaveRsTargetList();
+        OnPropertyChanged(nameof(RsTargetCountSummary));
+        if (RsTargetCategoryFilter == "active")
+        {
+            UpdateFilteredRsTargets();
+        }
+        Status = "✓ High-Value Targets ausgewählt (Tier S/A & Salvage)";
+    }
+
+    [RelayCommand]
+    public void SelectAllTargets()
+    {
+        var targets = FilteredRsTargets.Count > 0 && FilteredRsTargets.Count < RsTargetList.Count
+            ? FilteredRsTargets.ToList()
+            : RsTargetList.ToList();
+
+        foreach (var t in targets) t.IsEnabled = true;
+        SaveRsTargetList();
+        OnPropertyChanged(nameof(RsTargetCountSummary));
+        Status = $"✓ {targets.Count} Materialien in Suchliste aktiviert";
+    }
+
+    [RelayCommand]
+    public void ClearAllTargets()
+    {
+        var targets = FilteredRsTargets.Count > 0 && FilteredRsTargets.Count < RsTargetList.Count
+            ? FilteredRsTargets.ToList()
+            : RsTargetList.ToList();
+
+        foreach (var t in targets) t.IsEnabled = false;
+        SaveRsTargetList();
+        OnPropertyChanged(nameof(RsTargetCountSummary));
+        if (RsTargetCategoryFilter == "active")
+        {
+            UpdateFilteredRsTargets();
+        }
+        Status = $"✓ {targets.Count} Materialien in Suchliste deaktiviert";
+    }
+
+    [RelayCommand]
+    public void PlayTestSonarPing()
+    {
+        RsAudioAlertService.PlaySonarPing();
     }
 
     [RelayCommand]
     public void DecodeRs(string? input = null)
     {
+        RsAudioAlertService.ResetTargetAlertLatch();
         var raw = input ?? RsInputText;
         if (string.IsNullOrWhiteSpace(raw)) return;
 
@@ -5524,6 +5922,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void SetRsPreset(int value)
     {
+        RsAudioAlertService.ResetTargetAlertLatch();
         OnRsDetected(value);
     }
 
@@ -5601,7 +6000,7 @@ public partial class MainViewModel : ObservableObject
     {
         _settings.RsAutoScanEnabled = value;
         Settings.Save(_settings);
-        Logger.Log($"[RsOcr] Auto-Scan Status: {(value ? "AKTIV (150ms Loop gestartet)" : "INAKTIV / GESTOPPT")}");
+        Logger.Log($"[RsOcr] Auto-Scan Status: {(value ? "AKTIV (200ms Loop gestartet)" : "INAKTIV / GESTOPPT")}");
 
         if (value)
         {
