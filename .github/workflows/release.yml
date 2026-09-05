@@ -69,7 +69,7 @@ jobs:
         "EXE_HASH=$exeHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
     - name: VirusTotal Analysis
-      uses: crazy-max/ghaction-virustotal@v4
+      uses: crazy-max/ghaction-virustotal@v5
       if: ${{ env.VT_API_KEY != '' }}
       env:
         VT_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
