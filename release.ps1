@@ -37,6 +37,8 @@ $notesFile = Join-Path $env:TEMP "sclm_notes_$ver.md"
 Set-Content $notesFile $notes -Encoding UTF8
 
 # Single-file exe bauen
+Stop-Process -Name SCLogMate -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
 dotnet publish -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
