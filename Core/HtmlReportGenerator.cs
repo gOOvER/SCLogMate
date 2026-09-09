@@ -245,8 +245,8 @@ public static class HtmlReportGenerator
         sb.AppendLine("      <div class=\"brand\">");
         sb.AppendLine("        <div class=\"brand-icon\">🚀</div>");
         sb.AppendLine("        <div>");
-        sb.AppendLine($"          <div class=\"brand-title\">STAR CITIZEN FLUSCHSCHREIBER-BERICHT</div>");
-        sb.AppendLine($"          <div class=\"brand-sub\">Session: {sessionLabel} · Generiert am {DateTime.Now:dd.MM.yyyy HH:mm} Uhr</div>");
+        sb.AppendLine("          <div class=\"brand-title\">STAR CITIZEN FLUGSCHREIBER-BERICHT</div>");
+        sb.AppendLine($"          <div class=\"brand-sub\">Session: {System.Net.WebUtility.HtmlEncode(sessionLabel)} · Generiert am {DateTime.Now:dd.MM.yyyy HH:mm} Uhr</div>");
         sb.AppendLine("        </div>");
         sb.AppendLine("      </div>");
         sb.AppendLine("      <div><span class=\"badge\">SCLogMate Telemetrie</span></div>");
@@ -256,7 +256,7 @@ public static class HtmlReportGenerator
         sb.AppendLine("    <div class=\"kpi-grid\">");
         sb.AppendLine("      <div class=\"kpi-card\">");
         sb.AppendLine("        <div class=\"kpi-label\">🌌 Flugdistanz (Quantum)</div>");
-        sb.AppendLine($"        <div class=\"kpi-val\" style=\"color: #818CF8;\">{summary.TotalDistanceText}</div>");
+        sb.AppendLine($"        <div class=\"kpi-val\" style=\"color: #818CF8;\">{System.Net.WebUtility.HtmlEncode(summary.TotalDistanceText)}</div>");
         sb.AppendLine($"        <div class=\"kpi-sub\">{summary.QuantumJumps} Quantum-Sprünge</div>");
         sb.AppendLine("      </div>");
 
@@ -269,13 +269,13 @@ public static class HtmlReportGenerator
         sb.AppendLine("      <div class=\"kpi-card\">");
         sb.AppendLine("        <div class=\"kpi-label\">🛸 Schiffseinsätze</div>");
         sb.AppendLine($"        <div class=\"kpi-val\" style=\"color: #38BDF8;\">{summary.SortieCount} Starts</div>");
-        sb.AppendLine($"        <div class=\"kpi-sub\">{summary.ShipsUsedText}</div>");
+        sb.AppendLine($"        <div class=\"kpi-sub\">{System.Net.WebUtility.HtmlEncode(summary.ShipsUsedText)}</div>");
         sb.AppendLine("      </div>");
 
         sb.AppendLine("      <div class=\"kpi-card\">");
         sb.AppendLine("        <div class=\"kpi-label\">🪐 Destinationen</div>");
         sb.AppendLine($"        <div class=\"kpi-val\" style=\"color: #4ADE80;\">{summary.VisitedBodies.Count} Himmelskörper</div>");
-        sb.AppendLine($"        <div class=\"kpi-sub\">{summary.ShipLossesText}</div>");
+        sb.AppendLine($"        <div class=\"kpi-sub\">{System.Net.WebUtility.HtmlEncode(summary.ShipLossesText)}</div>");
         sb.AppendLine("      </div>");
         sb.AppendLine("    </div>");
 
@@ -289,19 +289,19 @@ public static class HtmlReportGenerator
             sb.AppendLine("        <div class=\"item\">");
             sb.AppendLine("          <div class=\"node\"></div>");
             sb.AppendLine("          <div class=\"item-header\">");
-            sb.AppendLine($"            <div class=\"item-title\">{it.IconGlyph} {it.Title} {(string.IsNullOrEmpty(it.ShipName) ? "" : $"<span class=\"ship-pill\">{it.ShipName}</span>")}</div>");
-            sb.AppendLine($"            <div class=\"time-tag\">{it.FormattedTime} ({it.RelativeTimeText})</div>");
+            sb.AppendLine($"            <div class=\"item-title\">{it.IconGlyph} {System.Net.WebUtility.HtmlEncode(it.Title)} {(string.IsNullOrEmpty(it.ShipName) ? "" : $"<span class=\"ship-pill\">{System.Net.WebUtility.HtmlEncode(it.ShipName)}</span>")}</div>");
+            sb.AppendLine($"            <div class=\"time-tag\">{System.Net.WebUtility.HtmlEncode(it.FormattedTime)} ({System.Net.WebUtility.HtmlEncode(it.RelativeTimeText)})</div>");
             sb.AppendLine("          </div>");
             if (!string.IsNullOrEmpty(it.Subtitle))
             {
-                sb.AppendLine($"          <div class=\"item-sub\">{it.Subtitle}</div>");
+                sb.AppendLine($"          <div class=\"item-sub\">{System.Net.WebUtility.HtmlEncode(it.Subtitle)}</div>");
             }
             sb.AppendLine("          <div class=\"item-meta\">");
-            sb.AppendLine($"            <span>📍 {it.LocationName}</span>");
-            sb.AppendLine($"            <span>🌌 {it.SystemName}</span>");
+            sb.AppendLine($"            <span>📍 {System.Net.WebUtility.HtmlEncode(it.LocationName)}</span>");
+            sb.AppendLine($"            <span>🌌 {System.Net.WebUtility.HtmlEncode(it.SystemName)}</span>");
             if (!string.IsNullOrEmpty(it.DistanceText))
             {
-                sb.AppendLine($"            <span style=\"color: var(--accent); font-weight: bold;\">Distanz: {it.DistanceText}</span>");
+                sb.AppendLine($"            <span style=\"color: var(--accent); font-weight: bold;\">Distanz: {System.Net.WebUtility.HtmlEncode(it.DistanceText)}</span>");
             }
             sb.AppendLine("          </div>");
             sb.AppendLine("        </div>");
@@ -312,7 +312,7 @@ public static class HtmlReportGenerator
 
         // Footer
         sb.AppendLine("    <div class=\"footer\">");
-        sb.AppendLine($"      SCLogMate v1.0.0-beta5 · Erstellt für Star Citizen Piloten · <a href=\"https://github.com/gOOvER/SCLogMate\" style=\"color: #38BDF8; text-decoration: none;\">github.com/gOOvER/SCLogMate</a>");
+        sb.AppendLine($"      SCLogMate v{Updater.CurrentVersion} · Erstellt für Star Citizen Piloten · <a href=\"https://github.com/gOOvER/SCLogMate\" style=\"color: #38BDF8; text-decoration: none;\">github.com/gOOvER/SCLogMate</a>");
         sb.AppendLine("    </div>");
 
         sb.AppendLine("  </div>");

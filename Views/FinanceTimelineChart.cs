@@ -54,13 +54,57 @@ public sealed class FinanceTimelineChart : Control
         AffectsRender<FinanceTimelineChart>(ItemsSourceProperty, ChartModeProperty, EmptyTextProperty);
     }
 
+    // Gecachte unveränderliche Pinsel und Stifte zur Vermeidung von GC-Allokationen bei jedem Frame
+    private static readonly IBrush PanelBgBrush = new SolidColorBrush(Color.Parse("#060C16")).ToImmutable();
+    private static readonly IPen PanelBorderPen = new Pen(new SolidColorBrush(Color.Parse("#1A3047")).ToImmutable(), 1).ToImmutable();
+    private static readonly IPen GridPen = new Pen(new SolidColorBrush(Color.FromArgb(28, 56, 189, 248)).ToImmutable(), 1).ToImmutable();
+    private static readonly IPen ZeroPenDash = new Pen(new SolidColorBrush(Color.FromArgb(120, 110, 140, 170)).ToImmutable(), 1, DashStyle.Dash).ToImmutable();
+    private static readonly IPen ZeroPenSolid = new Pen(new SolidColorBrush(Color.FromArgb(140, 110, 140, 170)).ToImmutable(), 1).ToImmutable();
+    private static readonly IBrush GreenBarBrush = new SolidColorBrush(Color.Parse("#4ADE80")).ToImmutable();
+    private static readonly IBrush RedBarBrush = new SolidColorBrush(Color.Parse("#F87171")).ToImmutable();
+    private static readonly IPen CrossPen = new Pen(new SolidColorBrush(Color.FromArgb(140, 56, 189, 248)).ToImmutable(), 1, DashStyle.Dash).ToImmutable();
+    private static readonly IBrush ReticleBrush = new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable();
+    private static readonly IBrush TipBgBrush = new SolidColorBrush(Color.FromArgb(235, 10, 22, 38)).ToImmutable();
+    private static readonly IPen TipBorderPen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 1).ToImmutable();
+    private static readonly IPen DotBorderPen = new Pen(new SolidColorBrush(Color.Parse("#060C16")).ToImmutable(), 1.5).ToImmutable();
+
+    private static readonly IPen CyanLinePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 2.2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round).ToImmutable();
+    private static readonly IBrush CyanDotBrush = new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable();
+    private static readonly IPen CoralLinePen = new Pen(new SolidColorBrush(Color.Parse("#F87171")).ToImmutable(), 2.2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round).ToImmutable();
+    private static readonly IBrush CoralDotBrush = new SolidColorBrush(Color.Parse("#F87171")).ToImmutable();
+    private static readonly IPen BlueLinePen = new Pen(new SolidColorBrush(Color.Parse("#60A5FA")).ToImmutable(), 2.2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round).ToImmutable();
+    private static readonly IBrush BlueDotBrush = new SolidColorBrush(Color.Parse("#60A5FA")).ToImmutable();
+
+    private static readonly IBrush TextBrushMuted = new SolidColorBrush(Color.Parse("#64748B")).ToImmutable();
+    private static readonly IBrush TextBrushLight = new SolidColorBrush(Color.Parse("#94A3B8")).ToImmutable();
+    private static readonly IBrush TextBrushAccent = new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable();
+    private static readonly IBrush TextBrushGreen = new SolidColorBrush(Color.Parse("#4ADE80")).ToImmutable();
+    private static readonly IBrush TextBrushRed = new SolidColorBrush(Color.Parse("#F87171")).ToImmutable();
+
+    private static readonly Typeface DefaultNormalTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.Normal);
+    private static readonly Typeface DefaultBoldTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
+
     private Point? _hoverPos;
     private FinanceTimelinePoint? _hoverItem;
     private Point _hoverPointCanvas;
+    private List<FinanceTimelinePoint> _cachedSortedPts = new();
 
     public FinanceTimelineChart()
     {
         ClipToBounds = true;
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == ItemsSourceProperty)
+        {
+            _cachedSortedPts = ItemsSource != null
+                ? ItemsSource.OrderBy(p => p.Time).ToList()
+                : new List<FinanceTimelinePoint>();
+            UpdateHoverItem();
+            InvalidateVisual();
+        }
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -81,19 +125,13 @@ public sealed class FinanceTimelineChart : Control
 
     private void UpdateHoverItem()
     {
-        if (_hoverPos == null || ItemsSource == null)
+        if (_hoverPos == null || _cachedSortedPts.Count == 0)
         {
             _hoverItem = null;
             return;
         }
 
-        var pts = ItemsSource.ToList();
-        if (pts.Count == 0)
-        {
-            _hoverItem = null;
-            return;
-        }
-
+        var pts = _cachedSortedPts;
         double w = Bounds.Width;
         double padLeft = 70;
         double padRight = 20;
@@ -144,12 +182,10 @@ public sealed class FinanceTimelineChart : Control
         if (w < 60 || h < 60) return;
 
         // 1. Hintergrund (Sci-Fi Panel)
-        var bgBrush = new SolidColorBrush(Color.Parse("#060C16"));
-        var borderPen = new Pen(new SolidColorBrush(Color.Parse("#1A3047")), 1);
-        context.DrawRectangle(bgBrush, borderPen, new Rect(0, 0, w, h), 6, 6);
+        context.DrawRectangle(PanelBgBrush, PanelBorderPen, new Rect(0, 0, w, h), 6, 6);
 
-        var pts = ItemsSource?.OrderBy(p => p.Time).ToList();
-        if (pts == null || pts.Count == 0)
+        var pts = _cachedSortedPts;
+        if (pts.Count == 0)
         {
             DrawEmptyState(context, w, h);
             return;
@@ -185,7 +221,7 @@ public sealed class FinanceTimelineChart : Control
         }
 
         // Datum-Ticks auf X-Achse
-        DrawTimeAxis(context, pts, tMin, tMax, padLeft, padTop, plotW, plotH, getX);
+        DrawTimeAxis(context, pts, padLeft, padTop, plotW, plotH, getX);
 
         // 4. Interaktives Crosshair & Hover Tooltip
         if (_hoverItem != null && _hoverPos != null)
@@ -208,11 +244,11 @@ public sealed class FinanceTimelineChart : Control
 
         // Kurve 1: Einnahmen (Neon-Cyan/Grün #38BDF8)
         DrawSmoothCurve(context, pts, getX, p => getY(p.CumulativeIncome), padTop + plotH,
-            Color.Parse("#38BDF8"), Color.FromArgb(40, 56, 189, 248));
+            CyanLinePen, CyanDotBrush, Color.FromArgb(40, 56, 189, 248));
 
         // Kurve 2: Ausgaben (Neon-Orange/Koralle #F87171)
         DrawSmoothCurve(context, pts, getX, p => getY(p.CumulativeSpend), padTop + plotH,
-            Color.Parse("#F87171"), Color.FromArgb(32, 248, 113, 113));
+            CoralLinePen, CoralDotBrush, Color.FromArgb(32, 248, 113, 113));
     }
 
     private void RenderNetProfitTrend(DrawingContext context, List<FinanceTimelinePoint> pts,
@@ -234,12 +270,11 @@ public sealed class FinanceTimelineChart : Control
 
         // Null-Linie hervorheben
         double zeroY = getY(0);
-        var zeroPen = new Pen(new SolidColorBrush(Color.FromArgb(120, 110, 140, 170)), 1, DashStyle.Dash);
-        context.DrawLine(zeroPen, new Point(padLeft, zeroY), new Point(padLeft + plotW, zeroY));
+        context.DrawLine(ZeroPenDash, new Point(padLeft, zeroY), new Point(padLeft + plotW, zeroY));
 
         // Netto-Kurve (Neon Sky-Blue #60A5FA)
         DrawSmoothCurve(context, pts, getX, p => getY(p.CumulativeNet), zeroY,
-            Color.Parse("#60A5FA"), Color.FromArgb(45, 96, 165, 250));
+            BlueLinePen, BlueDotBrush, Color.FromArgb(45, 96, 165, 250));
     }
 
     private void RenderCashflowBars(DrawingContext context, List<FinanceTimelinePoint> pts,
@@ -256,13 +291,9 @@ public sealed class FinanceTimelineChart : Control
         DrawHorizontalGrid(context, padLeft, padTop, plotW, plotH, minVal, maxVal, getY);
 
         double zeroY = getY(0);
-        var zeroPen = new Pen(new SolidColorBrush(Color.FromArgb(140, 110, 140, 170)), 1);
-        context.DrawLine(zeroPen, new Point(padLeft, zeroY), new Point(padLeft + plotW, zeroY));
+        context.DrawLine(ZeroPenSolid, new Point(padLeft, zeroY), new Point(padLeft + plotW, zeroY));
 
         double barWidth = Math.Max(3, Math.Min(18, plotW / Math.Max(1, pts.Count) * 0.7));
-
-        var greenBrush = new SolidColorBrush(Color.Parse("#4ADE80"));
-        var redBrush = new SolidColorBrush(Color.Parse("#F87171"));
 
         foreach (var p in pts)
         {
@@ -273,14 +304,14 @@ public sealed class FinanceTimelineChart : Control
 
             if (barH < 1.5) barH = 1.5;
 
-            var brush = p.Amount >= 0 ? greenBrush : redBrush;
+            var brush = p.Amount >= 0 ? GreenBarBrush : RedBarBrush;
             context.FillRectangle(brush, new Rect(bx, topY, barWidth, barH));
         }
     }
 
     private void DrawSmoothCurve(DrawingContext context, List<FinanceTimelinePoint> pts,
         Func<long, double> getX, Func<FinanceTimelinePoint, double> getY, double baselineY,
-        Color lineColor, Color areaFillColor)
+        IPen linePen, IBrush dotBrush, Color areaFillColor)
     {
         if (pts.Count == 0) return;
 
@@ -323,17 +354,14 @@ public sealed class FinanceTimelineChart : Control
             sgc.EndFigure(false);
         }
 
-        var linePen = new Pen(new SolidColorBrush(lineColor), 2.2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
         context.DrawGeometry(null, linePen, lineGeom);
 
         // 3. Markante Event-Punkte hervorheben (wenn nicht zu viele Punkte)
         if (points.Count <= 45)
         {
-            var dotBrush = new SolidColorBrush(lineColor);
-            var dotBorderPen = new Pen(new SolidColorBrush(Color.Parse("#060C16")), 1.5);
             foreach (var pt in points)
             {
-                context.DrawEllipse(dotBrush, dotBorderPen, pt, 3.2, 3.2);
+                context.DrawEllipse(dotBrush, DotBorderPen, pt, 3.2, 3.2);
             }
         }
     }
@@ -341,8 +369,6 @@ public sealed class FinanceTimelineChart : Control
     private void DrawHorizontalGrid(DrawingContext context, double padLeft, double padTop,
         double plotW, double plotH, long minVal, long maxVal, Func<long, double> getY)
     {
-        var gridPen = new Pen(new SolidColorBrush(Color.FromArgb(28, 56, 189, 248)), 1);
-
         int steps = 4;
         long stepVal = (maxVal - minVal) / steps;
         if (stepVal <= 0) stepVal = 1;
@@ -352,36 +378,36 @@ public sealed class FinanceTimelineChart : Control
             long val = minVal + i * stepVal;
             double gy = getY(val);
 
-            context.DrawLine(gridPen, new Point(padLeft, gy), new Point(padLeft + plotW, gy));
+            context.DrawLine(GridPen, new Point(padLeft, gy), new Point(padLeft + plotW, gy));
 
             // Achsenbeschriftung links
             string label = FormatAuecMetric(val);
-            var ft = CreateText(label, "#64748B", 9.5);
+            var ft = CreateText(label, TextBrushMuted, 9.5);
             context.DrawText(ft, new Point(padLeft - ft.Width - 6, gy - ft.Height / 2));
         }
     }
 
     private void DrawTimeAxis(DrawingContext context, List<FinanceTimelinePoint> pts,
-        long tMin, long tMax, double padLeft, double padTop, double plotW, double plotH, Func<long, double> getX)
+        double padLeft, double padTop, double plotW, double plotH, Func<long, double> getX)
     {
         double yPos = padTop + plotH + 8;
 
         var first = pts.First();
         var last = pts.Last();
 
-        var ftStart = CreateText(first.WhenText, "#64748B", 9.5);
+        var ftStart = CreateText(first.WhenText, TextBrushMuted, 9.5);
         context.DrawText(ftStart, new Point(padLeft, yPos));
 
         if (pts.Count > 1)
         {
-            var ftEnd = CreateText(last.WhenText, "#64748B", 9.5);
+            var ftEnd = CreateText(last.WhenText, TextBrushMuted, 9.5);
             context.DrawText(ftEnd, new Point(padLeft + plotW - ftEnd.Width, yPos));
 
             // Mittlerer Timestamp, falls Zeitspanne groß genug
             if (pts.Count >= 3)
             {
                 var mid = pts[pts.Count / 2];
-                var ftMid = CreateText(mid.WhenText, "#64748B", 9.5);
+                var ftMid = CreateText(mid.WhenText, TextBrushMuted, 9.5);
                 double midX = getX(mid.Time.Ticks) - ftMid.Width / 2;
                 if (midX > padLeft + ftStart.Width + 10 && midX + ftMid.Width < padLeft + plotW - ftEnd.Width - 10)
                 {
@@ -395,12 +421,10 @@ public sealed class FinanceTimelineChart : Control
         double curX, double padTop, double plotH, double w, double h)
     {
         // 1. Vertikale Fadenkreuz-Linie
-        var crossPen = new Pen(new SolidColorBrush(Color.FromArgb(140, 56, 189, 248)), 1, DashStyle.Dash);
-        context.DrawLine(crossPen, new Point(curX, padTop), new Point(curX, padTop + plotH));
+        context.DrawLine(CrossPen, new Point(curX, padTop), new Point(curX, padTop + plotH));
 
         // 2. Fadenkreuz-Zielpunkt
-        var reticleBrush = new SolidColorBrush(Color.Parse("#38BDF8"));
-        context.DrawEllipse(reticleBrush, null, new Point(curX, _hoverPos?.Y ?? padTop + plotH / 2), 4, 4);
+        context.DrawEllipse(ReticleBrush, null, new Point(curX, _hoverPos?.Y ?? padTop + plotH / 2), 4, 4);
 
         // 3. Schwebendes mobiGlas Tooltip-Badge
         string line1 = $"{item.WhenText} · {item.Detail}";
@@ -411,9 +435,9 @@ public sealed class FinanceTimelineChart : Control
             ? $"Kumuliert: +{item.CumulativeIncome:N0} / -{item.CumulativeSpend:N0} aUEC"
             : $"Netto-Saldo: {(item.CumulativeNet >= 0 ? "+" : "")}{item.CumulativeNet:N0} aUEC";
 
-        var ft1 = CreateText(line1, "#94A3B8", 10, isBold: false);
-        var ft2 = CreateText(line2, item.IsIncome ? "#4ADE80" : "#F87171", 12.5, isBold: true);
-        var ft3 = CreateText(line3, "#38BDF8", 10.5, isBold: true);
+        var ft1 = CreateText(line1, TextBrushLight, 10, isBold: false);
+        var ft2 = CreateText(line2, item.IsIncome ? TextBrushGreen : TextBrushRed, 12.5, isBold: true);
+        var ft3 = CreateText(line3, TextBrushAccent, 10.5, isBold: true);
 
         double tipW = Math.Max(ft1.Width, Math.Max(ft2.Width, ft3.Width)) + 20;
         double tipH = ft1.Height + ft2.Height + ft3.Height + 16;
@@ -427,10 +451,7 @@ public sealed class FinanceTimelineChart : Control
         if (tipY + tipH > h - 10) tipY = h - tipH - 10;
 
         var tipRect = new Rect(tipX, tipY, tipW, tipH);
-        var tipBg = new SolidColorBrush(Color.FromArgb(235, 10, 22, 38));
-        var tipBorder = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1);
-
-        context.DrawRectangle(tipBg, tipBorder, tipRect, 5, 5);
+        context.DrawRectangle(TipBgBrush, TipBorderPen, tipRect, 5, 5);
 
         double textY = tipY + 7;
         context.DrawText(ft1, new Point(tipX + 10, textY));
@@ -442,7 +463,7 @@ public sealed class FinanceTimelineChart : Control
 
     private void DrawEmptyState(DrawingContext context, double w, double h)
     {
-        var ft = CreateText(EmptyText, "#64748B", 12, isBold: true);
+        var ft = CreateText(EmptyText, TextBrushMuted, 12, isBold: true);
         context.DrawText(ft, new Point(w / 2 - ft.Width / 2, h / 2 - ft.Height / 2));
     }
 
@@ -457,15 +478,15 @@ public sealed class FinanceTimelineChart : Control
         return $"{val:N0}";
     }
 
-    private static FormattedText CreateText(string text, string colorHex, double size, bool isBold = false)
+    private static FormattedText CreateText(string text, IBrush brush, double size, bool isBold = false)
     {
         return new FormattedText(
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, isBold ? FontWeight.Bold : FontWeight.Normal),
+            isBold ? DefaultBoldTypeface : DefaultNormalTypeface,
             size,
-            new SolidColorBrush(Color.Parse(colorHex))
+            brush
         );
     }
 }

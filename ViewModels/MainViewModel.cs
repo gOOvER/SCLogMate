@@ -895,6 +895,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     public string DebugLogPath => Path.Combine(Settings.Dir, "SCLogMate.debug.log");
+    public string UnknownEventsLogPath => Core.UnknownEventsLogger.Path;
     public string DatabaseSummaryText => $"SQLite WAL · {Sessions.Count} Sessions · {Database.FormatBytes(Database.GetDatabaseSizeBytes())}";
     public string RuntimeInfoText => $".NET 10.0 (Win-x64) · Avalonia UI · Windows.Media.Ocr";
     public string WalletRegionSummaryText => _settings.WalletRegion is { } r ? $"{r.Width}x{r.Height} @ ({r.X}, {r.Y})" : "Standard (Auto-Erkennung)";
@@ -991,6 +992,7 @@ public partial class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(DatabaseSummaryText));
             }
             SyncBlueprints();
+            FlushUnknownNotifications();
         }
         catch (Exception ex)
         {
@@ -1001,6 +1003,7 @@ public partial class MainViewModel : ObservableObject
         {
             IsDatabaseBusy = false;
             OnPropertyChanged(nameof(DatabaseSummaryText));
+            RefreshDbDiagnosticsInBackground();
         }
     }
 
@@ -1041,7 +1044,7 @@ public partial class MainViewModel : ObservableObject
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
-                            DatabaseProgressPercent = (double)curr / total * 100.0;
+                            DatabaseProgressPercent = total > 0 ? Math.Max(1.0, (double)curr / total * 100.0) : 0;
                             DatabaseStatusMessage = $"⚡ Auto-Scan ({curr}/{total}): {name}";
                         });
                     });
@@ -1073,7 +1076,7 @@ public partial class MainViewModel : ObservableObject
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
-                            DatabaseProgressPercent = (double)curr / total * 100.0;
+                            DatabaseProgressPercent = total > 0 ? Math.Max(1.0, (double)curr / total * 100.0) : 0;
                             DatabaseStatusMessage = $"⚡ Indexiere ({curr}/{total}): {name}";
                         });
                     });
@@ -1143,6 +1146,7 @@ public partial class MainViewModel : ObservableObject
         {
             IsDatabaseBusy = false;
             OnPropertyChanged(nameof(DatabaseSummaryText));
+            RefreshDbDiagnosticsInBackground();
         }
     }
 
@@ -1181,6 +1185,7 @@ public partial class MainViewModel : ObservableObject
         {
             IsDatabaseBusy = false;
             OnPropertyChanged(nameof(DatabaseSummaryText));
+            RefreshDbDiagnosticsInBackground();
         }
     }
 
@@ -1201,6 +1206,27 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = "Fehler beim Öffnen des Debug-Logs: " + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenUnknownEventsLog()
+    {
+        try
+        {
+            Core.UnknownEventsLogger.FlushSummary();
+            if (File.Exists(UnknownEventsLogPath))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = UnknownEventsLogPath, UseShellExecute = true });
+            }
+            else
+            {
+                Status = "Noch keine unbekannten Events protokolliert: " + UnknownEventsLogPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = "Fehler beim Öffnen des Unknown-Logs: " + ex.Message;
         }
     }
 
@@ -1467,12 +1493,29 @@ public partial class MainViewModel : ObservableObject
         FleetItems.Clear();
         var customData = Database.GetAllFleetCustomData();
 
-        foreach (var stat in stats)
+        // 1. Gruppierung nach kanonischem Schiffsnamen aus dem Katalog,
+        // um Split-Einträge durch rohe Spawn-Tags (wie MOLE Salvage vs MOLE) zusammenzuführen.
+        var groupedStats = stats
+            .GroupBy(s =>
+            {
+                var cat = FleetCatalog.Lookup(s.Ship);
+                return cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : s.Ship;
+            })
+            .Select(g => new Database.DbShipStat(
+                Ship: g.Key,
+                FlightCount: g.Sum(x => x.FlightCount),
+                QtCount: g.Sum(x => x.QtCount),
+                LossCount: g.Sum(x => x.LossCount),
+                LastTime: g.Max(x => x.LastTime)
+            ));
+
+        foreach (var stat in groupedStats)
         {
             var cat = FleetCatalog.Lookup(stat.Ship);
+            var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : stat.Ship;
             var item = new ShipFleetItem
             {
-                Name = stat.Ship,
+                Name = canonicalName,
                 RawCode = stat.Ship,
                 Manufacturer = cat.Manufacturer,
                 ManufacturerBadge = cat.ManufacturerBadge,
@@ -1486,11 +1529,13 @@ public partial class MainViewModel : ObservableObject
                 IsCurrent = stat.Ship.Equals(CurrentShip, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(CurrentShip) && CurrentShip.Contains(stat.Ship, StringComparison.OrdinalIgnoreCase))
             };
 
-            if (customData.TryGetValue(stat.Ship, out var cd))
+            // CustomData entweder unter kanonischem Namen oder altem Roh-Namen suchen
+            if (customData.TryGetValue(item.Name, out var cd) || customData.TryGetValue(stat.Ship, out cd))
             {
-                item.IsInHangar = cd.InHangar;
-                item.IsPledgeBought = cd.IsPledge;
-                item.PledgeValueUsd = cd.PledgeUsd;
+                // Schiffe mit Pledge oder In-Game Kauf sind immer im Hangar
+                item.IsInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
+                item.IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store";
+                item.PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd;
                 item.InsuranceType = cd.Insurance;
                 item.AcquisitionType = cd.Acquisition;
                 item.CustomNotes = cd.Notes;
@@ -1511,13 +1556,16 @@ public partial class MainViewModel : ObservableObject
         // Falls der Nutzer Schiffe manuell im Hangar gespeichert hat, die noch nicht geflogen wurden:
         foreach (var (shipName, cd) in customData)
         {
-            if (cd.InHangar && !FleetItems.Any(f => f.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase)))
+            var cat = FleetCatalog.Lookup(shipName);
+            var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : shipName;
+
+            bool shouldBeInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
+            if (shouldBeInHangar && !FleetItems.Any(f => f.Name.Equals(canonicalName, StringComparison.OrdinalIgnoreCase)))
             {
-                var cat = FleetCatalog.Lookup(shipName);
                 FleetItems.Add(new ShipFleetItem
                 {
-                    Name = shipName,
-                    RawCode = shipName,
+                    Name = canonicalName,
+                    RawCode = canonicalName,
                     Manufacturer = cat.Manufacturer,
                     ManufacturerBadge = cat.ManufacturerBadge,
                     ManufacturerColor = cat.ManufacturerColor,
@@ -1527,7 +1575,7 @@ public partial class MainViewModel : ObservableObject
                     QuantumJumps = 0,
                     LossCount = 0,
                     IsInHangar = true,
-                    IsPledgeBought = cd.IsPledge,
+                    IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store",
                     PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd,
                     InsuranceType = cd.Insurance,
                     AcquisitionType = cd.Acquisition,
@@ -1536,6 +1584,12 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
+        NotifyFleetStats();
+        FleetView?.Refresh();
+    }
+
+    private void NotifyFleetStats()
+    {
         OnPropertyChanged(nameof(HangarShipCount));
         OnPropertyChanged(nameof(AllFlownShipCount));
         OnPropertyChanged(nameof(TotalFleetValue));
@@ -1544,17 +1598,23 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
         OnPropertyChanged(nameof(TotalFleetFlights));
         OnPropertyChanged(nameof(TotalFleetQuantumJumps));
+        OnPropertyChanged(nameof(CombatShipsCount));
+        OnPropertyChanged(nameof(CargoShipsCount));
+        OnPropertyChanged(nameof(IndustrialShipsCount));
+        OnPropertyChanged(nameof(ExplorationShipsCount));
         OnPropertyChanged(nameof(CurrentShipFlightInfo));
         OnPropertyChanged(nameof(FleetText));
         OnPropertyChanged(nameof(ShipsSeenText));
-        FleetView?.Refresh();
     }
 
     public void RegisterOrUpdateShip(string shipName, bool isFlight = false, bool isQt = false, bool isLoss = false, DateTime? time = null, string? location = null)
     {
         if (string.IsNullOrWhiteSpace(shipName) || shipName == "—" || shipName == "Fahrzeug") return;
 
-        var existing = FleetItems.FirstOrDefault(s => s.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase) || shipName.Contains(s.Name, StringComparison.OrdinalIgnoreCase));
+        var cat = FleetCatalog.Lookup(shipName);
+        var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : shipName;
+
+        var existing = FleetItems.FirstOrDefault(s => s.Name.Equals(canonicalName, StringComparison.OrdinalIgnoreCase) || s.Name.Equals(shipName, StringComparison.OrdinalIgnoreCase) || shipName.Contains(s.Name, StringComparison.OrdinalIgnoreCase));
         if (existing != null)
         {
             if (isFlight) existing.FlightCount++;
@@ -1566,11 +1626,10 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
-            var cat = FleetCatalog.Lookup(shipName);
             var customData = Database.GetAllFleetCustomData();
             var item = new ShipFleetItem
             {
-                Name = shipName,
+                Name = canonicalName,
                 RawCode = shipName,
                 Manufacturer = cat.Manufacturer,
                 ManufacturerBadge = cat.ManufacturerBadge,
@@ -1585,11 +1644,12 @@ public partial class MainViewModel : ObservableObject
                 IsCurrent = shipName.Equals(CurrentShip, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(CurrentShip) && CurrentShip.Contains(shipName, StringComparison.OrdinalIgnoreCase))
             };
 
-            if (customData.TryGetValue(shipName, out var cd))
+            if (customData.TryGetValue(canonicalName, out var cd) || customData.TryGetValue(shipName, out cd))
             {
-                item.IsInHangar = cd.InHangar;
-                item.IsPledgeBought = cd.IsPledge;
-                item.PledgeValueUsd = cd.PledgeUsd;
+                // Schiffe mit Pledge oder In-Game Kauf sind immer im Hangar
+                item.IsInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
+                item.IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store";
+                item.PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd;
                 item.InsuranceType = cd.Insurance;
                 item.AcquisitionType = cd.Acquisition;
                 item.CustomNotes = cd.Notes;
@@ -1608,17 +1668,7 @@ public partial class MainViewModel : ObservableObject
 
         if (_shipSet.Add(shipName)) ShipsSeen.Add(shipName);
 
-        OnPropertyChanged(nameof(HangarShipCount));
-        OnPropertyChanged(nameof(AllFlownShipCount));
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
-        OnPropertyChanged(nameof(TotalFleetFlights));
-        OnPropertyChanged(nameof(TotalFleetQuantumJumps));
-        OnPropertyChanged(nameof(CurrentShipFlightInfo));
-        OnPropertyChanged(nameof(FleetText));
-        OnPropertyChanged(nameof(ShipsSeenText));
+        NotifyFleetStats();
         FleetView?.Refresh();
     }
 
@@ -1631,10 +1681,7 @@ public partial class MainViewModel : ObservableObject
     private void SelectFleetViewMode(string mode)
     {
         SelectedFleetViewMode = mode;
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        NotifyFleetStats();
         FleetView?.Refresh();
     }
 
@@ -1661,9 +1708,7 @@ public partial class MainViewModel : ObservableObject
         {
             s.IsCurrent = (s == ship);
         }
-        OnPropertyChanged(nameof(CurrentShip));
-        OnPropertyChanged(nameof(CurrentShipFlightInfo));
-        OnPropertyChanged(nameof(FleetText));
+        NotifyFleetStats();
     }
 
     [RelayCommand]
@@ -1676,14 +1721,15 @@ public partial class MainViewModel : ObservableObject
             ship.AcquisitionType = "Pledge Store";
             ship.IsPledgeBought = true;
         }
+        else if (!ship.IsInHangar && (ship.IsPledgeBought || ship.AcquisitionType == "Pledge Store" || ship.AcquisitionType == "In-Game (aUEC)"))
+        {
+            // Wenn der Nutzer ein Schiff explizit aus dem Hangar entfernt, Status auf Gast / Geliehen setzen
+            ship.AcquisitionType = "Geliehen / Free Fly";
+            ship.IsPledgeBought = false;
+        }
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(HangarShipCount));
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
-        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        NotifyFleetStats();
         FleetView?.Refresh();
         Status = ship.IsInHangar ? $"✓ {ship.Name} zu 'Mein Hangar' hinzugefügt" : $"— {ship.Name} aus 'Mein Hangar' entfernt (bleibt in Flug-Historie)";
     }
@@ -1700,12 +1746,7 @@ public partial class MainViewModel : ObservableObject
         }
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(HangarShipCount));
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
-        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        NotifyFleetStats();
         FleetView?.Refresh();
         Status = $"✓ {ship.Name} zu 'Mein Hangar' hinzugefügt";
     }
@@ -1715,14 +1756,11 @@ public partial class MainViewModel : ObservableObject
     {
         if (ship == null) return;
         ship.IsInHangar = false;
+        ship.IsPledgeBought = false;
+        ship.AcquisitionType = "Geliehen / Free Fly";
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(HangarShipCount));
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
-        OnPropertyChanged(nameof(CurrentShipFlightInfo));
+        NotifyFleetStats();
         FleetView?.Refresh();
         Status = $"— {ship.Name} aus 'Mein Hangar' entfernt (bleibt in Flug-Historie)";
     }
@@ -1740,11 +1778,22 @@ public partial class MainViewModel : ObservableObject
         };
         ship.AcquisitionType = next;
         ship.IsPledgeBought = (next == "Pledge Store");
+
+        // Schiffe im Pledge Store oder In-Game Kauf gehören immer in den persönlichen Hangar!
+        if (next == "Pledge Store" || next == "In-Game (aUEC)")
+        {
+            ship.IsInHangar = true;
+        }
+        else if (next == "Geliehen / Free Fly")
+        {
+            ship.IsInHangar = false;
+        }
+
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
-        Status = $"{ship.Name}: {ship.AcquisitionType}";
+        NotifyFleetStats();
+        FleetView?.Refresh();
+        Status = $"{ship.Name}: {ship.AcquisitionType} {(ship.IsInHangar ? "(in 'Mein Hangar')" : "(in 'Flug-Historie')")}";
     }
 
     [RelayCommand]
@@ -1759,15 +1808,16 @@ public partial class MainViewModel : ObservableObject
 
         var next = ship.InsuranceType switch
         {
-            "LTI (Lifetime)" => "120 Monate (IAE)",
-            "120 Monate (IAE)" => "24 Monate",
-            "24 Monate" => "12 Monate",
-            "12 Monate" => "6 Monate",
+            "LTI (Lifetime)" or "LTI" => "120 Monate (IAE)",
+            "120 Monate (IAE)" or "120M" => "24 Monate",
+            "24 Monate" or "24M" => "12 Monate",
+            "12 Monate" or "12M" => "6 Monate",
             _ => "LTI (Lifetime)"
         };
         ship.InsuranceType = next;
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
+        FleetView?.Refresh();
         Status = $"Versicherung für {ship.Name}: {ship.InsuranceType}";
     }
 
@@ -1788,12 +1838,18 @@ public partial class MainViewModel : ObservableObject
         if (int.TryParse(digits, out var val) && val >= 0)
         {
             ship.PledgeValueUsd = val;
+            if (val > 0)
+            {
+                ship.IsPledgeBought = true;
+                ship.AcquisitionType = "Pledge Store";
+                ship.IsInHangar = true;
+            }
         }
         ship.IsEditingPledge = false;
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        NotifyFleetStats();
+        FleetView?.Refresh();
         Status = $"💵 Pledge-Wert für {ship.Name} auf ${ship.PledgeValueUsd} gespeichert";
     }
 
@@ -1808,10 +1864,16 @@ public partial class MainViewModel : ObservableObject
     {
         if (ship == null) return;
         ship.PledgeValueUsd = Math.Max(0, ship.PledgeValueUsd + delta);
+        if (ship.PledgeValueUsd > 0)
+        {
+            ship.IsPledgeBought = true;
+            ship.AcquisitionType = "Pledge Store";
+            ship.IsInHangar = true;
+        }
         ship.NotifyPropertiesChanged();
         Database.SaveFleetShipCustomData(ship.Name, ship.IsInHangar, ship.IsPledgeBought, ship.PledgeValueUsd, ship.InsuranceType, ship.AcquisitionType, ship.CustomNotes);
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        NotifyFleetStats();
+        FleetView?.Refresh();
     }
 
     [RelayCommand]
@@ -1857,12 +1919,7 @@ public partial class MainViewModel : ObservableObject
             Database.SaveFleetShipCustomData(item.Name, item.IsInHangar, item.IsPledgeBought, item.PledgeValueUsd, item.InsuranceType, item.AcquisitionType, item.CustomNotes);
         }
 
-        OnPropertyChanged(nameof(HangarShipCount));
-        OnPropertyChanged(nameof(AllFlownShipCount));
-        OnPropertyChanged(nameof(TotalFleetValue));
-        OnPropertyChanged(nameof(TotalFleetValueText));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsd));
-        OnPropertyChanged(nameof(TotalFleetPledgeUsdText));
+        NotifyFleetStats();
         SelectedFleetViewMode = "Hangar";
         FleetView?.Refresh();
         Status = $"✓ {shipName} zu 'Mein Hangar' hinzugefügt";
@@ -2624,11 +2681,28 @@ public partial class MainViewModel : ObservableObject
         int total = 0;
         foreach (var e in missions)
         {
-            var parts = (e.Detail ?? "").Split(" · ");
-            if (parts.Length < 2) continue;
-            var faction = parts[0].Trim();
+            var d = e.Detail ?? "";
+            string faction;
+            string type;
+            if (d.Contains(" · "))
+            {
+                var parts = d.Split(" · ");
+                if (parts.Length < 2) continue;
+                faction = parts[0].Trim();
+                type = parts[1].Trim();
+            }
+            else if (d.Contains(':'))
+            {
+                var colon = d.IndexOf(':');
+                faction = d[..colon].Trim();
+                type = "Auftrag";
+            }
+            else
+            {
+                continue;
+            }
+
             if (faction.Length == 0) continue;
-            var type = parts[1].Trim();
             total++;
             if (!byFaction.TryGetValue(faction, out var cur))
                 cur = (0, new System.Collections.Generic.Dictionary<string,int>());
@@ -2670,13 +2744,45 @@ public partial class MainViewModel : ObservableObject
             if (_parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v))
             {
                 var ver = v.Trim();
-                return ver.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? ver : "v" + ver;
+                // Falls vorübergehend nur der Windows PE FileVersion-Fallback (1.0.x) vorliegt,
+                // prüfen ob base_version oder branch vorliegt:
+                if (ver.StartsWith("1.0.", StringComparison.Ordinal) || ver.StartsWith("v1.0.", StringComparison.Ordinal))
+                {
+                    if (_parser.Meta.TryGetValue("base_version", out var bv) && !string.IsNullOrWhiteSpace(bv))
+                    {
+                        var ch = ScChannel;
+                        var bld = _parser.Meta.TryGetValue("build", out var b) && !string.IsNullOrWhiteSpace(b) ? b.Trim() : "";
+                        ver = !string.IsNullOrEmpty(bld) ? $"{bv}-{ch}.{bld}" : $"{bv}-{ch}";
+                    }
+                    else if (_parser.Meta.TryGetValue("branch", out var b) && !string.IsNullOrWhiteSpace(b))
+                    {
+                        var m = Regex.Match(b, @"\b(\d+\.\d+(?:\.\d+)?)\b");
+                        if (m.Success)
+                        {
+                            var ch = ScChannel;
+                            var bld = _parser.Meta.TryGetValue("build", out var bldVal) && !string.IsNullOrWhiteSpace(bldVal) ? bldVal.Trim() : "";
+                            ver = !string.IsNullOrEmpty(bld) ? $"{m.Groups[1].Value}-{ch}.{bld}" : $"{m.Groups[1].Value}-{ch}";
+                        }
+                    }
+                }
+                return ver;
             }
             return "—";
         }
     }
 
-    public string ScChannel => _parser.Meta.TryGetValue("env", out var e) && !string.IsNullOrWhiteSpace(e) ? e.ToUpperInvariant() : "LIVE";
+    public string ScChannel
+    {
+        get
+        {
+            if (_parser.Meta.TryGetValue("env", out var e) && !string.IsNullOrWhiteSpace(e))
+            {
+                var env = e.Trim().ToUpperInvariant();
+                return env == "PUB" ? "LIVE" : env;
+            }
+            return "LIVE";
+        }
+    }
 
     public string ServerShardName => _parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s) ? s : "—";
 
@@ -2750,7 +2856,7 @@ public partial class MainViewModel : ObservableObject
 
     public string ServerTooltipText => ServerShardName == "—"
         ? "Keine Serververbindung im aktuellen Log gefunden."
-        : $"Vollständiger Shard-Name:\n{ServerShardName}\n\nRegion: {ServerRegionName} ({ServerRegionCode})\nLatenz (RTT): {(ServerPingMs is { } p ? $"{p} ms" : "Wird gemessen...")}\nKanal: {ScChannel}\nSpieler: {ScPlayerName}\nStar Citizen Build: {ScVersionText}";
+        : $"Vollständiger Shard-Name:\n{ServerShardName}\n\nRegion: {ServerRegionName} ({ServerRegionCode})\nLatenz (RTT): {(ServerPingMs is { } p ? $"{p} ms" : "Wird gemessen...")}\nKanal: {ScChannel}\nSpieler: {ScPlayerName}\nStar Citizen Version: {ScVersionText}";
 
     public async Task PingCurrentServerAsync()
     {
@@ -3351,9 +3457,9 @@ public partial class MainViewModel : ObservableObject
         foreach (var r in TradingCatalog.CreatePopularRoutes(SelectedTradeShipCapacity)) TradeRoutes.Add(r);
 
         // Globaler Hotkey (Alt+H)
+        GlobalHotkey.HotkeyPressed += () => ToggleOverlay();
         if (GlobalHotkeyEnabled)
         {
-            GlobalHotkey.HotkeyPressed += () => Dispatcher.UIThread.Post(() => ToggleOverlay());
             GlobalHotkey.Start();
         }
 
@@ -3656,7 +3762,7 @@ public partial class MainViewModel : ObservableObject
             RebuildIndependentMissions();
             RebuildPlacesFromDatabase(_allDbTimelineEvents);
         }
-        else
+        else if (!IsDatabaseBusy && !Database.WasParserResetRequired)
         {
             LoadGlobalDataAsync();
         }
@@ -3813,6 +3919,7 @@ public partial class MainViewModel : ObservableObject
 
     static void FlushUnknownNotifications()
     {
+        Core.UnknownEventsLogger.FlushSummary();
         if (LogParser.Unknown.IsEmpty) return;
         Logger.Log($"--- Unbekannte Notification-Typen ({LogParser.Unknown.Count}) – nach Häufigkeit ---");
         foreach (var kv in LogParser.Unknown.OrderByDescending(k => k.Value))
@@ -4320,6 +4427,26 @@ public partial class MainViewModel : ObservableObject
                     });
                 }
             }
+
+            if (matchContract == null)
+            {
+                var norm = ContractParser.NormalizeTitle(missionTitle);
+                var words = norm.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Where(w => w.Length >= 3).ToList();
+                if (words.Count > 0)
+                {
+                    matchContract = ActiveContracts.FirstOrDefault(c =>
+                    {
+                        var cNorm = ContractParser.NormalizeTitle(c.Title);
+                        return words.Count(w => cNorm.Contains(w)) >= Math.Min(2, words.Count);
+                    });
+                }
+            }
+        }
+
+        if (matchContract == null && ActiveContracts.Count == 1)
+        {
+            matchContract = ActiveContracts[0];
         }
 
         long reward = matchContract != null && matchContract.Reward > 0 ? matchContract.Reward : passedReward;
@@ -4441,6 +4568,26 @@ public partial class MainViewModel : ObservableObject
                     });
                 }
             }
+
+            if (matchContract == null)
+            {
+                var norm = ContractParser.NormalizeTitle(missionTitle);
+                var words = norm.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Where(w => w.Length >= 3).ToList();
+                if (words.Count > 0)
+                {
+                    matchContract = ActiveContracts.FirstOrDefault(c =>
+                    {
+                        var cNorm = ContractParser.NormalizeTitle(c.Title);
+                        return words.Count(w => cNorm.Contains(w)) >= Math.Min(2, words.Count);
+                    });
+                }
+            }
+        }
+
+        if (matchContract == null && ActiveContracts.Count == 1)
+        {
+            matchContract = ActiveContracts[0];
         }
 
         if (matchContract != null)
@@ -4473,14 +4620,48 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
+            if (!string.IsNullOrWhiteSpace(missionTitle))
+            {
+                Database.RemoveContract(missionTitle, 0);
+            }
             Status = $"✕ {detail}";
         }
 
         // In _rawContracts (SubTab 0 Aufträge-Tabelle) aktualisieren
         var normCanc = ContractParser.NormalizeTitle(missionTitle);
         var rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
-            (!string.IsNullOrEmpty(normCanc) && ContractParser.NormalizeTitle(c.Title).Contains(normCanc) ||
-             normCanc.Contains(ContractParser.NormalizeTitle(c.Title))));
+            (!string.IsNullOrEmpty(normCanc) && (ContractParser.NormalizeTitle(c.Title).Contains(normCanc) ||
+             normCanc.Contains(ContractParser.NormalizeTitle(c.Title)))));
+
+        if (rawMatch == null && !string.IsNullOrEmpty(normCanc))
+        {
+            var words = normCanc.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Where(w => w.Length >= 3).ToList();
+            if (words.Count > 0)
+            {
+                rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
+                    words.Count(w => ContractParser.NormalizeTitle(c.Title).Contains(w)) >= Math.Min(2, words.Count));
+            }
+        }
+
+        if (rawMatch == null && matchContract != null)
+        {
+            var mNorm = ContractParser.NormalizeTitle(matchContract.Title);
+            rawMatch = _rawContracts.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress &&
+                (ContractParser.NormalizeTitle(c.Title) == mNorm ||
+                 ContractParser.NormalizeTitle(c.Title).Contains(mNorm) ||
+                 mNorm.Contains(ContractParser.NormalizeTitle(c.Title))));
+        }
+
+        if (rawMatch == null)
+        {
+            var singleInProgress = _rawContracts.Where(c => c.Outcome == ContractOutcome.InProgress).ToList();
+            if (singleInProgress.Count == 1)
+            {
+                rawMatch = singleInProgress[0];
+            }
+        }
+
         if (rawMatch != null)
         {
             var idx = _rawContracts.IndexOf(rawMatch);
@@ -4529,6 +4710,30 @@ public partial class MainViewModel : ObservableObject
         int finalReward = (int)(reward > 0 ? reward : (cat?.BaseReward ?? 0));
         string org = cat != null && !string.IsNullOrEmpty(cat.Contractor) ? cat.Contractor : (cat?.Faction ?? "");
 
+        if (string.IsNullOrEmpty(org) && _parser != null)
+        {
+            var pMatch = _parser.ContractsList.FirstOrDefault(c =>
+                !string.IsNullOrEmpty(c.Issuer) && c.Issuer != "Unbekannt" && c.Issuer != "mobiGlas" &&
+                (ContractParser.NormalizeTitle(c.Title) == norm ||
+                 ContractParser.NormalizeTitle(c.Title).Contains(norm) ||
+                 norm.Contains(ContractParser.NormalizeTitle(c.Title)) ||
+                 (c.Title.Contains(" · ") && c.Outcome == ContractOutcome.InProgress)));
+            if (pMatch != null)
+            {
+                org = pMatch.Issuer;
+            }
+        }
+
+        if (string.IsNullOrEmpty(org))
+        {
+            if (missionTitle.Contains("Moraine", StringComparison.OrdinalIgnoreCase) ||
+                missionTitle.Contains("Glaciem", StringComparison.OrdinalIgnoreCase) ||
+                (CurrentLocation != null && CurrentLocation.Contains("Levski", StringComparison.OrdinalIgnoreCase)))
+            {
+                org = "Recco Battaglia";
+            }
+        }
+
         var contract = new ContractDetails
         {
             Title = cat?.Title ?? missionTitle,
@@ -4542,7 +4747,7 @@ public partial class MainViewModel : ObservableObject
         if (existing != null)
         {
             if (finalReward > 0 && existing.Reward <= 0) existing.Reward = finalReward;
-            if (!string.IsNullOrEmpty(org) && string.IsNullOrEmpty(existing.ContractedBy)) existing.ContractedBy = org;
+            if (!string.IsNullOrEmpty(org) && (string.IsNullOrEmpty(existing.ContractedBy) || existing.ContractedBy == "Unbekannt" || existing.ContractedBy == "mobiGlas")) existing.ContractedBy = org;
             if (contract.Title.Length > existing.Title.Length) existing.Title = contract.Title;
             existing.ScannedAt = DateTime.UtcNow;
             Database.SaveContract(existing);
@@ -4552,7 +4757,12 @@ public partial class MainViewModel : ObservableObject
             ActiveContractTitle = existing.Title;
 
             // Auch _rawContracts aktualisieren
-            var existingRawDupe = _rawContracts.FirstOrDefault(c => ContractParser.NormalizeTitle(c.Title) == norm && c.Outcome == ContractOutcome.InProgress);
+            var existingRawDupe = _rawContracts.FirstOrDefault(c =>
+                c.Outcome == ContractOutcome.InProgress &&
+                (ContractParser.NormalizeTitle(c.Title) == norm ||
+                 ContractParser.NormalizeTitle(c.Title).Contains(norm) ||
+                 norm.Contains(ContractParser.NormalizeTitle(c.Title)) ||
+                 (c.Title.Contains(" · ") && !string.IsNullOrEmpty(org) && (c.Issuer == org || org.Contains(c.Issuer)))));
             if (existingRawDupe != null)
             {
                 var idx = _rawContracts.IndexOf(existingRawDupe);
@@ -4560,8 +4770,10 @@ public partial class MainViewModel : ObservableObject
                 {
                     _rawContracts[idx] = existingRawDupe with
                     {
+                        Title = contract.Title,
                         Reward = finalReward > 0 ? finalReward : existingRawDupe.Reward,
-                        Issuer = !string.IsNullOrEmpty(org) ? org : existingRawDupe.Issuer
+                        Issuer = !string.IsNullOrEmpty(org) && (existingRawDupe.Issuer == "Unbekannt" || existingRawDupe.Issuer == "mobiGlas" || existingRawDupe.Issuer == "Battaglia") ? org : existingRawDupe.Issuer,
+                        System = cat?.StarSystems ?? (existingRawDupe.System != "k.A." ? existingRawDupe.System : (SelectedStarmapSystem ?? "Stanton"))
                     };
                 }
             }
@@ -4586,7 +4798,12 @@ public partial class MainViewModel : ObservableObject
         Status = $"★ Auftrag angenommen: {contract.Title} · {contract.RewardText}";
 
         // In _rawContracts (SubTab 0 Aufträge-Tabelle) einbinden/aktualisieren
-        var existingRaw = _rawContracts.FirstOrDefault(c => ContractParser.NormalizeTitle(c.Title) == norm && c.Outcome == ContractOutcome.InProgress);
+        var existingRaw = _rawContracts.FirstOrDefault(c =>
+            c.Outcome == ContractOutcome.InProgress &&
+            (ContractParser.NormalizeTitle(c.Title) == norm ||
+             ContractParser.NormalizeTitle(c.Title).Contains(norm) ||
+             norm.Contains(ContractParser.NormalizeTitle(c.Title)) ||
+             (c.Title.Contains(" · ") && !string.IsNullOrEmpty(org) && (c.Issuer == org || org.Contains(c.Issuer)))));
         if (existingRaw == null)
         {
             _rawContracts.Insert(0, new ContractRecord
@@ -4594,9 +4811,9 @@ public partial class MainViewModel : ObservableObject
                 MissionId = "active_" + norm,
                 AcceptedAt = DateTime.UtcNow,
                 Title = contract.Title,
-                Issuer = !string.IsNullOrEmpty(contract.ContractedBy) && !contract.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase)
+                Issuer = !string.IsNullOrEmpty(contract.ContractedBy) && !contract.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase) && contract.ContractedBy != "Unbekannt"
                     ? contract.ContractedBy
-                    : (!string.IsNullOrEmpty(cat?.Contractor) ? cat.Contractor : (!string.IsNullOrEmpty(cat?.Faction) ? cat.Faction : "Unbekannt")),
+                    : (!string.IsNullOrEmpty(cat?.Contractor) ? cat.Contractor : (!string.IsNullOrEmpty(cat?.Faction) ? cat.Faction : (!string.IsNullOrEmpty(org) ? org : "Unbekannt"))),
                 Type = cat?.MissionType ?? "Auftrag",
                 Difficulty = "k.A.",
                 System = cat?.StarSystems ?? (SelectedStarmapSystem ?? "Stanton"),
@@ -4605,6 +4822,20 @@ public partial class MainViewModel : ObservableObject
                 Reward = contract.Reward,
                 Outcome = ContractOutcome.InProgress
             });
+        }
+        else
+        {
+            var idx = _rawContracts.IndexOf(existingRaw);
+            if (idx >= 0)
+            {
+                _rawContracts[idx] = existingRaw with
+                {
+                    Title = contract.Title,
+                    Reward = finalReward > 0 ? finalReward : existingRaw.Reward,
+                    Issuer = !string.IsNullOrEmpty(org) && (existingRaw.Issuer == "Unbekannt" || existingRaw.Issuer == "mobiGlas" || existingRaw.Issuer == "Battaglia") ? org : existingRaw.Issuer,
+                    System = cat?.StarSystems ?? (existingRaw.System != "k.A." ? existingRaw.System : (SelectedStarmapSystem ?? "Stanton"))
+                };
+            }
         }
         UpdateContractsView();
     }
@@ -5232,7 +5463,15 @@ public partial class MainViewModel : ObservableObject
     partial void OnToastSoundEnabledChanged(bool value) { _settings.ToastSoundEnabled = value; Settings.Save(_settings); }
     partial void OnOverlayLockedChanged(bool value) { _settings.OverlayLocked = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
     partial void OnOverlayClickThroughChanged(bool value) { _settings.OverlayClickThrough = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
-    partial void OnGlobalHotkeyEnabledChanged(bool value) { _settings.GlobalHotkeyEnabled = value; Settings.Save(_settings); }
+    partial void OnGlobalHotkeyEnabledChanged(bool value)
+    {
+        _settings.GlobalHotkeyEnabled = value;
+        Settings.Save(_settings);
+        if (value)
+            GlobalHotkey.Start();
+        else
+            GlobalHotkey.Stop();
+    }
 
     public void TriggerAchievementToast(AchievementToastData toast)
     {

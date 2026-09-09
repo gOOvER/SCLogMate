@@ -130,13 +130,75 @@ public static class Updater
         return null;
     }
 
-    static bool IsNewer(string remote, string local)
+    public static bool IsNewer(string remote, string local)
     {
-        static (int, int, int) P(string s)
+        return CompareSemVer(remote, local) > 0;
+    }
+
+    public static int CompareSemVer(string a, string b)
+    {
+        var (vA, preA) = ParseVersion(a);
+        var (vB, preB) = ParseVersion(b);
+
+        int cmp = vA.CompareTo(vB);
+        if (cmp != 0) return cmp;
+
+        // Gleiche Hauptversion: Release ohne Pre-Release ist HÖHER als Pre-Release (z.B. 1.0.0 > 1.0.0-rc1)
+        if (string.IsNullOrEmpty(preA) && !string.IsNullOrEmpty(preB)) return 1;
+        if (!string.IsNullOrEmpty(preA) && string.IsNullOrEmpty(preB)) return -1;
+        if (string.IsNullOrEmpty(preA) && string.IsNullOrEmpty(preB)) return 0;
+
+        // Beide haben Pre-Release-Tags (z.B. "rc1" vs "beta7", "rc2" vs "rc1")
+        return ComparePreRelease(preA, preB);
+    }
+
+    private static (Version BaseVer, string PreRelease) ParseVersion(string s)
+    {
+        s = s.Trim().TrimStart('v', 'V');
+        int dashIdx = s.IndexOf('-');
+        int plusIdx = s.IndexOf('+');
+        int splitIdx = (dashIdx >= 0 && plusIdx >= 0) ? Math.Min(dashIdx, plusIdx) : Math.Max(dashIdx, plusIdx);
+
+        string basePart = splitIdx >= 0 ? s[..splitIdx] : s;
+        string prePart = dashIdx >= 0 ? (plusIdx > dashIdx ? s[(dashIdx + 1)..plusIdx] : s[(dashIdx + 1)..]) : "";
+
+        var parts = basePart.Split('.');
+        int major = parts.Length > 0 && int.TryParse(parts[0], out var m) ? m : 0;
+        int minor = parts.Length > 1 && int.TryParse(parts[1], out var n) ? n : 0;
+        int patch = parts.Length > 2 && int.TryParse(parts[2], out var p) ? p : 0;
+
+        return (new Version(major, minor, patch), prePart.ToLowerInvariant());
+    }
+
+    private static int ComparePreRelease(string a, string b)
+    {
+        // Pre-Release Ränge: alpha < beta < rc
+        static int Rank(string s)
         {
-            var p = s.Split('.', '-', '+').Where(x => int.TryParse(x, out _)).Select(int.Parse).ToArray();
-            return (p.ElementAtOrDefault(0), p.ElementAtOrDefault(1), p.ElementAtOrDefault(2));
+            if (s.StartsWith("alpha")) return 1;
+            if (s.StartsWith("beta")) return 2;
+            if (s.StartsWith("rc")) return 3;
+            return 0;
         }
-        return P(remote).CompareTo(P(local)) > 0;
+
+        int rankA = Rank(a);
+        int rankB = Rank(b);
+        if (rankA != rankB) return rankA.CompareTo(rankB);
+
+        // Gleicher Rang: Nummern vergleichen (z.B. "rc1" vs "rc2", "beta7" vs "beta6")
+        int numA = ExtractTrailingNumber(a);
+        int numB = ExtractTrailingNumber(b);
+        if (numA != numB) return numA.CompareTo(numB);
+
+        return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int ExtractTrailingNumber(string s)
+    {
+        int i = s.Length - 1;
+        while (i >= 0 && char.IsDigit(s[i])) i--;
+        if (i < s.Length - 1 && int.TryParse(s[(i + 1)..], out var n))
+            return n;
+        return 0;
     }
 }

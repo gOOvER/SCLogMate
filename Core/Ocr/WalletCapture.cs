@@ -95,6 +95,7 @@ public sealed class WalletCapture : IDisposable
         }
 
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 

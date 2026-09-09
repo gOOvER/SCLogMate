@@ -34,10 +34,10 @@ public static class FlightRecorderService
         var items = new List<FlightTimelineItem>();
         var summary = new FlightSummary();
 
-        if (!entries.Any()) return (items, summary);
+        if (entries.Count == 0) return (items, summary);
 
-        var sessionStart = entries.First().Time;
-        var sessionEnd = entries.Last().Time;
+        var sessionStart = entries[0].Time;
+        var sessionEnd = entries[^1].Time;
         summary.TotalSessionDuration = sessionEnd - sessionStart;
 
         string currentShip = "";
@@ -97,7 +97,7 @@ public static class FlightRecorderService
             // 2. Ortswechsel, Hangar & Quantum Travel
             else if (entry.Kind == EventKind.Location || entry.Kind == EventKind.Quantum || entry.Kind == EventKind.Hangar)
             {
-                var locName = entry.Kind == EventKind.Quantum && !string.IsNullOrEmpty(entry.Detail) ? entry.Detail : entry.Detail;
+                var locName = entry.Detail;
                 var resolved = Locations.ResolveLocation(locName);
                 if (resolved.DisplayName != "—" && resolved.DisplayName != lastResolvedLoc?.DisplayName)
                 {
@@ -199,8 +199,8 @@ public static class FlightRecorderService
 
         sb.AppendLine("## 📊 Missions-Zusammenfassung (Black Box KPIs)");
         sb.AppendLine($"- **Gesamte Flugdistanz**: {summary.TotalDistanceText}");
-        sb.AppendLine($"- **Reine Flugzeit**: {summary.TotalFlightDuration.Hours}h {summary.TotalFlightDuration.Minutes}m");
-        sb.AppendLine($"- **Session-Dauer**: {summary.TotalSessionDuration.Hours}h {summary.TotalSessionDuration.Minutes}m");
+        sb.AppendLine($"- **Reine Flugzeit**: {(int)summary.TotalFlightDuration.TotalHours}h {summary.TotalFlightDuration.Minutes}m");
+        sb.AppendLine($"- **Session-Dauer**: {(int)summary.TotalSessionDuration.TotalHours}h {summary.TotalSessionDuration.Minutes}m");
         sb.AppendLine($"- **Schiffseinsätze**: {summary.SortieCount} Starts ({summary.ShipsUsedText})");
         sb.AppendLine($"- **Schiffsverluste**: {summary.ShipLossesText}");
         sb.AppendLine($"- **Quantum Sprünge**: {summary.QuantumJumps}");

@@ -73,6 +73,53 @@ public partial class ShipFleetItem : ObservableObject
     [ObservableProperty]
     private bool _isCurrent;
 
+    partial void OnIsInHangarChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HangarStatusText));
+        OnPropertyChanged(nameof(HangarStarText));
+        OnPropertyChanged(nameof(HangarStarColor));
+        OnPropertyChanged(nameof(HangarTooltip));
+    }
+
+    partial void OnAcquisitionTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(PledgeValueText));
+        OnPropertyChanged(nameof(PledgeBadgeColor));
+        OnPropertyChanged(nameof(InsuranceShortBadge));
+        OnPropertyChanged(nameof(InsuranceBadgeColor));
+    }
+
+    partial void OnIsPledgeBoughtChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PledgeValueText));
+        OnPropertyChanged(nameof(InsuranceShortBadge));
+        OnPropertyChanged(nameof(InsuranceBadgeColor));
+    }
+
+    partial void OnPledgeValueUsdChanged(int value)
+    {
+        OnPropertyChanged(nameof(PledgeValueText));
+    }
+
+    partial void OnInsuranceTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(InsuranceShortBadge));
+        OnPropertyChanged(nameof(InsuranceBadgeColor));
+    }
+
+    partial void OnFlightCountChanged(int value) => OnPropertyChanged(nameof(FlightCountText));
+    partial void OnQuantumJumpsChanged(int value) => OnPropertyChanged(nameof(QuantumJumpsText));
+    partial void OnLossCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(LossCountText));
+        OnPropertyChanged(nameof(LossCountColor));
+    }
+    partial void OnLastFlownChanged(DateTime? value)
+    {
+        OnPropertyChanged(nameof(LastFlownText));
+        OnPropertyChanged(nameof(LastFlownShort));
+    }
+
     // Formatierte UI-Eigenschaften
     public string FlightCountText => $"{FlightCount}× geflogen";
     public string QuantumJumpsText => $"{QuantumJumps} QT-Sprünge";

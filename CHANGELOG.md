@@ -5,7 +5,143 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-rc1] - 2026-09-07
+### Added
+- **Database Version Overview & Structure Diagnostics (`Models/DatabaseDiagnosticsInfo.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.Database.cs`, `Views/MainWindow.axaml`)**:
+  - Implemented comprehensive database version tracking and integrity verification diagnostics for the local SQLite database (`sessions.db`).
+  - Added real-time version comparison cards displaying installed vs. target Schema Version (`v11`), Parser Version (`v28`), SQLite engine version, and journal mode (WAL).
+  - Added structural validation checking the presence and schema of all 7 SQLite tables (`sessions`, `events`, `contracts`, `user_pois`, `reputation`, `fleet_user_ships`, `meta`), critical columns, and 7 performance/composite indexes.
+  - Added native SQLite physical integrity check (`PRAGMA quick_check;`) with detailed health status reporting.
+  - Added metrics overview displaying record counts across all database entities (Sessions, Events, Contracts, Fleet Ships, Custom Waypoints, Reputation Factions).
+  - Added interactive diagnostic actions: `CheckDbStructureCommand` to trigger live deep structural inspection, `RepairDbStructureCommand` to automatically restore missing tables, columns, indexes, and apply pending migrations, and `OpenDatabaseFileLocationCommand` to locate `sessions.db` in Windows Explorer.
+  - Automatically runs diagnostic checks upon switching to the Database settings sub-tab and refreshes diagnostics following Rescan, Cleanup, or Reset operations.
+- **Dedicated Unknown Events Logger & Diagnostic Actions (`Core/UnknownEventsLogger.cs`, `ViewModels/MainViewModel.cs`, `Views/MainWindow.axaml`, `App.axaml.cs`)**:
+  - Implemented dedicated unknown event logger recording unhandled HUD notifications, uncataloged ship models, unresolved factions, and unmapped blueprints into `%APPDATA%\SCLogMate\SCLogMate.unknown.log`.
+  - Added formatted frequency summary flusher (`UnknownEventsLogger.FlushSummary()`) triggered on application shutdown, post-rescan, and via UI diagnostics.
+  - Added `OpenUnknownEventsLogCommand` and corresponding action buttons in the Database diagnostics header and the Storage & Diagnostics settings card in `MainWindow.axaml`.
+- **Game Data Synchronization & Automation Tools (`tools/sync-fleet-catalog.ps1`, `tools/gen-missions.ps1`)**:
+  - Implemented `tools/sync-fleet-catalog.ps1` to query `scunpacked-data/ships.json`, verify missing ships/vehicles against `FleetCatalog.cs`, and automate catalog maintenance for future Star Citizen patches.
+  - Implemented `tools/gen-missions.ps1` to inspect and sync contract templates, factions, and rewards from `scunpacked-data` repository trees.
+  - Expanded `FleetCatalog.cs` with the complete Argo Astronautics lineup (`Argo ATLS`, `MOLE`, `RAFT`, `SRV`, `MPUV`), ground vehicles (`Anvil Ballista`, `Centurion`, `Greycat ROC`, `ROC-DS`, `PTV`, `STV`, `Tumbril Cyclone` variants, `Nova Tank`, `Storm`, `RSI Ursa`, `Ursa Medivac`, `Lynx`), and modern combat ships (`Mirai Guardian`, `Guardian MX`, `Anvil Paladin`).
+  - Added new modern Star Citizen 3.24+ / 4.0 reputation factions in `ReputationService.cs` (`Alliance Aid`, `Ling Family`, `Headhunters`, `Rough Animals`) with dedicated XP thresholds and faction matching logic.
+  - Added modern contract profiles to `MissionCatalog.cs` for Cargo Hauling, Wikelo Collector introductions, and Pyro underworld operations.
+
+### Changed
+- **Ship Model Normalization & Archetype Noise Filtering (`Core/Ships.cs`, `Core/FleetCatalog.cs`, `ViewModels/MainViewModel.cs`, `Core/Database.cs`)**:
+  - Fixed a bug where internal CIG mission archetype tags and spawn suffixes (such as `Salvage`, `Derelict`, `Wreck`, `Pirate`, `Civilian`, `Bounty`) were retained in prettified ship names (e.g. `MOLE Salvage · Argo` instead of `MOLE · Argo`), causing mining ships spawned for salvage missions to appear with corrupted model names.
+  - Added archetype noise filtering in `Ships.NormalizeModelName` and expanded the internal noise tag set in `Ships.cs`.
+  - Updated `MainViewModel.RebuildFleet` to group flight statistics by canonical catalog model name (`cat.NormalizedName`), consolidating split archetype entries into single clean fleet records.
+  - Bumped SQLite database schema to `v14` (`Database.CurrentSchemaVersion = 14`) with automatic migration query to sanitize existing `MOLE Salvage` records in `events` and `fleet_user_ships` to `MOLE · Argo`.
+- **Mission Ingestion Pipeline & Faction Statistics (`Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `Core/Database.cs`)**:
+  - Fixed a critical bug where accepted contracts (`Contract Accepted: ...`) in HUD notifications were emitted with `EventKind.Mission` instead of `EventKind.MissionTaken`. Because `RebuildMissions` and SQLite database queries strictly filter for `EventKind.MissionTaken`, accepted contracts were omitted from the mission overview and faction reputation statistics.
+  - Implemented automatic issuer/contractor extraction from notification titles (e.g. `Alliance Aid: ...`, `Red Wind: ...`, `Ling Family: ...`) when no static catalog match exists.
+  - Added smart mission type derivation (`Fracht/Transport`, `Lieferung`, `Kopfgeld`, `Söldner`, `Bergung`, `Bergbau`, `Person/Bergung`) from contract titles.
+  - Enhanced `RebuildMissions` in `MainViewModel` to gracefully support both dot-separated and colon-separated mission details.
+  - Bumped SQLite database `CurrentParserVersion` from `30` to `31` to automatically re-index historical sessions from the archive and populate all accepted mission events.
+- **Fleet Catalog O(1) Lookup & Substring Match Prioritization (`Core/FleetCatalog.cs`)**:
+  - Optimized catalog lookup to execute an O(1) exact dictionary match before substring matching.
+  - Pre-sorted catalog entries by key length descending (`SortedCatalog`) to prevent shorter model names (e.g. `Cutter`, `Cutlass`) from mistakenly matching before longer specific variants (e.g. `Cutter Rambler`, `Cutlass Black`).
+- **LogParser Performance Optimization & Thread Safety (`Core/LogParser.cs`)**:
+  - Implemented fast pre-filtering for HUD notification patterns (`isNotif`) and engine log prefixes (`SShop...`, `CActor::Kill`, `CSCItemNavigation`, etc.), bypassing up to 15 regex evaluations per log line.
+  - Replaced ad-hoc runtime dynamic regexes (`CleanMissionTitlePrefixRegex`, `CamelCaseSplitRegex`) with compile-time source-generated regexes (`[GeneratedRegex]`).
+  - Optimized timestamp parsing in `ParseTs()` to reuse universal timestamp cached in `_lastSeenTime` during `Feed()`, avoiding repetitive regex parsing and datetime string evaluations.
+  - Consolidated duplicate location resolution and visit tracking across 5 separate code paths into `RecordLocationVisit()`.
+  - Added `_stateLock` thread-safety guards for `ContractsList` snapshot generation and concurrent dictionary access.
+- **Service & OCR Subsystem Performance Optimizations (`Core/AuroraVoiceService.cs`, `Core/ReputationService.cs`, `Core/Ocr/WalletOcrTrigger.cs`, `Core/FlightRecorderService.cs`, `Models/LogEntry.cs`)**:
+  - Added fast notification pre-checks and compile-time `[GeneratedRegex]` source generators for ship channel detection in `AuroraVoiceService.ProcessLiveLine`.
+  - Converted runtime dynamic regexes in `WalletOcrTrigger.ExtractBalance` to compile-time source-generated regexes (`OcrNoiseCharsRegex`, `SpaceThousandsRegex`).
+  - Cached static frozen Avalonia `SolidColorBrush` instances in `FactionReputation` and `LogEntry` (`KindBadgeBg`, `KindBadgeFg`), eliminating hundreds of thousands of heap allocations when scrolling through large historical log tables.
+  - Replaced LINQ calls with direct indexed list operations in `FlightRecorderService.BuildTimeline`.
+- **UI Rendering Performance & Resource Optimization (`Views/FinanceTimelineChart.cs`, `Views/StarmapCanvas.cs`, `Views/ScanIndicatorWindow.cs`, `Views/RegionSelectorWindow.axaml.cs`, `App.axaml.cs`)**:
+  - Cached static frozen Avalonia brushes, pens, and typefaces in `FinanceTimelineChart`, eliminating per-frame allocations during hover and pan interactions.
+  - Implemented cached sorted data points in `FinanceTimelineChart` to avoid repeated LINQ sorting allocations on mouse movement.
+  - Pre-allocated immutable starfield brushes and cached static drawing pens/brushes in `StarmapCanvas`, avoiding thousands of brush allocations per second during rendering.
+  - Tied `StarmapCanvas._pulseTimer` to visual tree attachment and effective visibility, stopping unnecessary background rendering and timer ticks when the Starmap tab is inactive.
+  - Replaced ad-hoc timer allocations in `ScanIndicatorWindow.FlashGreen` with a reusable timer instance and removed dead `MoveWindow` P/Invoke declarations in `RegionSelectorWindow` and `ScanIndicatorWindow`.
+  - Added clean desktop application exit hook in `App.axaml.cs` to ensure `GlobalHotkey.Stop()` is invoked upon application termination.
+- **Feature Freeze & Dependency Alignment (`SCLogMate.csproj`)**:
+  - Declared Feature Freeze for the 1.0.0 Release Candidate phase with focus on stability, resilience, and clean resource management.
+  - Upgraded dependencies to native .NET 10 runtime packages: `Microsoft.Data.Sqlite 10.0.11`, `System.Security.Cryptography.ProtectedData 10.0.11`, `CommunityToolkit.Mvvm 8.4.2`, and `Tmds.DBus.Protocol 0.95.1`.
+
+### Fixed
+- **Star Citizen Game Version Detection & Status Header (`Core/LogParser.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Fixed an issue where the game version in the status header and tooltips was extracted from internal PE binary `FileVersion:` (e.g. displaying `v1.0.191.55227`) or with raw branch suffix noise (e.g. `v4.10.0-hotfix`).
+  - Implemented extraction of official full Star Citizen release version strings (`<BaseVersion>-<Channel>.<BuildNumber>`, e.g. `4.10.0-LIVE.12572603`) by parsing numeric version from `Branch:`, mapping environment `PUB` to `LIVE`, and appending changelist build numbers.
+  - Enhanced `ScVersionText`, `ScChannel`, `ServerSublineText`, and `ServerTooltipText` in `MainViewModel` to present the clean, official full game version without leading "v" or internal branch noise.
+- **M80 / m80 Casing Normalization & Fleet Duplicate Resolution (`Core/Ships.cs`, `Core/FleetCatalog.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Corrected lowercase `m80` model casing to uppercase `M80` across parser normalization and catalog aliases (`M80 · Origin`).
+  - Added SQLite schema migration `v15` (`Database.CurrentSchemaVersion = 15`) consolidating split `m80 · Origin`, `Origin M80 · Origin`, and `M80 · Origin` entries in `events` and `fleet_user_ships`, preserving custom user pledge data ($300, 24 Monate insurance).
+  - Enhanced `Database.GetAllFleetCustomData` and `Database.SaveFleetShipCustomData` to resolve canonical model names and deduplicate custom hangar entries while cleaning up obsolete legacy keys.
+  - Guarded `MainViewModel.RebuildFleet` against injecting duplicate un-flown custom hangar ships by checking against canonical model names.
+- **Notification Parser Robustness & Real-World Log Coverage (`Core/LogParser.cs`, `Core/FleetCatalog.cs`)**:
+  - Fixed notification categorization failing on `Entered/Exited Monitored Space`, `Entered ... Jurisdiction` (People's Alliance, Ungoverned, microTech, Hurston, UEE), and `Private Property` due to rigid `StartsWith` checks; converted to flexible substring matching (`Contains`).
+  - Added recognition for medical emergency services (`Emergency Services`), vehicle retrieval (`Retrieve`), money transfer offers (`has sent you`), hangar queue positions (`Hangar-Warteschlange`), journal entries, and refinery work order completions.
+  - Filtered out chat channel join/leave notifications (`left the channel`) to prevent pollution of unknown event diagnostics.
+  - Corrected `Origin M80` catalog entry to Origin Jumpworks (was mistakenly attributed to Aegis).
+  - Validated parser against 50 real-world game sessions (35+ hours of gameplay), reducing unhandled notification occurrences from 129 down to 0.
+- **Fleet & Hangar Pledge Synchronization & Data Persistence (`Models/ShipFleetItem.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.cs`, `Views/MainWindow.axaml`)**:
+  - Fixed a critical bug where ships marked as pledged or with acquisition cycled to "Pledge Store" or "In-Game (aUEC)" did not have `IsInHangar = true` set, causing them to be hidden from "Mein Hangar".
+  - Bumped SQLite database schema to `v13` (`Database.CurrentSchemaVersion = 13`) with automatic migration query to ensure all existing records with `is_pledge = 1` or `acquisition IN ('Pledge Store', 'In-Game (aUEC)')` are marked with `in_hangar = 1`.
+  - Added guard in `Database.SaveFleetShipCustomData` to automatically enforce `in_hangar = 1` whenever `is_pledge = true` or `acquisition` is "Pledge Store" or "In-Game (aUEC)".
+  - Added reactive property change notifications (`OnIsInHangarChanged`, `OnAcquisitionTypeChanged`, `OnIsPledgeBoughtChanged`, `OnPledgeValueUsdChanged`, `OnInsuranceTypeChanged`) in `ShipFleetItem.cs`.
+  - Unified telemetry and statistics updates via `NotifyFleetStats()` across all acquisition cycling, pledge editing, catalog additions, and view mode toggling in `MainViewModel.cs`.
+  - Wired up `CycleShipInsuranceCommand` in `MainWindow.axaml` allowing users to cycle insurance levels (LTI ➔ 120M ➔ 24M ➔ 12M ➔ 6M) by clicking the badge, and removed an obsolete duplicate read-only "HERKUNFT & PLEDGE" column.
+- **Auto-Updater SemVer Version Comparison (`Core/Updater.cs`)**:
+  - Fixed a critical version comparison bug where pre-release suffixes (e.g. `-beta7`, `-rc1`) were ignored by the naive 3-int parser, causing the updater to treat `1.0.0-beta7`, `1.0.0-rc1`, and `1.0.0` as identical versions (`1.0.0.CompareTo(1.0.0) == 0`).
+  - Implemented full SemVer 2.0.0 precedence rules recognizing pre-release ranks (`alpha < beta < rc < release`) and sub-versions (`rc1 < rc2`), ensuring users seamlessly receive updates to release candidates and the final 1.0.0 release.
+- **Global Hotkey Message Loop Termination & Dynamic Toggling (`Core/GlobalHotkey.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Fixed an issue where stopping the global hotkey listener left the background thread blocked indefinitely inside Win32 `GetMessage()`. Added `PostThreadMessage(threadId, WM_QUIT)` to unblock the thread and ensure `UnregisterHotKey` is reliably called.
+  - Connected `OnGlobalHotkeyEnabledChanged` in `MainViewModel` to immediately start or stop the listener when toggled in the UI settings.
+- **Single-Instance Mutex Permission Resilience (`Program.cs`)**:
+  - Added exception handling with fallback to local session namespace for `Global\SCLogMate_SingleInstance` mutex creation, preventing crashes in restricted or non-elevated user environments.
+- **Atomic Settings Persistence (`Core/Settings.cs`)**:
+  - Made `Settings.Save()` thread-safe with an internal lock and implemented atomic file replacement via temporary file swap to eliminate the risk of settings file corruption during sudden terminations.
+- **HTML Flight Report Export Sanitization & Accuracy (`Core/HtmlReportGenerator.cs`, `Core/Refinery.cs`)**:
+  - Corrected spelling error in report title ("FLUGSCHREIBER" instead of "FLUSCHSCHREIBER") and made version string dynamically reference `Updater.CurrentVersion`.
+  - Added HTML entity encoding for all interpolated log titles, locations, and ship names to prevent broken formatting.
+  - Fixed remaining time hour formatting in `RefineryJob.StatusText` for jobs taking 24 hours or longer (`(int)TotalHours`).
+- **Starmap Player System Indicator Formatting (`Views/StarmapCanvas.cs`, `Core/StarmapData.cs`)**:
+  - Fixed an issue where viewing a starmap for a different star system displayed an unformatted fallback `(Unbekannt)` location banner (`SPIELER IST IM NYX-SYSTEM (Unbekannt)`).
+  - Omitted the location detail parentheses when the specific outpost or station within the star system has not yet been resolved (`SPIELER IST IM NYX-SYSTEM`).
+  - Corrected `ResolvedLocation.DisplayName` default property value from `"Unbekannt"` to `"—"`, preventing premature fallback resolution before location events are parsed.
+- **Shard Region Detection in Server Ping Service (`Services/ServerPingService.cs`)**:
+  - Fixed an issue where Australian/Oceanic game shards (e.g. `pub-aus-...`) were incorrectly matched as US West due to `s.Contains("us")` being evaluated before Australia. Reordered regional detection and refined regional identifiers to prevent false routing.
+- **Audio Playback Event Leak & Resource Cleanup (`Core/AuroraVoiceService.cs`, `Core/RsAudioAlertService.cs`)**:
+  - Fixed an issue in `AuroraVoiceService` where `MediaEnded` and `MediaFailed` event handlers remained permanently subscribed if playback timed out after 8 seconds, causing orphaned handlers to fire and prematurely terminate subsequent audio cues.
+  - Ensured `Windows.Media.Core.MediaSource` instances are reliably disposed upon playback completion.
+  - Fixed TTS speech cut-offs and WinRT resource leaks in `RsAudioAlertService.SpeakTargetNameAsync` by introducing a persistent synthesizer and player lifecycle with full playback await and cleanup.
+- **Flight Duration Calculation in Flight Recorder (`Core/FlightRecorderService.cs`)**:
+  - Fixed total flight and session duration formatting in markdown export (`summary.TotalSessionDuration.TotalHours` instead of `Hours`) to correctly display durations exceeding 24 hours.
+- **Contract Contractor Resolution & Deduplication (`Core/Missions.cs`, `Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.cs`, `ViewModels/MainViewModel.QuantumViews.cs`)**:
+  - Fixed an issue where accepting missions from mission givers (e.g. `Battaglia_Generator` / `Battaglia_CreateUplink`) created duplicate entries with "Unbekannt" contractor and generic marker placeholder titles in the active contracts list.
+  - Added explicit generator contractor mapping in `Missions.Faction` and `LogParser.FormatMissionGiver` to resolve `Battaglia` to `Recco Battaglia` and recognize Nyx / Levski mission systems and mission types (`Daten`, `Bergbau`, `Bergung`).
+  - Added missing "Moraine Movements" contract definition to `MissionCatalog` under Recco Battaglia / People's Alliance in the Nyx system.
+  - Updated `LogParser` to prefer HUD notification mission titles over marker fallback strings and keep existing contractor details when processing subsequent contract log lines.
+  - Enhanced contract deduplication in `HandleMissionAccepted` and `SyncQuantumViewsFromParser` to seamlessly merge marker placeholders with live accepted contracts and update SQLite database entries.
+- **False Ship Welcome & Vehicle Event on Leaving Pilot Seat (`Core/LogParser.cs`, `Core/AuroraVoiceService.cs`, `Core/Database.cs`)**:
+  - Fixed an issue where standing up from the pilot seat in a ship (`CVehicleMovementBase::ClearDriver: releasing control token`) emitted a false-positive `EventKind.Vehicle` event, triggering the Aurora Voice welcome announcement inside the ship and inflating the flight recorder's sortie count.
+  - Updated `LogParser` so `ClearDriver` log lines only update `_lastShip` without creating a vehicle spawn/entry log entry.
+  - Added additional safeguards in `AuroraVoiceService` (`ProcessRawLine` and `ProcessLogEntry`) to ignore seat exit keywords (`ClearDriver`, `verlassen`, `Pilotensitz`, `releasing control token`) for ship greetings.
+  - Bumped `CurrentParserVersion` to `30`.
+- **Settings Sub-Tab Navigation Hook (`ViewModels/MainViewModel.Database.cs`)**:
+  - Connected `OnSettingsSubTabIndexChanged` hook in `MainViewModel.Database.cs` to trigger automatic database structure diagnostics whenever navigating to the Database settings sub-tab (`SettingsSubTabIndex = 6`).
+- **Win32 GDI Resource Leak Prevention (`Core/Ocr/ScreenCapture.cs`)**:
+  - Encapsulated GDI device context, bitmap creation, and blitting in `ScreenCapture.Capture()` inside a robust `try-finally` block to guarantee strict cleanup order (`SelectObject(old) -> DeleteObject -> DeleteDC -> ReleaseDC`) even when memory allocations fail or exceptions occur.
+- **CancellationTokenSource Resource Cleanup (`Core/Ocr/WalletCapture.cs`)**:
+  - Disposed previous `CancellationTokenSource` instances prior to allocating new tokens when re-triggering mobiGlas wallet OCR capture bursts.
+
+## [1.0.0-beta7] - 2026-09-06
+### Fixed
+- **Contract Abandonment & Cancellation Recognition (`Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `Core/Database.cs`)**:
+  - Implemented parsing for Star Citizen engine `<EndMission>` log events (`CompletionType[Abandon]`, `CompletionType[Fail]`, `CompletionType[Deactivate]`, `CompletionType[Complete]`). Previously, abandoned missions were not removed because the parser expected non-existent HUD notifications rather than the actual `<EndMission>` engine messages.
+  - Abandoned and failed missions now immediately resolve their contract title from active contracts or the mission catalog, trigger `HandleMissionCancelled`, remove the contract from the active contracts widget (`ActiveContracts`), purge it from the persistent SQLite `contracts` table, and update the mission history (`_rawContracts`) with status `ContractOutcome.Abandoned`.
+  - Added robust multi-token and single-contract fallback resolution in `HandleMissionCancelled` and `HandleMissionCompleted`, ensuring active contracts are reliably cleared even if slight OCR or title phrasing discrepancies occur.
+  - Bumped `CurrentParserVersion` from 27 to 28 in `Core/Database.cs` to re-index historical session contracts from the archive.
+- **Startup Indexing & Database Index Resilience (`Core/Database.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Ensured all composite indexes on `events` are automatically restored during `Database.Init()` and inside a `finally` block in `RescanAll()`, preventing unindexed table scans if a rescan was interrupted.
+  - Added fast string pre-check guards in `LogParser.Feed()` for `<MissionEnded>` and `<EndMission>` to avoid executing regex matches on millions of irrelevant lines during bulk indexing.
+  - Guarded `LoadGlobalDataAsync()` during startup to prevent competing background database queries while a background rescan/indexing operation is active.
+  - Ensured visual progress percentage reflects active processing immediately (`Math.Max(1.0, ...)`) rather than displaying a static `0%` during initial file chunks.
 
 ## [1.0.0-beta6] - 2026-09-05
 ### Added

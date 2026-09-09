@@ -164,6 +164,10 @@ public partial class LogParser
     [GeneratedRegex(@"<MissionEnded>.*mission_id (?<id>[0-9a-f-]+) - mission_state MISSION_STATE_COMPLETED")]
     private static partial Regex MissionDoneRegex();
 
+    // Missions-Beendigung / Abbruch / Fehlschlag / Abschluss via Engine-Event
+    [GeneratedRegex(@"<EndMission>\s+Ending mission for player\.\s+MissionId\[(?<id>[0-9a-fA-F-]+)\].*?CompletionType\[(?<type>[^\]]+)\]")]
+    private static partial Regex EndMissionRegex();
+
     // Ausrüstung/Item defekt ("Dein X ist unbrauchbar" / "Your X is broken").
     [GeneratedRegex(@"Deaktivierung eingeleitet: (?:Dein|Your) (?<item>[^""]+?) ist? (?:unbrauchbar|broken|unusable)")]
     private static partial Regex GearBrokeRegex();
@@ -326,6 +330,15 @@ public partial class LogParser
     [GeneratedRegex(@"Join PU>.*shard\[(?<s>[^\]]+)\]")]
     private static partial Regex ShardRegex();
 
+    [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", RegexOptions.IgnoreCase)]
+    private static partial Regex CleanMissionTitlePrefixRegex();
+
+    [GeneratedRegex(@"(\B[A-Z])")]
+    private static partial Regex CamelCaseSplitRegex();
+
+    [GeneratedRegex(@"\b(\d+\.\d+(?:\.\d+)?)\b")]
+    private static partial Regex BranchVersionRegex();
+
     string? _pendWho;
     int _pendDir;          // +1 = rein, -1 = raus
     DateTime _pendTime;
@@ -360,10 +373,20 @@ public partial class LogParser
     public List<(DateTime Time, string RawId, string Name, string? System, string? Body, string Kind)> LocationVisits { get; } = new();
     public List<(DateTime Time, string Destination)> QuantumDestinations { get; } = new();
 
+    private readonly object _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Giver, string Faction)> _missionComms = new(StringComparer.OrdinalIgnoreCase);
-    public IReadOnlyCollection<ContractRecord> ContractsList => _contracts.Values;
+    public IReadOnlyCollection<ContractRecord> ContractsList
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _contracts.Values.ToArray();
+            }
+        }
+    }
 
     public string PlaceAt(DateTime at)
     {
@@ -378,6 +401,24 @@ public partial class LogParser
                 return QuantumDestinations[i].Destination;
         }
         return _lastLoc ?? "—";
+    }
+
+    private LogEntry? RecordLocationVisit(string rawLoc, DateTime ts)
+    {
+        if (string.IsNullOrWhiteSpace(rawLoc) || rawLoc.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var locRes = Locations.ResolveLocation(rawLoc);
+        if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit", StringComparison.OrdinalIgnoreCase))
+        {
+            LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
+            if (locRes.DisplayName != _lastLoc)
+            {
+                _lastLoc = locRes.DisplayName;
+                return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+            }
+        }
+        return null;
     }
 
     public static string CategorizeItem(string? guid, string item)
@@ -419,6 +460,7 @@ public partial class LogParser
         }
 
         CaptureMeta(line);
+        bool isNotif = line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase);
 
         // Kiosk-Kaufbestätigung (Shop Flow Response)
         if (_pendingPurchase != null && (line.Contains("Shop Flow Response", StringComparison.OrdinalIgnoreCase) || line.Contains("RmShopFlowResponse", StringComparison.OrdinalIgnoreCase)))
@@ -467,19 +509,6 @@ public partial class LogParser
                 var stateStr = om.Groups["state"].Value;
                 bool isShowInLog = om.Groups["flags"].Success && om.Groups["flags"].Value.Contains("ShowInLog", StringComparison.OrdinalIgnoreCase);
 
-                if (!_contractObjectives.TryGetValue(mId, out var steps))
-                {
-                    steps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    _contractObjectives[mId] = steps;
-                }
-                if (isShowInLog || !steps.ContainsKey(objId))
-                {
-                    steps[objId] = stateStr;
-                }
-
-                int totalSteps = steps.Count;
-                int doneSteps = steps.Values.Count(st => st.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase));
-
                 var dt = ParseTs(line);
                 ContractOutcome outcome = stateStr switch
                 {
@@ -488,21 +517,37 @@ public partial class LogParser
                     _ => ContractOutcome.InProgress
                 };
 
-                if (_contracts.TryGetValue(mId, out var existing))
+                lock (_stateLock)
                 {
-                    var finalOutcome = existing.Outcome == ContractOutcome.Completed
-                        ? ContractOutcome.Completed
-                        : outcome;
-
-                    _contracts[mId] = existing with
+                    if (!_contractObjectives.TryGetValue(mId, out var steps))
                     {
-                        StepsTotal = Math.Max(existing.StepsTotal, totalSteps),
-                        StepsDone = Math.Max(existing.StepsDone, doneSteps),
-                        Outcome = finalOutcome,
-                        CompletedAt = finalOutcome == ContractOutcome.Completed || finalOutcome == ContractOutcome.Abandoned
-                            ? (existing.CompletedAt ?? dt)
-                            : null
-                    };
+                        steps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        _contractObjectives[mId] = steps;
+                    }
+                    if (isShowInLog || !steps.ContainsKey(objId))
+                    {
+                        steps[objId] = stateStr;
+                    }
+
+                    int totalSteps = steps.Count;
+                    int doneSteps = steps.Values.Count(st => st.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase));
+
+                    if (_contracts.TryGetValue(mId, out var existing))
+                    {
+                        var finalOutcome = existing.Outcome == ContractOutcome.Completed
+                            ? ContractOutcome.Completed
+                            : outcome;
+
+                        _contracts[mId] = existing with
+                        {
+                            StepsTotal = Math.Max(existing.StepsTotal, totalSteps),
+                            StepsDone = Math.Max(existing.StepsDone, doneSteps),
+                            Outcome = finalOutcome,
+                            CompletedAt = finalOutcome == ContractOutcome.Completed || finalOutcome == ContractOutcome.Abandoned
+                                ? (existing.CompletedAt ?? dt)
+                                : null
+                        };
+                    }
                 }
             }
         }
@@ -549,561 +594,599 @@ public partial class LogParser
             }
         }
 
-        var r = RecvHdrRegex().Match(line);
-        if (r.Success) { _pendWho = Clean(r.Groups["who"].Value); _pendDir = +1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
-
-        var s = SentHdrRegex().Match(line);
-        if (s.Success) { _pendWho = Clean(s.Groups["who"].Value); _pendDir = -1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
-
-        var rw = RewardRegex().Match(line);
-        if (rw.Success)
+        if (isNotif)
         {
-            var ts = ParseTs(line);
-            long amt = ParseAmt(rw.Groups["amt"].Value);
-            LedgerRecords.Add(new LedgerRecord
+            var r = RecvHdrRegex().Match(line);
+            if (r.Success) { _pendWho = Clean(r.Groups["who"].Value); _pendDir = +1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
+
+            var s = SentHdrRegex().Match(line);
+            if (s.Success) { _pendWho = Clean(s.Groups["who"].Value); _pendDir = -1; _pendTime = ParseTs(line); _pendingLines = 0; return null; }
+
+            var rw = RewardRegex().Match(line);
+            if (rw.Success)
             {
-                Timestamp = ts,
-                Kind = "Belohnung",
-                What = "Missions-Belohnung",
-                Where = PlaceAt(ts),
-                Shop = "mobiGlas",
-                Amount = amt,
-                Quantity = 1,
-                Confirmed = true
-            });
-            return new LogEntry { Time = ts, Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = amt };
+                var ts = ParseTs(line);
+                long amt = ParseAmt(rw.Groups["amt"].Value);
+                LedgerRecords.Add(new LedgerRecord
+                {
+                    Timestamp = ts,
+                    Kind = "Belohnung",
+                    What = "Missions-Belohnung",
+                    Where = PlaceAt(ts),
+                    Shop = "mobiGlas",
+                    Amount = amt,
+                    Quantity = 1,
+                    Confirmed = true
+                });
+                return new LogEntry { Time = ts, Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = amt };
+            }
         }
 
         // Quantum Route-Berechnungen (Destination merken für QT-Ankunft & System-Erkennung)
-        var qr = QuantumRouteRegex().Match(line);
-        if (qr.Success)
+        if (line.Contains("route to", StringComparison.OrdinalIgnoreCase) || line.Contains("as their destination", StringComparison.OrdinalIgnoreCase))
         {
-            _pendingQtDestination = qr.Groups["dest"].Value;
-            var origin = qr.Groups["origin"].Value;
-            var resOrigin = Locations.ResolveLocation(origin);
-            if (resOrigin.SystemName is "Stanton" or "Pyro" or "Nyx")
+            var qr = QuantumRouteRegex().Match(line);
+            if (qr.Success)
             {
-                _currentSystem = resOrigin.SystemName;
-                Locations.ActiveSystem = resOrigin.SystemName;
-            }
-        }
-        else
-        {
-            var qrs = QuantumRouteSuccessRegex().Match(line);
-            if (qrs.Success)
-            {
-                _pendingQtDestination = qrs.Groups["dest"].Value;
+                _pendingQtDestination = qr.Groups["dest"].Value;
+                var origin = qr.Groups["origin"].Value;
+                var resOrigin = Locations.ResolveLocation(origin);
+                if (resOrigin.SystemName is "Stanton" or "Pyro" or "Nyx")
+                {
+                    _currentSystem = resOrigin.SystemName;
+                    Locations.ActiveSystem = resOrigin.SystemName;
+                }
             }
             else
             {
-                var qtTarget = QuantumTargetRegex().Match(line);
-                if (qtTarget.Success)
+                var qrs = QuantumRouteSuccessRegex().Match(line);
+                if (qrs.Success)
                 {
-                    _pendingQtDestination = qtTarget.Groups["dest"].Value;
+                    _pendingQtDestination = qrs.Groups["dest"].Value;
+                }
+                else
+                {
+                    var qtTarget = QuantumTargetRegex().Match(line);
+                    if (qtTarget.Success)
+                    {
+                        _pendingQtDestination = qtTarget.Groups["dest"].Value;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_pendingQtDestination))
+            {
+                var resDest = Locations.ResolveLocation(_pendingQtDestination);
+                if (resDest.SystemName is "Stanton" or "Pyro" or "Nyx")
+                {
+                    _currentSystem = resDest.SystemName;
+                    Locations.ActiveSystem = resDest.SystemName;
                 }
             }
         }
 
-        if (!string.IsNullOrEmpty(_pendingQtDestination))
+        if (line.Contains("SShopBuyRequest", StringComparison.Ordinal))
         {
-            var resDest = Locations.ResolveLocation(_pendingQtDestination);
-            if (resDest.SystemName is "Stanton" or "Pyro" or "Nyx")
+            var by = BuyRegex().Match(line);
+            if (by.Success)
             {
-                _currentSystem = resDest.SystemName;
-                Locations.ActiveSystem = resDest.SystemName;
+                long price = (long)ParseDouble(by.Groups["price"].Value);   // client_price = GESAMTpreis (alle Stück)
+                int qty = int.TryParse(by.Groups["qty"].Value, out var q) ? q : 1;
+                var shop = CleanShop(by.Groups["shop"].Value);
+                var shopLoc = ExtractLocationFromShop(shop);
+                if (shopLoc != null) _lastLoc = shopLoc;
+                var item = ItemNames.CleanFallback(by.Groups["item"].Value);
+                var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
+                var ts = ParseTs(line);
+                _pendingPurchase = new PendingPurchase(ts, shop, item, by.Groups["guid"].Value, price, qty);
+
+                return new LogEntry
+                {
+                    Time = ts,
+                    Kind = EventKind.Purchase,
+                    Amount = -price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
+                    ItemRef = by.Groups["guid"].Value,
+                    Suffix = suffix,
+                    Detail = $"{item}  {suffix}"
+                };
             }
         }
 
-        var by = BuyRegex().Match(line);
-        if (by.Success)
+        if (line.Contains("SShopSellRequest", StringComparison.Ordinal))
         {
-            long price = (long)ParseDouble(by.Groups["price"].Value);   // client_price = GESAMTpreis (alle Stück)
-            int qty = int.TryParse(by.Groups["qty"].Value, out var q) ? q : 1;
-            var shop = CleanShop(by.Groups["shop"].Value);
-            var shopLoc = ExtractLocationFromShop(shop);
-            if (shopLoc != null) _lastLoc = shopLoc;
-            var item = ItemNames.CleanFallback(by.Groups["item"].Value);
-            var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
-            var ts = ParseTs(line);
-            _pendingPurchase = new PendingPurchase(ts, shop, item, by.Groups["guid"].Value, price, qty);
-
-            return new LogEntry
+            var se = SellRegex().Match(line);
+            if (se.Success)
             {
-                Time = ts,
-                Kind = EventKind.Purchase,
-                Amount = -price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
-                ItemRef = by.Groups["guid"].Value,
-                Suffix = suffix,
-                Detail = $"{item}  {suffix}"
-            };
+                long price = (long)ParseDouble(se.Groups["price"].Value);   // client_price = GESAMTpreis (alle Stück)
+                int qty = int.TryParse(se.Groups["qty"].Value, out var q) ? q : 1;
+                var shop = CleanShop(se.Groups["shop"].Value);
+                var shopLoc = ExtractLocationFromShop(shop);
+                if (shopLoc != null) _lastLoc = shopLoc;
+                var item = ItemNames.CleanFallback(se.Groups["item"].Value);
+                var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
+                return new LogEntry
+                {
+                    Time = ParseTs(line),
+                    Kind = EventKind.Sale,
+                    Amount = price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
+                    ItemRef = se.Groups["guid"].Value,
+                    Suffix = suffix,
+                    Detail = $"{item}  {suffix}"
+                };
+            }
         }
 
-        var se = SellRegex().Match(line);
-        if (se.Success)
+        if (line.Contains("SShopCommoditySellRequest", StringComparison.Ordinal))
         {
-            long price = (long)ParseDouble(se.Groups["price"].Value);   // client_price = GESAMTpreis (alle Stück)
-            int qty = int.TryParse(se.Groups["qty"].Value, out var q) ? q : 1;
-            var shop = CleanShop(se.Groups["shop"].Value);
-            var shopLoc = ExtractLocationFromShop(shop);
-            if (shopLoc != null) _lastLoc = shopLoc;
-            var item = ItemNames.CleanFallback(se.Groups["item"].Value);
-            var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
-            return new LogEntry
+            var co = CommodityRegex().Match(line);
+            if (co.Success)
             {
-                Time = ParseTs(line),
-                Kind = EventKind.Sale,
-                Amount = price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
-                ItemRef = se.Groups["guid"].Value,
-                Suffix = suffix,
-                Detail = $"{item}  {suffix}"
-            };
-        }
+                long amt = (long)ParseDouble(co.Groups["amt"].Value);
+                int qty = int.TryParse(co.Groups["qty"].Value, out var q) ? q : 0;
+                var shop = CleanShop(co.Groups["shop"].Value);
+                var shopLoc = ExtractLocationFromShop(shop);
+                if (shopLoc != null) _lastLoc = shopLoc;
+                var ware = Commodities.Resolve(co.Groups["guid"].Value);
+                var ts = ParseTs(line);
+                var where = PlaceAt(ts);
 
-        var co = CommodityRegex().Match(line);
-        if (co.Success)
-        {
-            long amt = (long)ParseDouble(co.Groups["amt"].Value);
-            int qty = int.TryParse(co.Groups["qty"].Value, out var q) ? q : 0;
-            var shop = CleanShop(co.Groups["shop"].Value);
-            var shopLoc = ExtractLocationFromShop(shop);
-            if (shopLoc != null) _lastLoc = shopLoc;
-            var ware = Commodities.Resolve(co.Groups["guid"].Value);
-            var ts = ParseTs(line);
-            var where = PlaceAt(ts);
+                CargoTrades.Add(new CargoTradeRecord
+                {
+                    Timestamp = ts,
+                    IsSell = true,
+                    Commodity = ware,
+                    ResourceGuid = co.Groups["guid"].Value,
+                    QuantityScu = qty,
+                    TotalAuec = amt,
+                    Shop = shop,
+                    Where = where
+                });
 
-            CargoTrades.Add(new CargoTradeRecord
-            {
-                Timestamp = ts,
-                IsSell = true,
-                Commodity = ware,
-                ResourceGuid = co.Groups["guid"].Value,
-                QuantityScu = qty,
-                TotalAuec = amt,
-                Shop = shop,
-                Where = where
-            });
+                LedgerRecords.Add(new LedgerRecord
+                {
+                    Timestamp = ts,
+                    Kind = "Frachtverkauf",
+                    What = $"{ware} · {qty:N0} SCU",
+                    Where = where,
+                    Shop = shop,
+                    Amount = amt,
+                    Quantity = qty,
+                    Confirmed = true
+                });
 
-            LedgerRecords.Add(new LedgerRecord
-            {
-                Timestamp = ts,
-                Kind = "Frachtverkauf",
-                What = $"{ware} · {qty:N0} SCU",
-                Where = where,
-                Shop = shop,
-                Amount = amt,
-                Quantity = qty,
-                Confirmed = true
-            });
-
-            return new LogEntry
-            {
-                Time = ts,
-                Kind = EventKind.Trade,
-                Amount = amt,
-                Detail = $"{ware} ×{qty} SCU  · {shop}"
-            };
+                return new LogEntry
+                {
+                    Time = ts,
+                    Kind = EventKind.Trade,
+                    Amount = amt,
+                    Detail = $"{ware} ×{qty} SCU  · {shop}"
+                };
+            }
         }
 
         // Fracht-KAUF: price = Gesamtbetrag (Geld raus), Menge in cSCU → ÷100 = SCU.
-        var cb = CommodityBuyRegex().Match(line);
-        if (cb.Success)
+        if (line.Contains("SShopCommodityBuyRequest", StringComparison.Ordinal))
         {
-            long price = (long)ParseDouble(cb.Groups["price"].Value);
-            int scu = (int)Math.Round(ParseDouble(cb.Groups["qty"].Value) / 100.0);
-            var shop = CleanShop(cb.Groups["shop"].Value);
-            var shopLoc = ExtractLocationFromShop(shop);
-            if (shopLoc != null) _lastLoc = shopLoc;
-            var ware = Commodities.Resolve(cb.Groups["guid"].Value);
-            var ts = ParseTs(line);
-            var where = PlaceAt(ts);
-
-            CargoTrades.Add(new CargoTradeRecord
+            var cb = CommodityBuyRegex().Match(line);
+            if (cb.Success)
             {
-                Timestamp = ts,
-                IsSell = false,
-                Commodity = ware,
-                ResourceGuid = cb.Groups["guid"].Value,
-                QuantityScu = scu,
-                TotalAuec = price,
-                Shop = shop,
-                Where = where
-            });
+                long price = (long)ParseDouble(cb.Groups["price"].Value);
+                int scu = (int)Math.Round(ParseDouble(cb.Groups["qty"].Value) / 100.0);
+                var shop = CleanShop(cb.Groups["shop"].Value);
+                var shopLoc = ExtractLocationFromShop(shop);
+                if (shopLoc != null) _lastLoc = shopLoc;
+                var ware = Commodities.Resolve(cb.Groups["guid"].Value);
+                var ts = ParseTs(line);
+                var where = PlaceAt(ts);
 
-            LedgerRecords.Add(new LedgerRecord
-            {
-                Timestamp = ts,
-                Kind = "Frachtkauf",
-                What = $"{ware} · {scu:N0} SCU",
-                Where = where,
-                Shop = shop,
-                Amount = -price,
-                Quantity = scu,
-                Confirmed = true
-            });
+                CargoTrades.Add(new CargoTradeRecord
+                {
+                    Timestamp = ts,
+                    IsSell = false,
+                    Commodity = ware,
+                    ResourceGuid = cb.Groups["guid"].Value,
+                    QuantityScu = scu,
+                    TotalAuec = price,
+                    Shop = shop,
+                    Where = where
+                });
 
-            return new LogEntry
-            {
-                Time = ts,
-                Kind = EventKind.Trade,
-                Amount = -price,
-                Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)"
-            };
-        }
+                LedgerRecords.Add(new LedgerRecord
+                {
+                    Timestamp = ts,
+                    Kind = "Frachtkauf",
+                    What = $"{ware} · {scu:N0} SCU",
+                    Where = where,
+                    Shop = shop,
+                    Amount = -price,
+                    Quantity = scu,
+                    Confirmed = true
+                });
 
-        // Spieler-Login & Handle Erkennung
-        var logH = LoginHandleRegex().Match(line);
-        if (logH.Success)
-        {
-            var h = logH.Groups["handle"].Value.Trim();
-            if (!string.IsNullOrEmpty(h))
-            {
-                LocalHandle = h;
-                _ownNames.Add(h);
+                return new LogEntry
+                {
+                    Time = ts,
+                    Kind = EventKind.Trade,
+                    Amount = -price,
+                    Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)"
+                };
             }
         }
 
-        var charH = CharacterStatusRegex().Match(line);
-        if (charH.Success)
+        // Spieler-Login & Handle Erkennung
+        if (line.Contains("[Legacy login response]", StringComparison.Ordinal))
         {
-            var n = charH.Groups["name"].Value.Trim();
-            if (!string.IsNullOrEmpty(n))
+            var logH = LoginHandleRegex().Match(line);
+            if (logH.Success)
             {
-                _ownNames.Add(n);
+                var h = logH.Groups["handle"].Value.Trim();
+                if (!string.IsNullOrEmpty(h))
+                {
+                    LocalHandle = h;
+                    _ownNames.Add(h);
+                }
+            }
+        }
+
+        if (line.Contains("[AccountLoginCharacterStatus_Character]", StringComparison.Ordinal))
+        {
+            var charH = CharacterStatusRegex().Match(line);
+            if (charH.Success)
+            {
+                var n = charH.Groups["name"].Value.Trim();
+                if (!string.IsNullOrEmpty(n))
+                {
+                    _ownNames.Add(n);
+                }
             }
         }
 
         // Spawn ins Spiel
-        if (ClientSpawnedRegex().IsMatch(line))
+        if (line.Contains("[CSessionManager::OnClientSpawned]", StringComparison.Ordinal) && ClientSpawnedRegex().IsMatch(line))
         {
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = "Im Spiel gespawnt (Station / Hangar)" };
         }
 
         // ASOP Terminal Fahrzeugbereitstellung
-        var asop = AsopShipSpawnRegex().Match(line);
-        if (asop.Success)
+        if (line.Contains("SetVehicleSpawn", StringComparison.Ordinal))
         {
-            var rawShip = asop.Groups["ship"].Value.Trim();
-            var ship = Ships.Prettify(rawShip);
-            _lastShip = ship;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
+            var asop = AsopShipSpawnRegex().Match(line);
+            if (asop.Success)
+            {
+                var rawShip = asop.Groups["ship"].Value.Trim();
+                var ship = Ships.Prettify(rawShip);
+                _lastShip = ship;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
+            }
         }
 
         // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel
-        var vcf = VehicleControlFlowRegex().Match(line);
-        if (vcf.Success)
+        if (line.Contains("<Vehicle Control Flow>", StringComparison.Ordinal))
         {
-            var method = vcf.Groups["method"].Value;
-            var vehRaw = vcf.Groups["veh"].Value;
-            var ship = Ships.Prettify(vehRaw);
-            if (method.Contains("Enter", StringComparison.OrdinalIgnoreCase))
+            var vcf = VehicleControlFlowRegex().Match(line);
+            if (vcf.Success)
             {
+                var method = vcf.Groups["method"].Value;
+                var vehRaw = vcf.Groups["veh"].Value;
+                var ship = Ships.Prettify(vehRaw);
+                if (method.Contains("Enter", StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastShip = ship;
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"{ship} (Pilotensitz eingenommen)", Ship = ship };
+                }
+            }
+        }
+
+        if (isNotif)
+        {
+            var gn = GenericNotificationRegex().Match(line);
+            if (gn.Success)
+            {
+                var text = gn.Groups["text"].Value.Trim();
+                
+                // 1. Armistice / Schutzzone betreten
+                if (text.StartsWith("Entering Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("Betreten einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("Schutzzone betreten", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Schutzzone aktiv (Waffen blockiert)" };
+                }
+
+                // 2. Armistice / Schutzzone verlassen
+                if (text.StartsWith("Leaving Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("Verlassen einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("Schutzzone verlassen", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🔴 Schutzzone verlassen (Waffen scharf)" };
+                }
+
+                // 3. Jurisdiktion / Rechtssystem
+                if (text.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Nyx";
+                    Locations.ActiveSystem = "Nyx";
+                    if (_lastLoc == null || _lastLoc == "—") _lastLoc = "Delamar";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: People's Alliance (Nyx)" };
+                }
+                if (text.Contains("UEE Jurisdiction", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet der UEE", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Stanton";
+                    Locations.ActiveSystem = "Stanton";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: UEE (Stanton)" };
+                }
+                if (text.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) || text.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = $"🏴 Ungesetzlicher Sektor ({_currentSystem})" };
+                }
+                if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) || text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
+                }
+            }
+
+            var an = ArmisticeNotifRegex().Match(line);
+            if (an.Success)
+            {
+                var locEntry = RecordLocationVisit(an.Groups["loc"].Value, ParseTs(line));
+                if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("requested inventory for Location[", StringComparison.Ordinal))
+        {
+            var reqInv = RequestInventoryLocRegex().Match(line);
+            if (reqInv.Success && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
+            {
+                var locEntry = RecordLocationVisit(reqInv.Groups["loc"].Value, ParseTs(line));
+                if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("RequestLocationInventory", StringComparison.Ordinal))
+        {
+            var lo = LocRegex().Match(line);
+            if (lo.Success && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
+            {
+                var locEntry = RecordLocationVisit(lo.Groups["loc"].Value, ParseTs(line));
+                if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("Player spawned in zone '", StringComparison.Ordinal))
+        {
+            var spz = PlayerSpawnZoneRegex().Match(line);
+            if (spz.Success)
+            {
+                var locEntry = RecordLocationVisit(spz.Groups["loc"].Value, ParseTs(line));
+                if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("SpawnLocation[", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("LocalSpawnLocation[", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("SpawnPoint[", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("zone[", StringComparison.OrdinalIgnoreCase))
+        {
+            var zn = ZoneRegex().Match(line);
+            if (zn.Success)
+            {
+                var locEntry = RecordLocationVisit(zn.Groups["loc"].Value, ParseTs(line));
+                if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("Inventory[", StringComparison.Ordinal) && line.Contains("Item Count:[", StringComparison.Ordinal))
+        {
+            var iv = InvRegex().Match(line);
+            if (iv.Success)
+            {
+                // rohe Inventar-ID durch den zuletzt bekannten Standort ersetzen
+                var place = _lastLoc ?? "Lager";
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Inventory, Detail = $"{place}  ·  {iv.Groups["cnt"].Value} Item(s)" };
+            }
+        }
+
+        if (isNotif)
+        {
+            var scj = ShipChannelJoinRegex().Match(line);
+            if (scj.Success)
+            {
+                var rawShip = scj.Groups["ship"].Value.Trim();
+                var ship = Ships.Prettify(rawShip);
                 _lastShip = ship;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"{ship} (Pilotensitz eingenommen)", Ship = ship };
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
             }
         }
 
-        var gn = GenericNotificationRegex().Match(line);
-        if (gn.Success)
+        if (line.Contains("CSCItemNavigation::", StringComparison.Ordinal))
         {
-            var text = gn.Groups["text"].Value.Trim();
-            
-            // 1. Armistice / Schutzzone betreten
-            if (text.StartsWith("Entering Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
-                text.StartsWith("Betreten einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
-                text.StartsWith("Schutzzone betreten", StringComparison.OrdinalIgnoreCase))
+            var ins = ItemNavShipRegex().Match(line);
+            if (ins.Success)
             {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Schutzzone aktiv (Waffen blockiert)" };
-            }
-
-            // 2. Armistice / Schutzzone verlassen
-            if (text.StartsWith("Leaving Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
-                text.StartsWith("Verlassen einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
-                text.StartsWith("Schutzzone verlassen", StringComparison.OrdinalIgnoreCase))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🔴 Schutzzone verlassen (Waffen scharf)" };
-            }
-
-            // 3. Jurisdiktion / Rechtssystem
-            if (text.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Nyx";
-                Locations.ActiveSystem = "Nyx";
-                if (_lastLoc == null || _lastLoc == "—") _lastLoc = "Delamar";
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: People's Alliance (Nyx)" };
-            }
-            if (text.Contains("UEE Jurisdiction", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet der UEE", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentSystem = "Stanton";
-                Locations.ActiveSystem = "Stanton";
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: UEE (Stanton)" };
-            }
-            if (text.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) || text.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = $"🏴 Ungesetzlicher Sektor ({_currentSystem})" };
-            }
-            if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) || text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
+                var rawShip = ins.Groups["ship"].Value;
+                var ship = Ships.Prettify(rawShip);
+                _lastShip = ship;
             }
         }
 
-        var reqInv = RequestInventoryLocRegex().Match(line);
-        if (reqInv.Success)
+        if (line.Contains("ClearDriver:", StringComparison.Ordinal))
         {
-            var raw = reqInv.Groups["loc"].Value;
-            if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
+            var ve = VehRegex().Match(line);
+            if (ve.Success)
             {
-                var locRes = Locations.ResolveLocation(raw);
-                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
-                {
-                    var ts = ParseTs(line);
-                    LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
-                    if (locRes.DisplayName != _lastLoc)
-                    {
-                        _lastLoc = locRes.DisplayName;
-                        return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
-                    }
-                }
+                var ship = Ships.Prettify(ve.Groups["ship"].Value);
+                if (string.IsNullOrEmpty(_lastShip))
+                    _lastShip = ship;
+                // ClearDriver (Aus dem Pilotensitz aufstehen / Releasing control token) ist KEIN Fahrzeugeinstieg oder Spawn-Event!
+                return null;
             }
         }
 
-        var lo = LocRegex().Match(line);
-        if (lo.Success)
+        if (line.Contains("Vehicle", StringComparison.OrdinalIgnoreCase) && (line.Contains("Retrieval", StringComparison.OrdinalIgnoreCase) || line.Contains("Spawn", StringComparison.OrdinalIgnoreCase)))
         {
-            var raw = lo.Groups["loc"].Value;
-            if (!raw.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase) && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
+            var vr = VehicleRetrievalRegex().Match(line);
+            if (vr.Success)
             {
-                var locRes = Locations.ResolveLocation(raw);
-                if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
-                {
-                    var ts = ParseTs(line);
-                    LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
-                    if (locRes.DisplayName != _lastLoc)
-                    {
-                        _lastLoc = locRes.DisplayName;
-                        return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
-                    }
-                }
+                var ship = Ships.Prettify(vr.Groups["ship"].Value);
+                _lastShip = ship;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
             }
-        }
-
-        var an = ArmisticeNotifRegex().Match(line);
-        if (an.Success)
-        {
-            var locRes = Locations.ResolveLocation(an.Groups["loc"].Value);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
-            {
-                var ts = ParseTs(line);
-                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
-                if (locRes.DisplayName != _lastLoc)
-                {
-                    _lastLoc = locRes.DisplayName;
-                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
-                }
-            }
-        }
-
-        var spz = PlayerSpawnZoneRegex().Match(line);
-        if (spz.Success)
-        {
-            var locRes = Locations.ResolveLocation(spz.Groups["loc"].Value);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
-            {
-                var ts = ParseTs(line);
-                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
-                if (locRes.DisplayName != _lastLoc)
-                {
-                    _lastLoc = locRes.DisplayName;
-                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
-                }
-            }
-        }
-
-        var zn = ZoneRegex().Match(line);
-        if (zn.Success)
-        {
-            var raw = zn.Groups["loc"].Value;
-            var locRes = Locations.ResolveLocation(raw);
-            if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit"))
-            {
-                var ts = ParseTs(line);
-                LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
-                if (locRes.DisplayName != _lastLoc)
-                {
-                    _lastLoc = locRes.DisplayName;
-                    return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
-                }
-            }
-        }
-
-        var iv = InvRegex().Match(line);
-        if (iv.Success)
-        {
-            // rohe Inventar-ID durch den zuletzt bekannten Standort ersetzen
-            var place = _lastLoc ?? "Lager";
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Inventory, Detail = $"{place}  ·  {iv.Groups["cnt"].Value} Item(s)" };
-        }
-
-        var scj = ShipChannelJoinRegex().Match(line);
-        if (scj.Success)
-        {
-            var rawShip = scj.Groups["ship"].Value.Trim();
-            var ship = Ships.Prettify(rawShip);
-            _lastShip = ship;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
-        }
-
-        var ins = ItemNavShipRegex().Match(line);
-        if (ins.Success)
-        {
-            var rawShip = ins.Groups["ship"].Value;
-            var ship = Ships.Prettify(rawShip);
-            _lastShip = ship;
-        }
-
-        var ve = VehRegex().Match(line);
-        if (ve.Success)
-        {
-            var ship = Ships.Prettify(ve.Groups["ship"].Value);
-            _lastShip = ship;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
-        }
-
-        var vr = VehicleRetrievalRegex().Match(line);
-        if (vr.Success)
-        {
-            var ship = Ships.Prettify(vr.Groups["ship"].Value);
-            _lastShip = ship;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
         }
 
         // Loot: nur von der Welt gespawnte Items (Kisten/Gegner), kein Kauf/Umräumen
-        var lt = LootStoreRegex().Match(line);
-        if (lt.Success)
+        if (line.Contains("<OnInventoryStoreItem>", StringComparison.Ordinal))
         {
-            if (!lt.Groups["ctx"].Value.Contains("Runtime-spawned")) return null;
-            var cls = lt.Groups["cls"].Value;
-            var name = Localization.ItemName(cls) ?? CleanLootName(cls);   // echter Name aus global.ini, sonst bereinigter Code
-            if (name.Length >= 3 && name != _lastLoot) { _lastLoot = name; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loot, Detail = name }; }
-            return null;
+            var lt = LootStoreRegex().Match(line);
+            if (lt.Success)
+            {
+                if (!lt.Groups["ctx"].Value.Contains("Runtime-spawned")) return null;
+                var cls = lt.Groups["cls"].Value;
+                var name = Localization.ItemName(cls) ?? CleanLootName(cls);   // echter Name aus global.ini, sonst bereinigter Code
+                if (name.Length >= 3 && name != _lastLoot) { _lastLoot = name; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loot, Detail = name }; }
+                return null;
+            }
         }
 
         // Loot, das direkt vom Boden/Leiche ausgerüstet wird (Armor-Swap) – nicht im Inventar
-        var el = EquipLootRegex().Match(line);
-        if (el.Success)
+        if (line.Contains("<EquipItem> Equip looting entity", StringComparison.Ordinal))
         {
-            var cls = el.Groups["cls"].Value;
-            var name = Localization.ItemName(cls) ?? CleanLootName(cls);
-            if (name.Length >= 3 && name != _lastLoot) { _lastLoot = name; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loot, Detail = name }; }
-            return null;
+            var el = EquipLootRegex().Match(line);
+            if (el.Success)
+            {
+                var cls = el.Groups["cls"].Value;
+                var name = Localization.ItemName(cls) ?? CleanLootName(cls);
+                if (name.Length >= 3 && name != _lastLoot) { _lastLoot = name; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loot, Detail = name }; }
+                return null;
+            }
         }
 
         // Quantum-Reise: nur ABGESCHLOSSENE Sprünge (Ankunft).
-        var qt = QtArriveRegex().Match(line);
-        if (qt.Success)
+        if (line.Contains("CSCItemNavigation::OnQuantumDriveArrived", StringComparison.Ordinal))
         {
-            var t = ParseTs(line);
-            var ship = Ships.Prettify(qt.Groups["ship"].Value);
-            string? destination = null;
-            if ((t - _lastQt).TotalSeconds > 3)   // doppelte Logzeilen entprellen
+            var qt = QtArriveRegex().Match(line);
+            if (qt.Success)
             {
-                _lastQt = t;
-                string destText = "";
-                if (!string.IsNullOrEmpty(_pendingQtDestination))
+                var t = ParseTs(line);
+                var ship = Ships.Prettify(qt.Groups["ship"].Value);
+                string? destination = null;
+                if ((t - _lastQt).TotalSeconds > 3)   // doppelte Logzeilen entprellen
                 {
-                    var resDest = Locations.ResolveLocation(_pendingQtDestination);
-                    if (resDest.DisplayName != "—" && !resDest.DisplayName.StartsWith("Im Transit"))
+                    _lastQt = t;
+                    string destText = "";
+                    if (!string.IsNullOrEmpty(_pendingQtDestination))
                     {
-                        _lastLoc = resDest.DisplayName;
-                        destination = _lastLoc;
-                        destText = $" (bei {_lastLoc})";
-
-                        if (resDest.SystemName is "Nyx" or "Pyro" or "Stanton")
+                        var resDest = Locations.ResolveLocation(_pendingQtDestination);
+                        if (resDest.DisplayName != "—" && !resDest.DisplayName.StartsWith("Im Transit"))
                         {
-                            _currentSystem = resDest.SystemName;
-                            Locations.ActiveSystem = resDest.SystemName;
+                            _lastLoc = resDest.DisplayName;
+                            destination = _lastLoc;
+                            destText = $" (bei {_lastLoc})";
+
+                            if (resDest.SystemName is "Nyx" or "Pyro" or "Stanton")
+                            {
+                                _currentSystem = resDest.SystemName;
+                                Locations.ActiveSystem = resDest.SystemName;
+                            }
                         }
+                        _pendingQtDestination = null;
                     }
-                    _pendingQtDestination = null;
-                }
-                else if (_lastLoc != null)
-                {
-                    destText = $" (bei {_lastLoc})";
-                }
+                    else if (_lastLoc != null)
+                    {
+                        destText = $" (bei {_lastLoc})";
+                    }
 
-                if (!string.IsNullOrEmpty(destination))
-                {
-                    QuantumDestinations.Add((t, destination));
-                }
+                    if (!string.IsNullOrEmpty(destination))
+                    {
+                        QuantumDestinations.Add((t, destination));
+                    }
 
-                return new LogEntry
-                {
-                    Time = t,
-                    Kind = EventKind.Quantum,
-                    Ship = ship,
-                    Location = destination,
-                    Detail = $"QT-Ankunft · {ship}{destText}"
-                };
+                    return new LogEntry
+                    {
+                        Time = t,
+                        Kind = EventKind.Quantum,
+                        Ship = ship,
+                        Location = destination,
+                        Detail = $"QT-Ankunft · {ship}{destText}"
+                    };
+                }
             }
         }
 
         // Kill-Feed (Combat)
-        var kl = KillLineRegex().Match(line);
-        if (kl.Success)
+        if (line.Contains("CActor::Kill:", StringComparison.Ordinal))
         {
-            var victim = kl.Groups["victim"].Value;
-            var killer = kl.Groups["killer"].Value;
-            var weapon = ItemNames.CleanFallback(kl.Groups["weapon"].Value);
-            if (_ownNames.Contains(victim))
+            var kl = KillLineRegex().Match(line);
+            if (kl.Success)
             {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Death, Detail = $"☠ getötet von {killer} ({weapon})" };
+                var victim = kl.Groups["victim"].Value;
+                var killer = kl.Groups["killer"].Value;
+                var weapon = ItemNames.CleanFallback(kl.Groups["weapon"].Value);
+                if (_ownNames.Contains(victim))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Death, Detail = $"☠ getötet von {killer} ({weapon})" };
+                }
+                if (_ownNames.Contains(killer))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"Kill: {victim} ({weapon})" };
+                }
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"{killer} ✟ {victim} ({weapon})" };
             }
-            if (_ownNames.Contains(killer))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"Kill: {victim} ({weapon})" };
-            }
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Kill, Detail = $"{killer} ✟ {victim} ({weapon})" };
         }
 
         // SC 4.x Fracht- & Schiffs-Aufzüge (technisches Hintergrundrauschen herausfiltern)
-        var elv = ElevatorStateRegex().Match(line);
-        if (elv.Success)
+        if (line.Contains("LoadingPlatformManager", StringComparison.Ordinal))
         {
-            return null;
+            var elv = ElevatorStateRegex().Match(line);
+            if (elv.Success)
+            {
+                return null;
+            }
         }
 
         // ATC Landefreigabe & Hangar-Zuweisung
-        var atc = AtcHangarRegex().Match(line);
-        if (atc.Success)
+        if (line.Contains("Landing", StringComparison.OrdinalIgnoreCase) || line.Contains("Hangar", StringComparison.OrdinalIgnoreCase) || line.Contains("Pad", StringComparison.OrdinalIgnoreCase))
         {
-            var hangar = atc.Groups["hangar"].Value.Trim();
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+            var atc = AtcHangarRegex().Match(line);
+            if (atc.Success)
+            {
+                var hangar = atc.Groups["hangar"].Value.Trim();
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+            }
         }
 
         // Schiffsverlust (Zerstörung / Selbstzerstörung)
-        var vd = VehicleDestroyedRegex().Match(line);
-        if (vd.Success)
+        if (line.Contains("VehicleDestroyed", StringComparison.OrdinalIgnoreCase) || line.Contains("Vehicle destroyed", StringComparison.OrdinalIgnoreCase) || line.Contains("Self-Destruct", StringComparison.OrdinalIgnoreCase) || line.Contains("Vehicle Exploded", StringComparison.OrdinalIgnoreCase))
         {
-            var rawShip = vd.Groups["ship"].Value;
-            var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Fahrzeug";
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = $"{ship} zerstört / Selbstzerstörung", Ship = ship };
+            var vd = VehicleDestroyedRegex().Match(line);
+            if (vd.Success)
+            {
+                var rawShip = vd.Groups["ship"].Value;
+                var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Fahrzeug";
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = $"{ship} zerstört / Selbstzerstörung", Ship = ship };
+            }
         }
 
         // Versicherungs-Claim
-        var ic = InsuranceClaimRegex().Match(line);
-        if (ic.Success)
+        if (line.Contains("Claim", StringComparison.OrdinalIgnoreCase) || line.Contains("claim", StringComparison.OrdinalIgnoreCase))
         {
-            var rawShip = ic.Groups["ship"].Value;
-            var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Schiff";
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"Versicherungs-Claim: {ship}", Ship = ship };
+            var ic = InsuranceClaimRegex().Match(line);
+            if (ic.Success)
+            {
+                var rawShip = ic.Groups["ship"].Value;
+                var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Schiff";
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"Versicherungs-Claim: {ship}", Ship = ship };
+            }
         }
 
         // Schiffsverlust (Kollision) – zählt auch zur Flotte (dein Schiff)
-        var fc = CollisionRegex().Match(line);
-        if (fc.Success)
+        if (line.Contains("Collision", StringComparison.OrdinalIgnoreCase))
         {
-            var ship = Ships.Prettify(fc.Groups["ship"].Value);
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = $"{ship} – Kollision", Ship = ship };
+            var fc = CollisionRegex().Match(line);
+            if (fc.Success)
+            {
+                var ship = Ships.Prettify(fc.Groups["ship"].Value);
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = $"{ship} – Kollision", Ship = ship };
+            }
         }
 
         // Entitlement/Miete gestartet
@@ -1111,372 +1194,569 @@ public partial class LogParser
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Entitlement, Detail = "Entitlement/Miete gestartet" };
 
         // Comm-Kanal -> eigene Schiffe in die Flotte, fremde als Party-Schiff
-        var ch = ChannelRegex().Match(line);
-        if (ch.Success)
+        if (line.Contains("Kanal [", StringComparison.Ordinal) || line.Contains("Channel [", StringComparison.Ordinal))
         {
-            var shipName = ch.Groups["ship"].Value.Trim();
-            var owner = ch.Groups["owner"].Value.Trim();
-            if (_ownNames.Contains(owner))
+            var ch = ChannelRegex().Match(line);
+            if (ch.Success)
             {
-                if (_channelSeen.Add("me|" + shipName))
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = shipName, Ship = shipName };
+                var shipName = ch.Groups["ship"].Value.Trim();
+                var owner = ch.Groups["owner"].Value.Trim();
+                if (_ownNames.Contains(owner))
+                {
+                    if (_channelSeen.Add("me|" + shipName))
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = shipName, Ship = shipName };
+                }
+                else if (_channelSeen.Add(shipName + "|" + owner))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"Schiff: {shipName} · {owner}" };
+                }
+                return null;
             }
-            else if (_channelSeen.Add(shipName + "|" + owner))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"Schiff: {shipName} · {owner}" };
-            }
-            return null;
         }
 
         // Getragene Ausrüstung (einmal je Item)
-        var at = AttachRegex().Match(line);
-        if (at.Success)
+        if (line.Contains("AttachmentReceived> Player[", StringComparison.Ordinal))
         {
-            var name = CleanLoadout(at.Groups["item"].Value);
-            if (name != null && _loadoutSeen.Add(name))
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loadout, Detail = name };
-            return null;
+            var at = AttachRegex().Match(line);
+            if (at.Success)
+            {
+                var name = CleanLoadout(at.Groups["item"].Value);
+                if (name != null && _loadoutSeen.Add(name))
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loadout, Detail = name };
+                return null;
+            }
         }
 
-        // Aufträge zuerst mit VOLLEM Text (Name/Rang/Route)
-        var ms = MissionLineRegex().Match(line);
-        if (ms.Success)
+        if (isNotif)
         {
-            var full = CleanMission(ms.Groups["full"].Value);
-            if (full == _lastNotif) return null;
-            _lastNotif = full;
-
-            var midMatch = NotificationMissionIdRegex().Match(line);
-            string mId = midMatch.Success && midMatch.Groups["id"].Value != "00000000-0000-0000-0000-000000000000"
-                ? midMatch.Groups["id"].Value
-                : "";
-
-            var cleanTitle = Regex.Replace(full, @"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", "", RegexOptions.IgnoreCase).Trim(' ', ':');
-            cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
-            var normTitle = cleanTitle.ToLowerInvariant().Trim();
-
-            if (string.IsNullOrEmpty(mId))
+            // Aufträge zuerst mit VOLLEM Text (Name/Rang/Route)
+            var ms = MissionLineRegex().Match(line);
+            if (ms.Success)
             {
-                mId = "contract_" + normTitle;
-            }
+                var full = CleanMission(ms.Groups["full"].Value);
+                if (full == _lastNotif) return null;
+                _lastNotif = full;
 
-            var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
+                var midMatch = NotificationMissionIdRegex().Match(line);
+                string mId = midMatch.Success && midMatch.Groups["id"].Value != "00000000-0000-0000-0000-000000000000"
+                    ? midMatch.Groups["id"].Value
+                    : "";
 
-            bool isComplete = full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase);
+                var cleanTitle = CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':');
+                cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
+                var normTitle = cleanTitle.ToLowerInvariant().Trim();
 
-            bool isAbandoned = full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
-                               full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase);
-
-            bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase);
-
-            bool isAccepted = full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("geteilt", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
-                              full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase);
-
-            long reward = 0;
-            if (isComplete)
-            {
-                if (cat != null && cat.BaseReward > 0)
+                if (string.IsNullOrEmpty(mId))
                 {
-                    reward = cat.BaseReward;
-                }
-                else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
-                {
-                    reward = 21250;
-                }
-                else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
-                {
-                    reward = 32000;
-                }
-                else
-                {
-                    reward = 25000; // Standard aUEC für Belohnungs-Events, damit kein 0-Betrag angezeigt wird
+                    mId = "contract_" + normTitle;
                 }
 
-                // In _contracts aktualisieren
-                string? targetKey = null;
-                if (_contracts.ContainsKey(mId)) targetKey = mId;
-                else
-                {
-                    targetKey = _contracts.Keys.FirstOrDefault(k =>
-                        _contracts[k].Outcome == ContractOutcome.InProgress &&
-                        (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
-                         normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
-                }
+                var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
 
-                if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                bool isComplete = full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase);
+
+                bool isAbandoned = full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase);
+
+                bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase);
+
+                bool isAccepted = full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("geteilt", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
+                                  full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase);
+
+                long reward = 0;
+                if (isComplete)
                 {
-                    _contracts[targetKey] = existing with
+                    if (cat != null && cat.BaseReward > 0)
                     {
-                        Outcome = ContractOutcome.Completed,
-                        CompletedAt = existing.CompletedAt ?? ParseTs(line),
-                        StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
-                        Reward = reward > 0 ? reward : existing.Reward
-                    };
-                }
-                else
-                {
-                    var issuer = ResolveIssuer(cat, mId);
-                    var sys = ResolveMissionSystem(cat, issuer);
-                    _contracts[mId] = new ContractRecord
+                        reward = cat.BaseReward;
+                    }
+                    else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
                     {
-                        MissionId = mId,
-                        AcceptedAt = ParseTs(line),
-                        CompletedAt = ParseTs(line),
-                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
-                        Issuer = issuer,
-                        Type = cat?.MissionType ?? "Auftrag",
-                        Difficulty = "k.A.",
-                        System = sys,
-                        StepsTotal = 1,
-                        StepsDone = 1,
-                        Reward = reward,
-                        Outcome = ContractOutcome.Completed
-                    };
-                }
-                _missionsDone.Add(mId);
-            }
-            else if (isAbandoned)
-            {
-                string? targetKey = null;
-                if (_contracts.ContainsKey(mId)) targetKey = mId;
-                else
-                {
-                    targetKey = _contracts.Keys.FirstOrDefault(k =>
-                        _contracts[k].Outcome == ContractOutcome.InProgress &&
-                        (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
-                         normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
-                }
+                        reward = 21250;
+                    }
+                    else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
+                    {
+                        reward = 32000;
+                    }
+                    else
+                    {
+                        reward = 25000; // Standard aUEC für Belohnungs-Events, damit kein 0-Betrag angezeigt wird
+                    }
 
-                if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
-                {
-                    _contracts[targetKey] = existing with
+                    lock (_stateLock)
                     {
-                        Outcome = ContractOutcome.Abandoned,
-                        CompletedAt = existing.CompletedAt ?? ParseTs(line)
-                    };
-                }
-                else
-                {
-                    var issuer = ResolveIssuer(cat, mId);
-                    var sys = ResolveMissionSystem(cat, issuer);
-                    _contracts[mId] = new ContractRecord
-                    {
-                        MissionId = mId,
-                        AcceptedAt = ParseTs(line),
-                        CompletedAt = ParseTs(line),
-                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
-                        Issuer = issuer,
-                        Type = cat?.MissionType ?? "Auftrag",
-                        Difficulty = "k.A.",
-                        System = sys,
-                        StepsTotal = 1,
-                        StepsDone = 0,
-                        Reward = cat?.BaseReward ?? 0,
-                        Outcome = ContractOutcome.Abandoned
-                    };
-                }
-            }
-            else if (isObjective)
-            {
-                if (_contracts.TryGetValue(mId, out var existing))
-                {
-                    _contracts[mId] = existing with { StepsTotal = existing.StepsTotal + 1 };
-                }
-                else
-                {
-                    var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
-                    if (activeKey != null)
-                    {
-                        _contracts[activeKey] = _contracts[activeKey] with { StepsTotal = _contracts[activeKey].StepsTotal + 1 };
+                        // In _contracts aktualisieren
+                        string? targetKey = null;
+                        if (_contracts.ContainsKey(mId)) targetKey = mId;
+                        else
+                        {
+                            targetKey = _contracts.Keys.FirstOrDefault(k =>
+                                _contracts[k].Outcome == ContractOutcome.InProgress &&
+                                (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                                 normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                        }
+
+                        if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                        {
+                            _contracts[targetKey] = existing with
+                            {
+                                Outcome = ContractOutcome.Completed,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line),
+                                StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
+                                Reward = reward > 0 ? reward : existing.Reward
+                            };
+                        }
+                        else
+                        {
+                            var issuer = ResolveIssuer(cat, mId);
+                            var sys = ResolveMissionSystem(cat, issuer);
+                            _contracts[mId] = new ContractRecord
+                            {
+                                MissionId = mId,
+                                AcceptedAt = ParseTs(line),
+                                CompletedAt = ParseTs(line),
+                                Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                                Issuer = issuer,
+                                Type = cat?.MissionType ?? "Auftrag",
+                                Difficulty = "k.A.",
+                                System = sys,
+                                StepsTotal = 1,
+                                StepsDone = 1,
+                                Reward = reward,
+                                Outcome = ContractOutcome.Completed
+                            };
+                        }
+                        _missionsDone.Add(mId);
                     }
                 }
-            }
-            else if (isAccepted)
-            {
-                var finalReward = cat?.BaseReward ?? 0;
-                var finalIssuer = ResolveIssuer(cat, mId);
-                var finalType = cat?.MissionType ?? (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ? "Person/Bergung" : "Auftrag");
-                var finalSystem = ResolveMissionSystem(cat, finalIssuer);
-
-                if (!_contracts.TryGetValue(mId, out var existing))
+                else if (isAbandoned)
                 {
-                    _contracts[mId] = new ContractRecord
+                    lock (_stateLock)
                     {
-                        MissionId = mId,
-                        AcceptedAt = ParseTs(line),
-                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
-                        Issuer = finalIssuer,
-                        Type = finalType,
-                        Difficulty = "k.A.",
-                        System = finalSystem,
-                        StepsTotal = 1,
-                        StepsDone = 0,
-                        Reward = finalReward,
-                        Outcome = ContractOutcome.InProgress
-                    };
-                }
-                else
-                {
-                    _contracts[mId] = existing with
-                    {
-                        Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : existing.Title,
-                        Issuer = finalIssuer != "Unbekannt" ? finalIssuer : (existing.Issuer != "mobiGlas" ? existing.Issuer : "Unbekannt"),
-                        Type = finalType != "Auftrag" ? finalType : existing.Type,
-                        Reward = finalReward > 0 ? finalReward : existing.Reward,
-                        System = finalSystem != "Stanton" ? finalSystem : existing.System
-                    };
-                }
-                _missionsTaken.Add(mId);
-            }
+                        string? targetKey = null;
+                        if (_contracts.ContainsKey(mId)) targetKey = mId;
+                        else
+                        {
+                            targetKey = _contracts.Keys.FirstOrDefault(k =>
+                                _contracts[k].Outcome == ContractOutcome.InProgress &&
+                                (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                                 normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                        }
 
-            return new LogEntry
-            {
-                Time = ParseTs(line),
-                Kind = isComplete ? EventKind.MissionReward : EventKind.Mission,
-                Amount = reward,
-                Detail = full
-            };
+                        if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                        {
+                            _contracts[targetKey] = existing with
+                            {
+                                Outcome = ContractOutcome.Abandoned,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                            };
+                        }
+                        else
+                        {
+                            var issuer = ResolveIssuer(cat, mId);
+                            var sys = ResolveMissionSystem(cat, issuer);
+                            _contracts[mId] = new ContractRecord
+                            {
+                                MissionId = mId,
+                                AcceptedAt = ParseTs(line),
+                                CompletedAt = ParseTs(line),
+                                Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                                Issuer = issuer,
+                                Type = cat?.MissionType ?? "Auftrag",
+                                Difficulty = "k.A.",
+                                System = sys,
+                                StepsTotal = 1,
+                                StepsDone = 0,
+                                Reward = cat?.BaseReward ?? 0,
+                                Outcome = ContractOutcome.Abandoned
+                            };
+                        }
+                    }
+                }
+                else if (isObjective)
+                {
+                    lock (_stateLock)
+                    {
+                        if (_contracts.TryGetValue(mId, out var existing))
+                        {
+                            _contracts[mId] = existing with { StepsTotal = existing.StepsTotal + 1 };
+                        }
+                        else
+                        {
+                            var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
+                            if (activeKey != null)
+                            {
+                                _contracts[activeKey] = _contracts[activeKey] with { StepsTotal = _contracts[activeKey].StepsTotal + 1 };
+                            }
+                        }
+                    }
+                }
+                else if (isAccepted)
+                {
+                    var finalReward = cat?.BaseReward ?? 0;
+                    var finalIssuer = ResolveIssuer(cat, mId);
+                    if (finalIssuer == "Unbekannt" && cleanTitle.Contains(':'))
+                    {
+                        var colonIdx = cleanTitle.IndexOf(':');
+                        if (colonIdx > 0)
+                        {
+                            var candidate = cleanTitle[..colonIdx].Trim();
+                            if (candidate.Length >= 3 &&
+                                !candidate.Equals("Contract", StringComparison.OrdinalIgnoreCase) &&
+                                !candidate.Equals("Auftrag", StringComparison.OrdinalIgnoreCase) &&
+                                !candidate.Equals("Mission", StringComparison.OrdinalIgnoreCase) &&
+                                !candidate.Equals("Objective", StringComparison.OrdinalIgnoreCase))
+                            {
+                                finalIssuer = candidate;
+                            }
+                        }
+                    }
+
+                    var finalType = cat?.MissionType ?? (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ? "Person/Bergung" : "Auftrag");
+                    if (finalType == "Auftrag")
+                    {
+                        if (cleanTitle.Contains("Cargo", StringComparison.OrdinalIgnoreCase) ||
+                            cleanTitle.Contains("Haul", StringComparison.OrdinalIgnoreCase) ||
+                            cleanTitle.Contains("Fracht", StringComparison.OrdinalIgnoreCase) ||
+                            cleanTitle.Contains("Transport", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Fracht/Transport";
+                        else if (cleanTitle.Contains("Delivery", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Lieferung", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Courier", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Paket", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Lieferung";
+                        else if (cleanTitle.Contains("Bounty", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Kopfgeld", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Target", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Hunt", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Kopfgeld";
+                        else if (cleanTitle.Contains("Mercenary", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Söldner", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Bunker", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Defend", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Security", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Patrol", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Söldner";
+                        else if (cleanTitle.Contains("Salvage", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Bergung", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Scrap", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Reclaim", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Bergung";
+                        else if (cleanTitle.Contains("Mining", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Bergbau", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Mineral", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Bergbau";
+                        else if (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Investigation", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Search", StringComparison.OrdinalIgnoreCase) ||
+                                 cleanTitle.Contains("Ermittlung", StringComparison.OrdinalIgnoreCase))
+                            finalType = "Person/Bergung";
+                    }
+
+                    var finalSystem = ResolveMissionSystem(cat, finalIssuer);
+                    var resolvedTitle = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : (!string.IsNullOrEmpty(cleanTitle) ? cleanTitle : "Auftrag");
+
+                    bool newlyTaken = false;
+                    lock (_stateLock)
+                    {
+                        if (!_contracts.TryGetValue(mId, out var existing))
+                        {
+                            _contracts[mId] = new ContractRecord
+                            {
+                                MissionId = mId,
+                                AcceptedAt = ParseTs(line),
+                                Title = resolvedTitle,
+                                Issuer = finalIssuer,
+                                Type = finalType,
+                                Difficulty = "k.A.",
+                                System = finalSystem,
+                                StepsTotal = 1,
+                                StepsDone = 0,
+                                Reward = finalReward,
+                                Outcome = ContractOutcome.InProgress
+                            };
+                        }
+                        else
+                        {
+                            _contracts[mId] = existing with
+                            {
+                                Title = resolvedTitle,
+                                Issuer = finalIssuer != "Unbekannt" ? finalIssuer : (existing.Issuer != "mobiGlas" && existing.Issuer != "Unbekannt" ? existing.Issuer : (cat?.Contractor ?? "Unbekannt")),
+                                Type = finalType != "Auftrag" ? finalType : (existing.Type != "Sonstige" && existing.Type != "Auftrag" ? existing.Type : finalType),
+                                Reward = finalReward > 0 ? finalReward : existing.Reward,
+                                System = finalSystem != "Stanton" && finalSystem != "k.A." ? finalSystem : (existing.System != "k.A." ? existing.System : finalSystem)
+                            };
+                        }
+                        newlyTaken = _missionsTaken.Add(mId);
+                    }
+
+                    if (newlyTaken)
+                    {
+                        return new LogEntry
+                        {
+                            Time = ParseTs(line),
+                            Kind = EventKind.MissionTaken,
+                            Amount = finalReward,
+                            Detail = $"{finalIssuer} · {finalType} · k.A. · {finalSystem}"
+                        };
+                    }
+                    return null;
+                }
+
+                return new LogEntry
+                {
+                    Time = ParseTs(line),
+                    Kind = isComplete ? EventKind.MissionReward : EventKind.Mission,
+                    Amount = reward,
+                    Detail = full
+                };
+            }
         }
 
         // Party-Mitglied beigetreten / verlassen (mit Name)
-        var pj = PartyJoinRegex().Match(line);
-        if (pj.Success)
+        if (line.Contains("Party", StringComparison.OrdinalIgnoreCase) || line.Contains("party", StringComparison.OrdinalIgnoreCase))
         {
-            var key = "j:" + pj.Groups["who"].Value;
-            if (key == _lastParty) return null;
-            _lastParty = key;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {pj.Groups["who"].Value} ist beigetreten" };
+            var pj = PartyJoinRegex().Match(line);
+            if (pj.Success)
+            {
+                var key = "j:" + pj.Groups["who"].Value;
+                if (key == _lastParty) return null;
+                _lastParty = key;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {pj.Groups["who"].Value} ist beigetreten" };
+            }
+            var pl = PartyLeaveRegex().Match(line);
+            if (pl.Success)
+            {
+                var who = pl.Groups["who"].Value;
+                if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+                var key = "l:" + who;
+                if (key == _lastParty) return null;
+                _lastParty = key;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+            }
         }
-        var pjn = PartyMemberJoinNotifRegex().Match(line);
-        if (pjn.Success)
+
+        if (isNotif)
         {
-            var who = pjn.Groups["who"].Value.Trim();
-            var key = "j:" + who;
-            if (key == _lastParty) return null;
-            _lastParty = key;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
-        }
-        var pl = PartyLeaveRegex().Match(line);
-        if (pl.Success)
-        {
-            var who = pl.Groups["who"].Value;
-            if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
-            var key = "l:" + who;
-            if (key == _lastParty) return null;
-            _lastParty = key;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
-        }
-        var pln = PartyMemberLeaveNotifRegex().Match(line);
-        if (pln.Success)
-        {
-            var who = pln.Groups["who"].Value.Trim();
-            if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
-            var key = "l:" + who;
-            if (key == _lastParty) return null;
-            _lastParty = key;
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+            var pjn = PartyMemberJoinNotifRegex().Match(line);
+            if (pjn.Success)
+            {
+                var who = pjn.Groups["who"].Value.Trim();
+                var key = "j:" + who;
+                if (key == _lastParty) return null;
+                _lastParty = key;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+            }
+            var pln = PartyMemberLeaveNotifRegex().Match(line);
+            if (pln.Success)
+            {
+                var who = pln.Groups["who"].Value.Trim();
+                if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+                var key = "l:" + who;
+                if (key == _lastParty) return null;
+                _lastParty = key;
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+            }
         }
 
         // Comms-Benachrichtigung für Missionsannahme mit Auftraggeber & Fraktion (SC 4.x)
-        var commsMatch = CommsNotificationRegex().Match(line);
-        if (commsMatch.Success)
+        if (line.Contains("SendCommsNotification", StringComparison.Ordinal))
         {
-            var id = commsMatch.Groups["id"].Value;
-            var giver = FormatMissionGiver(commsMatch.Groups["giver"].Value);
-            var faction = FormatFaction(commsMatch.Groups["faction"].Value);
-            _missionComms[id] = (giver, faction);
-
-            if (_contracts.TryGetValue(id, out var existingContract))
+            var commsMatch = CommsNotificationRegex().Match(line);
+            if (commsMatch.Success)
             {
-                var resolved = giver != "Unbekannt" ? giver : (faction != "Unbekannt" ? faction : existingContract.Issuer);
-                if (resolved != "Unbekannt" && (existingContract.Issuer == "Unbekannt" || existingContract.Issuer == "mobiGlas"))
+                var id = commsMatch.Groups["id"].Value;
+                var giver = FormatMissionGiver(commsMatch.Groups["giver"].Value);
+                var faction = FormatFaction(commsMatch.Groups["faction"].Value);
+                lock (_stateLock)
                 {
-                    var sys = (resolved.Contains("Recco", StringComparison.OrdinalIgnoreCase) || resolved.Contains("Battaglia", StringComparison.OrdinalIgnoreCase)) ? "Nyx" : existingContract.System;
-                    _contracts[id] = existingContract with { Issuer = resolved, System = sys };
+                    _missionComms[id] = (giver, faction);
+
+                    if (_contracts.TryGetValue(id, out var existingContract))
+                    {
+                        var resolved = giver != "Unbekannt" ? giver : (faction != "Unbekannt" ? faction : existingContract.Issuer);
+                        if (resolved != "Unbekannt" && (existingContract.Issuer == "Unbekannt" || existingContract.Issuer == "mobiGlas"))
+                        {
+                            var sys = (resolved.Contains("Recco", StringComparison.OrdinalIgnoreCase) || resolved.Contains("Battaglia", StringComparison.OrdinalIgnoreCase)) ? "Nyx" : existingContract.System;
+                            _contracts[id] = existingContract with { Issuer = resolved, System = sys };
+                        }
+                    }
                 }
             }
         }
 
         // Ausrüstung/Item defekt – jedes Item nur EINMAL (Warnung feuert sonst im Sekundentakt)
-        var gb = GearBrokeRegex().Match(line);
-        if (gb.Success)
+        if (line.Contains("Deaktivierung eingeleitet:", StringComparison.Ordinal))
         {
-            var item = gb.Groups["item"].Value.Trim();
-            if (item.Length > 0 && _gearSeen.Add(item))
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Gear, Detail = $"{item} unbrauchbar" };
-            return null;
+            var gb = GearBrokeRegex().Match(line);
+            if (gb.Success)
+            {
+                var item = gb.Groups["item"].Value.Trim();
+                if (item.Length > 0 && _gearSeen.Add(item))
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Gear, Detail = $"{item} unbrauchbar" };
+                return null;
+            }
         }
 
         // Angenommene Mission mit Auftraggeber/Fraktion – je missionId nur EINMAL
-        var mk = MissionMarkerRegex().Match(line);
-        if (mk.Success)
+        if (line.Contains("generator name [", StringComparison.Ordinal))
         {
-            var mId = mk.Groups["id"].Value;
-            var gen = mk.Groups["gen"].Value;
-            var con = mk.Groups["con"].Value;
-            var info = Missions.Derive(gen, con);
+            var mk = MissionMarkerRegex().Match(line);
+            if (mk.Success)
+            {
+                var mId = mk.Groups["id"].Value;
+                var gen = mk.Groups["gen"].Value;
+                var con = mk.Groups["con"].Value;
+                var info = Missions.Derive(gen, con);
 
-            if (!_contracts.TryGetValue(mId, out var existing))
-            {
-                _contracts[mId] = new ContractRecord
+                lock (_stateLock)
                 {
-                    MissionId = mId,
-                    AcceptedAt = ParseTs(line),
-                    Title = Missions.Format(info),
-                    Issuer = info.Faction,
-                    Type = info.Type,
-                    Difficulty = info.Difficulty,
-                    System = info.System,
-                    StepsTotal = 1,
-                    StepsDone = 0,
-                    Outcome = ContractOutcome.InProgress
-                };
-            }
-            else
-            {
-                _contracts[mId] = existing with
-                {
-                    Issuer = info.Faction != "Unbekannt" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas") ? info.Faction : existing.Issuer,
-                    Type = info.Type != "Sonstige" ? info.Type : existing.Type,
-                    Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
-                    System = info.System != "k.A." ? info.System : existing.System
-                };
-            }
+                    if (!_contracts.TryGetValue(mId, out var existing))
+                    {
+                        _contracts[mId] = new ContractRecord
+                        {
+                            MissionId = mId,
+                            AcceptedAt = ParseTs(line),
+                            Title = Missions.Format(info),
+                            Issuer = info.Faction,
+                            Type = info.Type,
+                            Difficulty = info.Difficulty,
+                            System = info.System,
+                            StepsTotal = 1,
+                            StepsDone = 0,
+                            Outcome = ContractOutcome.InProgress
+                        };
+                    }
+                    else
+                    {
+                        var keepTitle = !string.IsNullOrEmpty(existing.Title) && !existing.Title.Contains(" · ");
+                        _contracts[mId] = existing with
+                        {
+                            Title = keepTitle ? existing.Title : Missions.Format(info),
+                            Issuer = info.Faction != "Unbekannt" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
+                            Type = info.Type != "Sonstige" && info.Type != "Auftrag" ? info.Type : existing.Type,
+                            Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
+                            System = info.System != "k.A." ? info.System : existing.System
+                        };
+                    }
 
-            if (_missionsTaken.Add(mId))
-            {
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+                    if (_missionsTaken.Add(mId))
+                    {
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+                    }
+                }
+                return null;
             }
-            return null;
         }
 
         // Abgeschlossene Mission (Server-Event) – nur Zähler erhöhen, keine doppelte Tabellen-Zeile
-        var md = MissionDoneRegex().Match(line);
-        if (md.Success)
+        if (line.Contains("<MissionEnded>", StringComparison.Ordinal))
         {
-            var mId = md.Groups["id"].Value;
-            _missionsDone.Add(mId);
-            if (_contracts.TryGetValue(mId, out var existing))
+            var md = MissionDoneRegex().Match(line);
+            if (md.Success)
             {
-                _contracts[mId] = existing with
+                var mId = md.Groups["id"].Value;
+                lock (_stateLock)
                 {
-                    Outcome = ContractOutcome.Completed,
-                    CompletedAt = existing.CompletedAt ?? ParseTs(line)
-                };
+                    _missionsDone.Add(mId);
+                    if (_contracts.TryGetValue(mId, out var existing))
+                    {
+                        _contracts[mId] = existing with
+                        {
+                            Outcome = ContractOutcome.Completed,
+                            CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                        };
+                    }
+                }
+                return null;
             }
-            return null;
+        }
+
+        // Missions-Ende (Server-Event: Abandon, Complete, Fail, Deactivate)
+        if (line.Contains("<EndMission>", StringComparison.Ordinal))
+        {
+            var em = EndMissionRegex().Match(line);
+            if (em.Success)
+            {
+                var mId = em.Groups["id"].Value;
+                var compType = em.Groups["type"].Value;
+
+                if (compType.Equals("Complete", StringComparison.OrdinalIgnoreCase))
+                {
+                    lock (_stateLock)
+                    {
+                        _missionsDone.Add(mId);
+                        if (_contracts.TryGetValue(mId, out var existing))
+                        {
+                            _contracts[mId] = existing with
+                            {
+                                Outcome = ContractOutcome.Completed,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                            };
+                        }
+                    }
+                    return null;
+                }
+                else
+                {
+                    // Abandon, Fail, Deactivate, etc.
+                    string title = "";
+                    lock (_stateLock)
+                    {
+                        if (_contracts.TryGetValue(mId, out var existing))
+                        {
+                            _contracts[mId] = existing with
+                            {
+                                Outcome = ContractOutcome.Abandoned,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                            };
+                            title = existing.Title;
+                        }
+                        else
+                        {
+                            var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
+                            if (activeKey != null)
+                            {
+                                var act = _contracts[activeKey];
+                                _contracts[activeKey] = act with
+                                {
+                                    Outcome = ContractOutcome.Abandoned,
+                                    CompletedAt = act.CompletedAt ?? ParseTs(line)
+                                };
+                                title = act.Title;
+                            }
+                        }
+                    }
+
+                    var prefix = compType.Equals("Fail", StringComparison.OrdinalIgnoreCase)
+                        ? "Contract Failed"
+                        : "Contract Abandoned";
+
+                    var detail = string.IsNullOrWhiteSpace(title)
+                        ? prefix
+                        : $"{prefix}: {title}";
+
+                    return new LogEntry
+                    {
+                        Time = ParseTs(line),
+                        Kind = EventKind.Mission,
+                        Detail = detail,
+                        ItemRef = mId
+                    };
+                }
+            }
         }
 
         // Blaupause / Crafting Blueprint / Belohnung erhalten
@@ -1492,75 +1772,83 @@ public partial class LogParser
             return new LogEntry { Time = t, Kind = EventKind.Blueprint, Detail = bpName };
         }
 
-        // Bußgeld gezahlt – echtes aUEC raus (fließt in den Saldo)
-        var fn = FineLineRegex().Match(line);
-        if (fn.Success)
+        if (isNotif)
         {
-            long amt = ParseAmt(fn.Groups["amt"].Value);
-            var ts = ParseTs(line);
-            LedgerRecords.Add(new LedgerRecord
+            // Bußgeld gezahlt – echtes aUEC raus (fließt in den Saldo)
+            var fn = FineLineRegex().Match(line);
+            if (fn.Success)
             {
-                Timestamp = ts,
-                Kind = "Strafe gezahlt",
-                What = $"Strafe: {amt:N0} aUEC",
-                Where = PlaceAt(ts),
-                Shop = "Klescher / UEE",
-                Amount = -amt,
-                Quantity = 1,
-                Confirmed = true
-            });
-            return new LogEntry { Time = ts, Kind = EventKind.Fine, Amount = -amt, Detail = $"Strafe gezahlt: {amt:N0} aUEC" };
-        }
-
-        // Begangene Straftat (Crimestat)
-        var cr = CrimeLineRegex().Match(line);
-        if (cr.Success)
-        {
-            var crime = cr.Groups["crime"].Value.TrimEnd(' ', ':');
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Crime, Detail = crime };
-        }
-
-        // Veredelungs-Auftrag abgeschlossen (Refinery)
-        var rf = RefineryLineRegex().Match(line);
-        if (rf.Success)
-        {
-            var where = rf.Groups["txt"].Value.Trim().TrimStart('.').Trim().TrimEnd('.');
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Refinery, Detail = where.Length > 0 ? $"Veredelung fertig {where}" : "Veredelung fertig" };
-        }
-
-        // Verletzung/Lähmung festgestellt (Körperteil + Behandlungsstufe)
-        var ij = InjuryLineRegex().Match(line);
-        if (ij.Success)
-        {
-            var txt = ij.Groups["txt"].Value.Replace(" Behandlung erforderlich", "").Replace(" festgestellt", "").Trim().TrimEnd(' ', ':', '-');
-            if (txt != _lastNotif) { _lastNotif = txt; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Injury, Detail = txt }; }
-            return null;
-        }
-
-        // Notifications -> Gebiete / Party / Med-Bett / Hangar / Gefängnis / Angebote
-        var nt = NotifRegex().Match(line);
-        if (nt.Success)
-        {
-            var txt = nt.Groups["txt"].Value.Trim();
-            if (txt == _lastNotif) return null;       // exakte Wiederholung überspringen
-            _lastNotif = txt;
-
-            var off = OfferRegex().Match(txt);
-            if (off.Success)
-                return new LogEntry
+                long amt = ParseAmt(fn.Groups["amt"].Value);
+                var ts = ParseTs(line);
+                LedgerRecords.Add(new LedgerRecord
                 {
-                    Time = ParseTs(line),
-                    Kind = EventKind.Offer,
-                    Amount = ParseAmt(off.Groups["amt"].Value),     // nur Anzeige, nicht in Bilanz
-                    Detail = $"Angebot von {off.Groups["who"].Value.Trim()}"
-                };
+                    Timestamp = ts,
+                    Kind = "Strafe gezahlt",
+                    What = $"Strafe: {amt:N0} aUEC",
+                    Where = PlaceAt(ts),
+                    Shop = "Klescher / UEE",
+                    Amount = -amt,
+                    Quantity = 1,
+                    Confirmed = true
+                });
+                return new LogEntry { Time = ts, Kind = EventKind.Fine, Amount = -amt, Detail = $"Strafe gezahlt: {amt:N0} aUEC" };
+            }
 
-            var kind = Categorize(txt);
-            if (kind != null)
-                return new LogEntry { Time = ParseTs(line), Kind = kind.Value, Detail = txt };
+            // Begangene Straftat (Crimestat)
+            var cr = CrimeLineRegex().Match(line);
+            if (cr.Success)
+            {
+                var crime = cr.Groups["crime"].Value.TrimEnd(' ', ':');
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Crime, Detail = crime };
+            }
 
-            // unbekannte Notification -> für Diagnose merken (Debug-Log)
-            Unknown.AddOrUpdate(txt, 1, (_, c) => c + 1);
+            // Veredelungs-Auftrag abgeschlossen (Refinery)
+            var rf = RefineryLineRegex().Match(line);
+            if (rf.Success)
+            {
+                var where = rf.Groups["txt"].Value.Trim().TrimStart('.').Trim().TrimEnd('.');
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Refinery, Detail = where.Length > 0 ? $"Veredelung fertig {where}" : "Veredelung fertig" };
+            }
+
+            // Verletzung/Lähmung festgestellt (Körperteil + Behandlungsstufe)
+            var ij = InjuryLineRegex().Match(line);
+            if (ij.Success)
+            {
+                var txt = ij.Groups["txt"].Value.Replace(" Behandlung erforderlich", "").Replace(" festgestellt", "").Trim().TrimEnd(' ', ':', '-');
+                if (txt != _lastNotif) { _lastNotif = txt; return new LogEntry { Time = ParseTs(line), Kind = EventKind.Injury, Detail = txt }; }
+                return null;
+            }
+
+            // Notifications -> Gebiete / Party / Med-Bett / Hangar / Gefängnis / Angebote
+            var nt = NotifRegex().Match(line);
+            if (nt.Success)
+            {
+                var txt = nt.Groups["txt"].Value.Trim();
+                if (txt == _lastNotif) return null;       // exakte Wiederholung überspringen
+                _lastNotif = txt;
+
+                var off = OfferRegex().Match(txt);
+                if (off.Success)
+                    return new LogEntry
+                    {
+                        Time = ParseTs(line),
+                        Kind = EventKind.Offer,
+                        Amount = ParseAmt(off.Groups["amt"].Value),     // nur Anzeige, nicht in Bilanz
+                        Detail = $"Angebot von {off.Groups["who"].Value.Trim()}"
+                    };
+
+                var kind = Categorize(txt);
+                if (kind != null)
+                    return new LogEntry { Time = ParseTs(line), Kind = kind.Value, Detail = txt };
+
+                // Chat / Channel-Meldungen ignorieren
+                if (txt.Contains("left the channel", StringComparison.OrdinalIgnoreCase) || txt.Contains("joined channel", StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                // unbekannte Notification -> für Diagnose merken
+                Unknown.AddOrUpdate(txt, 1, (_, c) => c + 1);
+                UnknownEventsLogger.LogUnknown("Notification", txt);
+            }
         }
 
         // Game Crash / Fatal Error Erkennung
@@ -1588,8 +1876,8 @@ public partial class LogParser
         // Server-Beitritt (<Join PU>)
         if (line.Contains("<Join PU>", StringComparison.Ordinal))
         {
-            var mShard = Regex.Match(line, @"shard\[(?<shard>[^\]]+)\]");
-            var shardName = mShard.Success ? mShard.Groups["shard"].Value : "PU";
+            var mShard = ShardRegex().Match(line);
+            var shardName = mShard.Success ? mShard.Groups["s"].Value : "PU";
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = $"Server beigetreten (Shard: {shardName})" };
         }
 
@@ -1606,12 +1894,14 @@ public partial class LogParser
 
         if (t.Contains("Kampfunfähig", StringComparison.OrdinalIgnoreCase) || t.Contains("Notfalldienste", StringComparison.OrdinalIgnoreCase) || 
             t.Contains("Incapacitat", StringComparison.OrdinalIgnoreCase) || t.Contains("Emergency Medical", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Emergency Services", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Wiederbelebt", StringComparison.OrdinalIgnoreCase) || t.Contains("Revived", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Killed", StringComparison.OrdinalIgnoreCase)) return EventKind.Death;
 
         if (t.StartsWith("Auftrag", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) || 
             t.Contains("Mission", StringComparison.OrdinalIgnoreCase) || t.Contains("Contract", StringComparison.OrdinalIgnoreCase) ||
-            t.Contains("Objective", StringComparison.OrdinalIgnoreCase)) return EventKind.Mission;
+            t.Contains("Objective", StringComparison.OrdinalIgnoreCase) || t.Contains("Journal Entry", StringComparison.OrdinalIgnoreCase) ||
+            t.StartsWith("Downloading", StringComparison.OrdinalIgnoreCase)) return EventKind.Mission;
 
         if (t.Contains("Klescher", StringComparison.OrdinalIgnoreCase) || t.Contains("Gefängnis", StringComparison.OrdinalIgnoreCase) || 
             t.Contains("Haftstrafe", StringComparison.OrdinalIgnoreCase) || t.Contains("Prison", StringComparison.OrdinalIgnoreCase) ||
@@ -1621,9 +1911,10 @@ public partial class LogParser
             t.Contains("Felony", StringComparison.OrdinalIgnoreCase) || t.Contains("CrimeStat", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("inhaftiert", StringComparison.OrdinalIgnoreCase) || t.Contains("Incarcerated", StringComparison.OrdinalIgnoreCase)) return EventKind.Jurisdiction;
 
-        if (t.StartsWith("Rechtsgebiet", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Kontrollierten Raum", StringComparison.OrdinalIgnoreCase) ||
-            t.StartsWith("Jurisdiction", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Monitored Space", StringComparison.OrdinalIgnoreCase) ||
-            t.StartsWith("Schutzzone", StringComparison.OrdinalIgnoreCase) || t.Contains("Armistice", StringComparison.OrdinalIgnoreCase)) return EventKind.Jurisdiction;
+        if (t.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase) || t.Contains("Kontrollierten Raum", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) || t.Contains("Monitored Space", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Schutzzone", StringComparison.OrdinalIgnoreCase) || t.Contains("Armistice", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Private Property", StringComparison.OrdinalIgnoreCase) || t.Contains("Privatbesitz", StringComparison.OrdinalIgnoreCase)) return EventKind.Jurisdiction;
 
         if (t.StartsWith("Partystart", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Party start", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("GRUPPE", StringComparison.OrdinalIgnoreCase) || t.Contains("Group", StringComparison.OrdinalIgnoreCase) ||
@@ -1633,7 +1924,17 @@ public partial class LogParser
         if (t.Contains("Krankenbett", StringComparison.OrdinalIgnoreCase) || t.Contains("Medical Bed", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("MedBed", StringComparison.OrdinalIgnoreCase) || t.Contains("Clinic Bed", StringComparison.OrdinalIgnoreCase)) return EventKind.MedBed;
 
-        if (t.StartsWith("Hangar", StringComparison.OrdinalIgnoreCase)) return EventKind.Hangar;
+        if (t.StartsWith("Hangar", StringComparison.OrdinalIgnoreCase) || t.Contains("Hangar Request", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Hangaranfrage", StringComparison.OrdinalIgnoreCase) || t.Contains("Hangar-Warteschlange", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase)) return EventKind.Hangar;
+
+        if (t.Contains("Blueprint", StringComparison.OrdinalIgnoreCase) || t.Contains("Bauplan", StringComparison.OrdinalIgnoreCase)) return EventKind.Blueprint;
+
+        if (t.Contains("Refinery", StringComparison.OrdinalIgnoreCase) || t.Contains("Raffinerie", StringComparison.OrdinalIgnoreCase)) return EventKind.Refinery;
+
+        if (t.Contains("has sent you", StringComparison.OrdinalIgnoreCase) || t.Contains("überwiesen", StringComparison.OrdinalIgnoreCase)) return EventKind.Offer;
+
+        if (t.Contains("Retrieve", StringComparison.OrdinalIgnoreCase) || t.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase)) return EventKind.Hangar;
 
         return null;
     }
@@ -1679,12 +1980,66 @@ public partial class LogParser
     {
         if (_metaComplete) return;
 
-        if (!Meta.ContainsKey("version") && line.Contains("FileVersion:", StringComparison.Ordinal))
-            Meta["version"] = After(line, "FileVersion:");
+        // 1. Echte Star Citizen Spielversion aus Branch ermitteln (z.B. "sc-alpha-4.10.0-hotfix" -> "4.10.0")
+        if (line.Contains("Branch:", StringComparison.Ordinal))
+        {
+            var rawBranch = After(line, "Branch:");
+            var m = BranchVersionRegex().Match(rawBranch);
+            if (m.Success)
+            {
+                Meta["base_version"] = m.Groups[1].Value;
+            }
+            else if (!string.IsNullOrWhiteSpace(rawBranch))
+            {
+                var clean = rawBranch.Replace("sc-alpha-", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("sc-live-", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("sc-", "", StringComparison.OrdinalIgnoreCase);
+                var idxHyphen = clean.IndexOf('-');
+                Meta["base_version"] = idxHyphen > 0 ? clean[..idxHyphen] : clean;
+            }
+            Meta["branch"] = rawBranch;
+            UpdateFullVersion();
+        }
+        else if (line.Contains("[Trace] @env_session:", StringComparison.Ordinal) || line.Contains("--system-trace-env-id", StringComparison.Ordinal))
+        {
+            // Fallback auf Environment Session (z.B. 'pub-sc-alpha-4100-12519617' -> '4.10.0') falls Branch noch nicht gesehen
+            if (!Meta.ContainsKey("base_version"))
+            {
+                var matchEnv = Regex.Match(line, @"alpha-(\d)(\d+?)(?:00|0)?-\d+");
+                if (matchEnv.Success)
+                {
+                    Meta["base_version"] = $"{matchEnv.Groups[1].Value}.{matchEnv.Groups[2].Value}.0";
+                    UpdateFullVersion();
+                }
+            }
+        }
+        else if (!Meta.ContainsKey("file_version") && line.Contains("FileVersion:", StringComparison.Ordinal))
+        {
+            Meta["file_version"] = After(line, "FileVersion:");
+        }
+
+        if (!Meta.ContainsKey("build") && line.Contains("Changelist:", StringComparison.Ordinal))
+        {
+            Meta["build"] = After(line, "Changelist:");
+            UpdateFullVersion();
+        }
+        else if (!Meta.ContainsKey("build") && line.Contains("build_version[", StringComparison.Ordinal))
+        {
+            var mBld = Regex.Match(line, @"build_version\[(\d+)\]");
+            if (mBld.Success)
+            {
+                Meta["build"] = mBld.Groups[1].Value;
+                UpdateFullVersion();
+            }
+        }
+
         if (!Meta.ContainsKey("cpu") && line.Contains("Host CPU:", StringComparison.Ordinal))
             Meta["cpu"] = After(line, "Host CPU:");
         if (!Meta.ContainsKey("env") && line.Contains("[Trace] Environment:", StringComparison.Ordinal))
+        {
             Meta["env"] = After(line, "Environment:");
+            UpdateFullVersion();
+        }
         if (!Meta.ContainsKey("gpu"))
         {
             var m = GpuRegex().Match(line);
@@ -1706,7 +2061,29 @@ public partial class LogParser
             if (m.Success) Meta["shard"] = m.Groups["s"].Value;
         }
 
-        if (Meta.Count >= 7) _metaComplete = true;
+        if (Meta.Count >= 7 && Meta.ContainsKey("shard") && Meta.ContainsKey("character") && Meta.ContainsKey("version") && !Meta["version"].StartsWith("1.0.", StringComparison.Ordinal))
+        {
+            _metaComplete = true;
+        }
+    }
+
+    private void UpdateFullVersion()
+    {
+        if (Meta.TryGetValue("base_version", out var baseVer) && !string.IsNullOrWhiteSpace(baseVer))
+        {
+            var channel = Meta.TryGetValue("env", out var e) && !string.IsNullOrWhiteSpace(e)
+                ? (e.Trim().Equals("PUB", StringComparison.OrdinalIgnoreCase) ? "LIVE" : e.Trim().ToUpperInvariant())
+                : "LIVE";
+            var build = Meta.TryGetValue("build", out var b) && !string.IsNullOrWhiteSpace(b) ? b.Trim() : "";
+
+            Meta["version"] = !string.IsNullOrEmpty(build)
+                ? $"{baseVer}-{channel}.{build}"
+                : $"{baseVer}-{channel}";
+        }
+        else if (!Meta.ContainsKey("version") && Meta.TryGetValue("file_version", out var fv))
+        {
+            Meta["version"] = fv;
+        }
     }
 
     static string After(string line, string key)
@@ -1729,6 +2106,7 @@ public partial class LogParser
 
     DateTime ParseTs(string line)
     {
+        if (_lastSeenTime.HasValue) return _lastSeenTime.Value;
         var m = TsRegex().Match(line);
         if (m.Success && DateTime.TryParse(m.Groups["ts"].Value, CultureInfo.InvariantCulture,
                 DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt))
@@ -1736,7 +2114,7 @@ public partial class LogParser
             _lastSeenTime = dt;
             return dt;
         }
-        return _lastSeenTime ?? DateTime.UtcNow;
+        return DateTime.UtcNow;
     }
 
     static string? ExtractLocationFromShop(string shop)
@@ -1831,6 +2209,14 @@ public partial class LogParser
                 return cat.Faction;
         }
 
+        if (!string.IsNullOrEmpty(mId) && _contracts.TryGetValue(mId, out var existingContract))
+        {
+            if (!string.IsNullOrWhiteSpace(existingContract.Issuer) &&
+                existingContract.Issuer != "Unbekannt" &&
+                existingContract.Issuer != "mobiGlas")
+                return existingContract.Issuer;
+        }
+
         return "Unbekannt";
     }
 
@@ -1880,6 +2266,8 @@ public partial class LogParser
         return clean switch
         {
             "ReccoBattaglia" => "Recco Battaglia",
+            "Battaglia" => "Recco Battaglia",
+            "Recco" => "Recco Battaglia",
             "MilesEckhart" => "Miles Eckhart",
             "ClovusDarneely" => "Clovus Darneely",
             "ConstantineHurston" => "Constantine Hurston",
@@ -1919,7 +2307,7 @@ public partial class LogParser
     private static string SplitCamelCase(string str)
     {
         if (string.IsNullOrEmpty(str)) return str;
-        return Regex.Replace(str, @"(\B[A-Z])", " $1").Trim();
+        return CamelCaseSplitRegex().Replace(str, " $1").Trim();
     }
 }
 

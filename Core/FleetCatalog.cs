@@ -187,8 +187,66 @@ public static class FleetCatalog
         ["Blade"] = new("Blade · Esperia", "Esperia", "ESPERIA", "#EF4444", "Vanduul Leichter Jäger", 5_200_000, 275, "120 Monate (IAE)"),
         ["Glaive"] = new("Glaive · Esperia", "Esperia", "ESPERIA", "#EF4444", "Vanduul Mittlerer Jäger (Dual S5)", 7_500_000, 350, "120 Monate (IAE)"),
         ["Scythe"] = new("Scythe · Esperia", "Esperia", "ESPERIA", "#EF4444", "Original Vanduul Abfangjäger", 8_500_000, 300, "LTI (Lifetime)"),
-        ["M80"] = new("M80", "Aegis Dynamics", "AEGIS", "#F87171", "Elite-Schiff", 15_000_000, 300, "LTI (Lifetime)")
+        ["Origin M80"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+        ["M80"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+        ["m80"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+        ["M80 · Origin"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+        ["m80 · Origin"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+        ["Origin M80 · Origin"] = new("M80 · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Schwerer Luxus-Snub", 1_800_000, 75, "LTI (Lifetime)"),
+
+        // Argo Astronautics (#F59E0B)
+        ["Argo ATLS"] = new("Argo ATLS · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Fracht-Exoskelett & Lader", 150_000, 40, "LTI (Lifetime)"),
+        ["ATLS"] = new("Argo ATLS · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Fracht-Exoskelett & Lader", 150_000, 40, "LTI (Lifetime)"),
+        ["Argo MOLE"] = new("MOLE · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrieller Multi-Crew Bergbau", 5_150_000, 315, "120 Monate (IAE)"),
+        ["MOLE"] = new("MOLE · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrieller Multi-Crew Bergbau", 5_150_000, 315, "120 Monate (IAE)"),
+        ["MOLE Salvage"] = new("MOLE · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrieller Multi-Crew Bergbau", 5_150_000, 315, "120 Monate (IAE)"),
+        ["Argo RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
+        ["RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
+        ["Argo SRV"] = new("SRV · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Schlepper & Bergung (Tractor)", 2_450_000, 165, "LTI (Lifetime)"),
+        ["SRV"] = new("SRV · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Schlepper & Bergung (Tractor)", 2_450_000, 165, "LTI (Lifetime)"),
+        ["MPUV Cargo"] = new("MPUV Cargo · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Fracht", 350_000, 35, "LTI (Lifetime)"),
+        ["MPUV Personnel"] = new("MPUV Personnel · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Personen", 350_000, 35, "LTI (Lifetime)"),
+        ["MPUV Tractor"] = new("MPUV Tractor · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Traktorstrahl", 450_000, 40, "LTI (Lifetime)"),
+
+        // Greycat Industrial (#EAB308)
+        ["Greycat ROC"] = new("ROC · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Leichter Bergbau-Bodenlader", 350_000, 55, "LTI (Lifetime)"),
+        ["ROC"] = new("ROC · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Leichter Bergbau-Bodenlader", 350_000, 55, "LTI (Lifetime)"),
+        ["ROC-DS"] = new("ROC-DS · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Zweisitziger Bergbau-Bodenlader", 480_000, 75, "LTI (Lifetime)"),
+        ["PTV"] = new("PTV · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Persönlicher Transport-Buggy", 85_000, 15, "6 Monate"),
+        ["STV"] = new("STV · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Geländegängiges Utility-Fahrzeug", 180_000, 40, "LTI (Lifetime)"),
+
+        // Tumbril Land Systems (#84CC16)
+        ["Cyclone"] = new("Cyclone · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Militärischer Geländebuggy", 220_000, 55, "120 Monate (IAE)"),
+        ["Cyclone RN"] = new("Cyclone RN · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Aufklärungs- & Radar-Buggy", 280_000, 65, "120 Monate (IAE)"),
+        ["Cyclone TR"] = new("Cyclone TR · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Geschütz-Kampfbuggy", 320_000, 65, "120 Monate (IAE)"),
+        ["Cyclone AA"] = new("Cyclone AA · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Flugabwehr & EMP-Buggy", 350_000, 80, "120 Monate (IAE)"),
+        ["Cyclone MT"] = new("Cyclone MT · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Raketen & Kanonen-Buggy", 380_000, 75, "LTI (Lifetime)"),
+        ["Cyclone RC"] = new("Cyclone RC · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Rennbuggy", 280_000, 65, "120 Monate (IAE)"),
+        ["Nova Tank"] = new("Nova Tank · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Schwerer Kampfpanzer (S5)", 1_450_000, 120, "120 Monate (IAE)"),
+        ["Nova"] = new("Nova Tank · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Schwerer Kampfpanzer (S5)", 1_450_000, 120, "120 Monate (IAE)"),
+        ["Storm"] = new("Storm · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Leichter Mini-Panzer", 850_000, 90, "LTI (Lifetime)"),
+        ["Storm AA"] = new("Storm AA · Tumbril", "Tumbril Land Systems", "TUMBRILL", "#84CC16", "Flugabwehr-Mini-Panzer", 950_000, 100, "LTI (Lifetime)"),
+
+        // Weitere moderne Neuzugänge (Mirai, Anvil)
+        ["Mirai Guardian"] = new("Mirai Guardian · Mirai", "Mirai", "MIRAI", "#38BDF8", "Schwerer Dogfighter", 4_500_000, 220, "LTI (Lifetime)"),
+        ["Guardian"] = new("Mirai Guardian · Mirai", "Mirai", "MIRAI", "#38BDF8", "Schwerer Dogfighter", 4_500_000, 220, "LTI (Lifetime)"),
+        ["Mirai Guardian MX"] = new("Mirai Guardian MX · Mirai", "Mirai", "MIRAI", "#38BDF8", "Schwerer Raketenjäger", 4_800_000, 235, "LTI (Lifetime)"),
+        ["Guardian MX"] = new("Mirai Guardian MX · Mirai", "Mirai", "MIRAI", "#38BDF8", "Schwerer Raketenjäger", 4_800_000, 235, "LTI (Lifetime)"),
+        ["Paladin"] = new("Paladin · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Gepanzertes Gunship", 8_500_000, 300, "LTI (Lifetime)"),
+        ["Anvil Paladin"] = new("Paladin · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Gepanzertes Gunship", 8_500_000, 300, "LTI (Lifetime)"),
+        ["Ballista"] = new("Ballista · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Boden-Flugabwehrpanzer", 750_000, 140, "120 Monate (IAE)"),
+        ["Centurion"] = new("Centurion · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Boden-Flak-Fahrzeug", 850_000, 110, "120 Monate (IAE)"),
+
+        // RSI Rover
+        ["Ursa Rover"] = new("Ursa Rover · RSI", "RSI", "RSI", "#60A5FA", "Erkundungs-Rover", 450_000, 50, "120 Monate (IAE)"),
+        ["Ursa"] = new("Ursa Rover · RSI", "RSI", "RSI", "#60A5FA", "Erkundungs-Rover", 450_000, 50, "120 Monate (IAE)"),
+        ["Ursa Medivac"] = new("Ursa Medivac · RSI", "RSI", "RSI", "#60A5FA", "Medizinischer Rettungs-Rover", 650_000, 60, "LTI (Lifetime)"),
+        ["Lynx Rover"] = new("Lynx Rover · RSI", "RSI", "RSI", "#60A5FA", "Luxus-Touring-Rover", 550_000, 60, "LTI (Lifetime)"),
+        ["Lynx"] = new("Lynx Rover · RSI", "RSI", "RSI", "#60A5FA", "Luxus-Touring-Rover", 550_000, 60, "LTI (Lifetime)")
     };
+
+    private static readonly KeyValuePair<string, ShipCatalogEntry>[] SortedCatalog =
+        Catalog.OrderByDescending(kv => kv.Key.Length).ToArray();
 
     public static ShipCatalogEntry Lookup(string shipName)
     {
@@ -197,16 +255,22 @@ public static class FleetCatalog
 
         var clean = shipName.Trim();
 
-        // 1. Exakter & Teilstring-Abgleich
-        foreach (var (key, val) in Catalog)
+        // 1. Exakter O(1) Match
+        if (Catalog.TryGetValue(clean, out var exact))
+            return exact;
+
+        // 2. Längster Teilstring-Abgleich (verhindert False-Positives von kurzen Namen wie 'Cutter' vor 'Cutter Rambler')
+        foreach (var (key, val) in SortedCatalog)
         {
-            if (clean.Equals(key, StringComparison.OrdinalIgnoreCase) ||
-                clean.Contains(key, StringComparison.OrdinalIgnoreCase) ||
+            if (clean.Contains(key, StringComparison.OrdinalIgnoreCase) ||
                 key.Contains(clean, StringComparison.OrdinalIgnoreCase))
             {
                 return val;
             }
         }
+
+        // Unbekanntes Schiff -> zur kontinuierlichen Katalogpflege protokollieren
+        UnknownEventsLogger.LogUnknown("Ship", clean);
 
         // 2. Hersteller ableiten aus Name
         string mfg = "Unbekannt";

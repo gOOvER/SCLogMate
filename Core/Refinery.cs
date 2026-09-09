@@ -51,7 +51,7 @@ public partial class RefineryJob : ObservableObject
             if (IsCompleted) return "★ Fertiggestellt (Abholbereit)";
             var rem = RemainingTime;
             return rem.TotalHours >= 1 
-                ? $"⏳ In Arbeit (noch {rem.Hours}h {rem.Minutes}m)" 
+                ? $"⏳ In Arbeit (noch {(int)rem.TotalHours}h {rem.Minutes}m)" 
                 : $"⏳ In Arbeit (noch {rem.Minutes}m {rem.Seconds}s)";
         }
     }

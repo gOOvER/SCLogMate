@@ -27,24 +27,46 @@ internal static partial class Program
         }
 
         // Nur eine Instanz zulassen.
-        using var mutex = new System.Threading.Mutex(true, @"Global\SCLogMate_SingleInstance", out bool isNew);
-        if (!isNew)
-        {
-            Core.Logger.Log("Zweite Instanz blockiert – läuft bereits.");
-            return;
-        }
-
-        Core.Logger.Log($"GUI-Start · {Environment.OSVersion}");
+        System.Threading.Mutex? mutex = null;
+        bool isNew = true;
         try
         {
-            Database.Init();
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            mutex = new System.Threading.Mutex(true, @"Global\SCLogMate_SingleInstance", out isNew);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
         {
-            Core.Logger.Error("FATAL", ex);
-            throw;
+            try
+            {
+                mutex = new System.Threading.Mutex(true, @"Local\SCLogMate_SingleInstance", out isNew);
+            }
+            catch { isNew = true; }
         }
+        catch
+        {
+            isNew = true;
+        }
+
+        using (mutex)
+        {
+            if (!isNew)
+            {
+                Core.Logger.Log("Zweite Instanz blockiert – läuft bereits.");
+                return;
+            }
+
+            Core.Logger.Log($"GUI-Start · {Environment.OSVersion}");
+            try
+            {
+                Database.Init();
+                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            }
+            catch (Exception ex)
+            {
+                Core.Logger.Error("FATAL", ex);
+                throw;
+            }
+        }
+        return;
     }
 
     public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()

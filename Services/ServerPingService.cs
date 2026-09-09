@@ -15,18 +15,25 @@ public static class ServerPingService
     public static string GetRegionalHost(string shard)
     {
         var s = (shard ?? "").ToLowerInvariant();
-        if (s.Contains("euc") || s.Contains("fra") || s.Contains("ger"))
-            return "ec2.eu-central-1.amazonaws.com"; // Frankfurt
-        if (s.Contains("euw") || s.Contains("eu") || s.Contains("lon") || s.Contains("irl"))
-            return "ec2.eu-west-1.amazonaws.com"; // Irland / Europa
-        if (s.Contains("use") || s.Contains("va") || s.Contains("us-east"))
-            return "ec2.us-east-1.amazonaws.com"; // US East (Virginia)
-        if (s.Contains("usw") || s.Contains("or") || s.Contains("us-west") || s.Contains("us"))
-            return "ec2.us-west-2.amazonaws.com"; // US West (Oregon)
-        if (s.Contains("aus") || s.Contains("oce") || s.Contains("ap") || s.Contains("syd"))
+        // 1. Australien / Ozeanien (Muss VOR "us" geprüft werden, da "aus" die Teilzeichenkette "us" enthält!)
+        if (s.Contains("aus") || s.Contains("oce") || s.Contains("syd") || s.Contains("ap-south"))
             return "ec2.ap-southeast-2.amazonaws.com"; // Australien (Sydney)
-        if (s.Contains("asia") || s.Contains("jp") || s.Contains("sg") || s.Contains("tyo"))
+
+        // 2. Asien / Pazifik
+        if (s.Contains("asia") || s.Contains("jp") || s.Contains("sg") || s.Contains("tyo") || s.Contains("tokyo"))
             return "ec2.ap-northeast-1.amazonaws.com"; // Asien (Tokio)
+
+        // 3. Europa
+        if (s.Contains("euc") || s.Contains("fra") || s.Contains("ger") || s.Contains("frankfurt"))
+            return "ec2.eu-central-1.amazonaws.com"; // Frankfurt
+        if (s.Contains("euw") || s.Contains("lon") || s.Contains("irl") || s.Contains("dublin") || s.Contains("eu"))
+            return "ec2.eu-west-1.amazonaws.com"; // Irland / Europa
+
+        // 4. US East & West
+        if (s.Contains("use") || s.Contains("us-east") || s.Contains("virginia") || s.Contains("-va-"))
+            return "ec2.us-east-1.amazonaws.com"; // US East (Virginia)
+        if (s.Contains("usw") || s.Contains("us-west") || s.Contains("oregon") || s.Contains("-or-") || s.Contains("us"))
+            return "ec2.us-west-2.amazonaws.com"; // US West (Oregon)
 
         return "ec2.eu-west-1.amazonaws.com";
     }

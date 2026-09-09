@@ -54,7 +54,7 @@ public sealed class QuantumDriveProfile
 public sealed class ResolvedLocation
 {
     public string RawCode { get; set; } = "";
-    public string DisplayName { get; set; } = "Unbekannt";
+    public string DisplayName { get; set; } = "—";
     public string SystemName { get; set; } = "Stanton";
     public string ParentBody { get; set; } = "—";
     public StarmapObjectType Type { get; set; } = StarmapObjectType.Outpost;

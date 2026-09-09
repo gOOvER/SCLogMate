@@ -28,10 +28,10 @@ public class ScanIndicatorWindow : Window
     private IntPtr _hwnd;
     private int _px, _py, _pw, _ph;
 
+    private readonly DispatcherTimer _flashTimer;
+
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int idx);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hwnd, int idx, int val);
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
@@ -72,6 +72,15 @@ public class ScanIndicatorWindow : Window
         };
 
         Content = _border;
+        _flashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        _flashTimer.Tick += (_, _) =>
+        {
+            _flashTimer.Stop();
+            _border.BorderBrush = _accentBrush;
+            _label.Foreground = _accentBrush;
+            _label.Text = _title;
+        };
+
         Opened += OnOpened;
         Closing += (_, e) =>
         {
@@ -133,15 +142,8 @@ public class ScanIndicatorWindow : Window
         _label.Foreground = GreenBrush;
         _label.Text = $"✓ {_title}";
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            _border.BorderBrush = _accentBrush;
-            _label.Foreground = _accentBrush;
-            _label.Text = _title;
-        };
-        timer.Start();
+        _flashTimer.Stop();
+        _flashTimer.Start();
     }
 
     private void ApplyPhysicalBounds()

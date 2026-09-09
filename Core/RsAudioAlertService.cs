@@ -34,6 +34,9 @@ public static class RsAudioAlertService
 
     private static byte[]? _cachedSonarWav;
     private static readonly object _sonarLock = new();
+    private static readonly object _ttsLock = new();
+    private static Windows.Media.SpeechSynthesis.SpeechSynthesizer? _speechSynth;
+    private static Windows.Media.Playback.MediaPlayer? _ttsPlayer;
 
     /// <summary>
     /// Setzt die Alarm-Sperre zurück (z.B. bei manuellem Eingriff oder neuem Scan).
@@ -214,15 +217,51 @@ public static class RsAudioAlertService
     {
         try
         {
-            var synth = new Windows.Media.SpeechSynthesis.SpeechSynthesizer();
             var text = resourceName.Equals("Salvage Panel", StringComparison.OrdinalIgnoreCase)
                 ? "Salvage Panels erfasst"
                 : $"{resourceName} geortet";
 
-            var stream = await synth.SynthesizeTextToStreamAsync(text);
-            var player = new Windows.Media.Playback.MediaPlayer();
-            player.Source = Windows.Media.Core.MediaSource.CreateFromStream(stream, stream.ContentType);
-            player.Play();
+            Windows.Media.SpeechSynthesis.SpeechSynthesisStream? stream = null;
+            Windows.Media.Core.MediaSource? mediaSource = null;
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, object>? ended = null;
+            Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, Windows.Media.Playback.MediaPlayerFailedEventArgs>? failed = null;
+
+            Windows.Media.Playback.MediaPlayer player;
+            lock (_ttsLock)
+            {
+                _speechSynth ??= new Windows.Media.SpeechSynthesis.SpeechSynthesizer();
+                _ttsPlayer ??= new Windows.Media.Playback.MediaPlayer();
+                player = _ttsPlayer;
+            }
+
+            stream = await _speechSynth.SynthesizeTextToStreamAsync(text);
+            mediaSource = Windows.Media.Core.MediaSource.CreateFromStream(stream, stream.ContentType);
+
+            ended = (s, e) => tcs.TrySetResult(true);
+            failed = (s, e) => tcs.TrySetResult(false);
+
+            lock (_ttsLock)
+            {
+                player.MediaEnded += ended;
+                player.MediaFailed += failed;
+                player.Source = mediaSource;
+                player.Play();
+            }
+
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var reg = cts.Token.Register(() => tcs.TrySetResult(false));
+            await tcs.Task;
+
+            lock (_ttsLock)
+            {
+                if (ended != null) player.MediaEnded -= ended;
+                if (failed != null) player.MediaFailed -= failed;
+            }
+
+            mediaSource.Dispose();
+            stream.Dispose();
         }
         catch (Exception ex)
         {

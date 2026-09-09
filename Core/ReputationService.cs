@@ -26,22 +26,34 @@ public partial class FactionReputation : ObservableObject
     public string ProgressText => $"{CurrentXp:N0} / {GetNextLevelXp(CurrentLevel):N0} XP";
     public string MissionsCountText => $"{CompletedMissions} {(CompletedMissions == 1 ? "Auftrag" : "Aufträge")}";
 
+    private static readonly IBrush BrushSicherheit = new SolidColorBrush(Color.Parse("#38BDF8"));
+    private static readonly IBrush BrushFracht = new SolidColorBrush(Color.Parse("#FFB23E"));
+    private static readonly IBrush BrushIndustrie = new SolidColorBrush(Color.Parse("#34D399"));
+    private static readonly IBrush BrushUnterwelt = new SolidColorBrush(Color.Parse("#F87171"));
+    private static readonly IBrush BrushDefault = new SolidColorBrush(Color.Parse("#A371F7"));
+
+    private static readonly IBrush BgBrushSicherheit = new SolidColorBrush(Color.Parse("#1A1D6FA5"));
+    private static readonly IBrush BgBrushFracht = new SolidColorBrush(Color.Parse("#1AFFB23E"));
+    private static readonly IBrush BgBrushIndustrie = new SolidColorBrush(Color.Parse("#1A34D399"));
+    private static readonly IBrush BgBrushUnterwelt = new SolidColorBrush(Color.Parse("#1AF87171"));
+    private static readonly IBrush BgBrushDefault = new SolidColorBrush(Color.Parse("#1AA371F7"));
+
     public IBrush CategoryBrush => Category switch
     {
-        "Sicherheit" => new SolidColorBrush(Color.Parse("#38BDF8")), // Ice Cyan
-        "Fracht" => new SolidColorBrush(Color.Parse("#FFB23E")),     // Warm Amber
-        "Industrie" => new SolidColorBrush(Color.Parse("#34D399")),  // Emerald Green
-        "Unterwelt" => new SolidColorBrush(Color.Parse("#F87171")),  // Crimson Red
-        _ => new SolidColorBrush(Color.Parse("#A371F7"))             // Purple
+        "Sicherheit" => BrushSicherheit,
+        "Fracht" => BrushFracht,
+        "Industrie" => BrushIndustrie,
+        "Unterwelt" => BrushUnterwelt,
+        _ => BrushDefault
     };
 
     public IBrush CategoryBgBrush => Category switch
     {
-        "Sicherheit" => new SolidColorBrush(Color.Parse("#1A1D6FA5")),
-        "Fracht" => new SolidColorBrush(Color.Parse("#1AFFB23E")),
-        "Industrie" => new SolidColorBrush(Color.Parse("#1A34D399")),
-        "Unterwelt" => new SolidColorBrush(Color.Parse("#1AF87171")),
-        _ => new SolidColorBrush(Color.Parse("#1AA371F7"))
+        "Sicherheit" => BgBrushSicherheit,
+        "Fracht" => BgBrushFracht,
+        "Industrie" => BgBrushIndustrie,
+        "Unterwelt" => BgBrushUnterwelt,
+        _ => BgBrushDefault
     };
 
     public void NotifyStateChanged()
@@ -296,6 +308,46 @@ public static class ReputationCatalog
         },
         new FactionReputation
         {
+            Id = "ALLIANCE_AID",
+            Name = "Alliance Aid",
+            ShortName = "Alliance Aid",
+            Category = "Fracht",
+            Icon = "📦",
+            System = "Stanton",
+            Description = "Humanitäre Hilfstransporte, medizinische Güter und Großraum-Frachtversorgung."
+        },
+        new FactionReputation
+        {
+            Id = "LING_FAMILY",
+            Name = "Ling Family",
+            ShortName = "Ling Family",
+            Category = "Industrie",
+            Icon = "🧬",
+            System = "Stanton & Nyx",
+            Description = "Familiengeführtes Biotechnologie- und Ressourcen-Unternehmen."
+        },
+        new FactionReputation
+        {
+            Id = "HEADHUNTERS",
+            Name = "Headhunters",
+            ShortName = "Headhunters",
+            Category = "Unterwelt",
+            Icon = "☠",
+            System = "Stanton & Pyro",
+            Description = "Gefürchtetes Söldner- und Piratensyndikat für schwere Kampfaufträge."
+        },
+        new FactionReputation
+        {
+            Id = "ROUGH_ANIMALS",
+            Name = "Rough Animals",
+            ShortName = "Rough Animals",
+            Category = "Unterwelt",
+            Icon = "🐺",
+            System = "Pyro",
+            Description = "Skrupellose Pyro-Gang mit Fokus auf Territoriumskontrolle und Überfälle."
+        },
+        new FactionReputation
+        {
             Id = "RUTO",
             Name = "Ruto",
             ShortName = "Ruto",
@@ -347,6 +399,18 @@ public static class ReputationCatalog
 
         if (t.Contains("cdf") || t.Contains("civilian defense") || t.Contains("xenothreat") || t.Contains("siege of orison"))
             return AllFactions.FirstOrDefault(f => f.Id == "CDF");
+
+        if (t.Contains("alliance aid"))
+            return AllFactions.FirstOrDefault(f => f.Id == "ALLIANCE_AID");
+
+        if (t.Contains("ling family") || t.Contains("ling biotechnology") || t.Contains("lingbio"))
+            return AllFactions.FirstOrDefault(f => f.Id == "LING_FAMILY");
+
+        if (t.Contains("headhunters") || t.Contains("head hunters"))
+            return AllFactions.FirstOrDefault(f => f.Id == "HEADHUNTERS");
+
+        if (t.Contains("rough animals"))
+            return AllFactions.FirstOrDefault(f => f.Id == "ROUGH_ANIMALS");
 
         if (t.Contains("red wind"))
             return AllFactions.FirstOrDefault(f => f.Id == "REDWIND");

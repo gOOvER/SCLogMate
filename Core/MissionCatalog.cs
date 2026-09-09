@@ -590,6 +590,19 @@ public static class MissionCatalog
         });
         Add(new MissionInfo
         {
+            Id = "recco_moraine_movements",
+            Title = "Moraine Movements",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten",
+            BaseReward = 25000,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Blueprints = new[] { "Deadrig Shotgun", "Overlord Helmet Supernova" },
+            Description = "Installiere ein Datenlaufwerk (Data Drive) an der Moraine-Basis auf Delamar für Recco Battaglia."
+        });
+        Add(new MissionInfo
+        {
             Id = "recco_ship_in_distress",
             Title = "Ship In Distress",
             Contractor = "Recco Battaglia",
@@ -861,6 +874,111 @@ public static class MissionCatalog
             ReputationGain = 380,
             StarSystems = "Nyx",
             Description = "Dringender Noteinsatz für die People's Alliance bei Levski."
+        });
+
+        // ── ALLIANCE AID & CARGO HAULING (FRACHT & TRANSPORT) ────────────────
+        Add(new MissionInfo
+        {
+            Id = "aa_treatment_cargo_small",
+            Title = "Alliance Aid: Treatment Cargo Haul - Small Scale",
+            Contractor = "Alliance Aid",
+            Faction = "Alliance Aid",
+            MissionType = "Fracht/Transport",
+            BaseReward = 18500,
+            ReputationGain = 200,
+            StarSystems = "Stanton",
+            Description = "Dringender Frachttransport medizinischer Behandlungsgüter im regionalen Raum."
+        });
+        Add(new MissionInfo
+        {
+            Id = "aa_interstellar_large_haul",
+            Title = "Alliance Aid: Interstellar Large Cargo Haul (Research)",
+            Contractor = "Alliance Aid",
+            Faction = "Alliance Aid",
+            MissionType = "Fracht/Transport",
+            BaseReward = 68000,
+            ReputationGain = 600,
+            StarSystems = "Stanton",
+            Description = "Interstellarer Großraum-Frachttransport von Forschungsmaterialien und technischer Ausrüstung."
+        });
+        Add(new MissionInfo
+        {
+            Id = "aa_urgent_medical_supplies",
+            Title = "Alliance Aid: Urgent Medical Supplies",
+            Contractor = "Alliance Aid",
+            Faction = "Alliance Aid",
+            MissionType = "Fracht/Transport",
+            BaseReward = 32000,
+            ReputationGain = 350,
+            StarSystems = "Stanton",
+            Description = "Express-Lieferung von Notfallmedikamenten an isolierte Stationen."
+        });
+
+        // ── WIKELO EMPORIUM & SAMMLER (BERGUNG & SUCHE) ─────────────────────
+        Add(new MissionInfo
+        {
+            Id = "wikelo_collector_intro",
+            Title = "Wikelo: The Collector Intro",
+            Contractor = "Wikelo Emporium",
+            Faction = "Wikelo",
+            MissionType = "Bergung/Lieferung",
+            BaseReward = 25000,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Einführung in die Sammler-Aufträge des Wikelo Emporiums. Beschaffe und liefere seltene Artefakte und Fracht ab."
+        });
+        Add(new MissionInfo
+        {
+            Id = "wikelo_collector_intro_short",
+            Title = "The Collector Intro",
+            Contractor = "Wikelo Emporium",
+            Faction = "Wikelo",
+            MissionType = "Bergung/Lieferung",
+            BaseReward = 25000,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Einführung in die Sammler-Aufträge des Wikelo Emporiums. Beschaffe und liefere seltene Artefakte und Fracht ab."
+        });
+
+        // ── HEADHUNTERS & PYRO FRAKTIONEN (SÖLDNER & UNTERWELT) ──────────────
+        Add(new MissionInfo
+        {
+            Id = "headhunters_hijacked_caterpillar",
+            Title = "Headhunters: Hijacked Ship Caterpillar",
+            Contractor = "Headhunters",
+            Faction = "Headhunters",
+            MissionType = "Söldner",
+            BaseReward = 45000,
+            ReputationGain = 500,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Ein gekapertes Caterpillar-Frachtschiff attackieren und die Fracht bzw. Zielpersonen sichern."
+        });
+        Add(new MissionInfo
+        {
+            Id = "headhunters_outpost_raid",
+            Title = "Headhunters: Outpost Raid Defense",
+            Contractor = "Headhunters",
+            Faction = "Headhunters",
+            MissionType = "Söldner",
+            BaseReward = 38000,
+            ReputationGain = 400,
+            IsIllegal = true,
+            StarSystems = "Pyro",
+            Description = "Verteidigung eines eingenommenen Außenpostens gegen feindliche Sicherheitskräfte in Pyro."
+        });
+        Add(new MissionInfo
+        {
+            Id = "rough_animals_territory_patrol",
+            Title = "Rough Animals: Territory Patrol",
+            Contractor = "Rough Animals",
+            Faction = "Rough Animals",
+            MissionType = "Söldner",
+            BaseReward = 28000,
+            ReputationGain = 300,
+            IsIllegal = true,
+            StarSystems = "Pyro",
+            Description = "Patrouillenfahrt zur Sicherung von Gang-Territorium und Abfangen von Eindringlingen."
         });
     }
 }

@@ -48,34 +48,47 @@ public static class ScreenCapture
         var hdc = GetDC(IntPtr.Zero);
         if (hdc == IntPtr.Zero) return null;
 
-        var hdcMem = CreateCompatibleDC(hdc);
-        var hBmp = CreateCompatibleBitmap(hdc, w, h);
-        var hOld = SelectObject(hdcMem, hBmp);
+        IntPtr hdcMem = IntPtr.Zero;
+        IntPtr hBmp = IntPtr.Zero;
+        IntPtr hOld = IntPtr.Zero;
 
-        BitBlt(hdcMem, 0, 0, w, h, hdc, x, y, SRCCOPY);
-
-        var bmpInfo = new BITMAPINFOHEADER
+        try
         {
-            biSize = (uint)sizeof(BITMAPINFOHEADER),
-            biWidth = (uint)w,
-            biHeight = -h, // Top-Down DIB
-            biPlanes = 1,
-            biBitCount = 32,
-            biCompression = 0
-        };
+            hdcMem = CreateCompatibleDC(hdc);
+            if (hdcMem == IntPtr.Zero) return null;
 
-        var buf = new byte[w * h * 4];
-        fixed (byte* p = buf)
-        {
-            GetDIBits(hdcMem, hBmp, 0, (uint)h, (IntPtr)p, ref bmpInfo, DIB_RGB_COLORS);
+            hBmp = CreateCompatibleBitmap(hdc, w, h);
+            if (hBmp == IntPtr.Zero) return null;
+
+            hOld = SelectObject(hdcMem, hBmp);
+
+            BitBlt(hdcMem, 0, 0, w, h, hdc, x, y, SRCCOPY);
+
+            var bmpInfo = new BITMAPINFOHEADER
+            {
+                biSize = (uint)sizeof(BITMAPINFOHEADER),
+                biWidth = (uint)w,
+                biHeight = -h, // Top-Down DIB
+                biPlanes = 1,
+                biBitCount = 32,
+                biCompression = 0
+            };
+
+            var buf = new byte[w * h * 4];
+            fixed (byte* p = buf)
+            {
+                GetDIBits(hdcMem, hBmp, 0, (uint)h, (IntPtr)p, ref bmpInfo, DIB_RGB_COLORS);
+            }
+
+            return buf;
         }
-
-        SelectObject(hdcMem, hOld);
-        DeleteObject(hBmp);
-        DeleteDC(hdcMem);
-        ReleaseDC(IntPtr.Zero, hdc);
-
-        return buf;
+        finally
+        {
+            if (hOld != IntPtr.Zero) SelectObject(hdcMem, hOld);
+            if (hBmp != IntPtr.Zero) DeleteObject(hBmp);
+            if (hdcMem != IntPtr.Zero) DeleteDC(hdcMem);
+            ReleaseDC(IntPtr.Zero, hdc);
+        }
     }
 
     /// <summary>Erfasst einen Bildschirmbereich direkt als Avalonia WriteableBitmap für Freeze-Frame Overlays.</summary>

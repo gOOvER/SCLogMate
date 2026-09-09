@@ -23,6 +23,12 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥]")]
     private static partial Regex CurrencyLabelRegex();
 
+    [GeneratedRegex(@"[+*~|/\\()\[\]{}]")]
+    private static partial Regex OcrNoiseCharsRegex();
+
+    [GeneratedRegex(@"(?<=\b\d{1,3})\s+(?=\d{3}(?:\s+\d{3})*\b)")]
+    private static partial Regex SpaceThousandsRegex();
+
     /// <summary>Prüft, ob die Logzeile das Öffnen des mobiGlas oder Inventorys signalisiert.</summary>
     public static bool IsMobiGlasOpenSignal(string raw)
     {
@@ -64,10 +70,10 @@ public static partial class WalletOcrTrigger
         normalized = CurrencyLabelRegex().Replace(normalized, " ");
 
         // 3. Führende Vorzeichen / OCR-Störzeichen entfernen
-        normalized = Regex.Replace(normalized, @"[+*~|/\\()\[\]{}]", " ");
+        normalized = OcrNoiseCharsRegex().Replace(normalized, " ");
 
         // 4. Leerzeichen als Tausendertrennzeichen zwischen Zifferngruppen normalisieren ("2 463 039" -> "2.463.039")
-        normalized = Regex.Replace(normalized, @"(?<=\b\d{1,3})\s+(?=\d{3}(?:\s+\d{3})*\b)", ".");
+        normalized = SpaceThousandsRegex().Replace(normalized, ".");
 
         long? bestValue = null;
         var bestDigits = 0;

@@ -22,6 +22,12 @@ public partial class App : Application
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => mainWin.Hide(), Avalonia.Threading.DispatcherPriority.Loaded);
             }
+
+            desktop.Exit += (s, e) =>
+            {
+                Core.UnknownEventsLogger.FlushSummary();
+                Core.GlobalHotkey.Stop();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

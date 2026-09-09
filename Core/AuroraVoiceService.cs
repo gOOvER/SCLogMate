@@ -13,7 +13,7 @@ using SCLogMate.Models;
 namespace SCLogMate.Core;
 
 
-public class AuroraVoiceService : IDisposable
+public partial class AuroraVoiceService : IDisposable
 {
     private readonly object _lock = new();
     private readonly Random _rand = new();
@@ -479,16 +479,23 @@ public class AuroraVoiceService : IDisposable
             _greetedShipsAtCurrentStation.Clear();
         }
 
-        // 1. Channel join -> Ship Greetings
-        if (ShipGreetingsEnabled)
+        // ClearDriver / Pilotensitz verlassen: Niemals Begrüßung auslösen
+        if (line.Contains("ClearDriver", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("releasing control token", StringComparison.OrdinalIgnoreCase))
         {
-            var matchEn = Regex.Match(line, @"<SHUDEvent_OnNotification> Added notification ""You have joined channel ''(?<ch>.+?)''\.", RegexOptions.IgnoreCase);
+            return;
+        }
+
+        // 1. Channel join -> Ship Greetings
+        if (ShipGreetingsEnabled && line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase))
+        {
+            var matchEn = ShipChannelEnRegex().Match(line);
             if (matchEn.Success)
             {
                 OnShipIdentified(matchEn.Groups["ch"].Value);
                 return;
             }
-            var matchDe = Regex.Match(line, @"<SHUDEvent_OnNotification> Added notification ""Du bist Kanal \[\s*(?<ch>.+?)\s*\]\s+beigetreten", RegexOptions.IgnoreCase);
+            var matchDe = ShipChannelDeRegex().Match(line);
             if (matchDe.Success)
             {
                 OnShipIdentified(matchDe.Groups["ch"].Value);
@@ -605,7 +612,9 @@ public class AuroraVoiceService : IDisposable
             if (!e.Detail.Contains("Claim", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("ClearDriver", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("zerstört", StringComparison.OrdinalIgnoreCase) &&
-                !e.Detail.Contains("Kollision", StringComparison.OrdinalIgnoreCase))
+                !e.Detail.Contains("Kollision", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("verlassen", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("Pilotensitz", StringComparison.OrdinalIgnoreCase))
             {
                 OnShipIdentified(e.Ship);
             }
@@ -898,45 +907,32 @@ public class AuroraVoiceService : IDisposable
         }
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, object>? endedHandler = null;
+        Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, Windows.Media.Playback.MediaPlayerFailedEventArgs>? failedHandler = null;
+        Windows.Media.Playback.MediaPlayer? player = null;
+        Windows.Media.Core.MediaSource? mediaSource = null;
 
         lock (_lock)
         {
             try
             {
                 _mediaPlayer ??= new Windows.Media.Playback.MediaPlayer();
+                player = _mediaPlayer;
 
-                Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, object>? endedHandler = null;
-                Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlayer, Windows.Media.Playback.MediaPlayerFailedEventArgs>? failedHandler = null;
-
-                endedHandler = (s, e) =>
-                {
-                    try
-                    {
-                        s.MediaEnded -= endedHandler;
-                        s.MediaFailed -= failedHandler;
-                    }
-                    catch { }
-                    tcs.TrySetResult(true);
-                };
-
+                endedHandler = (s, e) => tcs.TrySetResult(true);
                 failedHandler = (s, e) =>
                 {
-                    try
-                    {
-                        s.MediaEnded -= endedHandler;
-                        s.MediaFailed -= failedHandler;
-                    }
-                    catch { }
                     Logger.Log($"[AuroraVoiceService] MediaPlayer Fehler: {e.ErrorMessage} ({e.ExtendedErrorCode?.Message})");
                     tcs.TrySetResult(false);
                 };
 
-                _mediaPlayer.MediaEnded += endedHandler;
-                _mediaPlayer.MediaFailed += failedHandler;
+                player.MediaEnded += endedHandler;
+                player.MediaFailed += failedHandler;
 
-                _mediaPlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(filePath));
-                _mediaPlayer.Volume = Math.Clamp(_volume / 100.0, 0.0, 1.0);
-                _mediaPlayer.Play();
+                mediaSource = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(filePath));
+                player.Source = mediaSource;
+                player.Volume = Math.Clamp(_volume / 100.0, 0.0, 1.0);
+                player.Play();
                 Logger.Log($"[AuroraVoiceService] Audio abgespielt: {Path.GetFileName(filePath)} (Lautstärke: {_volume}%)");
             }
             catch (Exception ex)
@@ -951,13 +947,31 @@ public class AuroraVoiceService : IDisposable
             // Max 8 Sekunden warten, falls MediaEnded ausbleibt
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-            linked.Token.Register(() => tcs.TrySetResult(false));
+            using var reg = linked.Token.Register(() => tcs.TrySetResult(false));
 
             await tcs.Task;
             // 200 ms natürliche Pause zwischen zwei Sprachansagen
             await Task.Delay(200, ct);
         }
         catch (OperationCanceledException) { }
+        finally
+        {
+            lock (_lock)
+            {
+                if (player != null)
+                {
+                    if (endedHandler != null)
+                    {
+                        try { player.MediaEnded -= endedHandler; } catch { }
+                    }
+                    if (failedHandler != null)
+                    {
+                        try { player.MediaFailed -= failedHandler; } catch { }
+                    }
+                }
+                try { mediaSource?.Dispose(); } catch { }
+            }
+        }
     }
 
     private void ApplyCurrentVolume()
@@ -999,5 +1013,11 @@ public class AuroraVoiceService : IDisposable
         }
         catch { }
     }
+
+    [GeneratedRegex(@"<SHUDEvent_OnNotification> Added notification ""You have joined channel ''(?<ch>.+?)''\.", RegexOptions.IgnoreCase)]
+    private static partial Regex ShipChannelEnRegex();
+
+    [GeneratedRegex(@"<SHUDEvent_OnNotification> Added notification ""Du bist Kanal \[\s*(?<ch>.+?)\s*\]\s+beigetreten", RegexOptions.IgnoreCase)]
+    private static partial Regex ShipChannelDeRegex();
 }
 

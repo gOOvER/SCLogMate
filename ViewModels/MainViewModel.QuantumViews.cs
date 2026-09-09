@@ -198,7 +198,44 @@ public partial class MainViewModel
         foreach (var ac in ActiveContracts)
         {
             var normAc = ContractParser.NormalizeTitle(ac.Title);
-            if (!string.IsNullOrEmpty(normAc) && !_rawContracts.Any(c => ContractParser.NormalizeTitle(c.Title).Contains(normAc) || normAc.Contains(ContractParser.NormalizeTitle(c.Title))))
+            if (string.IsNullOrEmpty(normAc)) continue;
+
+            var matchedRaw = _rawContracts.FirstOrDefault(c =>
+                c.Outcome == ContractOutcome.InProgress &&
+                (ContractParser.NormalizeTitle(c.Title).Contains(normAc) ||
+                 normAc.Contains(ContractParser.NormalizeTitle(c.Title)) ||
+                 (c.Title.Contains(" · ") && !string.IsNullOrEmpty(ac.ContractedBy) && (c.Issuer == ac.ContractedBy || ac.ContractedBy.Contains(c.Issuer)))));
+
+            if (matchedRaw != null)
+            {
+                var idx = _rawContracts.IndexOf(matchedRaw);
+                if (idx >= 0)
+                {
+                    var catMatch = MissionCatalog.FuzzyLookup(ac.Title);
+                    var bestIssuer = !string.IsNullOrEmpty(matchedRaw.Issuer) && matchedRaw.Issuer != "Unbekannt" && matchedRaw.Issuer != "mobiGlas"
+                        ? matchedRaw.Issuer
+                        : (!string.IsNullOrEmpty(ac.ContractedBy) && !ac.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase) && ac.ContractedBy != "Unbekannt"
+                            ? ac.ContractedBy
+                            : (!string.IsNullOrEmpty(catMatch?.Contractor) ? catMatch.Contractor : (catMatch?.Faction ?? "Unbekannt")));
+
+                    _rawContracts[idx] = matchedRaw with
+                    {
+                        Title = ac.Title,
+                        Issuer = bestIssuer,
+                        Reward = ac.Reward > 0 ? ac.Reward : matchedRaw.Reward
+                    };
+
+                    if (string.IsNullOrEmpty(ac.ContractedBy) || ac.ContractedBy == "Unbekannt" || ac.ContractedBy == "mobiGlas")
+                    {
+                        if (bestIssuer != "Unbekannt")
+                        {
+                            ac.ContractedBy = bestIssuer;
+                            Database.SaveContract(ac);
+                        }
+                    }
+                }
+            }
+            else
             {
                 var cat = MissionCatalog.FuzzyLookup(ac.Title);
                 _rawContracts.Insert(0, new ContractRecord
@@ -206,7 +243,7 @@ public partial class MainViewModel
                     MissionId = "active_" + normAc,
                     AcceptedAt = ac.ScannedAt != default ? ac.ScannedAt : DateTime.UtcNow,
                     Title = ac.Title,
-                    Issuer = !string.IsNullOrEmpty(ac.ContractedBy) && !ac.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase)
+                    Issuer = !string.IsNullOrEmpty(ac.ContractedBy) && !ac.ContractedBy.Equals("mobiGlas", StringComparison.OrdinalIgnoreCase) && ac.ContractedBy != "Unbekannt"
                         ? ac.ContractedBy
                         : (!string.IsNullOrEmpty(cat?.Contractor) ? cat.Contractor : (!string.IsNullOrEmpty(cat?.Faction) ? cat.Faction : "Unbekannt")),
                     Type = cat?.MissionType ?? "Auftrag",

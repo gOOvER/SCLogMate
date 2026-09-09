@@ -16,10 +16,12 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 11; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 27; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 15; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 31; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
+
+    public static string DatabaseFilePath => DbPath;
 
     static string DbPath => Path.Combine(Settings.Dir, "sessions.db");
 
@@ -57,6 +59,13 @@ public static class Database
 
             // 2. Parser-Version prüfen -> bei Änderung Cache leeren & neu indexieren
             CheckParserVersion(db);
+
+            // 3. Sicherstellen, dass Indizes immer existieren (z.B. falls Re-Scan unterbrochen wurde)
+            Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                       CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                       CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
+                       CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
+                       CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);");
             _isInitialized = true;
         }
     }
@@ -224,6 +233,91 @@ public static class Database
             Exec(db, "PRAGMA user_version = 11;");
             dbSchemaVersion = 11;
             Logger.Log("DB Schema: Migration auf v11 (Bereinigung von 'mobiGlas' als Auftraggeber in contracts) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 12)
+        {
+            Exec(db, @"
+                UPDATE contracts 
+                SET contracted_by = 'Recco Battaglia' 
+                WHERE (title LIKE '%Moraine%' OR title LIKE '%Battaglia%') 
+                  AND (contracted_by = '' OR contracted_by IS NULL OR contracted_by = 'Unbekannt' OR contracted_by = 'Battaglia');
+            ");
+            Exec(db, "PRAGMA user_version = 12;");
+            dbSchemaVersion = 12;
+            Logger.Log("DB Schema: Migration auf v12 (Bereinigung von 'Recco Battaglia' Aufträgen in contracts) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 13)
+        {
+            Exec(db, @"
+                UPDATE fleet_user_ships 
+                SET in_hangar = 1 
+                WHERE is_pledge = 1 OR acquisition = 'Pledge Store' OR acquisition = 'In-Game (aUEC)';
+            ");
+            Exec(db, "PRAGMA user_version = 13;");
+            dbSchemaVersion = 13;
+            Logger.Log("DB Schema: Migration auf v13 (Pledged und In-Game Schiffe automatisch im Hangar aktiv) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 14)
+        {
+            try
+            {
+                Exec(db, @"
+                    UPDATE events 
+                    SET ship = REPLACE(REPLACE(REPLACE(ship, ' Salvage', ''), ' Teach', ''), ' GS', '') 
+                    WHERE ship LIKE '% Salvage%' OR ship LIKE '% Teach%' OR ship LIKE '% GS%';
+                ");
+                Exec(db, @"
+                    UPDATE fleet_user_ships 
+                    SET name = REPLACE(REPLACE(REPLACE(name, ' Salvage', ''), ' Teach', ''), ' GS', '') 
+                    WHERE name LIKE '% Salvage%' OR name LIKE '% Teach%' OR name LIKE '% GS%';
+                ");
+            }
+            catch { }
+            Exec(db, "PRAGMA user_version = 14;");
+            dbSchemaVersion = 14;
+            Logger.Log("DB Schema: Migration auf v14 (Umfassende Bereinigung von Spawn-Archetypen wie Salvage, Teach, GS) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 15)
+        {
+            try
+            {
+                Exec(db, @"
+                    UPDATE events 
+                    SET ship = 'M80 · Origin' 
+                    WHERE ship = 'm80 · Origin' OR ship = 'm80' OR ship = 'Origin M80' OR ship = 'Origin M80 · Origin';
+                ");
+
+                Exec(db, @"
+                    INSERT INTO fleet_user_ships (name, in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes)
+                    SELECT 'M80 · Origin', in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes
+                    FROM fleet_user_ships 
+                    WHERE name IN ('m80 · Origin', 'Origin M80 · Origin', 'm80', 'Origin M80')
+                    ORDER BY is_pledge DESC, in_hangar DESC, pledge_usd DESC
+                    LIMIT 1
+                    ON CONFLICT(name) DO UPDATE SET
+                        in_hangar = excluded.in_hangar,
+                        is_pledge = excluded.is_pledge,
+                        pledge_usd = CASE WHEN excluded.pledge_usd > 0 THEN excluded.pledge_usd ELSE fleet_user_ships.pledge_usd END,
+                        insurance = CASE WHEN excluded.insurance != '' AND excluded.insurance != 'LTI (Lifetime)' THEN excluded.insurance ELSE fleet_user_ships.insurance END,
+                        acquisition = excluded.acquisition;
+                ");
+
+                Exec(db, @"
+                    DELETE FROM fleet_user_ships 
+                    WHERE name IN ('m80 · Origin', 'Origin M80 · Origin', 'm80', 'Origin M80');
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v15 (M80 Harmonisierung)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 15;");
+            dbSchemaVersion = 15;
+            Logger.Log("DB Schema: Migration auf v15 (M80 · Origin Harmonisierung und Deduplizierung) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -425,71 +519,76 @@ public static class Database
                        DROP INDEX IF EXISTS ix_events_session_kind;
                        DROP INDEX IF EXISTS ix_events_kind_time;");
 
-            for (int i = 0; i < totalFiles; i++)
+            try
             {
-                var file = files[i];
-                var name = Path.GetFileName(file);
-                onProgress?.Invoke(i + 1, totalFiles, name);
-
-                try
+                for (int i = 0; i < totalFiles; i++)
                 {
-                    var parser = new LogParser();
-                    DateTime? first = null, last = null;
-                    using var tx = db.BeginTransaction();
-                    using var cmd = db.CreateCommand();
-                    cmd.Transaction = tx;
-                    cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
-                    var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
-                    var pt = cmd.Parameters.Add("$t", SqliteType.Text);
-                    var pk = cmd.Parameters.Add("$k", SqliteType.Text);
-                    var pa = cmd.Parameters.Add("$a", SqliteType.Integer);
-                    var pd = cmd.Parameters.Add("$d", SqliteType.Text);
-                    var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
+                    var file = files[i];
+                    var name = Path.GetFileName(file);
+                    onProgress?.Invoke(i + 1, totalFiles, name);
 
-                    int sessionEvents = 0;
-                    foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
+                    try
                     {
-                        var e = parser.Feed(line);
-                        if (e == null) continue;
-                        if (first == null || e.Time < first) first = e.Time;
-                        if (last == null || e.Time > last) last = e.Time;
-                        pt.Value = e.Time.ToString("o", CultureInfo.InvariantCulture);
-                        pk.Value = e.Kind.ToString();
-                        pa.Value = e.Amount;
-                        pd.Value = e.Detail ?? "";
-                        psh.Value = (object?)e.Ship ?? DBNull.Value;
-                        cmd.ExecuteNonQuery();
-                        sessionEvents++;
-                    }
+                        var parser = new LogParser();
+                        DateTime? first = null, last = null;
+                        using var tx = db.BeginTransaction();
+                        using var cmd = db.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh)";
+                        var ps = cmd.Parameters.Add("$s", SqliteType.Text); ps.Value = name;
+                        var pt = cmd.Parameters.Add("$t", SqliteType.Text);
+                        var pk = cmd.Parameters.Add("$k", SqliteType.Text);
+                        var pa = cmd.Parameters.Add("$a", SqliteType.Integer);
+                        var pd = cmd.Parameters.Add("$d", SqliteType.Text);
+                        var psh = cmd.Parameters.Add("$sh", SqliteType.Text);
 
-                    using (var s = db.CreateCommand())
-                    {
-                        s.Transaction = tx;
-                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
-                        s.Parameters.AddWithValue("$n", name);
-                        s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                        s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
-                        s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
-                        s.ExecuteNonQuery();
+                        int sessionEvents = 0;
+                        foreach (var line in LogEntryReader.ReadEntries(ReadShared(file)))
+                        {
+                            var e = parser.Feed(line);
+                            if (e == null) continue;
+                            if (first == null || e.Time < first) first = e.Time;
+                            if (last == null || e.Time > last) last = e.Time;
+                            pt.Value = e.Time.ToString("o", CultureInfo.InvariantCulture);
+                            pk.Value = e.Kind.ToString();
+                            pa.Value = e.Amount;
+                            pd.Value = e.Detail ?? "";
+                            psh.Value = (object?)e.Ship ?? DBNull.Value;
+                            cmd.ExecuteNonQuery();
+                            sessionEvents++;
+                        }
+
+                        using (var s = db.CreateCommand())
+                        {
+                            s.Transaction = tx;
+                            s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
+                            s.Parameters.AddWithValue("$n", name);
+                            s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                            s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
+                            s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
+                            s.ExecuteNonQuery();
+                        }
+                        tx.Commit();
+                        sessionCount++;
+                        eventCount += sessionEvents;
                     }
-                    tx.Commit();
-                    sessionCount++;
-                    eventCount += sessionEvents;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error("Rescan " + name, ex);
+                    catch (Exception ex)
+                    {
+                        Logger.Error("Rescan " + name, ex);
+                    }
                 }
             }
-
-            // Indizes neu aufbauen & Normalzustand wiederherstellen
-            Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
-                       CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
-                       CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
-                       CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
-                       CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
-                       PRAGMA synchronous = NORMAL;
-                       PRAGMA wal_checkpoint(PASSIVE);");
+            finally
+            {
+                // Indizes neu aufbauen & Normalzustand wiederherstellen
+                Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                           CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                           CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
+                           CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
+                           CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
+                           PRAGMA synchronous = NORMAL;
+                           PRAGMA wal_checkpoint(PASSIVE);");
+            }
 
             Logger.Log($"DB: Re-Scan beendet: {sessionCount} Sessions, {eventCount} Events.");
             return (sessionCount, eventCount);
@@ -556,6 +655,263 @@ public static class Database
         if (bytes < 1024) return $"{bytes} B";
         if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+
+    /// <summary>
+    /// Liefert eine umfassende Diagnose der SQLite-Datenbank:
+    /// Schema- und Parser-Versionen, Tabellen- und Spaltenvalidierung, Indizes, Zeilenzahlen und Integritätsprüfung.
+    /// </summary>
+    public static DatabaseDiagnosticsInfo GetDiagnostics(bool runDeepCheck = true)
+    {
+        EnsureInitialized();
+        var diag = new DatabaseDiagnosticsInfo
+        {
+            DatabasePath = DbPath,
+            DatabaseSizeBytes = GetDatabaseSizeBytes(),
+            CheckedAt = DateTime.Now
+        };
+
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+
+            // 1. SQLite Version & Journal Mode
+            var sqliteVer = Scalar(db, "SELECT sqlite_version();");
+            diag.SqliteVersion = sqliteVer?.ToString() ?? "Unbekannt";
+
+            var jMode = Scalar(db, "PRAGMA journal_mode;");
+            diag.JournalMode = jMode?.ToString()?.ToUpperInvariant() ?? "WAL";
+
+            // 2. Schema- & Parser-Versionen
+            var userVer = Scalar(db, "PRAGMA user_version;");
+            diag.InstalledSchemaVersion = Convert.ToInt32(userVer ?? 0);
+
+            var parserVerStr = GetMeta(db, "parserVersion");
+            if (int.TryParse(parserVerStr, out var pVer))
+                diag.InstalledParserVersion = pVer;
+
+            // 3. Tabellen-Existenz prüfen
+            var expectedTables = new Dictionary<string, string[]>
+            {
+                ["meta"] = new[] { "key", "value" },
+                ["sessions"] = new[] { "name", "start", "end", "fingerprint" },
+                ["events"] = new[] { "session", "time", "kind", "amount", "detail", "ship" },
+                ["contracts"] = new[] { "id", "title", "reward", "contracted_by", "scanned_at", "status" },
+                ["user_pois"] = new[] { "id", "system", "body", "name", "notes", "category", "color", "created_at" },
+                ["reputation"] = new[] { "faction_id", "xp", "completed_missions", "last_updated" },
+                ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" }
+            };
+
+            var existingTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var cmd = db.CreateCommand())
+            {
+                cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';";
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    existingTables.Add(r.GetString(0));
+                }
+            }
+            diag.ExistingTables = existingTables.OrderBy(t => t).ToList();
+
+            foreach (var kvp in expectedTables)
+            {
+                var tbl = kvp.Key;
+                if (!existingTables.Contains(tbl))
+                {
+                    diag.MissingTables.Add(tbl);
+                }
+                else
+                {
+                    var existingCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    using var colCmd = db.CreateCommand();
+                    colCmd.CommandText = $"PRAGMA table_info({tbl});";
+                    using var cr = colCmd.ExecuteReader();
+                    while (cr.Read())
+                    {
+                        existingCols.Add(cr.GetString(1));
+                    }
+
+                    foreach (var col in kvp.Value)
+                    {
+                        if (!existingCols.Contains(col))
+                            diag.MissingColumns.Add($"{tbl}.{col}");
+                    }
+                }
+            }
+
+            // 4. Indizes prüfen
+            var expectedIndexes = new[]
+            {
+                "ix_events_session",
+                "ix_events_kind",
+                "ix_events_time",
+                "ix_events_session_kind",
+                "ix_events_kind_time",
+                "ix_contracts_status",
+                "ix_user_pois_system"
+            };
+
+            var existingIndexes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var idxCmd = db.CreateCommand())
+            {
+                idxCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%';";
+                using var ir = idxCmd.ExecuteReader();
+                while (ir.Read())
+                {
+                    existingIndexes.Add(ir.GetString(0));
+                }
+            }
+
+            foreach (var idx in expectedIndexes)
+            {
+                if (!existingIndexes.Contains(idx))
+                    diag.MissingIndexes.Add(idx);
+            }
+
+            // 5. Datensatz-Zahlen ermitteln
+            int SafeCount(string tbl)
+            {
+                if (!existingTables.Contains(tbl)) return 0;
+                try
+                {
+                    var count = Scalar(db, $"SELECT COUNT(*) FROM {tbl};");
+                    return Convert.ToInt32(count ?? 0);
+                }
+                catch { return 0; }
+            }
+
+            diag.SessionCount = SafeCount("sessions");
+            diag.EventCount = SafeCount("events");
+            diag.ContractCount = SafeCount("contracts");
+            diag.FleetShipCount = SafeCount("fleet_user_ships");
+            diag.PoiCount = SafeCount("user_pois");
+            diag.ReputationCount = SafeCount("reputation");
+
+            // 6. Physische Integritätsprüfung
+            if (runDeepCheck)
+            {
+                var check = Scalar(db, "PRAGMA quick_check;");
+                var checkStr = check?.ToString() ?? "";
+                if (string.Equals(checkStr, "ok", StringComparison.OrdinalIgnoreCase))
+                {
+                    diag.IntegrityCheckOk = true;
+                    diag.IntegrityMessage = "Fehlerfrei (ok)";
+                }
+                else
+                {
+                    diag.IntegrityCheckOk = false;
+                    diag.IntegrityMessage = string.IsNullOrWhiteSpace(checkStr) ? "Unbekannter Fehler" : checkStr;
+                }
+            }
+            else
+            {
+                diag.IntegrityCheckOk = true;
+                diag.IntegrityMessage = "Übersprungen (Schnellprüfung)";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.GetDiagnostics", ex);
+            diag.IntegrityCheckOk = false;
+            diag.IntegrityMessage = $"Diagnosefehler: {ex.Message}";
+        }
+
+        return diag;
+    }
+
+    /// <summary>
+    /// Führt gezielte Reparaturen und Schema-Upgrades an der SQLite-Datenbank aus:
+    /// Wendet fehlende Migrationen an, repariert Tabellen, Spalten und fehlende Indizes.
+    /// </summary>
+    public static (bool success, string message) RepairOrUpdateStructure()
+    {
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+
+                Exec(db, @"PRAGMA journal_mode = WAL;
+                           PRAGMA synchronous = NORMAL;
+                           PRAGMA busy_timeout = 60000;");
+
+                // 1. Schema-Migrationen strukturiert anwenden
+                ApplySchemaMigrations(db);
+
+                // 2. Sicherstellen, dass alle Tabellen existieren (Idempotent)
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+                    CREATE TABLE IF NOT EXISTS sessions(name TEXT PRIMARY KEY, start TEXT, end TEXT, fingerprint TEXT);
+                    CREATE TABLE IF NOT EXISTS events(session TEXT, time TEXT, kind TEXT, amount INTEGER, detail TEXT, ship TEXT);
+                    CREATE TABLE IF NOT EXISTS contracts(
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        reward INTEGER NOT NULL,
+                        contracted_by TEXT NOT NULL,
+                        scanned_at TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'Active'
+                    );
+                    CREATE TABLE IF NOT EXISTS user_pois(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        system TEXT NOT NULL,
+                        body TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        color TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS reputation(
+                        faction_id TEXT PRIMARY KEY,
+                        xp INTEGER NOT NULL DEFAULT 0,
+                        completed_missions INTEGER NOT NULL DEFAULT 0,
+                        last_updated TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS fleet_user_ships(
+                        name TEXT PRIMARY KEY,
+                        in_hangar INTEGER NOT NULL DEFAULT 1,
+                        is_pledge INTEGER NOT NULL DEFAULT 1,
+                        pledge_usd INTEGER NOT NULL DEFAULT 0,
+                        insurance TEXT NOT NULL DEFAULT 'LTI (Lifetime)',
+                        acquisition TEXT NOT NULL DEFAULT 'Pledge Store',
+                        notes TEXT NOT NULL DEFAULT ''
+                    );
+                ");
+
+                // 3. Kritische Spalten nachziehen (falls eine Tabelle älter war)
+                try { Exec(db, "ALTER TABLE sessions ADD COLUMN fingerprint TEXT;"); } catch { }
+                try { Exec(db, "ALTER TABLE fleet_user_ships ADD COLUMN in_hangar INTEGER NOT NULL DEFAULT 1;"); } catch { }
+                Exec(db, "UPDATE fleet_user_ships SET in_hangar = 1 WHERE is_pledge = 1 OR acquisition = 'Pledge Store' OR acquisition = 'In-Game (aUEC)';");
+
+                // 4. Alle Indizes herstellen
+                Exec(db, @"CREATE INDEX IF NOT EXISTS ix_events_session ON events(session);
+                           CREATE INDEX IF NOT EXISTS ix_events_kind ON events(kind);
+                           CREATE INDEX IF NOT EXISTS ix_events_time ON events(time);
+                           CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
+                           CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
+                           CREATE INDEX IF NOT EXISTS ix_contracts_status ON contracts(status);
+                           CREATE INDEX IF NOT EXISTS ix_user_pois_system ON user_pois(system);");
+
+                // 5. Metadaten synchronisieren
+                Exec(db, $"PRAGMA user_version = {CurrentSchemaVersion};");
+                SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
+                if (string.IsNullOrEmpty(GetMeta(db, "parserVersion")))
+                {
+                    SetMeta(db, "parserVersion", CurrentParserVersion.ToString(CultureInfo.InvariantCulture));
+                }
+
+                Logger.Log($"DB: Struktur-Reparatur und Schema-Aktualisierung auf v{CurrentSchemaVersion} erfolgreich durchgeführt.");
+                return (true, $"Struktur erfolgreich auf Schema v{CurrentSchemaVersion} aktualisiert und alle Indizes repariert.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Database.RepairOrUpdateStructure", ex);
+                return (false, $"Fehler bei Struktur-Reparatur: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>Alle gespeicherten Events chronologisch (älteste zuerst).</summary>
@@ -1355,14 +1711,38 @@ public static class Database
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var name = r.GetString(0);
+                var rawName = r.GetString(0);
                 var inHangar = r.GetInt32(1) == 1;
                 var isPledge = r.GetInt32(2) == 1;
                 var pledgeUsd = r.GetInt32(3);
                 var insurance = r.GetString(4);
                 var acq = r.GetString(5);
                 var notes = r.GetString(6);
-                dict[name] = new DbFleetCustomData(inHangar, isPledge, pledgeUsd, insurance, acq, notes);
+
+                var cat = FleetCatalog.Lookup(rawName);
+                var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : rawName;
+
+                var data = new DbFleetCustomData(inHangar, isPledge, pledgeUsd, insurance, acq, notes);
+
+                if (dict.TryGetValue(canonicalName, out var existing))
+                {
+                    bool mergedHangar = existing.InHangar || inHangar;
+                    bool mergedPledge = existing.IsPledge || isPledge;
+                    int mergedUsd = Math.Max(existing.PledgeUsd, pledgeUsd);
+                    string mergedIns = !string.IsNullOrEmpty(insurance) && insurance != "LTI (Lifetime)" ? insurance : existing.Insurance;
+                    string mergedAcq = mergedPledge ? "Pledge Store" : (!string.IsNullOrEmpty(acq) ? acq : existing.Acquisition);
+                    string mergedNotes = !string.IsNullOrEmpty(existing.Notes) ? existing.Notes : notes;
+                    dict[canonicalName] = new DbFleetCustomData(mergedHangar, mergedPledge, mergedUsd, mergedIns, mergedAcq, mergedNotes);
+                }
+                else
+                {
+                    dict[canonicalName] = data;
+                }
+
+                if (!dict.ContainsKey(rawName))
+                {
+                    dict[rawName] = dict[canonicalName];
+                }
             }
         }
         catch (Exception ex)
@@ -1375,6 +1755,13 @@ public static class Database
     public static void SaveFleetShipCustomData(string name, bool inHangar, bool isPledge, int pledgeUsd, string insurance, string acquisition, string notes)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
+        var cat = FleetCatalog.Lookup(name);
+        var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : name;
+
+        if (isPledge || string.Equals(acquisition, "Pledge Store", StringComparison.OrdinalIgnoreCase) || string.Equals(acquisition, "In-Game (aUEC)", StringComparison.OrdinalIgnoreCase))
+        {
+            inHangar = true;
+        }
         lock (_writeLock)
         {
             EnsureInitialized();
@@ -1393,7 +1780,7 @@ public static class Database
                         insurance = excluded.insurance,
                         acquisition = excluded.acquisition,
                         notes = excluded.notes;";
-                cmd.Parameters.AddWithValue("$n", name);
+                cmd.Parameters.AddWithValue("$n", canonicalName);
                 cmd.Parameters.AddWithValue("$ih", inHangar ? 1 : 0);
                 cmd.Parameters.AddWithValue("$p", isPledge ? 1 : 0);
                 cmd.Parameters.AddWithValue("$u", pledgeUsd);
@@ -1401,6 +1788,15 @@ public static class Database
                 cmd.Parameters.AddWithValue("$a", acquisition);
                 cmd.Parameters.AddWithValue("$nt", notes);
                 cmd.ExecuteNonQuery();
+
+                // Falls ein alternativer Legacy-Name existierte, diesen aufräumen
+                if (!canonicalName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    using var delCmd = db.CreateCommand();
+                    delCmd.CommandText = "DELETE FROM fleet_user_ships WHERE name = $old;";
+                    delCmd.Parameters.AddWithValue("$old", name);
+                    delCmd.ExecuteNonQuery();
+                }
             }
             catch (Exception ex)
             {

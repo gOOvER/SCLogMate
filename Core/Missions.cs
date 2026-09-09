@@ -25,7 +25,25 @@ public static class Missions
     {
         var g = generator.Trim();
         var us = g.IndexOf('_');
-        return us > 0 ? g[..us] : g;
+        var raw = us > 0 ? g[..us] : g;
+        return raw switch
+        {
+            "Battaglia" => "Recco Battaglia",
+            "Eckhart" => "Miles Eckhart",
+            "Darneely" => "Clovus Darneely",
+            "Hurston" => "Constantine Hurston",
+            "Pacheco" => "Tecia Pacheco",
+            "Twitch" => "Tecia Pacheco",
+            "Klim" => "Wallace Klim",
+            "RedWind" => "Red Wind Line",
+            "NorthRock" => "Northrock Service Group",
+            "LingBiotechnology" => "Ling Biotechnology",
+            "MicroTechLogistics" => "microTech Logistics",
+            "CrusaderIndustries" => "Crusader Industries",
+            "HurstonDynamics" => "Hurston Dynamics",
+            "ArcCorp" => "ArcCorp",
+            _ => raw
+        };
     }
 
     static string Type(string s)
@@ -34,9 +52,12 @@ public static class Missions
         if (Has(s, "FacilityDelve")) return "Facility Delve";
         if (Has(s, "Assassinat") || Has(s, "Eliminate") || Has(s, "KillShip") || Has(s, "HeadHunt")) return "Kampf/Kill";
         if (Has(s, "Patrol") || Has(s, "Defend")) return "Patrouille/Verteidigung";
-        if (Has(s, "RecoverData") || Has(s, "DataDownload") || Has(s, "BlackBox")) return "Daten";
+        if (Has(s, "RecoverData") || Has(s, "DataDownload") || Has(s, "BlackBox") || Has(s, "Uplink") || Has(s, "DataDrive") || Has(s, "Data")) return "Daten";
         if (Has(s, "MissingPerson") || Has(s, "RecoverItem") || Has(s, "Collector")) return "Person/Bergung";
-        return "Sonstige";
+        if (Has(s, "Mining")) return "Bergbau";
+        if (Has(s, "Salvage")) return "Bergung";
+        if (Has(s, "Investigat")) return "Ermittlung";
+        return "Auftrag";
     }
 
     static string Difficulty(string c)
@@ -50,8 +71,8 @@ public static class Missions
 
     static string SystemOf(string c)
     {
-        if (Has(c, "Stanton")) return "Stanton";
-        if (Has(c, "Nyx")) return "Nyx";
+        if (Has(c, "Stanton") || Has(c, "Hurston") || Has(c, "Crusader") || Has(c, "MicroTech") || Has(c, "ArcCorp")) return "Stanton";
+        if (Has(c, "Nyx") || Has(c, "Battaglia") || Has(c, "Levski") || Has(c, "Delamar")) return "Nyx";
         if (Has(c, "Pyro")) return "Pyro";
         return "k.A.";
     }

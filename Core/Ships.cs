@@ -43,10 +43,13 @@ public static partial class Ships
         "Esperia", "Gatac", "Consolidated Outland", "Banu", "Tumbril", "Greycat", "Kruger"
     };
 
-    // interne Variant-Tags, die niemanden interessieren
+    // interne Variant-Tags, die niemanden interessieren (z. B. Missions-Archetypen, Wreck-Tags, Spawntemplates)
     static readonly HashSet<string> Noise = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Unmanned", "PU", "AI", "S42", "Template", "Modified"
+        "Unmanned", "PU", "AI", "S42", "Template", "Modified",
+        "Salvage", "Derelict", "Wreck", "Pirate", "Security", "Police",
+        "Civilian", "Criminal", "Outlaw", "Bounty", "Escort", "Patrol",
+        "Rental", "Loaner", "Test", "Preview", "Show", "FreeFly", "Mission", "Teach", "GS"
     };
 
     [GeneratedRegex(@"_\d{4,}$")]
@@ -73,11 +76,17 @@ public static partial class Ships
     [GeneratedRegex(@"\b(?:Mk|MK|mk)[\s_-]*I\b", RegexOptions.IgnoreCase)]
     private static partial Regex MkIRegex();
 
+    [GeneratedRegex(@"\b(?:Salvage|Derelict|Wreck|Pirate|Civilian|Criminal|Outlaw|Bounty|Escort|Patrol|Rental|Loaner|Teach|GS)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ArchetypeNoiseRegex();
+
     public static string NormalizeModelName(string model)
     {
         if (string.IsNullOrWhiteSpace(model)) return model;
 
         var m = model.Trim().Replace('_', ' ');
+
+        // Falsche Missions-/Spawn-Archetypen entfernen (z. B. "MOLE Salvage" -> "MOLE")
+        m = ArchetypeNoiseRegex().Replace(m, "");
 
         // Römische Zahlen & Mk Normalisierung (Mk2 / Mk_2 -> Mk II)
         m = MkIIIRegex().Replace(m, "Mk III");
@@ -89,6 +98,9 @@ public static partial class Ships
 
         // Spezifische Namensharmonisierungen
         if (m.Equals("Aurora", StringComparison.OrdinalIgnoreCase)) m = "Aurora Mk II";
+        if (m.Equals("m80", StringComparison.OrdinalIgnoreCase)) m = "M80";
+        if (m.Equals("m50", StringComparison.OrdinalIgnoreCase)) m = "M50";
+        if (m.Equals("85x", StringComparison.OrdinalIgnoreCase)) m = "85X";
 
         return Regex.Replace(m, @"\s+", " ").Trim();
     }

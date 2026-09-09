@@ -124,20 +124,57 @@ public sealed class StarmapCanvas : Control
     private double _pulsePhase = 0;
     private StarmapObject? _hoveredObject;
 
-    // Feste deterministische Hintergrund-Sterne
-    private static readonly (double X, double Y, double Size, byte Alpha)[] Starfield = GenerateStarfield();
+    // Gecachte unveränderliche Pinsel, Stifte und Typefaces zur Minimierung von Rendering-Allokationen
+    private static readonly IBrush SpaceBgBrush = new SolidColorBrush(Color.Parse("#040711")).ToImmutable();
+    private static readonly IPen RadarDashPen = new Pen(new SolidColorBrush(Color.FromArgb(20, 56, 189, 248)).ToImmutable(), 1, DashStyle.Dash).ToImmutable();
+    private static readonly IPen RadarSolidPen = new Pen(new SolidColorBrush(Color.FromArgb(32, 56, 189, 248)).ToImmutable(), 1).ToImmutable();
+    private static readonly IPen TetherPen = new Pen(new SolidColorBrush(Color.FromArgb(35, 56, 189, 248)).ToImmutable(), 1, DashStyle.Dot).ToImmutable();
+    private static readonly IPen RouteGlowPen = new Pen(new SolidColorBrush(Color.FromArgb(45, 56, 189, 248)).ToImmutable(), 5).ToImmutable();
+    private static readonly IPen RouteLinePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 1.8, DashStyle.Dash).ToImmutable();
+    private static readonly IPen TrailGlowPen = new Pen(new SolidColorBrush(Color.FromArgb(50, 96, 165, 250)).ToImmutable(), 4).ToImmutable();
+    private static readonly IPen TrailLinePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 1.6, DashStyle.Dash).ToImmutable();
+    private static readonly IBrush WaypointBadgeBrush = new SolidColorBrush(Color.Parse("#0C233C")).ToImmutable();
+    private static readonly IPen WaypointBadgePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 1.2).ToImmutable();
+    private static readonly IBrush DangerHaloBrush = new SolidColorBrush(Color.FromArgb(35, 239, 68, 68)).ToImmutable();
+    private static readonly IPen DiamondStrokePen = new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)).ToImmutable(), 1).ToImmutable();
+    private static readonly IPen ReticleOrangePen = new Pen(new SolidColorBrush(Color.Parse("#FFB23E")).ToImmutable(), 1.5).ToImmutable();
+    private static readonly IPen ReticleCyanPen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 1.5).ToImmutable();
+    private static readonly IBrush RouteBadgeBg = new SolidColorBrush(Color.FromArgb(220, 6, 12, 22)).ToImmutable();
+    private static readonly IPen RouteBadgeBorder = new Pen(new SolidColorBrush(Color.Parse("#1A3857")).ToImmutable(), 1).ToImmutable();
+    private static readonly IBrush PlayerBadgeBg = new SolidColorBrush(Color.FromArgb(220, 11, 19, 32)).ToImmutable();
+    private static readonly IPen PlayerBadgeBorder = new Pen(new SolidColorBrush(Color.Parse("#FFB23E")).ToImmutable(), 1.2).ToImmutable();
+    private static readonly IPen ScalePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable(), 2).ToImmutable();
+    private static readonly IBrush TextShadowBrush = new SolidColorBrush(Color.FromArgb(200, 4, 7, 17)).ToImmutable();
 
-    private static (double X, double Y, double Size, byte Alpha)[] GenerateStarfield()
+    private static readonly IBrush TextBrushCyan = new SolidColorBrush(Color.Parse("#38BDF8")).ToImmutable();
+    private static readonly IBrush TextBrushOrange = new SolidColorBrush(Color.Parse("#FFB23E")).ToImmutable();
+    private static readonly IBrush TextBrushWhite = new SolidColorBrush(Color.Parse("#EAF1F6")).ToImmutable();
+    private static readonly IBrush TextBrushDim = new SolidColorBrush(Color.Parse("#7E97AD")).ToImmutable();
+    private static readonly IBrush TextBrushStar = new SolidColorBrush(Color.Parse("#FFD089")).ToImmutable();
+    private static readonly IBrush TextBrushPoi = new SolidColorBrush(Color.Parse("#FBBF24")).ToImmutable();
+
+    private static readonly Typeface DefaultNormalTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.Normal);
+    private static readonly Typeface DefaultBoldTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
+    private static readonly Typeface DefaultSemiBoldTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
+    private static readonly Typeface CodeBoldTypeface = new("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Bold);
+    private static readonly Typeface CodeSemiBoldTypeface = new("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.SemiBold);
+
+    // Feste deterministische Hintergrund-Sterne mit vorab erzeugten unveränderlichen Pinseln
+    private static readonly (double X, double Y, double Size, IBrush Brush)[] Starfield = GenerateStarfield();
+
+    private static (double X, double Y, double Size, IBrush Brush)[] GenerateStarfield()
     {
         var rnd = new Random(42);
-        var stars = new (double X, double Y, double Size, byte Alpha)[180];
+        var stars = new (double X, double Y, double Size, IBrush Brush)[180];
         for (int i = 0; i < stars.Length; i++)
         {
+            byte alpha = (byte)rnd.Next(35, 195);
+            var brush = new SolidColorBrush(Color.FromArgb(alpha, 190, 225, 255)).ToImmutable();
             stars[i] = (
                 rnd.NextDouble() * 2600 - 1300,
                 rnd.NextDouble() * 2600 - 1300,
                 rnd.NextDouble() * 1.8 + 0.5,
-                (byte)rnd.Next(35, 195)
+                brush
             );
         }
         return stars;
@@ -153,10 +190,34 @@ public sealed class StarmapCanvas : Control
         };
         _pulseTimer.Tick += (s, e) =>
         {
+            if (!IsVisible) return;
             _pulsePhase = (_pulsePhase + 0.08) % (Math.PI * 2);
             InvalidateVisual();
         };
-        _pulseTimer.Start();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        UpdatePulseTimerState();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _pulseTimer.Stop();
+    }
+
+    private void UpdatePulseTimerState()
+    {
+        if (VisualRoot != null && IsVisible)
+        {
+            if (!_pulseTimer.IsEnabled) _pulseTimer.Start();
+        }
+        else
+        {
+            if (_pulseTimer.IsEnabled) _pulseTimer.Stop();
+        }
     }
 
     static StarmapCanvas()
@@ -196,6 +257,10 @@ public sealed class StarmapCanvas : Control
         if (change.Property == FocusRequestProperty && SelectedObject is not null)
         {
             FocusOnObject(SelectedObject);
+        }
+        else if (change.Property == IsVisibleProperty)
+        {
+            UpdatePulseTimerState();
         }
     }
 
@@ -261,11 +326,10 @@ public sealed class StarmapCanvas : Control
         }
         else
         {
-            var hover = FindObjectAt(pt);
-            if (hover != _hoveredObject)
+            var hovered = FindObjectAt(pt);
+            if (hovered != _hoveredObject)
             {
-                _hoveredObject = hover;
-                Cursor = hover != null ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Arrow);
+                _hoveredObject = hovered;
                 InvalidateVisual();
             }
         }
@@ -333,9 +397,9 @@ public sealed class StarmapCanvas : Control
         var center = new Point(w / 2 + _panOffset.X, h / 2 + _panOffset.Y);
 
         // 1. Tiefschwarzer Weltraum-Hintergrund (Cosmic Void)
-        context.FillRectangle(new SolidColorBrush(Color.Parse("#040711")), new Rect(0, 0, w, h));
+        context.FillRectangle(SpaceBgBrush, new Rect(0, 0, w, h));
 
-        // 2. Sternenfeld
+        // 2. Sternenfeld (mit vorberechneten Pinseln ohne Laufzeit-Allokation)
         foreach (var star in Starfield)
         {
             double sx = center.X + star.X * (_zoom * 0.45);
@@ -343,25 +407,21 @@ public sealed class StarmapCanvas : Control
 
             if (sx >= 0 && sx <= w && sy >= 0 && sy <= h)
             {
-                var starBrush = new SolidColorBrush(Color.FromArgb(star.Alpha, 190, 225, 255));
-                context.DrawEllipse(starBrush, null, new Point(sx, sy), star.Size, star.Size);
+                context.DrawEllipse(star.Brush, null, new Point(sx, sy), star.Size, star.Size);
             }
         }
 
         // 3. Sci-Fi Radar-Grid & Koordinatenringe
-        var radarPen = new Pen(new SolidColorBrush(Color.FromArgb(20, 56, 189, 248)), 1, DashStyle.Dash);
-        var radarSolidPen = new Pen(new SolidColorBrush(Color.FromArgb(32, 56, 189, 248)), 1);
-
         double[] ringRadii = { 90, 170, 250, 330, 390 };
         foreach (var r in ringRadii)
         {
             double scaledR = r * _zoom;
-            context.DrawEllipse(null, radarPen, center, scaledR, scaledR);
+            context.DrawEllipse(null, RadarDashPen, center, scaledR, scaledR);
         }
 
         // Fadenkreuz / Achsen
-        context.DrawLine(radarSolidPen, new Point(0, center.Y), new Point(w, center.Y));
-        context.DrawLine(radarSolidPen, new Point(center.X, 0), new Point(center.X, h));
+        context.DrawLine(RadarSolidPen, new Point(0, center.Y), new Point(w, center.Y));
+        context.DrawLine(RadarSolidPen, new Point(center.X, 0), new Point(center.X, h));
 
         var objects = StarmapData.GetSystemObjects(SystemName);
 
@@ -385,20 +445,22 @@ public sealed class StarmapCanvas : Control
             context.DrawEllipse(coreBrush, null, center, starR, starR);
 
             // Name
-            DrawText(context, starObj.Name, new Point(center.X, center.Y + starR + 7), "#FFD089", 11, true, true);
+            DrawText(context, starObj.Name, new Point(center.X, center.Y + starR + 7), TextBrushStar, 11, true, true);
         }
 
         // 5. Orbit-Tether-Linien (Mond / Station -> Planet)
-        var tetherPen = new Pen(new SolidColorBrush(Color.FromArgb(35, 56, 189, 248)), 1, DashStyle.Dot);
-        foreach (var obj in objects.Where(o => o.ParentId != null && o.ParentId != "stanton_star" && o.ParentId != "pyro_star" && o.ParentId != "nyx_star"))
+        foreach (var obj in objects)
         {
+            if (obj.ParentId == null || obj.ParentId == "stanton_star" || obj.ParentId == "pyro_star" || obj.ParentId == "nyx_star")
+                continue;
             if (!IsObjectVisible(obj)) continue;
+
             var parent = objects.FirstOrDefault(p => p.Id == obj.ParentId);
             if (parent != null)
             {
                 var p1 = new Point(center.X + parent.RelX * _zoom, center.Y + parent.RelY * _zoom);
                 var p2 = new Point(center.X + obj.RelX * _zoom, center.Y + obj.RelY * _zoom);
-                context.DrawLine(tetherPen, p1, p2);
+                context.DrawLine(TetherPen, p1, p2);
             }
         }
 
@@ -443,11 +505,8 @@ public sealed class StarmapCanvas : Control
             var pPos = new Point(center.X + playerObj.RelX * _zoom, center.Y + playerObj.RelY * _zoom);
             var tPos = new Point(center.X + SelectedObject.RelX * _zoom, center.Y + SelectedObject.RelY * _zoom);
 
-            // Glowing Line
-            var glowPen = new Pen(new SolidColorBrush(Color.FromArgb(45, 56, 189, 248)), 5);
-            var routePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.8, DashStyle.Dash);
-            context.DrawLine(glowPen, pPos, tPos);
-            context.DrawLine(routePen, pPos, tPos);
+            context.DrawLine(RouteGlowPen, pPos, tPos);
+            context.DrawLine(RouteLinePen, pPos, tPos);
 
             // Flugdistanz & Dauer Badge in der Mitte der Linie
             var drive = SelectedDrive ?? StarmapData.AvailableDrives[0];
@@ -488,30 +547,26 @@ public sealed class StarmapCanvas : Control
 
             if (resolvedPoints.Count > 1)
             {
-                var trailGlowPen = new Pen(new SolidColorBrush(Color.FromArgb(50, 96, 165, 250)), 4);
-                var trailLinePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.6, DashStyle.Dash);
-
                 for (int i = 0; i < resolvedPoints.Count - 1; i++)
                 {
-                    context.DrawLine(trailGlowPen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
-                    context.DrawLine(trailLinePen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
+                    context.DrawLine(TrailGlowPen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
+                    context.DrawLine(TrailLinePen, resolvedPoints[i].Pt, resolvedPoints[i + 1].Pt);
                 }
 
                 // Wegpunkt-Nummern
                 for (int i = 0; i < resolvedPoints.Count; i++)
                 {
                     var p = resolvedPoints[i].Pt;
-                    var badgeBrush = new SolidColorBrush(Color.Parse("#0C233C"));
-                    var badgeBorder = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 1.2);
-                    context.DrawEllipse(badgeBrush, badgeBorder, p, 8, 8);
-                    DrawText(context, (i + 1).ToString(), new Point(p.X, p.Y - 5), "#38BDF8", 8.5, true, true);
+                    context.DrawEllipse(WaypointBadgeBrush, WaypointBadgePen, p, 8, 8);
+                    DrawText(context, (i + 1).ToString(), new Point(p.X, p.Y - 5), TextBrushCyan, 8.5, true, true);
                 }
             }
         }
 
         // 8. Objekte zeichnen
-        foreach (var obj in objects.Where(o => o.Type != StarmapObjectType.Star))
+        foreach (var obj in objects)
         {
+            if (obj.Type == StarmapObjectType.Star) continue;
             if (!IsObjectVisible(obj)) continue;
 
             var objPos = new Point(center.X + obj.RelX * _zoom, center.Y + obj.RelY * _zoom);
@@ -524,18 +579,17 @@ public sealed class StarmapCanvas : Control
             // Halo für Sicherheits- / Gefahrenzonen
             if (obj.SecurityLevel == "Lawless" || !obj.HasArmistice)
             {
-                var dangerBrush = new SolidColorBrush(Color.FromArgb(35, 239, 68, 68)); // Rotes Warn-Halo
-                context.DrawEllipse(dangerBrush, null, objPos, objR * 2.2, objR * 2.2);
+                context.DrawEllipse(DangerHaloBrush, null, objPos, objR * 2.2, objR * 2.2);
             }
 
             // Selektions-Klammern (Target Reticle)
             if (isSelected)
             {
-                DrawTargetReticle(context, objPos, objR + 8, "#FFB23E");
+                DrawTargetReticle(context, objPos, objR + 8, ReticleOrangePen);
             }
             else if (isHovered)
             {
-                DrawTargetReticle(context, objPos, objR + 6, "#38BDF8");
+                DrawTargetReticle(context, objPos, objR + 6, ReticleCyanPen);
             }
 
             // Atmosphären-Ring für Planeten
@@ -561,7 +615,7 @@ public sealed class StarmapCanvas : Control
             }
 
             // Beschriftung & Spezialisierungs-Icon
-            string labelColor = isSelected ? "#FFB23E" : isHovered ? "#38BDF8" : "#EAF1F6";
+            var labelBrush = isSelected ? TextBrushOrange : isHovered ? TextBrushCyan : TextBrushWhite;
             double fontSize = obj.Type == StarmapObjectType.Planet ? 11.5 : 9.5;
             bool isBold = obj.Type == StarmapObjectType.Planet || obj.Type == StarmapObjectType.LandingZone;
 
@@ -572,7 +626,7 @@ public sealed class StarmapCanvas : Control
                 label = $"{icon} {obj.Name}";
             }
 
-            DrawText(context, label, new Point(objPos.X, objPos.Y + objR + 3), labelColor, fontSize, isBold, true);
+            DrawText(context, label, new Point(objPos.X, objPos.Y + objR + 3), labelBrush, fontSize, isBold, true);
         }
 
         // 9. Live Player Radar Beacon ("📍 DU BIST HIER")
@@ -619,7 +673,7 @@ public sealed class StarmapCanvas : Control
                     "Trade" => "💰",
                     _ => "📌"
                 };
-                DrawText(context, $"{catIcon} {poi.Name}", new Point(poiPos.X, poiPos.Y + 8), "#FBBF24", 9.0, true, true);
+                DrawText(context, $"{catIcon} {poi.Name}", new Point(poiPos.X, poiPos.Y + 8), TextBrushPoi, 9.0, true, true);
             }
         }
 
@@ -634,19 +688,18 @@ public sealed class StarmapCanvas : Control
         {
             ctx.BeginFigure(new Point(center.X, center.Y - size), true);
             ctx.LineTo(new Point(center.X + size, center.Y));
+            ctx.LineTo(new Point(center.X + size, center.Y));
             ctx.LineTo(new Point(center.X, center.Y + size));
             ctx.LineTo(new Point(center.X - size, center.Y));
             ctx.EndFigure(true);
         }
 
         var fill = new SolidColorBrush(color);
-        var stroke = new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 1);
-        context.DrawGeometry(fill, stroke, geom);
+        context.DrawGeometry(fill, DiamondStrokePen, geom);
     }
 
-    private void DrawTargetReticle(DrawingContext context, Point center, double r, string colorHex)
+    private void DrawTargetReticle(DrawingContext context, Point center, double r, IPen pen)
     {
-        var pen = new Pen(new SolidColorBrush(Color.Parse(colorHex)), 1.5);
         double len = Math.Max(4, r * 0.45);
 
         context.DrawLine(pen, new Point(center.X - r, center.Y - r + len), new Point(center.X - r, center.Y - r));
@@ -668,17 +721,17 @@ public sealed class StarmapCanvas : Control
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Bold),
+            CodeBoldTypeface,
             10.5,
-            new SolidColorBrush(Color.Parse("#38BDF8"))
+            TextBrushCyan
         );
 
         double padX = 8;
         double padY = 3;
         var rect = new Rect(center.X - ft.Width / 2 - padX, center.Y - ft.Height / 2 - padY, ft.Width + padX * 2, ft.Height + padY * 2);
 
-        context.FillRectangle(new SolidColorBrush(Color.FromArgb(220, 6, 12, 22)), rect, 5);
-        context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#1A3857")), 1), rect, 5);
+        context.FillRectangle(RouteBadgeBg, rect, 5);
+        context.DrawRectangle(null, RouteBadgeBorder, rect, 5);
         context.DrawText(ft, new Point(center.X - ft.Width / 2, center.Y - ft.Height / 2));
     }
 
@@ -688,17 +741,17 @@ public sealed class StarmapCanvas : Control
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Bold),
+            DefaultBoldTypeface,
             10.5,
-            new SolidColorBrush(Color.Parse("#FFB23E"))
+            TextBrushOrange
         );
 
         double padX = 8;
         double padY = 3;
         var rect = new Rect(pos.X - ft.Width / 2 - padX, pos.Y - ft.Height / 2 - padY, ft.Width + padX * 2, ft.Height + padY * 2);
 
-        context.FillRectangle(new SolidColorBrush(Color.FromArgb(220, 11, 19, 32)), rect, 5);
-        context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#FFB23E")), 1.2), rect, 5);
+        context.FillRectangle(PlayerBadgeBg, rect, 5);
+        context.DrawRectangle(null, PlayerBadgeBorder, rect, 5);
         context.DrawText(ft, new Point(pos.X - ft.Width / 2, pos.Y - ft.Height / 2));
     }
 
@@ -710,25 +763,29 @@ public sealed class StarmapCanvas : Control
             sysTitle,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.Bold),
+            CodeBoldTypeface,
             12,
-            new SolidColorBrush(Color.Parse("#38BDF8"))
+            TextBrushCyan
         );
         context.DrawText(ftSys, new Point(16, 16));
 
         // Spieler-System-Indikator, falls Spieler in anderem System ist
-        if (!string.IsNullOrEmpty(PlayerLocationName) && PlayerLocationName != "—")
+        if (!string.IsNullOrEmpty(PlayerLocationName) && PlayerLocationName != "—" && PlayerLocationName != "Unbekannt")
         {
             var res = StarmapData.Resolve(PlayerLocationName);
             if (!string.IsNullOrEmpty(res.SystemName) && !res.SystemName.Equals(SystemName, StringComparison.OrdinalIgnoreCase))
             {
+                string locDetail = !string.IsNullOrEmpty(res.DisplayName) && res.DisplayName != "Unbekannt" && res.DisplayName != "—"
+                    ? $" ({res.DisplayName})"
+                    : "";
+
                 var ftOther = new FormattedText(
-                    $"📍 SPIELER IST IM {res.SystemName.ToUpperInvariant()}-SYSTEM ({res.DisplayName})",
+                    $"📍 SPIELER IST IM {res.SystemName.ToUpperInvariant()}-SYSTEM{locDetail}",
                     CultureInfo.InvariantCulture,
                     FlowDirection.LeftToRight,
-                    new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold),
+                    DefaultSemiBoldTypeface,
                     10.5,
-                    new SolidColorBrush(Color.Parse("#FFB23E"))
+                    TextBrushOrange
                 );
                 context.DrawText(ftOther, new Point(16, 36));
             }
@@ -741,26 +798,26 @@ public sealed class StarmapCanvas : Control
             $"MAßSTAB: {scaleText}  ·  ZOOM: {_zoom * 100:F0}%",
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Cascadia Code, Consolas, monospace", FontStyle.Normal, FontWeight.SemiBold),
+            CodeSemiBoldTypeface,
             9.5,
-            new SolidColorBrush(Color.Parse("#7E97AD"))
+            TextBrushDim
         );
         context.DrawText(ftScale, new Point(16, h - 26));
 
         // Maßstabs-Linie
-        var scalePen = new Pen(new SolidColorBrush(Color.Parse("#38BDF8")), 2);
-        context.DrawLine(scalePen, new Point(16, h - 30), new Point(116, h - 30));
+        context.DrawLine(ScalePen, new Point(16, h - 30), new Point(116, h - 30));
     }
 
-    private void DrawText(DrawingContext context, string text, Point pos, string colorHex, double size, bool isBold = false, bool center = false)
+    private void DrawText(DrawingContext context, string text, Point pos, IBrush brush, double size, bool isBold = false, bool center = false)
     {
+        var tf = isBold ? DefaultBoldTypeface : DefaultNormalTypeface;
         var ft = new FormattedText(
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, isBold ? FontWeight.Bold : FontWeight.Normal),
+            tf,
             size,
-            new SolidColorBrush(Color.Parse(colorHex))
+            brush
         );
 
         double x = center ? pos.X - ft.Width / 2 : pos.X;
@@ -771,9 +828,9 @@ public sealed class StarmapCanvas : Control
             text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, isBold ? FontWeight.Bold : FontWeight.Normal),
+            tf,
             size,
-            new SolidColorBrush(Color.FromArgb(200, 4, 7, 17))
+            TextShadowBrush
         );
         context.DrawText(shadowFt, new Point(x + 1, y + 1));
         context.DrawText(ft, new Point(x, y));

@@ -14,6 +14,8 @@ public static class GlobalHotkey
     private const int WM_HOTKEY = 0x0312;
     private const int HOTKEY_ID = 9021;
 
+    private const int WM_QUIT = 0x0012;
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
@@ -29,6 +31,12 @@ public static class GlobalHotkey
     [DllImport("user32.dll")]
     private static extern IntPtr DispatchMessage(ref MSG lpMsg);
 
+    [DllImport("user32.dll")]
+    private static extern bool PostThreadMessage(uint idThread, uint msg, UIntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
     [StructLayout(LayoutKind.Sequential)]
     private struct MSG
     {
@@ -42,6 +50,7 @@ public static class GlobalHotkey
     }
 
     private static Thread? _listenerThread;
+    private static uint _listenerThreadId = 0;
     private static bool _isRunning = false;
     public static event Action? HotkeyPressed;
 
@@ -52,6 +61,7 @@ public static class GlobalHotkey
 
         _listenerThread = new Thread(() =>
         {
+            _listenerThreadId = GetCurrentThreadId();
             // 'H' key code is 0x48. Alt modifier is MOD_ALT.
             uint vk = 0x48; // 'H'
             uint modifiers = MOD_ALT | MOD_NOREPEAT;
@@ -64,11 +74,16 @@ public static class GlobalHotkey
                     {
                         Dispatcher.UIThread.Post(() => HotkeyPressed?.Invoke());
                     }
+                    else if (msg.message == WM_QUIT)
+                    {
+                        break;
+                    }
                     TranslateMessage(ref msg);
                     DispatchMessage(ref msg);
                 }
                 UnregisterHotKey(IntPtr.Zero, HOTKEY_ID);
             }
+            _listenerThreadId = 0;
         })
         {
             IsBackground = true,
@@ -80,5 +95,9 @@ public static class GlobalHotkey
     public static void Stop()
     {
         _isRunning = false;
+        if (_listenerThreadId != 0)
+        {
+            PostThreadMessage(_listenerThreadId, WM_QUIT, UIntPtr.Zero, IntPtr.Zero);
+        }
     }
 }

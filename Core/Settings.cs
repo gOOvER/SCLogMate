@@ -271,18 +271,25 @@ public static class Settings
         return new AppSettings();
     }
 
+    private static readonly object _saveLock = new();
+
     public static void Save(AppSettings s)
     {
-        try
+        lock (_saveLock)
         {
-            Directory.CreateDirectory(Dir);
-            var json = JsonSerializer.Serialize(s, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(FilePath, json);
-            Logger.Log($"[SETTINGS] Gespeichert: WalletRegion={(s.WalletRegion != null ? $"{s.WalletRegion.Width}x{s.WalletRegion.Height}@({s.WalletRegion.X},{s.WalletRegion.Y})" : "null")}, ContractRegion={(s.ContractRegion != null ? $"{s.ContractRegion.Width}x{s.ContractRegion.Height}@({s.ContractRegion.X},{s.ContractRegion.Y})" : "null")}");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("[SETTINGS] Fehler beim Speichern", ex);
+            try
+            {
+                Directory.CreateDirectory(Dir);
+                var json = JsonSerializer.Serialize(s, new JsonSerializerOptions { WriteIndented = true });
+                var tempFile = FilePath + ".tmp";
+                File.WriteAllText(tempFile, json);
+                File.Move(tempFile, FilePath, overwrite: true);
+                Logger.Log($"[SETTINGS] Gespeichert: WalletRegion={(s.WalletRegion != null ? $"{s.WalletRegion.Width}x{s.WalletRegion.Height}@({s.WalletRegion.X},{s.WalletRegion.Y})" : "null")}, ContractRegion={(s.ContractRegion != null ? $"{s.ContractRegion.Width}x{s.ContractRegion.Height}@({s.ContractRegion.X},{s.ContractRegion.Y})" : "null")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[SETTINGS] Fehler beim Speichern", ex);
+            }
         }
     }
 
