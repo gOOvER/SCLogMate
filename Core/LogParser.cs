@@ -373,7 +373,7 @@ public partial class LogParser
     public List<(DateTime Time, string RawId, string Name, string? System, string? Body, string Kind)> LocationVisits { get; } = new();
     public List<(DateTime Time, string Destination)> QuantumDestinations { get; } = new();
 
-    private readonly object _stateLock = new();
+    private readonly System.Threading.Lock _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Giver, string Faction)> _missionComms = new(StringComparer.OrdinalIgnoreCase);

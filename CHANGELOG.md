@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-rc1] - 2026-09-07
+## [1.0.0-rc1] - 2026-09-09
 ### Added
 - **Database Version Overview & Structure Diagnostics (`Models/DatabaseDiagnosticsInfo.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.Database.cs`, `Views/MainWindow.axaml`)**:
   - Implemented comprehensive database version tracking and integrity verification diagnostics for the local SQLite database (`sessions.db`).
@@ -59,9 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tied `StarmapCanvas._pulseTimer` to visual tree attachment and effective visibility, stopping unnecessary background rendering and timer ticks when the Starmap tab is inactive.
   - Replaced ad-hoc timer allocations in `ScanIndicatorWindow.FlashGreen` with a reusable timer instance and removed dead `MoveWindow` P/Invoke declarations in `RegionSelectorWindow` and `ScanIndicatorWindow`.
   - Added clean desktop application exit hook in `App.axaml.cs` to ensure `GlobalHotkey.Stop()` is invoked upon application termination.
-- **Feature Freeze & Dependency Alignment (`SCLogMate.csproj`)**:
+- **Feature Freeze & Dependency Alignment (`SCLogMate.csproj`, `Core/Settings.cs`, `Core/Logger.cs`)**:
   - Declared Feature Freeze for the 1.0.0 Release Candidate phase with focus on stability, resilience, and clean resource management.
   - Upgraded dependencies to native .NET 10 runtime packages: `Microsoft.Data.Sqlite 10.0.11`, `System.Security.Cryptography.ProtectedData 10.0.11`, `CommunityToolkit.Mvvm 8.4.2`, and `Tmds.DBus.Protocol 0.95.1`.
+  - Enabled `<PublishReadyToRun>true</PublishReadyToRun>` in `SCLogMate.csproj` for faster cold startup times in the self-contained single-file publish artifact.
+  - Adopted .NET 10 / C# 13 `System.Threading.Lock` synchronization primitives across `Database`, `LogParser`, `MainViewModel`, `AuroraVoiceService`, `RsAudioAlertService`, `Settings`, and `Logger`, replacing all legacy object monitor locks and debouncing repetitive settings persistence log messages.
 
 ### Fixed
 - **Star Citizen Game Version Detection & Status Header (`Core/LogParser.cs`, `ViewModels/MainViewModel.cs`)**:

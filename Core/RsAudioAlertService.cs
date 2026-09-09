@@ -33,8 +33,8 @@ public static class RsAudioAlertService
     private static readonly ConcurrentDictionary<string, DateTime> _lastResourceAlertTime = new(StringComparer.OrdinalIgnoreCase);
 
     private static byte[]? _cachedSonarWav;
-    private static readonly object _sonarLock = new();
-    private static readonly object _ttsLock = new();
+    private static readonly System.Threading.Lock _sonarLock = new();
+    private static readonly System.Threading.Lock _ttsLock = new();
     private static Windows.Media.SpeechSynthesis.SpeechSynthesizer? _speechSynth;
     private static Windows.Media.Playback.MediaPlayer? _ttsPlayer;
 

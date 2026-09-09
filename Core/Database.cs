@@ -27,8 +27,8 @@ public static class Database
 
     static string Conn => $"Data Source={DbPath};Default Timeout=60;";
 
-    private static readonly object _initLock = new();
-    private static readonly object _writeLock = new();
+    private static readonly System.Threading.Lock _initLock = new();
+    private static readonly System.Threading.Lock _writeLock = new();
     private static bool _isInitialized;
 
     public static void EnsureInitialized()

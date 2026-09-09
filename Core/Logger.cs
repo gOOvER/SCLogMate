@@ -10,7 +10,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Logger
 {
-    static readonly object Lock = new();
+    static readonly System.Threading.Lock Lock = new();
     static readonly string Path;
 
     static Logger()

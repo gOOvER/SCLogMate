@@ -109,7 +109,7 @@ public partial class MainViewModel : ObservableObject
     Avalonia.Threading.DispatcherTimer? _pingTimer;
     Avalonia.Threading.DispatcherTimer? _processTimer;
     readonly DispatcherTimer _eventSearchTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
-    readonly object _initialEventQueueLock = new();
+    readonly System.Threading.Lock _initialEventQueueLock = new();
     readonly List<(LogEntry Entry, bool IsLive)> _initialEventQueue = new();
     bool _initialEventDrainScheduled;
     [ObservableProperty] private SessionInfo? selectedSession;

@@ -271,7 +271,8 @@ public static class Settings
         return new AppSettings();
     }
 
-    private static readonly object _saveLock = new();
+    private static readonly System.Threading.Lock _saveLock = new();
+    private static string? _lastLoggedRegionState;
 
     public static void Save(AppSettings s)
     {
@@ -284,7 +285,13 @@ public static class Settings
                 var tempFile = FilePath + ".tmp";
                 File.WriteAllText(tempFile, json);
                 File.Move(tempFile, FilePath, overwrite: true);
-                Logger.Log($"[SETTINGS] Gespeichert: WalletRegion={(s.WalletRegion != null ? $"{s.WalletRegion.Width}x{s.WalletRegion.Height}@({s.WalletRegion.X},{s.WalletRegion.Y})" : "null")}, ContractRegion={(s.ContractRegion != null ? $"{s.ContractRegion.Width}x{s.ContractRegion.Height}@({s.ContractRegion.X},{s.ContractRegion.Y})" : "null")}");
+
+                var regionState = $"WalletRegion={(s.WalletRegion != null ? $"{s.WalletRegion.Width}x{s.WalletRegion.Height}@({s.WalletRegion.X},{s.WalletRegion.Y})" : "null")}, ContractRegion={(s.ContractRegion != null ? $"{s.ContractRegion.Width}x{s.ContractRegion.Height}@({s.ContractRegion.X},{s.ContractRegion.Y})" : "null")}";
+                if (regionState != _lastLoggedRegionState)
+                {
+                    _lastLoggedRegionState = regionState;
+                    Logger.Log($"[SETTINGS] Gespeichert: {regionState}");
+                }
             }
             catch (Exception ex)
             {

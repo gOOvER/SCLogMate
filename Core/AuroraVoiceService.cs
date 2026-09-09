@@ -15,7 +15,7 @@ namespace SCLogMate.Core;
 
 public partial class AuroraVoiceService : IDisposable
 {
-    private readonly object _lock = new();
+    private readonly System.Threading.Lock _lock = new();
     private readonly Random _rand = new();
     private string? _auroraDir;
     private bool _isInstalled;
