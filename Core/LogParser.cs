@@ -249,6 +249,19 @@ public partial class LogParser
     [GeneratedRegex(@"Added notification ""(?:Member Left|Member departed):\s*(?<who>[^""]+)")]
     private static partial Regex PartyMemberLeaveNotifRegex();
 
+    // Lager & Inventarbewegungen
+    [GeneratedRegex(@"<RequestInventory>\s+Request\[\d+\]\s+Inventory\[\d+:Location:(?<id>\d+)\]")]
+    private static partial Regex RequestInvIdRegex();
+
+    [GeneratedRegex(@"Type\[Move\]\s+SourceInventory\[(?<src>[^\]]+)\]\s+TargetInventory\[(?<dst>[^\]]+)\]\s+ItemClass\[(?<cls>[^\]]*)\]")]
+    private static partial Regex InvMoveRegex();
+
+    [GeneratedRegex(@":Location:(?<id>\d+)")]
+    private static partial Regex LocationIdRegex();
+
+    [GeneratedRegex(@"<OnInventoryStoreItem>\s+Entity\[.*Class\((?<cls>[^)]+)\).*Inventory\[(?<inv>[^\]]+)\]")]
+    private static partial Regex OnStoreItemRegex();
+
     // Angenommene/aktive Mission mit Auftraggeber + Contract (feuert je Mission viele Male
     // als Objektiv-Marker → wir nehmen je missionId nur EINEN Eintrag).
     [GeneratedRegex(@"missionId \[(?<id>[0-9a-f-]+)\], generator name \[(?<gen>[A-Za-z0-9_]+)\], contract \[(?<con>[A-Za-z0-9_]+)\]")]
@@ -373,6 +386,14 @@ public partial class LogParser
     public List<(DateTime Time, string RawId, string Name, string? System, string? Body, string Kind)> LocationVisits { get; } = new();
     public List<(DateTime Time, string Destination)> QuantumDestinations { get; } = new();
 
+    // Location-Inventory Mapping & Warehouse Movements
+    private string? _pendingLocationName;
+    private string? _pendingRawLoc;
+    private readonly Dictionary<string, (string Name, string RawId, string System, string ParentBody)> _locationIdToInfo = new();
+
+    public sealed record WarehouseMovementRecord(DateTime Time, string Location, string LocationCode, string System, string ParentBody, string ItemClass, string ItemName, string Category, int Delta);
+    public List<WarehouseMovementRecord> WarehouseMovements { get; } = new();
+
     private readonly System.Threading.Lock _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
@@ -409,6 +430,11 @@ public partial class LogParser
             return null;
 
         var locRes = Locations.ResolveLocation(rawLoc);
+        _pendingRawLoc = locRes.RawCode;
+        _pendingLocationName = locRes.DisplayName;
+        if (!string.IsNullOrWhiteSpace(locRes.SystemName))
+            _currentSystem = locRes.SystemName;
+
         if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit", StringComparison.OrdinalIgnoreCase))
         {
             LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
@@ -419,6 +445,17 @@ public partial class LogParser
             }
         }
         return null;
+    }
+
+    private (string Name, string RawId, string System, string ParentBody) GetLocationInfo(string locId)
+    {
+        if (!string.IsNullOrEmpty(locId) && _locationIdToInfo.TryGetValue(locId, out var info))
+            return info;
+
+        var place = _pendingLocationName ?? _lastLoc ?? "Lager";
+        var raw = _pendingRawLoc ?? place;
+        var locRes = Locations.ResolveLocation(raw);
+        return (locRes.DisplayName != "—" ? locRes.DisplayName : place, raw, locRes.SystemName, locRes.ParentBody);
     }
 
     public static string CategorizeItem(string? guid, string item)
@@ -972,6 +1009,117 @@ public partial class LogParser
             {
                 var locEntry = RecordLocationVisit(zn.Groups["loc"].Value, ParseTs(line));
                 if (locEntry != null) return locEntry;
+            }
+        }
+
+        if (line.Contains("requested inventory for Location[", StringComparison.Ordinal) || line.Contains("RequestLocationInventory", StringComparison.Ordinal))
+        {
+            var lo = LocRegex().Match(line);
+            if (lo.Success && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
+            {
+                var raw = lo.Groups["loc"].Value;
+                var locRes = Locations.ResolveLocation(raw);
+                _pendingRawLoc = raw;
+                _pendingLocationName = locRes.DisplayName;
+                if (!string.IsNullOrWhiteSpace(locRes.SystemName))
+                    _currentSystem = locRes.SystemName;
+            }
+        }
+
+        if (line.Contains("<RequestInventory>", StringComparison.Ordinal) && line.Contains(":Location:", StringComparison.Ordinal))
+        {
+            var m = RequestInvIdRegex().Match(line);
+            if (m.Success)
+            {
+                var locId = m.Groups["id"].Value;
+                var raw = _pendingRawLoc ?? (_lastLoc ?? "Lager");
+                var locRes = Locations.ResolveLocation(raw);
+                var name = _pendingLocationName ?? (locRes.DisplayName != "—" ? locRes.DisplayName : (_lastLoc ?? "Lager"));
+                _locationIdToInfo[locId] = (name, raw, locRes.SystemName, locRes.ParentBody);
+            }
+        }
+
+        if (line.Contains("Type[Move]", StringComparison.Ordinal) && line.Contains("New request[", StringComparison.Ordinal))
+        {
+            var m = InvMoveRegex().Match(line);
+            if (m.Success)
+            {
+                var src = m.Groups["src"].Value;
+                var dst = m.Groups["dst"].Value;
+                var cls = m.Groups["cls"].Value;
+
+                if (!string.IsNullOrWhiteSpace(cls) && !cls.Equals("None", StringComparison.OrdinalIgnoreCase) && !cls.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ts = ParseTs(line);
+                    var resolved = WarehouseCatalog.Resolve(cls);
+
+                    // Einlagerung in Location?
+                    if (dst.Contains(":Location:", StringComparison.Ordinal))
+                    {
+                        var locIdMatch = LocationIdRegex().Match(dst);
+                        var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
+                        var locInfo = GetLocationInfo(locId);
+
+                        WarehouseMovements.Add(new WarehouseMovementRecord(ts, locInfo.Name, locInfo.RawId, locInfo.System, locInfo.ParentBody, cls, resolved.Name, resolved.Category, +1));
+                        return new LogEntry
+                        {
+                            Time = ts,
+                            Kind = EventKind.Inventory,
+                            Amount = 1,
+                            Detail = $"{locInfo.Name}: +1 {resolved.Name}",
+                            Ship = locInfo.Name,
+                            ItemRef = cls
+                        };
+                    }
+
+                    // Entnahme aus Location?
+                    if (src.Contains(":Location:", StringComparison.Ordinal))
+                    {
+                        var locIdMatch = LocationIdRegex().Match(src);
+                        var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
+                        var locInfo = GetLocationInfo(locId);
+
+                        WarehouseMovements.Add(new WarehouseMovementRecord(ts, locInfo.Name, locInfo.RawId, locInfo.System, locInfo.ParentBody, cls, resolved.Name, resolved.Category, -1));
+                        return new LogEntry
+                        {
+                            Time = ts,
+                            Kind = EventKind.Inventory,
+                            Amount = -1,
+                            Detail = $"{locInfo.Name}: -1 {resolved.Name}",
+                            Ship = locInfo.Name,
+                            ItemRef = cls
+                        };
+                    }
+                }
+            }
+        }
+
+        if (line.Contains("<OnInventoryStoreItem>", StringComparison.Ordinal) && line.Contains(":Location:", StringComparison.Ordinal))
+        {
+            var m = OnStoreItemRegex().Match(line);
+            if (m.Success)
+            {
+                var cls = m.Groups["cls"].Value;
+                var inv = m.Groups["inv"].Value;
+                if (!string.IsNullOrWhiteSpace(cls))
+                {
+                    var ts = ParseTs(line);
+                    var resolved = WarehouseCatalog.Resolve(cls);
+                    var locIdMatch = LocationIdRegex().Match(inv);
+                    var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
+                    var locInfo = GetLocationInfo(locId);
+
+                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, locInfo.Name, locInfo.RawId, locInfo.System, locInfo.ParentBody, cls, resolved.Name, resolved.Category, +1));
+                    return new LogEntry
+                    {
+                        Time = ts,
+                        Kind = EventKind.Inventory,
+                        Amount = 1,
+                        Detail = $"{locInfo.Name}: +1 {resolved.Name}",
+                        Ship = locInfo.Name,
+                        ItemRef = cls
+                    };
+                }
             }
         }
 

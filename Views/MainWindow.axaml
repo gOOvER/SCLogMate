@@ -3474,6 +3474,219 @@
       </DockPanel>
     </TabItem>
 
+    <!-- Tab: Planeten- & Stationslager -->
+    <TabItem Header="{Binding I18n[Tab_Warehouse]}">
+      <DockPanel Margin="0,8,0,0">
+
+        <!-- Header: Statistik, Aktionen & Schnellsuche -->
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,10">
+          
+          <Border Classes="card" Padding="14,10">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,240">
+              
+              <!-- Titel & Gesamt-Metriken -->
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="📦  PLANETEN- &amp; STATIONSLAGER" Classes="label" VerticalAlignment="Center" />
+                <Border Background="#21262D" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding TotalWarehouseQuantity, StringFormat='{}{0:N0} Gegenstände'}" Foreground="#58A6FF" FontSize="10" FontWeight="Bold" />
+                </Border>
+              </StackPanel>
+
+              <!-- Status-Pills -->
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0">
+                <Border Background="#0D2818" BorderBrush="#1D6A35" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="🪐" FontSize="11" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TotalWarehouseLocationsCount, StringFormat='{}{0} Standorte'}" Foreground="#3FB950" FontSize="11" FontWeight="Bold" />
+                  </StackPanel>
+                </Border>
+
+                <Border Background="#0B233F" BorderBrush="#1F466E" BorderThickness="1" CornerRadius="10" Padding="8,2.5">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="🏷️" FontSize="11" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TotalWarehouseUniqueItems, StringFormat='{}{0} Item-Typen'}" Foreground="#58A6FF" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+
+              <!-- Aktionen: Aktualisieren & Export -->
+              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,14,0">
+                <Button Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Command="{Binding RefreshWarehouseCommand}"
+                        ToolTip.Tip="Lagerbestände aus der Datenbank neu laden">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="↻" FontSize="12" />
+                    <TextBlock Text="Neu laden" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+
+                <Button Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Command="{Binding ExportWarehouseMarkdownCommand}"
+                        ToolTip.Tip="Lagerbestand als strukturierte Markdown-Tabelle speichern">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="📄" FontSize="11" />
+                    <TextBlock Text="Export (.md)" FontSize="11" FontWeight="SemiBold" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+
+              <!-- Schnellsuche -->
+              <TextBox Grid.Column="4" Classes="path" Height="30" Text="{Binding WarehouseSearchText}"
+                       Watermark="🔍 Item, Standort, Typ..." VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+
+          <!-- Kategorie-Filter-Chips -->
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Classes="chip" Content="Alle Kategorien" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Alle Kategorien"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter='Alle Kategorien'}" />
+              <Button Classes="chip" Content="⛏️ Mineralien &amp; Erze" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Mineralien &amp; Erze"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter='Mineralien &amp; Erze'}" />
+              <Button Classes="chip" Content="🔧 Werkzeuge" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Werkzeuge"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter=Werkzeuge}" />
+              <Button Classes="chip" Content="🔫 Waffen" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Waffen"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter=Waffen}" />
+              <Button Classes="chip" Content="🛡️ Rüstung" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Rüstung"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter=Rüstung}" />
+              <Button Classes="chip" Content="💊 Verbrauchsgüter" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Verbrauchsgüter"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter=Verbrauchsgüter}" />
+              <Button Classes="chip" Content="💾 Quest &amp; Utility" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Quest &amp; Utility"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter='Quest &amp; Utility'}" />
+              <Button Classes="chip" Content="📦 Sonstiges" Command="{Binding SelectWarehouseCategoryCommand}" CommandParameter="Sonstiges"
+                      Background="{Binding SelectedWarehouseCategory, Converter={StaticResource FilterBg}, ConverterParameter=Sonstiges}" />
+            </StackPanel>
+          </ScrollViewer>
+        </StackPanel>
+
+        <!-- Hauptinhalt: 2 Spalten (Links: Standorte, Rechts: Item-Tabelle) -->
+        <Grid ColumnDefinitions="280,10,*">
+          
+          <!-- Linke Spalte: Standorte / Planeten / Stationen -->
+          <Border Grid.Column="0" Classes="card" Padding="10">
+            <DockPanel>
+              <!-- Kopf der Standort-Liste -->
+              <DockPanel DockPanel.Dock="Top" Margin="2,0,2,8">
+                <TextBlock Text="STANDORTE" Classes="label" VerticalAlignment="Center" />
+                <Button Classes="ghost" Padding="4,1" HorizontalAlignment="Right"
+                        Command="{Binding ClearWarehouseFilterCommand}"
+                        ToolTip.Tip="Alle Standorte anzeigen">
+                  <TextBlock Text="Alle zeigen" FontSize="10" Foreground="#58A6FF" />
+                </Button>
+              </DockPanel>
+
+              <!-- Liste der Standorte -->
+              <ListBox ItemsSource="{Binding WarehouseLocations}"
+                       SelectedItem="{Binding SelectedWarehouseLocation, Mode=TwoWay}"
+                       Background="Transparent" BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Border CornerRadius="6" Padding="8,6" Margin="0,1"
+                            Background="#0E1217" BorderBrush="#1C2128" BorderThickness="1">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding LocationName}" FontWeight="SemiBold" FontSize="12" Foreground="#E6EDF3"
+                                     TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding DisplaySubtitle}" FontSize="10" Foreground="#7E97AD" />
+                        </StackPanel>
+                        <Border Grid.Column="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                                CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding TotalItems, StringFormat='{}{0}×'}" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+                        </Border>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+
+          <!-- Trenner -->
+          <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+
+          <!-- Rechte Spalte: Gegenstände-Tabelle -->
+          <Border Grid.Column="2" Classes="card" Padding="0">
+            <DataGrid ItemsSource="{Binding FilteredWarehouseItems}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+              <DataGrid.Columns>
+                <!-- Icon & Typ -->
+                <DataGridTemplateColumn Header="Typ" Width="55">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Icon}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Category}" />
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Name & Klasse -->
+                <DataGridTemplateColumn Header="Gegenstand" Width="2*" MinWidth="180">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <StackPanel VerticalAlignment="Center" Margin="8,0">
+                        <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" FontSize="12" Foreground="#F0F6FC"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding ItemClass}" FontSize="10" Foreground="#7E97AD"
+                                   TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Kategorie Badge -->
+                <DataGridTemplateColumn Header="Kategorie" Width="130">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1"
+                              CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0">
+                        <TextBlock Text="{Binding Category}" FontSize="10" Foreground="#A5D6FF" />
+                      </Border>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Standort & Planet -->
+                <DataGridTemplateColumn Header="Standort / Planet" Width="2*" MinWidth="160">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <StackPanel VerticalAlignment="Center" Margin="8,0">
+                        <TextBlock Text="{Binding Location}" FontSize="12" Foreground="#E6EDF3" FontWeight="Medium"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding LocationDisplay}" FontSize="10" Foreground="#7E97AD"
+                                   TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Menge Badge -->
+                <DataGridTemplateColumn Header="Menge" Width="90">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <Border Background="#0D2818" BorderBrush="#238636" BorderThickness="1"
+                              CornerRadius="6" Padding="8,3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding QuantityBadge}" FontSize="11" FontWeight="Bold" Foreground="#3FB950" />
+                      </Border>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Zuletzt bewegt -->
+                <DataGridTextColumn Header="Zuletzt aktualisiert" Binding="{Binding FormattedDate}" Width="135" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </Border>
+
+        </Grid>
+
+      </DockPanel>
+    </TabItem>
+
     <!-- Tab 6: Bauplan-Datenbank -->
     <TabItem Header="{Binding I18n[Tab_Blueprints]}">
       <DockPanel Margin="0,8,0,0">

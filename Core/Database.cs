@@ -16,8 +16,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 15; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 31; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 16; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 32; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
@@ -320,6 +320,36 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v15 (M80 · Origin Harmonisierung und Deduplizierung) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 16)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS warehouse_items (
+                        location TEXT NOT NULL,
+                        location_code TEXT NOT NULL,
+                        system TEXT NOT NULL,
+                        parent_body TEXT NOT NULL,
+                        item_class TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        last_updated TEXT NOT NULL,
+                        PRIMARY KEY (location, item_class)
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_warehouse_location ON warehouse_items(location);
+                    CREATE INDEX IF NOT EXISTS ix_warehouse_category ON warehouse_items(category);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v16 (warehouse_items)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 16;");
+            dbSchemaVersion = 16;
+            Logger.Log("DB Schema: Migration auf v16 (warehouse_items Tabelle & Indizes) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -331,7 +361,7 @@ public static class Database
         var stored = GetMeta(db, "parserVersion");
         if (stored != CurrentParserVersion.ToString(CultureInfo.InvariantCulture))
         {
-            Exec(db, "DELETE FROM events; DELETE FROM sessions;");
+            Exec(db, "DELETE FROM events; DELETE FROM sessions; DELETE FROM warehouse_items;");
             SetMeta(db, "parserVersion", CurrentParserVersion.ToString(CultureInfo.InvariantCulture));
             WasParserResetRequired = true;
             Logger.Log($"DB: Parser-Version auf v{CurrentParserVersion} aktualisiert -> Cache für Re-Indexierung geleert.");
@@ -453,6 +483,11 @@ public static class Database
                         }
                     }
 
+                    foreach (var wm in parser.WarehouseMovements)
+                    {
+                        RecordWarehouseMovementInternal(db, tx, wm.Time, wm.Location, wm.LocationCode, wm.System, wm.ParentBody, wm.ItemClass, wm.ItemName, wm.Category, wm.Delta);
+                    }
+
                     using (var s = db.CreateCommand())
                     {
                         s.Transaction = tx;
@@ -482,9 +517,9 @@ public static class Database
         {
             using var db = new SqliteConnection(Conn);
             db.Open();
-            Exec(db, "DELETE FROM events; DELETE FROM sessions;");
+            Exec(db, "DELETE FROM events; DELETE FROM sessions; DELETE FROM warehouse_items;");
             Exec(db, "PRAGMA wal_checkpoint(PASSIVE);");
-            Logger.Log("DB: Alle Events und Sessions vollständig zurückgesetzt.");
+            Logger.Log("DB: Alle Events, Sessions und Lagerbestände vollständig zurückgesetzt.");
         }
     }
 
@@ -556,6 +591,11 @@ public static class Database
                             psh.Value = (object?)e.Ship ?? DBNull.Value;
                             cmd.ExecuteNonQuery();
                             sessionEvents++;
+                        }
+
+                        foreach (var wm in parser.WarehouseMovements)
+                        {
+                            RecordWarehouseMovementInternal(db, tx, wm.Time, wm.Location, wm.LocationCode, wm.System, wm.ParentBody, wm.ItemClass, wm.ItemName, wm.Category, wm.Delta);
                         }
 
                         using (var s = db.CreateCommand())
@@ -700,7 +740,8 @@ public static class Database
                 ["contracts"] = new[] { "id", "title", "reward", "contracted_by", "scanned_at", "status" },
                 ["user_pois"] = new[] { "id", "system", "body", "name", "notes", "category", "color", "created_at" },
                 ["reputation"] = new[] { "faction_id", "xp", "completed_missions", "last_updated" },
-                ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" }
+                ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" },
+                ["warehouse_items"] = new[] { "location", "location_code", "system", "parent_body", "item_class", "item_name", "category", "quantity", "last_updated" }
             };
 
             var existingTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -750,7 +791,9 @@ public static class Database
                 "ix_events_session_kind",
                 "ix_events_kind_time",
                 "ix_contracts_status",
-                "ix_user_pois_system"
+                "ix_user_pois_system",
+                "ix_warehouse_location",
+                "ix_warehouse_category"
             };
 
             var existingIndexes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -788,6 +831,7 @@ public static class Database
             diag.FleetShipCount = SafeCount("fleet_user_ships");
             diag.PoiCount = SafeCount("user_pois");
             diag.ReputationCount = SafeCount("reputation");
+            diag.WarehouseItemCount = SafeCount("warehouse_items");
 
             // 6. Physische Integritätsprüfung
             if (runDeepCheck)
@@ -879,6 +923,20 @@ public static class Database
                         acquisition TEXT NOT NULL DEFAULT 'Pledge Store',
                         notes TEXT NOT NULL DEFAULT ''
                     );
+                    CREATE TABLE IF NOT EXISTS warehouse_items (
+                        location TEXT NOT NULL,
+                        location_code TEXT NOT NULL,
+                        system TEXT NOT NULL,
+                        parent_body TEXT NOT NULL,
+                        item_class TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        last_updated TEXT NOT NULL,
+                        PRIMARY KEY (location, item_class)
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_warehouse_location ON warehouse_items(location);
+                    CREATE INDEX IF NOT EXISTS ix_warehouse_category ON warehouse_items(category);
                 ");
 
                 // 3. Kritische Spalten nachziehen (falls eine Tabelle älter war)
@@ -1803,6 +1861,146 @@ public static class Database
                 Logger.Error("SaveFleetShipCustomData", ex);
             }
         }
+    }
+
+    #endregion
+
+    #region Warehouse Inventory
+
+    public static void RecordWarehouseMovement(DateTime time, string location, string locationCode, string system, string parentBody, string itemClass, string itemName, string category, int deltaQty)
+    {
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                RecordWarehouseMovementInternal(db, null, time, location, locationCode, system, parentBody, itemClass, itemName, category, deltaQty);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("RecordWarehouseMovement", ex);
+            }
+        }
+    }
+
+    public static void RecordWarehouseMovementInternal(SqliteConnection db, SqliteTransaction? tx, DateTime time, string location, string locationCode, string system, string parentBody, string itemClass, string itemName, string category, int deltaQty)
+    {
+        using var cmd = db.CreateCommand();
+        if (tx != null) cmd.Transaction = tx;
+        cmd.CommandText = @"
+            INSERT INTO warehouse_items (location, location_code, system, parent_body, item_class, item_name, category, quantity, last_updated)
+            VALUES ($loc, $code, $sys, $body, $cls, $name, $cat, $qty, $lu)
+            ON CONFLICT(location, item_class) DO UPDATE SET
+                quantity = warehouse_items.quantity + excluded.quantity,
+                last_updated = CASE WHEN excluded.last_updated > warehouse_items.last_updated THEN excluded.last_updated ELSE warehouse_items.last_updated END;
+        ";
+        cmd.Parameters.AddWithValue("$loc", location);
+        cmd.Parameters.AddWithValue("$code", locationCode);
+        cmd.Parameters.AddWithValue("$sys", system);
+        cmd.Parameters.AddWithValue("$body", parentBody);
+        cmd.Parameters.AddWithValue("$cls", itemClass);
+        cmd.Parameters.AddWithValue("$name", itemName);
+        cmd.Parameters.AddWithValue("$cat", category);
+        cmd.Parameters.AddWithValue("$qty", deltaQty);
+        cmd.Parameters.AddWithValue("$lu", time.ToString("o", CultureInfo.InvariantCulture));
+        cmd.ExecuteNonQuery();
+    }
+
+    public static List<WarehouseItem> GetWarehouseItems(string? locationFilter = null, string? categoryFilter = null, string? search = null)
+    {
+        EnsureInitialized();
+        var items = new List<WarehouseItem>();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+
+            var sql = "SELECT location, location_code, system, parent_body, item_class, item_name, category, quantity, last_updated FROM warehouse_items WHERE quantity > 0";
+
+            if (!string.IsNullOrWhiteSpace(locationFilter) && locationFilter != "Alle Standorte")
+            {
+                sql += " AND location = $loc";
+                cmd.Parameters.AddWithValue("$loc", locationFilter);
+            }
+
+            if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "Alle Kategorien")
+            {
+                sql += " AND category = $cat";
+                cmd.Parameters.AddWithValue("$cat", categoryFilter);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sql += " AND (item_name LIKE $search OR item_class LIKE $search OR location LIKE $search OR category LIKE $search)";
+                cmd.Parameters.AddWithValue("$search", $"%{search}%");
+            }
+
+            sql += " ORDER BY location ASC, category ASC, item_name ASC;";
+            cmd.CommandText = sql;
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                DateTime.TryParse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lu);
+                items.Add(new WarehouseItem
+                {
+                    Location = reader.GetString(0),
+                    LocationCode = reader.GetString(1),
+                    System = reader.GetString(2),
+                    ParentBody = reader.GetString(3),
+                    ItemClass = reader.GetString(4),
+                    ItemName = reader.GetString(5),
+                    Category = reader.GetString(6),
+                    Quantity = reader.GetInt32(7),
+                    LastUpdated = lu
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetWarehouseItems", ex);
+        }
+        return items;
+    }
+
+    public static List<WarehouseLocationGroup> GetWarehouseLocationsSummary()
+    {
+        EnsureInitialized();
+        var list = new List<WarehouseLocationGroup>();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT location, location_code, system, parent_body, SUM(quantity) as total_items, COUNT(DISTINCT item_class) as unique_types
+                FROM warehouse_items
+                WHERE quantity > 0
+                GROUP BY location, location_code, system, parent_body
+                ORDER BY total_items DESC, location ASC;
+            ";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new WarehouseLocationGroup
+                {
+                    LocationName = reader.GetString(0),
+                    LocationCode = reader.GetString(1),
+                    System = reader.GetString(2),
+                    ParentBody = reader.GetString(3),
+                    TotalItems = Convert.ToInt32(reader.GetInt64(4)),
+                    UniqueItemTypes = Convert.ToInt32(reader.GetInt64(5))
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetWarehouseLocationsSummary", ex);
+        }
+        return list;
     }
 
     #endregion

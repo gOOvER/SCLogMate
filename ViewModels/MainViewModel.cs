@@ -2231,6 +2231,7 @@ public partial class MainViewModel : ObservableObject
                     RebuildIndependentTimeline();
                     RebuildIndependentMissions();
                     RebuildPlacesFromDatabase(_allDbTimelineEvents);
+                    LoadWarehouseData();
                 });
             }
             catch (Exception ex)
@@ -4242,6 +4243,13 @@ public partial class MainViewModel : ObservableObject
                     break;
                 case EventKind.Inventory:
                     LastInventory = e.Detail;
+                    if (e.Amount != 0 && !string.IsNullOrEmpty(e.ItemRef) && !string.IsNullOrEmpty(e.Ship))
+                    {
+                        var resolved = WarehouseCatalog.Resolve(e.ItemRef);
+                        var locRes = Locations.ResolveLocation(e.Ship);
+                        Database.RecordWarehouseMovement(e.Time, e.Ship, locRes.RawCode, locRes.SystemName, locRes.ParentBody, e.ItemRef, resolved.Name, resolved.Category, (int)e.Amount);
+                        LoadWarehouseData();
+                    }
                     break;
                 case EventKind.Mission:
                     // Wenn eine Notification wie "Contract Complete: ..." oder "Auftrag abgeschlossen: ..." reinkommt
@@ -5976,7 +5984,22 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void RebuildTimeline()
     {
+        if (TimelineScope == 0)
+        {
+            try
+            {
+                var wipeSince = GetEffectiveWipeDate();
+                _allDbTimelineEvents = Database.AllTimelineEvents(WipeFilterFleet ? wipeSince : null);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("RebuildTimeline:AllTimelineEvents", ex);
+            }
+        }
+
         RebuildIndependentTimeline();
+        TimelineView?.Refresh();
+        Status = $"✓ Flugschreiber neu analysiert: {SessionTimeline.Count} Ereignisse ({FlightSummary.TotalDistanceText} Gesamtstrecke)";
     }
 
     [RelayCommand]
