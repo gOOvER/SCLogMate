@@ -12,10 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deliberately filters out volatile ship inventories and temporary containers to provide a reliable ledger of items resting on planets and stations.
   - Implemented `WarehouseCatalog` translating internal CIG item classes (minerals, gems like Janalite and Aphorite, multi-tools, tractor beams, weapons, armor, medpens, quest items) into human-readable titles and organized categories.
   - Added SQLite schema migration `v16` creating `warehouse_items` table and indexes (`ix_warehouse_location`, `ix_warehouse_category`).
-  - Bumped `CurrentParserVersion` to `32` to automatically index historical warehouse movements across all archived sessions.
+  - Bumped `CurrentParserVersion` to `33` to automatically index historical warehouse movements across all archived sessions.
   - Added new primary tab **📦 Lager / Warehouse** with dual-column layout: Left sidebar listing planets/stations with item count badges and quick filtering; Right data grid detailing item icon, readable name, CIG class, category badge, location, quantity badge, and last movement timestamp.
   - Added category filter chips (All, Minerals & Ores, Tools, Weapons, Armor, Consumables, Quest & Utility, Miscellaneous) and live search bar.
   - Added Markdown export (`ExportWarehouseMarkdownCommand`) for saving full inventory reports by location.
+- **Freight Elevator, Shop, Mission Cargo & Refinery Warehouse Ingestion (`Core/LogParser.cs`, `Core/WarehouseCatalog.cs`)**:
+  - **Freight Elevator & Inventory Grid Tracking**: Added support for modern 3.24+ / 4.0 inventory movements (`Type[Store]`, `Type[Stack]`, `Type[Split]`, and `<Update Container Items Add New Item>`) with case-insensitive `request[` matching, resolving an issue where inventory movements in modern logs were skipped.
+  - **Location ID Mapping Fix**: Fixed inventory location resolution by binding `:Location:<id>` from `<Query Inventory>`, `Freight Inventory Grid`, and `FreightElevator` requests (e.g. Levski warehouse location `3723364946`), properly attributing cargo elevator operations to their respective planetary locations.
+  - **Shop Transactions Ledger Sync**: Integrated shop buy (`SShopBuyRequest`) and sell (`SShopSellRequest`) events into the warehouse ledger (+qty for purchased components, tools, and consumables; -qty for items sold at terminals).
+  - **Mission Cargo Deductions via Freight Elevator**: Integrated automatic cargo elevator drop-off deduction when mission delivery objectives complete (`MISSION_OBJECTIVE_STATE_COMPLETED` matching `SMarkerHandler_Hauling::OnItemRegistered`), accurately deducting delivered crates and packages from station/planetary storage.
+  - **Refinery Handover Deductions**: Added automatic deduction of raw minerals and unrefined ore delivered to refinery kiosks upon refinery job creation.
+  - **Expanded Item Catalog Coverage**: Added ship components (`QDRV_` Quantum Drives, `SHLD_` Shield Generators, `COOL_` Coolers, `POWR_` Power Plants, `JDRV_` Jump Drives), mining & tractor beam modules, multi-tool attachments, fabricators, base-building tools, minerals (`Beradom`, `Feynmaline`), apparel sets (`alb_`, `ctl_`, `drn_`, `scu_`, `r6p_`, `cbd_`, `nvs_`), and quest valuables (`currency_bar`, `medal`, `blackbox`).
 
 ### Fixed
 - **Timeline Re-Analysis Feedback & Global Refresh (`ViewModels/MainViewModel.cs`)**:

@@ -25,25 +25,34 @@ public static class WarehouseCatalog
         // Edelsteine / Harvestables
         if (lower.Contains("mineral") || lower.Contains("janalite") || lower.Contains("aphorite") ||
             lower.Contains("dolivine") || lower.Contains("hadanite") || lower.Contains("glacosite") ||
+            lower.Contains("feynmaline") || lower.Contains("beradom") ||
             lower.Contains("revenant") || lower.Contains("harvestable"))
         {
             return (PrettifyHarvestable(raw), "Mineralien & Erze");
         }
 
-        // Werkzeuge
-        if (lower.Contains("multitool") || lower.Contains("tractor") || lower.Contains("mining") ||
-            lower.Contains("salvage") || lower.Contains("repair") || lower.Contains("cambio"))
+        // Schiffskomponenten & Schiffsausrüstung
+        if (lower.StartsWith("qdrv_") || lower.StartsWith("shld_") || lower.StartsWith("cool_") ||
+            lower.StartsWith("powr_") || lower.StartsWith("jdrv_") || lower.Contains("_scitem"))
         {
-            return (PrettifyTool(raw), "Werkzeuge");
+            return (PrettifyShipComponent(raw), "Schiffsausrüstung");
+        }
+
+        // Werkzeuge & Module
+        if (lower.Contains("multitool") || lower.Contains("tractor") || lower.Contains("mining") ||
+            lower.Contains("salvage") || lower.Contains("repair") || lower.Contains("cambio") ||
+            lower.Contains("fabricator"))
+        {
+            return (PrettifyTool(raw), "Werkzeuge & Module");
         }
 
         // Waffen & Munition
         if (lower.Contains("rifle") || lower.Contains("pistol") || lower.Contains("lmg") ||
             lower.Contains("smg") || lower.Contains("shotgun") || lower.Contains("sniper") ||
             lower.Contains("gren") || lower.Contains("mag") || lower.Contains("melee") ||
-            lower.Contains("knife") || lower.Contains("weapon"))
+            lower.Contains("knife") || lower.Contains("weapon") || lower.Contains("optics"))
         {
-            return (PrettifyWeapon(raw), "Waffen");
+            return (PrettifyWeapon(raw), "Waffen & Munition");
         }
 
         // Rüstung & Kleidung
@@ -51,29 +60,55 @@ public static class WarehouseCatalog
             lower.Contains("jacket") || lower.Contains("shirt") || lower.Contains("pants") ||
             lower.Contains("hat") || lower.Contains("glasses") || lower.Contains("torso") ||
             lower.Contains("arms") || lower.Contains("legs") || lower.Contains("backpack") ||
-            lower.Contains("armor"))
+            lower.Contains("armor") || lower.StartsWith("alb_") || lower.StartsWith("ctl_") ||
+            lower.StartsWith("drn_") || lower.StartsWith("scu_") || lower.StartsWith("r6p_") ||
+            lower.StartsWith("cbd_") || lower.StartsWith("nvs_"))
         {
-            return (PrettifyArmor(raw), "Rüstung");
+            return (PrettifyArmor(raw), "Rüstung & Kleidung");
         }
 
         // Medizin & Verpflegung
         if (lower.Contains("consumable") || lower.Contains("medpen") || lower.Contains("oxypen") ||
             lower.Contains("drink") || lower.Contains("bottle") || lower.Contains("food") ||
             lower.Contains("meal") || lower.Contains("pips") || lower.Contains("cruz") ||
-            lower.Contains("can_") || lower.Contains("snack"))
+            lower.Contains("can_") || lower.Contains("snack") || lower.Contains("tin_") ||
+            lower.Contains("sachet_"))
         {
             return (PrettifyConsumable(raw), "Verbrauchsgüter");
         }
 
-        // Quest, Utensilien, Sicherungen
+        // Quest, Utensilien, Sicherungen, Wertsachen
         if (lower.Contains("fuse") || lower.Contains("harddrive") || lower.Contains("extinguisher") ||
-            lower.Contains("cryptokey") || lower.Contains("carryable"))
+            lower.Contains("cryptokey") || lower.Contains("carryable") || lower.Contains("currency_bar") ||
+            lower.Contains("medal") || lower.Contains("blackbox"))
         {
-            return (PrettifyUtility(raw), "Quest & Utility");
+            return (PrettifyUtility(raw), "Quest & Wertsachen");
         }
 
         // Fallback: Generische Bereinigung
         return (FormatGeneric(raw), "Sonstiges");
+    }
+
+    private static string PrettifyShipComponent(string raw)
+    {
+        var clean = raw.Replace("_SCItem", "", StringComparison.OrdinalIgnoreCase);
+        var parts = clean.Split('_');
+        if (parts.Length >= 4)
+        {
+            var type = parts[0].ToUpperInvariant() switch
+            {
+                "QDRV" => "Quantenantrieb",
+                "SHLD" => "Schildgenerator",
+                "COOL" => "Kühler",
+                "POWR" => "Kraftwerk",
+                "JDRV" => "Sprungantrieb",
+                _ => parts[0]
+            };
+            var size = parts[2].ToUpperInvariant();
+            var name = parts[3];
+            return $"{type} {name} ({size})";
+        }
+        return FormatGeneric(clean);
     }
 
     private static readonly Dictionary<string, (string Name, string Category)> KnownItems = new(StringComparer.OrdinalIgnoreCase)

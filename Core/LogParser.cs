@@ -250,11 +250,20 @@ public partial class LogParser
     private static partial Regex PartyMemberLeaveNotifRegex();
 
     // Lager & Inventarbewegungen
-    [GeneratedRegex(@"<RequestInventory>\s+Request\[\d+\]\s+Inventory\[\d+:Location:(?<id>\d+)\]")]
+    [GeneratedRegex(@"Inventory\[\d+:Location:(?<id>\d+)\]")]
     private static partial Regex RequestInvIdRegex();
 
-    [GeneratedRegex(@"Type\[Move\]\s+SourceInventory\[(?<src>[^\]]+)\]\s+TargetInventory\[(?<dst>[^\]]+)\]\s+ItemClass\[(?<cls>[^\]]*)\]")]
+    [GeneratedRegex(@"Type\[(?:Move|Store|Stack|Split)\]\s+SourceInventory\[(?<src>[^\]]+)\]\s+TargetInventory\[(?<dst>[^\]]+)\]\s+ItemClass\[(?<cls>[^\]]*)\]", RegexOptions.IgnoreCase)]
     private static partial Regex InvMoveRegex();
+
+    [GeneratedRegex(@"<Update Container Items Add New Item>.*?Entity Class\[(?<cls>[^\]]+)\].*?SourceInventory\[(?<inv>[^\]]+)\]")]
+    private static partial Regex UpdateContainerAddNewItemRegex();
+
+    [GeneratedRegex(@"SMarkerHandler_Hauling::OnItemRegistered.*?Mission Item (?<item>[^ ]+).*?registered with mission id (?<mid>[0-9a-fA-F-]+).*?drop off objective id (?<drop>[^ \],]+)")]
+    private static partial Regex MissionHaulingItemRegex();
+
+    [GeneratedRegex(@"mission_id (?<mid>[0-9a-fA-F-]+) - objective_id (?<drop>\S+) - state MISSION_OBJECTIVE_STATE_COMPLETED")]
+    private static partial Regex MissionDropoffCompletedRegex();
 
     [GeneratedRegex(@":Location:(?<id>\d+)")]
     private static partial Regex LocationIdRegex();
@@ -393,6 +402,7 @@ public partial class LogParser
 
     public sealed record WarehouseMovementRecord(DateTime Time, string Location, string LocationCode, string System, string ParentBody, string ItemClass, string ItemName, string Category, int Delta);
     public List<WarehouseMovementRecord> WarehouseMovements { get; } = new();
+    private readonly Dictionary<string, (string ItemClass, string MissionId)> _missionDropoffItems = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly System.Threading.Lock _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
@@ -712,10 +722,19 @@ public partial class LogParser
                 var shop = CleanShop(by.Groups["shop"].Value);
                 var shopLoc = ExtractLocationFromShop(shop);
                 if (shopLoc != null) _lastLoc = shopLoc;
-                var item = ItemNames.CleanFallback(by.Groups["item"].Value);
+                var rawItem = by.Groups["item"].Value;
+                var item = ItemNames.CleanFallback(rawItem);
                 var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
                 var ts = ParseTs(line);
                 _pendingPurchase = new PendingPurchase(ts, shop, item, by.Groups["guid"].Value, price, qty);
+
+                if (!string.IsNullOrWhiteSpace(rawItem))
+                {
+                    var locInfo = GetLocationInfo("");
+                    var targetLoc = shopLoc ?? locInfo.Name;
+                    var resolved = WarehouseCatalog.Resolve(rawItem);
+                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, +qty));
+                }
 
                 return new LogEntry
                 {
@@ -739,11 +758,22 @@ public partial class LogParser
                 var shop = CleanShop(se.Groups["shop"].Value);
                 var shopLoc = ExtractLocationFromShop(shop);
                 if (shopLoc != null) _lastLoc = shopLoc;
-                var item = ItemNames.CleanFallback(se.Groups["item"].Value);
+                var rawItem = se.Groups["item"].Value;
+                var item = ItemNames.CleanFallback(rawItem);
                 var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
+                var ts = ParseTs(line);
+
+                if (!string.IsNullOrWhiteSpace(rawItem))
+                {
+                    var locInfo = GetLocationInfo("");
+                    var targetLoc = shopLoc ?? locInfo.Name;
+                    var resolved = WarehouseCatalog.Resolve(rawItem);
+                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, -qty));
+                }
+
                 return new LogEntry
                 {
-                    Time = ParseTs(line),
+                    Time = ts,
                     Kind = EventKind.Sale,
                     Amount = price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
                     ItemRef = se.Groups["guid"].Value,
@@ -1012,9 +1042,10 @@ public partial class LogParser
             }
         }
 
-        if (line.Contains("requested inventory for Location[", StringComparison.Ordinal) || line.Contains("RequestLocationInventory", StringComparison.Ordinal))
+        if (line.Contains("requested inventory for Location[", StringComparison.OrdinalIgnoreCase) || line.Contains("RequestLocationInventory", StringComparison.OrdinalIgnoreCase))
         {
-            var lo = LocRegex().Match(line);
+            var lo = RequestInventoryLocRegex().Match(line);
+            if (!lo.Success) lo = LocRegex().Match(line);
             if (lo.Success && !line.Contains("doesn't have inventory", StringComparison.OrdinalIgnoreCase))
             {
                 var raw = lo.Groups["loc"].Value;
@@ -1026,9 +1057,14 @@ public partial class LogParser
             }
         }
 
-        if (line.Contains("<RequestInventory>", StringComparison.Ordinal) && line.Contains(":Location:", StringComparison.Ordinal))
+        if (line.Contains(":Location:", StringComparison.OrdinalIgnoreCase) &&
+           (line.Contains("Query Inventory", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Freight Inventory Grid", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Request Personal Inventory Data", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("RequestInventory", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("FreightElevator", StringComparison.OrdinalIgnoreCase)))
         {
-            var m = RequestInvIdRegex().Match(line);
+            var m = LocationIdRegex().Match(line);
             if (m.Success)
             {
                 var locId = m.Groups["id"].Value;
@@ -1039,7 +1075,11 @@ public partial class LogParser
             }
         }
 
-        if (line.Contains("Type[Move]", StringComparison.Ordinal) && line.Contains("New request[", StringComparison.Ordinal))
+        if ((line.Contains("Type[Move]", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Type[Store]", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Type[Stack]", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Type[Split]", StringComparison.OrdinalIgnoreCase)) &&
+            line.Contains("request[", StringComparison.OrdinalIgnoreCase))
         {
             var m = InvMoveRegex().Match(line);
             if (m.Success)
@@ -1054,7 +1094,7 @@ public partial class LogParser
                     var resolved = WarehouseCatalog.Resolve(cls);
 
                     // Einlagerung in Location?
-                    if (dst.Contains(":Location:", StringComparison.Ordinal))
+                    if (dst.Contains(":Location:", StringComparison.OrdinalIgnoreCase))
                     {
                         var locIdMatch = LocationIdRegex().Match(dst);
                         var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
@@ -1073,7 +1113,7 @@ public partial class LogParser
                     }
 
                     // Entnahme aus Location?
-                    if (src.Contains(":Location:", StringComparison.Ordinal))
+                    if (src.Contains(":Location:", StringComparison.OrdinalIgnoreCase))
                     {
                         var locIdMatch = LocationIdRegex().Match(src);
                         var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
@@ -1092,6 +1132,90 @@ public partial class LogParser
                     }
                 }
             }
+        }
+
+        if (line.Contains("<Update Container Items Add New Item>", StringComparison.Ordinal) && line.Contains(":Location:", StringComparison.OrdinalIgnoreCase))
+        {
+            var m = UpdateContainerAddNewItemRegex().Match(line);
+            if (m.Success)
+            {
+                var cls = m.Groups["cls"].Value;
+                var inv = m.Groups["inv"].Value;
+                if (!string.IsNullOrWhiteSpace(cls) && !cls.Equals("None", StringComparison.OrdinalIgnoreCase) && !cls.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ts = ParseTs(line);
+                    var resolved = WarehouseCatalog.Resolve(cls);
+                    var locIdMatch = LocationIdRegex().Match(inv);
+                    var locId = locIdMatch.Success ? locIdMatch.Groups["id"].Value : "";
+                    var locInfo = GetLocationInfo(locId);
+
+                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, locInfo.Name, locInfo.RawId, locInfo.System, locInfo.ParentBody, cls, resolved.Name, resolved.Category, +1));
+                    return new LogEntry
+                    {
+                        Time = ts,
+                        Kind = EventKind.Inventory,
+                        Amount = 1,
+                        Detail = $"{locInfo.Name}: +1 {resolved.Name}",
+                        Ship = locInfo.Name,
+                        ItemRef = cls
+                    };
+                }
+            }
+        }
+
+        if (line.Contains("SMarkerHandler_Hauling::OnItemRegistered", StringComparison.Ordinal))
+        {
+            var m = MissionHaulingItemRegex().Match(line);
+            if (m.Success)
+            {
+                var rawItem = m.Groups["item"].Value;
+                var drop = m.Groups["drop"].Value;
+                var mid = m.Groups["mid"].Value;
+                var lastUnderscore = rawItem.LastIndexOf('_');
+                var itemClass = (lastUnderscore > 0 && long.TryParse(rawItem[(lastUnderscore + 1)..], out _))
+                    ? rawItem[..lastUnderscore]
+                    : rawItem;
+                _missionDropoffItems[drop] = (itemClass, mid);
+            }
+        }
+
+        if (line.Contains("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.Ordinal) && _missionDropoffItems.Count > 0)
+        {
+            var m = MissionDropoffCompletedRegex().Match(line);
+            if (m.Success)
+            {
+                var drop = m.Groups["drop"].Value;
+                if (_missionDropoffItems.Remove(drop, out var info))
+                {
+                    var ts = ParseTs(line);
+                    var locInfo = GetLocationInfo("");
+                    var resolved = WarehouseCatalog.Resolve(info.ItemClass);
+                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, locInfo.Name, locInfo.RawId, locInfo.System, locInfo.ParentBody, info.ItemClass, resolved.Name, resolved.Category, -1));
+                    return new LogEntry
+                    {
+                        Time = ts,
+                        Kind = EventKind.Inventory,
+                        Amount = -1,
+                        Detail = $"{locInfo.Name}: -1 {resolved.Name} (Missionsabgabe Frachtaufzug)",
+                        Ship = locInfo.Name,
+                        ItemRef = info.ItemClass
+                    };
+                }
+            }
+        }
+
+        if (line.Contains("CEntityComponentMiningShopUIProvider::OnRefineryRequest", StringComparison.Ordinal) ||
+            line.Contains("FlashCallback_OnSellToRefineryPressed", StringComparison.Ordinal))
+        {
+            var ts = ParseTs(line);
+            var locInfo = GetLocationInfo("");
+            return new LogEntry
+            {
+                Time = ts,
+                Kind = EventKind.Refinery,
+                Detail = $"{locInfo.Name}: Material zur Veredelung abgegeben",
+                Ship = locInfo.Name
+            };
         }
 
         if (line.Contains("<OnInventoryStoreItem>", StringComparison.Ordinal) && line.Contains(":Location:", StringComparison.Ordinal))

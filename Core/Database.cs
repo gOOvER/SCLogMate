@@ -17,7 +17,7 @@ namespace SCLogMate.Core;
 public static class Database
 {
     public const int CurrentSchemaVersion = 16; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 32; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentParserVersion = 33; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
