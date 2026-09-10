@@ -54,11 +54,11 @@ internal static partial class Program
                 return;
             }
 
-            Core.Logger.Log($"GUI-Start · {Environment.OSVersion}");
+            Core.Logger.Log($"Photino-GUI Start · {Environment.OSVersion}");
             try
             {
                 Database.Init();
-                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                RunPhotinoApp(args);
             }
             catch (Exception ex)
             {
@@ -67,6 +67,68 @@ internal static partial class Program
             }
         }
         return;
+    }
+
+    private static void RunPhotinoApp(string[] args)
+    {
+        var window = new Photino.NET.PhotinoWindow()
+            .SetTitle("SCLogMate — Star Citizen Live Companion")
+            .SetUseOsDefaultSize(false)
+            .SetSize(1440, 900)
+            .SetMinSize(1024, 700)
+            .Center();
+
+        var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.ico");
+        if (File.Exists(iconPath))
+        {
+            try { window.SetIconFile(iconPath); } catch { }
+        }
+
+        var bridge = new Core.Photino.PhotinoBridge();
+        bridge.Initialize(window);
+
+        // Prüfen, ob Vite Dev-Server läuft (http://localhost:5173)
+        bool useDevServer = args.Contains("--dev");
+        if (!useDevServer)
+        {
+            try
+            {
+                using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(250) };
+                var res = client.GetAsync("http://localhost:5173").GetAwaiter().GetResult();
+                if (res.IsSuccessStatusCode)
+                {
+                    useDevServer = true;
+                }
+            }
+            catch { }
+        }
+
+        if (useDevServer)
+        {
+            Core.Logger.Log("Photino: Lade Vite Dev-Server unter http://localhost:5173");
+            window.Load(new Uri("http://localhost:5173"));
+        }
+        else
+        {
+            var wwwrootIndex = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "index.html");
+            if (File.Exists(wwwrootIndex))
+            {
+                Core.Logger.Log($"Photino: Lade lokales wwwroot/index.html ({wwwrootIndex})");
+                window.Load(wwwrootIndex);
+            }
+            else if (File.Exists("wwwroot/index.html"))
+            {
+                Core.Logger.Log("Photino: Lade relatives wwwroot/index.html");
+                window.Load("wwwroot/index.html");
+            }
+            else
+            {
+                Core.Logger.Log("Photino: Fallback zu http://localhost:5173");
+                window.Load(new Uri("http://localhost:5173"));
+            }
+        }
+
+        window.WaitForClose();
     }
 
     public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
