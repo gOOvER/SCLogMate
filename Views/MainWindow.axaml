@@ -134,29 +134,7 @@
       </StackPanel>
     </Grid>
 
-    <!-- ══ Auto-Scan / Datenbank-Indexierung Live-Status & Fortschrittsbalken ══ -->
-    <Border DockPanel.Dock="Top" Margin="0,0,0,10"
-            Background="#0B192C" BorderBrush="#0284C7" BorderThickness="1.5"
-            CornerRadius="8" Padding="14,9"
-            BoxShadow="0 4 16 #80000000"
-            IsVisible="{Binding IsDatabaseBusy}">
-      <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
-        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="⚡" FontSize="14" Foreground="#38BDF8" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding DatabaseStatusMessage}" FontSize="12" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
-        </StackPanel>
 
-        <TextBlock Grid.Row="0" Grid.Column="2"
-                   Text="{Binding DatabaseProgressPercent, StringFormat='{}{0:N0}%'}"
-                   FontSize="12.5" FontWeight="Bold" Foreground="#38BDF8" FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
-
-        <!-- Animierter Fortschrittsbalken -->
-        <ProgressBar Grid.Row="1" Grid.ColumnSpan="3" Height="6" Margin="0,7,0,0"
-                     Minimum="0" Maximum="100"
-                     Value="{Binding DatabaseProgressPercent}"
-                     Foreground="#38BDF8" Background="#1E293B" CornerRadius="3" />
-      </Grid>
-    </Border>
 
     <!-- ══ Session-Auswahl Bar (mobiGlas Strip) ══ -->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
@@ -6083,6 +6061,56 @@
   </Border>
 
 
+
+    <!-- ══ NEUES MODERNES DATENBANK-FORTSCHRITTS-MODAL ══ -->
+    <Border Background="#D8070D14" IsVisible="{Binding IsDatabaseBusy}"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ZIndex="999">
+      <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="520"
+              Background="#0E1624" BorderBrush="#38BDF8" BorderThickness="1.5" CornerRadius="12"
+              BoxShadow="0 16 48 #80000000" Padding="28,24">
+        <StackPanel Spacing="18">
+          
+          <!-- Header mit pulsierendem Radar-Icon & Titel -->
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Grid.Column="0" Background="#0A2239" BorderBrush="#38BDF8" BorderThickness="1"
+                    CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+              <TextBlock Text="⚡" FontSize="22" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="Star Citizen Datenbank-Indexierung" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" />
+              <TextBlock Text="Sessions &amp; Ereignisse werden verarbeitet" FontSize="11" Foreground="#8B949E" />
+            </StackPanel>
+          </Grid>
+
+          <!-- Aktuelle Datei & Operation -->
+          <Border Background="#070D16" BorderBrush="#1C2B3E" BorderThickness="1" CornerRadius="8" Padding="12,10">
+            <TextBlock Text="{Binding DatabaseStatusMessage}" FontSize="12" Foreground="#38BDF8" FontWeight="SemiBold"
+                       TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+          </Border>
+
+          <!-- Große animierte Fortschrittsleiste -->
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="FORTSCHRITT" FontSize="10" FontWeight="Bold" Foreground="#8B949E" LetterSpacing="0.5" />
+              <TextBlock Grid.Column="1" Text="{Binding DatabaseProgressPercent, StringFormat='{}{0:F0}%'}"
+                         FontSize="12" FontWeight="Bold" Foreground="#FFB23E" />
+            </Grid>
+            <ProgressBar Height="8" CornerRadius="4" Background="#162232" Foreground="#38BDF8"
+                         Minimum="0" Maximum="100" Value="{Binding DatabaseProgressPercent}" />
+          </StackPanel>
+
+          <!-- Info-Hinweisbox -->
+          <Border Background="#091422" BorderBrush="#16283D" BorderThickness="1" CornerRadius="6" Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0" Text="ℹ" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="1" Text="Logs werden im Hintergrund indexiert. Daten stehen gleich bereit."
+                         FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </Grid>
+          </Border>
+
+        </StackPanel>
+      </Border>
+    </Border>
 
     <!-- ══ DEDIZIERTES UPDATE-FENSTER MODAL ══ -->
     <Border Background="#E6070D14" IsVisible="{Binding IsUpdateModalOpen}"

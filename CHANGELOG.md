@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bumped `CurrentParserVersion` to `34` in `Core/Database.cs`.
 
 ### Removed
-- **Duplicate Database Indexing Modal Overlay (`Views/MainWindow.axaml`)**:
-  - Removed the redundant full-window modal overlay during database scanning (`IsDatabaseBusy`), retaining the clean, non-blocking top banner to allow uninterrupted UI interaction during background log indexing.
+- **Duplicate Database Indexing Top Banner (`Views/MainWindow.axaml`)**:
+  - Removed the redundant top progress bar banner during database scanning (`IsDatabaseBusy`), retaining the dedicated central modal progress overlay (`Star Citizen Datenbank-Indexierung`).
 
 ## [1.0.0-rc2] - 2026-09-09
 ### Added
