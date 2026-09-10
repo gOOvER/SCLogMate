@@ -122,8 +122,128 @@ public class LogEventDto
     [JsonPropertyName("amount")]
     public long? Amount { get; set; }
 
+    [JsonPropertyName("ship")]
+    public string? Ship { get; set; }
+
     [JsonPropertyName("rawText")]
     public string? RawText { get; set; }
+}
+
+public class WarehouseItemDto
+{
+    [JsonPropertyName("location")]
+    public string Location { get; set; } = "";
+
+    [JsonPropertyName("locationCode")]
+    public string LocationCode { get; set; } = "";
+
+    [JsonPropertyName("system")]
+    public string System { get; set; } = "Stanton";
+
+    [JsonPropertyName("parentBody")]
+    public string ParentBody { get; set; } = "";
+
+    [JsonPropertyName("itemClass")]
+    public string ItemClass { get; set; } = "";
+
+    [JsonPropertyName("itemName")]
+    public string ItemName { get; set; } = "";
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "Sonstiges";
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; }
+
+    [JsonPropertyName("lastUpdated")]
+    public string LastUpdated { get; set; } = "";
+
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "📦";
+
+    [JsonPropertyName("locationDisplay")]
+    public string LocationDisplay { get; set; } = "";
+}
+
+public class WarehouseLocationDto
+{
+    [JsonPropertyName("locationName")]
+    public string LocationName { get; set; } = "";
+
+    [JsonPropertyName("locationCode")]
+    public string LocationCode { get; set; } = "";
+
+    [JsonPropertyName("system")]
+    public string System { get; set; } = "Stanton";
+
+    [JsonPropertyName("parentBody")]
+    public string ParentBody { get; set; } = "";
+
+    [JsonPropertyName("totalItems")]
+    public int TotalItems { get; set; }
+
+    [JsonPropertyName("uniqueItemTypes")]
+    public int UniqueItemTypes { get; set; }
+
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "🪐";
+}
+
+public class FinanceOverviewDto
+{
+    [JsonPropertyName("totalIncome")]
+    public long TotalIncome { get; set; }
+
+    [JsonPropertyName("totalSpend")]
+    public long TotalSpend { get; set; }
+
+    [JsonPropertyName("totalNet")]
+    public long TotalNet { get; set; }
+
+    [JsonPropertyName("sales")]
+    public long Sales { get; set; }
+
+    [JsonPropertyName("trade")]
+    public long Trade { get; set; }
+
+    [JsonPropertyName("missionsReward")]
+    public long MissionsReward { get; set; }
+
+    [JsonPropertyName("purchases")]
+    public long Purchases { get; set; }
+
+    [JsonPropertyName("transferIn")]
+    public long TransferIn { get; set; }
+
+    [JsonPropertyName("transferOut")]
+    public long TransferOut { get; set; }
+
+    [JsonPropertyName("ledger")]
+    public List<LogEventDto> Ledger { get; set; } = new();
+
+    [JsonPropertyName("cargo")]
+    public List<LogEventDto> Cargo { get; set; } = new();
+
+    [JsonPropertyName("topExpenses")]
+    public List<LogEventDto> TopExpenses { get; set; } = new();
+}
+
+public class FleetStatDto
+{
+    [JsonPropertyName("shipName")]
+    public string ShipName { get; set; } = "";
+
+    [JsonPropertyName("flights")]
+    public int Flights { get; set; }
+
+    [JsonPropertyName("quantumJumps")]
+    public int QuantumJumps { get; set; }
+
+    [JsonPropertyName("losses")]
+    public int Losses { get; set; }
+
+    [JsonPropertyName("lastUsed")]
+    public string LastUsed { get; set; } = "";
 }
 
 public class PhotinoBridge
@@ -221,6 +341,75 @@ public class PhotinoBridge
 
                 case "get_sessions":
                     SendResponse(req.Id, "sessions_response", GetSessions());
+                    break;
+
+                case "get_events":
+                    string? category = null;
+                    string? search = null;
+                    int limit = 100;
+                    int offset = 0;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("category", out var catProp)) category = catProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("search", out var sProp)) search = sProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("limit", out var limProp)) limit = limProp.GetInt32();
+                        if (req.Payload.Value.TryGetProperty("offset", out var offProp)) offset = offProp.GetInt32();
+                    }
+                    SendResponse(req.Id, "events_response", GetEvents(category, search, limit, offset));
+                    break;
+
+                case "get_finance":
+                    SendResponse(req.Id, "finance_response", GetFinanceOverview());
+                    break;
+
+                case "get_warehouse":
+                    string? locFilter = null;
+                    string? catFilter = null;
+                    string? whSearch = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("location", out var lfProp)) locFilter = lfProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("category", out var cfProp)) catFilter = cfProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("search", out var wsProp)) whSearch = wsProp.GetString();
+                    }
+                    SendResponse(req.Id, "warehouse_response", GetWarehouseData(locFilter, catFilter, whSearch));
+                    break;
+
+                case "adjust_warehouse_qty":
+                    if (req.Payload.HasValue)
+                    {
+                        string loc = req.Payload.Value.GetProperty("location").GetString() ?? "";
+                        string itemClass = req.Payload.Value.GetProperty("itemClass").GetString() ?? "";
+                        int delta = req.Payload.Value.GetProperty("delta").GetInt32();
+                        Database.AdjustWarehouseItemQuantity(loc, itemClass, delta);
+                        SendResponse(req.Id, "adjust_warehouse_qty_response", GetWarehouseData(loc, null, null));
+                        Broadcast("WAREHOUSE_UPDATED", GetWarehouseData(null, null, null));
+                    }
+                    break;
+
+                case "delete_warehouse_item":
+                    if (req.Payload.HasValue)
+                    {
+                        string loc = req.Payload.Value.GetProperty("location").GetString() ?? "";
+                        string itemClass = req.Payload.Value.GetProperty("itemClass").GetString() ?? "";
+                        Database.DeleteWarehouseItem(loc, itemClass);
+                        SendResponse(req.Id, "delete_warehouse_item_response", GetWarehouseData(loc, null, null));
+                        Broadcast("WAREHOUSE_UPDATED", GetWarehouseData(null, null, null));
+                    }
+                    break;
+
+                case "clear_warehouse_location":
+                    if (req.Payload.HasValue)
+                    {
+                        string loc = req.Payload.Value.GetProperty("location").GetString() ?? "";
+                        Database.ClearWarehouseLocation(loc);
+                        SendResponse(req.Id, "clear_warehouse_location_response", GetWarehouseData(null, null, null));
+                        Broadcast("WAREHOUSE_UPDATED", GetWarehouseData(null, null, null));
+                    }
+                    break;
+
+                case "get_fleet":
+                    SendResponse(req.Id, "fleet_response", GetFleetData());
                     break;
 
                 case "toggle_watcher":
@@ -367,7 +556,6 @@ public class PhotinoBridge
                 });
             }
 
-            // Fallback: If DB had no sessions yet, scan files on disk
             if (list.Count == 0 && !string.IsNullOrEmpty(_currentLogPath))
             {
                 var scanned = SessionScanner.Scan(_currentLogPath);
@@ -399,6 +587,151 @@ public class PhotinoBridge
         }
 
         return list;
+    }
+
+    private List<LogEventDto> GetEvents(string? categoryFilter, string? searchQuery, int limit, int offset)
+    {
+        Database.EnsureInitialized();
+        var rawEvents = Database.LoadRecentEvents(2500);
+        var query = rawEvents.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "all")
+        {
+            query = query.Where(e => MapCategory(e.Kind).Equals(categoryFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(e =>
+                (e.Detail != null && e.Detail.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                (e.Ship != null && e.Ship.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                e.KindText.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return query
+            .Reverse()
+            .Skip(offset)
+            .Take(limit)
+            .Select(e => new LogEventDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm:ss"),
+                Category = MapCategory(e.Kind),
+                Title = e.KindText,
+                Description = e.Detail ?? e.KindText,
+                Amount = e.Amount != 0 ? e.Amount : null,
+                Ship = e.Ship,
+                RawText = e.Detail,
+            })
+            .ToList();
+    }
+
+    private FinanceOverviewDto GetFinanceOverview()
+    {
+        Database.EnsureInitialized();
+        var agg = Database.Aggregate(since: null, filterMoney: true, filterContracts: true, filterFleet: false);
+
+        var financeEvents = Database.AllFinanceEvents().Take(100).Select(e => new LogEventDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            Category = MapCategory(e.Kind),
+            Title = e.KindText,
+            Description = e.Detail ?? e.KindText,
+            Amount = e.Amount,
+            Ship = e.Ship,
+        }).ToList();
+
+        var cargoEvents = Database.AllTrades().Take(100).Select(e => new LogEventDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            Category = "wallet",
+            Title = e.KindText,
+            Description = e.Detail ?? e.KindText,
+            Amount = e.Amount,
+            Ship = e.Ship,
+        }).ToList();
+
+        var topMoney = Database.TopMoney(15).Select(e => new LogEventDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            Category = "wallet",
+            Title = e.KindText,
+            Description = e.Detail ?? e.KindText,
+            Amount = e.Amount,
+            Ship = e.Ship,
+        }).ToList();
+
+        return new FinanceOverviewDto
+        {
+            TotalIncome = agg.In + agg.Reward + agg.Sales + agg.Trade,
+            TotalSpend = agg.Out + agg.Purchases,
+            TotalNet = (agg.In + agg.Reward + agg.Sales + agg.Trade) - (agg.Out + agg.Purchases),
+            Sales = agg.Sales,
+            Trade = agg.Trade,
+            MissionsReward = agg.Reward,
+            Purchases = agg.Purchases,
+            TransferIn = agg.In,
+            TransferOut = agg.Out,
+            Ledger = financeEvents,
+            Cargo = cargoEvents,
+            TopExpenses = topMoney,
+        };
+    }
+
+    private object GetWarehouseData(string? locationFilter, string? categoryFilter, string? search)
+    {
+        Database.EnsureInitialized();
+        var locationsRaw = Database.GetWarehouseLocationsSummary();
+        var itemsRaw = Database.GetWarehouseItems(locationFilter, categoryFilter, search);
+
+        var locations = locationsRaw.Select(l => new WarehouseLocationDto
+        {
+            LocationName = l.LocationName,
+            LocationCode = l.LocationCode,
+            System = l.System,
+            ParentBody = l.ParentBody,
+            TotalItems = l.TotalItems,
+            UniqueItemTypes = l.UniqueItemTypes,
+            Icon = l.Icon,
+        }).ToList();
+
+        var items = itemsRaw.Select(i => new WarehouseItemDto
+        {
+            Location = i.Location,
+            LocationCode = i.LocationCode,
+            System = i.System,
+            ParentBody = i.ParentBody,
+            ItemClass = i.ItemClass,
+            ItemName = i.ItemName,
+            Category = i.Category,
+            Quantity = i.Quantity,
+            LastUpdated = i.FormattedDate,
+            Icon = i.Icon,
+            LocationDisplay = i.LocationDisplay,
+        }).ToList();
+
+        return new
+        {
+            locations,
+            items,
+        };
+    }
+
+    private List<FleetStatDto> GetFleetData()
+    {
+        Database.EnsureInitialized();
+        var stats = Database.GetFleetStats();
+        return stats.Select(s => new FleetStatDto
+        {
+            ShipName = s.Ship,
+            Flights = s.FlightCount,
+            QuantumJumps = s.QtCount,
+            Losses = s.LossCount,
+            LastUsed = s.LastTime.HasValue ? s.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
+        }).ToList();
     }
 
     private int TriggerScan()
@@ -459,6 +792,7 @@ public class PhotinoBridge
                 Title = entry.KindText,
                 Description = entry.Detail ?? entry.KindText,
                 Amount = entry.Amount != 0 ? entry.Amount : null,
+                Ship = entry.Ship,
                 RawText = rawLine.Length > 120 ? rawLine[..120] + "…" : rawLine,
             };
 

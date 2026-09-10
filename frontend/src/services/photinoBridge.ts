@@ -49,7 +49,55 @@ export interface LogEventItem {
   title: string;
   description: string;
   amount?: number;
+  ship?: string;
   rawText?: string;
+}
+
+export interface WarehouseItemDto {
+  location: string;
+  locationCode: string;
+  system: string;
+  parentBody: string;
+  itemClass: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  lastUpdated: string;
+  icon: string;
+  locationDisplay: string;
+}
+
+export interface WarehouseLocationDto {
+  locationName: string;
+  locationCode: string;
+  system: string;
+  parentBody: string;
+  totalItems: number;
+  uniqueItemTypes: number;
+  icon: string;
+}
+
+export interface FinanceOverviewDto {
+  totalIncome: number;
+  totalSpend: number;
+  totalNet: number;
+  sales: number;
+  trade: number;
+  missionsReward: number;
+  purchases: number;
+  transferIn: number;
+  transferOut: number;
+  ledger: LogEventItem[];
+  cargo: LogEventItem[];
+  topExpenses: LogEventItem[];
+}
+
+export interface FleetStatDto {
+  shipName: string;
+  flights: number;
+  quantumJumps: number;
+  losses: number;
+  lastUsed: string;
 }
 
 type EventListener = (payload: any) => void;
@@ -111,7 +159,7 @@ class PhotinoBridge {
   }
 
   /** Send a command to C# and await a response */
-  public sendRequest<TResponse = any, TPayload = any>(type: string, payload?: TPayload, timeoutMs = 8000): Promise<TResponse> {
+  public sendRequest<TResponse = any, TPayload = any>(type: string, payload?: TPayload, timeoutMs = 12000): Promise<TResponse> {
     return new Promise((resolve, reject) => {
       const id = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -157,20 +205,19 @@ class PhotinoBridge {
     };
   }
 
-  // Mock implementation for browser-only development (npm run dev in Chrome/Edge)
+  // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
-    console.log(`[PhotinoBridge Mock] Handled request: ${type}`, payload);
     switch (type) {
       case 'get_status':
         return {
           version: '1.0.0-photino-preview',
           isLiveWatching: true,
-          logPath: 'C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\logbackups',
-          activeSessionName: 'Session 2026-09-10 18:30',
-          dbSessionCount: 14,
-          totalIncome: 1450000,
-          totalSpend: 320000,
-          totalNet: 1130000,
+          logPath: 'C:\\Games\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log',
+          activeSessionName: 'Game.log (Aktuell)',
+          dbSessionCount: 24,
+          totalIncome: 4250000,
+          totalSpend: 980000,
+          totalNet: 3270000,
           lastEventTime: new Date().toLocaleTimeString(),
         } as AppStatus;
 
@@ -194,27 +241,147 @@ class PhotinoBridge {
           },
           {
             id: 2,
-            name: 'Stanton Bounty Hunting',
+            name: 'Stanton Cargo Hauling',
             startTime: '09.09. 20:00',
             endTime: '09.09. 22:15',
             duration: '2h 15m',
-            income: 600000,
-            spend: 200000,
-            net: 400000,
+            income: 1400000,
+            spend: 400000,
+            net: 1000000,
             sales: 0,
-            trade: 0,
-            deaths: 1,
-            missions: 8,
-            ships: ['Aegis Vanguard Warden'],
-            lastLocation: 'Port Tressler',
+            trade: 1400000,
+            deaths: 0,
+            missions: 6,
+            ships: ['Crusader C2 Hercules'],
+            lastLocation: 'Lorville (Hurston)',
           },
         ] as SessionSummary[];
+
+      case 'get_events':
+        return [
+          {
+            id: 'e1',
+            timestamp: '10.09. 18:42:15',
+            category: 'wallet',
+            title: 'Verkauf',
+            description: 'RMC (Recycled Material Composite) ×24 SCU',
+            amount: 345600,
+            ship: 'Drake Vulture',
+          },
+          {
+            id: 'e2',
+            timestamp: '10.09. 18:25:00',
+            category: 'ship',
+            title: 'Quantum-Sprung',
+            description: 'Sprung nach OM-1 (Aberdeen)',
+            ship: 'Drake Vulture',
+          },
+          {
+            id: 'e3',
+            timestamp: '10.09. 18:10:20',
+            category: 'mission',
+            title: 'Auftrag abgeschlossen',
+            description: 'Unverified Salvage Claim',
+            amount: 65000,
+          },
+        ] as LogEventItem[];
+
+      case 'get_finance':
+        return {
+          totalIncome: 4250000,
+          totalSpend: 980000,
+          totalNet: 3270000,
+          sales: 1850000,
+          trade: 1600000,
+          missionsReward: 800000,
+          purchases: 750000,
+          transferIn: 0,
+          transferOut: 230000,
+          ledger: [],
+          cargo: [],
+          topExpenses: [],
+        } as FinanceOverviewDto;
+
+      case 'get_warehouse':
+        return {
+          locations: [
+            {
+              locationName: 'Everus Harbor',
+              locationCode: 'EH_HUR',
+              system: 'Stanton',
+              parentBody: 'Hurston',
+              totalItems: 42,
+              uniqueItemTypes: 8,
+              icon: '🛰️',
+            },
+            {
+              locationName: 'Lorville',
+              locationCode: 'LOR_HUR',
+              system: 'Stanton',
+              parentBody: 'Hurston',
+              totalItems: 115,
+              uniqueItemTypes: 24,
+              icon: '🪐',
+            },
+          ] as WarehouseLocationDto[],
+          items: [
+            {
+              location: 'Everus Harbor',
+              locationCode: 'EH_HUR',
+              system: 'Stanton',
+              parentBody: 'Hurston',
+              itemClass: 'scitem_multitool',
+              itemName: 'Pyro RYT Multi-Tool',
+              category: 'Werkzeuge',
+              quantity: 4,
+              lastUpdated: '10.09.2026 17:30',
+              icon: '🔧',
+              locationDisplay: 'Everus Harbor · Hurston (Stanton)',
+            },
+            {
+              location: 'Everus Harbor',
+              locationCode: 'EH_HUR',
+              system: 'Stanton',
+              parentBody: 'Hurston',
+              itemClass: 'scitem_medpen',
+              itemName: 'Hemozal MedPen',
+              category: 'Verbrauchsgüter',
+              quantity: 24,
+              lastUpdated: '10.09.2026 17:35',
+              icon: '💊',
+              locationDisplay: 'Everus Harbor · Hurston (Stanton)',
+            },
+          ] as WarehouseItemDto[],
+        };
+
+      case 'adjust_warehouse_qty':
+      case 'delete_warehouse_item':
+      case 'clear_warehouse_location':
+        return this.handleMockRequest('get_warehouse', payload);
+
+      case 'get_fleet':
+        return [
+          {
+            shipName: 'Drake Vulture',
+            flights: 14,
+            quantumJumps: 38,
+            losses: 0,
+            lastUsed: '10.09.2026 18:45',
+          },
+          {
+            shipName: 'Aegis Vanguard Warden',
+            flights: 22,
+            quantumJumps: 64,
+            losses: 2,
+            lastUsed: '08.09.2026 23:10',
+          },
+        ] as FleetStatDto[];
 
       case 'toggle_watcher':
         return { isLiveWatching: payload?.enable ?? true };
 
       case 'scan_logs':
-        return { scannedCount: 12, newEvents: 48 };
+        return { scannedCount: 24 };
 
       default:
         return { success: true };

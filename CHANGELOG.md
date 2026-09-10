@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- **Photino.NET & React Modern Frontend Architecture Prototype (`Core/Photino/`, `frontend/`, `SCLogMate.csproj`, `Program.cs`)**:
-  - Integrated `Photino.NET` (v4.0.16) lightweight OS-native WebView2 host, transitioning away from Avalonia XAML UI.
-  - Implemented high-performance modern React 19 + TypeScript + Vite 6 + Tailwind CSS v4 web interface located in `frontend/`.
-  - Styled interface aligned with SCVerse sci-fi aesthetics: glassmorphism cards, glowing HUD corners, neon cyan and gold color schemes, and responsive layout.
-  - Implemented type-safe bidirectional IPC bridge (`PhotinoBridge.cs` ↔ `photinoBridge.ts`) supporting message dispatch, event subscriptions, and request/response workflows (`get_status`, `get_sessions`, `toggle_watcher`, `scan_logs`, and live `LOG_EVENT` broadcasting).
-  - Configured Vite build output to bundle directly into `wwwroot` for seamless offline desktop execution, with auto-detection for the Vite dev server (`http://localhost:5173`) during active development.
+- **Photino.NET & React Full Functional Migration — Phase 1 (`Core/Photino/`, `frontend/`)**:
+  - Implemented 16-tab categorized sidebar navigation matching the entire functional landscape of the Avalonia application (Chronik, Finanzen, Lager, Flotte, Aufträge, Ansehen, Starmap, Orte, Flugschreiber, RS Scanner, Markt, Baupläne, Ausrüstung, Werkzeuge, Einstellungen, Über).
+  - Ported **Chronik / Events View** (`EventsView.tsx`): Real-time and historical event browsing with filter pills (All, Wallet, Combat, Missions, Ships, Locations, System), search bar, and detailed entry inspector drawer.
+  - Ported **Finanzen & Saldo View** (`FinancesView.tsx`): Financial overview cards, transaction ledger, cargo & commodity trading log, and top expense breakdowns.
+  - Ported **Lager & Bestandsverwaltung View** (`WarehouseView.tsx`): Dual-column planetary & station inventory management, location filtering, instant `+`/`-` stock adjustment buttons, context action menu (Freight Elevator -1, Dismantled -1, Delete), and Markdown export.
+  - Ported **Flotte & Schiffe View** (`FleetView.tsx`): Fleet summary cards, flight counts, quantum jumps, losses, and last used timestamps.
+  - Added dashboard overview (`DashboardView.tsx`) with quick navigation and placeholders (`PlaceholderView.tsx`) for upcoming phases.
+  - Expanded `PhotinoBridge.cs` backend IPC handlers (`get_events`, `get_finance`, `get_warehouse`, `adjust_warehouse_qty`, `delete_warehouse_item`, `clear_warehouse_location`, `get_fleet`).
 - **Warehouse Item Management & Manual Stock Adjustments (`Core/Database.cs`, `ViewModels/MainViewModel.Warehouse.cs`, `Views/MainWindow.axaml`)**:
   - Added direct item adjustment controls (`-` and `+` buttons) directly in the Warehouse grid quantity column for instantaneous manual stock corrections (e.g. when retrieving items via the freight elevator or consuming gear).
   - Added dedicated warehouse row action buttons and context menu entries:
