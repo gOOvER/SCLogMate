@@ -16,6 +16,11 @@ import { MissionsView } from './views/MissionsView';
 import { ReputationView } from './views/ReputationView';
 import { BlueprintsView } from './views/BlueprintsView';
 import { LoadoutView } from './views/LoadoutView';
+import { StarmapView } from './views/StarmapView';
+import { PlacesView } from './views/PlacesView';
+import { BlackboxView } from './views/BlackboxView';
+import { OreScannerView } from './views/OreScannerView';
+import { MarketView } from './views/MarketView';
 import { PlaceholderView } from './views/PlaceholderView';
 import {
   FolderSync,
@@ -214,17 +219,20 @@ export const App: React.FC = () => {
 
           {activeTab === 'loadout' && <LoadoutView />}
 
+          {activeTab === 'starmap' && <StarmapView />}
+
+          {activeTab === 'places' && <PlacesView />}
+
+          {activeTab === 'blackbox' && <BlackboxView />}
+
+          {activeTab === 'orescanner' && <OreScannerView />}
+
+          {activeTab === 'market' && <MarketView />}
+
           {/* Placeholders for remaining tabs */}
-          {[
-            'starmap',
-            'places',
-            'blackbox',
-            'orescanner',
-            'market',
-            'tools',
-            'settings',
-            'about',
-          ].includes(activeTab) && <PlaceholderView tab={activeTab} />}
+          {['tools', 'settings', 'about'].includes(activeTab) && (
+            <PlaceholderView tab={activeTab} />
+          )}
         </main>
 
         {/* Bottom Statusbar */}

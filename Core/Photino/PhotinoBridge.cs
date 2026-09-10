@@ -399,6 +399,135 @@ public class LoadoutSlotDto
     public string? LastEquipped { get; set; }
 }
 
+public class StarmapObjectDto
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("system")] public string System { get; set; } = "";
+    [JsonPropertyName("parentId")] public string? ParentId { get; set; }
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("orbitRadius")] public double OrbitRadius { get; set; }
+    [JsonPropertyName("orbitAngleDeg")] public double OrbitAngleDeg { get; set; }
+    [JsonPropertyName("colorHex")] public string ColorHex { get; set; } = "#58A6FF";
+    [JsonPropertyName("size")] public double Size { get; set; } = 8;
+    [JsonPropertyName("hasArmistice")] public bool HasArmistice { get; set; } = true;
+    [JsonPropertyName("jurisdiction")] public string Jurisdiction { get; set; } = "UEE";
+    [JsonPropertyName("securityLevel")] public string SecurityLevel { get; set; } = "High";
+    [JsonPropertyName("specialization")] public string Specialization { get; set; } = "";
+    [JsonPropertyName("resources")] public string Resources { get; set; } = "";
+    [JsonPropertyName("description")] public string Description { get; set; } = "";
+    [JsonPropertyName("targetSystem")] public string? TargetSystem { get; set; }
+    [JsonPropertyName("relX")] public double RelX { get; set; }
+    [JsonPropertyName("relY")] public double RelY { get; set; }
+}
+
+public class QuantumDriveDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("sizeClass")] public string SizeClass { get; set; } = "S1";
+    [JsonPropertyName("topSpeedKmS")] public double TopSpeedKmS { get; set; } = 150000;
+    [JsonPropertyName("displayText")] public string DisplayText { get; set; } = "";
+}
+
+public class QuantumRouteResultDto
+{
+    [JsonPropertyName("fromId")] public string FromId { get; set; } = "";
+    [JsonPropertyName("fromName")] public string FromName { get; set; } = "";
+    [JsonPropertyName("toId")] public string ToId { get; set; } = "";
+    [JsonPropertyName("toName")] public string ToName { get; set; } = "";
+    [JsonPropertyName("driveName")] public string DriveName { get; set; } = "";
+    [JsonPropertyName("distKm")] public double DistKm { get; set; }
+    [JsonPropertyName("distGm")] public double DistGm { get; set; }
+    [JsonPropertyName("flightTimeSeconds")] public double FlightTimeSeconds { get; set; }
+    [JsonPropertyName("flightTimeFormatted")] public string FlightTimeFormatted { get; set; } = "";
+}
+
+public class StarmapResponseDto
+{
+    [JsonPropertyName("currentSystem")] public string CurrentSystem { get; set; } = "Stanton";
+    [JsonPropertyName("objects")] public List<StarmapObjectDto> Objects { get; set; } = new();
+    [JsonPropertyName("drives")] public List<QuantumDriveDto> Drives { get; set; } = new();
+}
+
+public class PlaceItemDto
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("system")] public string System { get; set; } = "Stanton";
+    [JsonPropertyName("parentBody")] public string ParentBody { get; set; } = "";
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("icon")] public string Icon { get; set; } = "📍";
+    [JsonPropertyName("securityLevel")] public string SecurityLevel { get; set; } = "High";
+    [JsonPropertyName("hasArmistice")] public bool HasArmistice { get; set; } = true;
+    [JsonPropertyName("specialization")] public string Specialization { get; set; } = "";
+    [JsonPropertyName("description")] public string Description { get; set; } = "";
+}
+
+public class FlightTimelineItemDto
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    [JsonPropertyName("time")] public string Time { get; set; } = "";
+    [JsonPropertyName("relativeTime")] public string RelativeTime { get; set; } = "";
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+    [JsonPropertyName("title")] public string Title { get; set; } = "";
+    [JsonPropertyName("subtitle")] public string Subtitle { get; set; } = "";
+    [JsonPropertyName("ship")] public string? Ship { get; set; }
+    [JsonPropertyName("location")] public string? Location { get; set; }
+    [JsonPropertyName("isMajor")] public bool IsMajor { get; set; }
+}
+
+public class FlightRecorderDto
+{
+    [JsonPropertyName("totalDistanceGm")] public double TotalDistanceGm { get; set; }
+    [JsonPropertyName("totalDistanceKm")] public double TotalDistanceKm { get; set; }
+    [JsonPropertyName("totalDistanceText")] public string TotalDistanceText { get; set; } = "";
+    [JsonPropertyName("flightDurationText")] public string FlightDurationText { get; set; } = "";
+    [JsonPropertyName("quantumJumps")] public int QuantumJumps { get; set; }
+    [JsonPropertyName("sortieCount")] public int SortieCount { get; set; }
+    [JsonPropertyName("shipLosses")] public int ShipLosses { get; set; }
+    [JsonPropertyName("visitedBodies")] public List<string> VisitedBodies { get; set; } = new();
+    [JsonPropertyName("usedShips")] public List<string> UsedShips { get; set; } = new();
+    [JsonPropertyName("timeline")] public List<FlightTimelineItemDto> Timeline { get; set; } = new();
+}
+
+public class RsResourceDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("baseRs")] public int BaseRs { get; set; }
+    [JsonPropertyName("tier")] public string Tier { get; set; } = "C";
+    [JsonPropertyName("rarity")] public string Rarity { get; set; } = "common";
+    [JsonPropertyName("method")] public string Method { get; set; } = "ship";
+    [JsonPropertyName("estimatedPricePerScu")] public double EstimatedPricePerScu { get; set; }
+    [JsonPropertyName("locations")] public List<string> Locations { get; set; } = new();
+}
+
+public class RsMatchDto
+{
+    [JsonPropertyName("resourceName")] public string ResourceName { get; set; } = "";
+    [JsonPropertyName("baseRs")] public int BaseRs { get; set; }
+    [JsonPropertyName("tier")] public string Tier { get; set; } = "C";
+    [JsonPropertyName("rarity")] public string Rarity { get; set; } = "common";
+    [JsonPropertyName("method")] public string Method { get; set; } = "ship";
+    [JsonPropertyName("estimatedPricePerScu")] public double EstimatedPricePerScu { get; set; }
+    [JsonPropertyName("nodes")] public int Nodes { get; set; }
+    [JsonPropertyName("isExact")] public bool IsExact { get; set; }
+    [JsonPropertyName("errorPct")] public double ErrorPct { get; set; }
+    [JsonPropertyName("scannedRs")] public int ScannedRs { get; set; }
+    [JsonPropertyName("estimatedClusterValue")] public long EstimatedClusterValue { get; set; }
+}
+
+public class MarketCommodityDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("category")] public string Category { get; set; } = "Metals";
+    [JsonPropertyName("tier")] public string Tier { get; set; } = "A";
+    [JsonPropertyName("avgBuyPrice")] public double AvgBuyPrice { get; set; }
+    [JsonPropertyName("avgSellPrice")] public double AvgSellPrice { get; set; }
+    [JsonPropertyName("margin")] public double Margin { get; set; }
+    [JsonPropertyName("bestBuyLocation")] public string BestBuyLocation { get; set; } = "";
+    [JsonPropertyName("bestSellLocation")] public string BestSellLocation { get; set; } = "";
+}
+
 public class PhotinoBridge
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -579,6 +708,60 @@ public class PhotinoBridge
 
                 case "get_loadout":
                     SendResponse(req.Id, "loadout_response", GetLoadoutData());
+                    break;
+
+                case "get_starmap":
+                    string sys = "Stanton";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("system", out var sysProp))
+                    {
+                        sys = sysProp.GetString() ?? "Stanton";
+                    }
+                    SendResponse(req.Id, "starmap_response", GetStarmapData(sys));
+                    break;
+
+                case "calculate_route":
+                    string fromId = "";
+                    string toId = "";
+                    string? drive = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("fromId", out var fProp)) fromId = fProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("toId", out var tProp)) toId = tProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("driveName", out var dProp)) drive = dProp.GetString();
+                    }
+                    SendResponse(req.Id, "calculate_route_response", CalculateQuantumRoute(fromId, toId, drive));
+                    break;
+
+                case "get_places":
+                    string? placeSys = null;
+                    string? placeType = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("system", out var psProp)) placeSys = psProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("type", out var ptProp)) placeType = ptProp.GetString();
+                    }
+                    SendResponse(req.Id, "places_response", GetPlacesData(placeSys, placeType));
+                    break;
+
+                case "get_blackbox":
+                    SendResponse(req.Id, "blackbox_response", GetBlackboxData());
+                    break;
+
+                case "get_rs_signatures":
+                    SendResponse(req.Id, "rs_signatures_response", GetRsSignaturesData());
+                    break;
+
+                case "decode_rs":
+                    int rsVal = 0;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("rs", out var rsProp))
+                    {
+                        rsVal = rsProp.GetInt32();
+                    }
+                    SendResponse(req.Id, "decode_rs_response", DecodeRsData(rsVal));
+                    break;
+
+                case "get_market":
+                    SendResponse(req.Id, "market_response", GetMarketData());
                     break;
 
                 case "toggle_watcher":
@@ -1137,6 +1320,286 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.StartLogTailer", ex);
         }
+    }
+
+    private StarmapResponseDto GetStarmapData(string system)
+    {
+        var objs = StarmapData.GetSystemObjects(system ?? "Stanton");
+        var objDtos = objs.Select(o => new StarmapObjectDto
+        {
+            Id = o.Id,
+            Name = o.Name,
+            System = o.System,
+            ParentId = o.ParentId,
+            Type = o.Type.ToString(),
+            OrbitRadius = o.OrbitRadius,
+            OrbitAngleDeg = o.OrbitAngleDeg,
+            ColorHex = o.ColorHex,
+            Size = o.Size,
+            HasArmistice = o.HasArmistice,
+            Jurisdiction = o.Jurisdiction,
+            SecurityLevel = o.SecurityLevel,
+            Specialization = o.Specialization,
+            Resources = o.Resources,
+            Description = o.Description,
+            TargetSystem = o.TargetSystem,
+            RelX = o.RelX,
+            RelY = o.RelY
+        }).ToList();
+
+        var drives = StarmapData.AvailableDrives.Select(d => new QuantumDriveDto
+        {
+            Name = d.Name,
+            SizeClass = d.SizeClass,
+            TopSpeedKmS = d.TopSpeedKmS,
+            DisplayText = d.DisplayText
+        }).ToList();
+
+        return new StarmapResponseDto
+        {
+            CurrentSystem = system ?? "Stanton",
+            Objects = objDtos,
+            Drives = drives
+        };
+    }
+
+    private QuantumRouteResultDto CalculateQuantumRoute(string fromId, string toId, string? driveName)
+    {
+        var fromObj = StarmapData.FindObject(fromId);
+        var toObj = StarmapData.FindObject(toId);
+        var drive = StarmapData.AvailableDrives.FirstOrDefault(d => d.Name.Equals(driveName, StringComparison.OrdinalIgnoreCase)) 
+                    ?? StarmapData.AvailableDrives[0];
+
+        if (fromObj == null || toObj == null)
+        {
+            return new QuantumRouteResultDto
+            {
+                FromId = fromId,
+                ToId = toId,
+                DriveName = drive.Name,
+                DistKm = 0,
+                DistGm = 0,
+                FlightTimeSeconds = 0,
+                FlightTimeFormatted = "0s"
+            };
+        }
+
+        var (distKm, distGm, flightTime) = StarmapData.CalculateRoute(fromObj, toObj, drive);
+        string formattedTime = flightTime.TotalMinutes >= 1
+            ? $"{(int)flightTime.TotalMinutes}m {flightTime.Seconds:D2}s"
+            : $"{flightTime.Seconds}s";
+
+        return new QuantumRouteResultDto
+        {
+            FromId = fromObj.Id,
+            FromName = fromObj.Name,
+            ToId = toObj.Id,
+            ToName = toObj.Name,
+            DriveName = drive.Name,
+            DistKm = Math.Round(distKm, 0),
+            DistGm = Math.Round(distGm, 2),
+            FlightTimeSeconds = Math.Round(flightTime.TotalSeconds, 1),
+            FlightTimeFormatted = formattedTime
+        };
+    }
+
+    private List<PlaceItemDto> GetPlacesData(string? systemFilter, string? typeFilter)
+    {
+        var allObjs = new List<StarmapObject>();
+        allObjs.AddRange(StarmapData.GetSystemObjects("Stanton"));
+        allObjs.AddRange(StarmapData.GetSystemObjects("Pyro"));
+
+        var result = new List<PlaceItemDto>();
+        foreach (var o in allObjs)
+        {
+            if (o.Type == StarmapObjectType.Star) continue;
+
+            if (!string.IsNullOrWhiteSpace(systemFilter) && !o.System.Equals(systemFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string typeStr = o.Type.ToString();
+            if (!string.IsNullOrWhiteSpace(typeFilter) && !typeStr.Equals(typeFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string icon = o.Type switch
+            {
+                StarmapObjectType.Planet => "🪐",
+                StarmapObjectType.Moon => "🌑",
+                StarmapObjectType.LandingZone => "🏙️",
+                StarmapObjectType.SpaceStation => "🛰️",
+                StarmapObjectType.LagrangeStation => "⛽",
+                StarmapObjectType.Outpost => "🏭",
+                StarmapObjectType.JumpPoint => "🌀",
+                _ => "📍"
+            };
+
+            string parentName = "";
+            if (!string.IsNullOrEmpty(o.ParentId))
+            {
+                var p = StarmapData.FindObject(o.ParentId);
+                parentName = p?.Name ?? o.ParentId;
+            }
+
+            result.Add(new PlaceItemDto
+            {
+                Id = o.Id,
+                Name = o.Name,
+                System = o.System,
+                ParentBody = parentName,
+                Type = typeStr,
+                Icon = icon,
+                SecurityLevel = o.SecurityLevel,
+                HasArmistice = o.HasArmistice,
+                Specialization = o.Specialization,
+                Description = o.Description
+            });
+        }
+
+        return result;
+    }
+
+    private FlightRecorderDto GetBlackboxData()
+    {
+        Database.EnsureInitialized();
+        var recentEvents = Database.LoadRecentEvents(800)
+            .OrderBy(e => e.Time)
+            .ToList();
+
+        var flightEvents = recentEvents.Where(e =>
+            e.Kind is EventKind.Quantum or EventKind.Vehicle or EventKind.ShipLoss or EventKind.Crash or EventKind.Location
+        ).ToList();
+
+        int quantumJumps = flightEvents.Count(e => e.Kind == EventKind.Quantum);
+        int losses = flightEvents.Count(e => e.Kind is EventKind.ShipLoss or EventKind.Crash);
+        var ships = flightEvents.Where(e => !string.IsNullOrEmpty(e.Ship)).Select(e => e.Ship!).Distinct().ToList();
+        var bodies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var timeline = new List<FlightTimelineItemDto>();
+        DateTime? startTime = flightEvents.FirstOrDefault()?.Time;
+
+        foreach (var ev in flightEvents)
+        {
+            var relSpan = startTime.HasValue ? ev.Time - startTime.Value : TimeSpan.Zero;
+            string relText = relSpan.TotalDays >= 1
+                ? ev.Time.ToLocalTime().ToString("dd.MM. HH:mm")
+                : $"+{(int)relSpan.TotalHours:D2}:{relSpan.Minutes:D2}:{relSpan.Seconds:D2}";
+
+            string title = ev.KindText;
+            string subtitle = ev.Detail ?? "";
+            bool isMajor = false;
+
+            if (ev.Kind == EventKind.Quantum)
+            {
+                title = "Quantum-Sprung";
+                isMajor = true;
+                if (!string.IsNullOrEmpty(ev.Detail))
+                {
+                    var resolved = Locations.ResolveLocation(ev.Detail);
+                    if (!string.IsNullOrEmpty(resolved.ParentBody) && resolved.ParentBody != "—") bodies.Add(resolved.ParentBody);
+                }
+            }
+            else if (ev.Kind == EventKind.Vehicle)
+            {
+                title = "Schiff ausgelagert / gespawnt";
+                isMajor = true;
+            }
+            else if (ev.Kind is EventKind.ShipLoss or EventKind.Crash)
+            {
+                title = "Schiffsverlust / Havarie";
+                isMajor = true;
+            }
+            else if (ev.Kind == EventKind.Location)
+            {
+                title = "Standortwechsel";
+                if (!string.IsNullOrEmpty(ev.Detail))
+                {
+                    var resolved = Locations.ResolveLocation(ev.Detail);
+                    if (!string.IsNullOrEmpty(resolved.ParentBody) && resolved.ParentBody != "—") bodies.Add(resolved.ParentBody);
+                }
+            }
+
+            timeline.Add(new FlightTimelineItemDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Time = ev.Time.ToLocalTime().ToString("dd.MM. HH:mm:ss"),
+                RelativeTime = relText,
+                Kind = ev.Kind.ToString().ToLowerInvariant(),
+                Title = title,
+                Subtitle = subtitle,
+                Ship = ev.Ship,
+                Location = ev.Location,
+                IsMajor = isMajor
+            });
+        }
+
+        double totalDistGm = quantumJumps * 18.5; // Heuristische Schätzung pro Sprung
+        double totalDistKm = totalDistGm * 1_000_000.0;
+        var duration = flightEvents.Count > 1 ? flightEvents[^1].Time - flightEvents[0].Time : TimeSpan.Zero;
+        string durText = $"{(int)duration.TotalHours}h {duration.Minutes}m";
+
+        return new FlightRecorderDto
+        {
+            TotalDistanceGm = Math.Round(totalDistGm, 1),
+            TotalDistanceKm = Math.Round(totalDistKm, 0),
+            TotalDistanceText = totalDistGm > 0 ? $"{totalDistGm:F1} GM ({totalDistKm:N0} km)" : "0 km",
+            FlightDurationText = durText,
+            QuantumJumps = quantumJumps,
+            SortieCount = Math.Max(1, flightEvents.Count(e => e.Kind == EventKind.Vehicle)),
+            ShipLosses = losses,
+            VisitedBodies = bodies.ToList(),
+            UsedShips = ships,
+            Timeline = timeline.OrderByDescending(t => t.Time).Take(150).ToList()
+        };
+    }
+
+    private List<RsResourceDto> GetRsSignaturesData()
+    {
+        return RsDecoderCatalog.AllResources.Select(r => new RsResourceDto
+        {
+            Name = r.Name,
+            BaseRs = r.BaseRs,
+            Tier = r.Tier,
+            Rarity = r.Rarity,
+            Method = r.Method,
+            EstimatedPricePerScu = r.EstimatedPricePerScu,
+            Locations = r.Locations ?? new()
+        }).OrderBy(r => r.Name).ToList();
+    }
+
+    private List<RsMatchDto> DecodeRsData(int rs)
+    {
+        var matches = RsDecoderCatalog.Decode(rs);
+        return matches.Select(m => new RsMatchDto
+        {
+            ResourceName = m.Resource.Name,
+            BaseRs = m.Resource.BaseRs,
+            Tier = m.Resource.Tier,
+            Rarity = m.Resource.Rarity,
+            Method = m.Resource.Method,
+            EstimatedPricePerScu = m.Resource.EstimatedPricePerScu,
+            Nodes = m.Nodes,
+            IsExact = m.IsExact,
+            ErrorPct = Math.Round(m.ErrorPct, 1),
+            ScannedRs = m.ScannedRs,
+            EstimatedClusterValue = (long)m.Resource.EstimatedPricePerScu * m.Nodes * 12
+        }).ToList();
+    }
+
+    private List<MarketCommodityDto> GetMarketData()
+    {
+        return new List<MarketCommodityDto>
+        {
+            new() { Name = "Laranite", Category = "Minerals", Tier = "S", AvgBuyPrice = 28.50, AvgSellPrice = 33.20, Margin = 4.70, BestBuyLocation = "Mining Area 045 (Wala)", BestSellLocation = "Lorville CBD (Hurston)" },
+            new() { Name = "Recycled Material Composite (RMC)", Category = "Salvage", Tier = "S", AvgBuyPrice = 11.80, AvgSellPrice = 14.50, Margin = 2.70, BestBuyLocation = "Pickers Field (Hurston)", BestSellLocation = "Area 18 TDD (ArcCorp)" },
+            new() { Name = "Beryl", Category = "Minerals", Tier = "A", AvgBuyPrice = 3.90, AvgSellPrice = 4.85, Margin = 0.95, BestBuyLocation = "HDMS-Ryder (Ita)", BestSellLocation = "Orison Cloudview (Crusader)" },
+            new() { Name = "Titanium", Category = "Metals", Tier = "A", AvgBuyPrice = 7.80, AvgSellPrice = 9.20, Margin = 1.40, BestBuyLocation = "HDMS-Bezdek (Arial)", BestSellLocation = "New Babbage (microTech)" },
+            new() { Name = "Gold", Category = "Precious", Tier = "S", AvgBuyPrice = 6.80, AvgSellPrice = 8.10, Margin = 1.30, BestBuyLocation = "Tram & Myers (Cellin)", BestSellLocation = "Lorville CBD (Hurston)" },
+            new() { Name = "Medical Supplies", Category = "Medical", Tier = "A", AvgBuyPrice = 17.50, AvgSellPrice = 20.20, Margin = 2.70, BestBuyLocation = "Deakins Research (Yela)", BestSellLocation = "CRU-L1 Ambitious Dream" },
+            new() { Name = "Agricium", Category = "Minerals", Tier = "A", AvgBuyPrice = 24.20, AvgSellPrice = 27.60, Margin = 3.40, BestBuyLocation = "Shubin SAL-2 (Lyria)", BestSellLocation = "Area 18 TDD (ArcCorp)" },
+            new() { Name = "Tungsten", Category = "Metals", Tier = "B", AvgBuyPrice = 3.60, AvgSellPrice = 4.25, Margin = 0.65, BestBuyLocation = "HDMS-Perlman (Magda)", BestSellLocation = "Everus Harbor (Hurston)" },
+            new() { Name = "Quantanium (Raw)", Category = "Volatile", Tier = "S", AvgBuyPrice = 44.00, AvgSellPrice = 88.00, Margin = 44.00, BestBuyLocation = "Lyria Asteroids", BestSellLocation = "ARC-L1 Refinery" },
+            new() { Name = "Diamond", Category = "Gems", Tier = "B", AvgBuyPrice = 6.20, AvgSellPrice = 7.15, Margin = 0.95, BestBuyLocation = "HDMS-Lathan (Arial)", BestSellLocation = "Baijini Point (ArcCorp)" },
+        };
     }
 
     private void OnLogLineReceived(string rawLine)

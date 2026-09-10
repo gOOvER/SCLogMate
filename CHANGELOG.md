@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Photino.NET & React Full Functional Migration — Phase 3 (`frontend/src/views/`, `Core/Photino/`)**:
+  - Ported **Sternenkarte / Starmap View** (`StarmapView.tsx`): Interactive 2D radar starmap visualization with Stanton and Pyro solar systems, concentric orbital rings, glowing celestial bodies, layer filters (Stations, Moons, Landing Zones), zoom/pan controls, celestial body inspector, and integrated Quantum Jump route planner calculating exact flight time and GM/km distance for various quantum drives.
+  - Ported **Orte & Stationen View** (`PlacesView.tsx`): Searchable directory of Star Citizen locations across Stanton and Pyro, categorized by planets, moons, landing zones, orbital stations, Lagrange refineries (L1-L5), and outposts with security ratings and armistice status.
+  - Ported **Flugschreiber / Blackbox View** (`BlackboxView.tsx`): Flight telemetry recorder tracking total traveled distance (GM / km), active flight duration, quantum jumps, ship losses, sortie counts, visited celestial bodies, and a chronological flight timeline with event badges and Markdown export.
+  - Ported **RS Signal Scanner View** (`OreScannerView.tsx`): Radar Signature (RS) decoder for mining ores and salvage panels, featuring an interactive RS value calculator (calculating node clusters, mineral types, and estimated aUEC value) alongside a full RS signature catalog table.
+  - Ported **Handelsmarkt & UEX Rohstoffe View** (`MarketView.tsx`): Commodity market browser with buy/sell prices, margins per SCU, optimal trading routes, and an interactive cargo hauler profit calculator with ship presets (C2 Hercules, Caterpillar, Constellation Taurus, Freelancer MAX, Cutlass Black).
+  - Expanded `PhotinoBridge.cs` with backend IPC endpoints: `get_starmap`, `calculate_route`, `get_places`, `get_blackbox`, `get_rs_signatures`, `decode_rs`, and `get_market`.
+  - Integrated all Phase 3 views into `frontend/src/App.tsx`.
 - **Photino.NET & React Full Functional Migration — Phase 2 (`frontend/src/views/`)**:
   - Ported **Aufträge & Missionen View** (`MissionsView.tsx`): Multi-tab mission tracker supporting active OCR contracts from mobiGlas, parsed historical mission completions with aUEC rewards, and the global CIG mission catalog with type filtering (Bounty, Delivery, Mercenary, Salvage, etc.) and search.
   - Ported **Ansehen & Fraktionen View** (`ReputationView.tsx`): Faction reputation dashboard categorizing organizations (Security & Bounty Hunting, Cargo & Logistics, Industry & Mining, Underworld & Syndicates) with XP progression bars, current rank titles, and total completed contract counts.

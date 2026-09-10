@@ -165,6 +165,125 @@ export interface LoadoutSlotDto {
   lastEquipped?: string;
 }
 
+export interface StarmapObjectDto {
+  id: string;
+  name: string;
+  system: string;
+  parentId?: string;
+  type: string;
+  orbitRadius: number;
+  orbitAngleDeg: number;
+  colorHex: string;
+  size: number;
+  hasArmistice: boolean;
+  jurisdiction: string;
+  securityLevel: string;
+  specialization: string;
+  resources: string;
+  description: string;
+  targetSystem?: string;
+  relX: number;
+  relY: number;
+}
+
+export interface QuantumDriveDto {
+  name: string;
+  sizeClass: string;
+  topSpeedKmS: number;
+  displayText: string;
+}
+
+export interface QuantumRouteResultDto {
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  driveName: string;
+  distKm: number;
+  distGm: number;
+  flightTimeSeconds: number;
+  flightTimeFormatted: string;
+}
+
+export interface StarmapResponseDto {
+  currentSystem: string;
+  objects: StarmapObjectDto[];
+  drives: QuantumDriveDto[];
+}
+
+export interface PlaceItemDto {
+  id: string;
+  name: string;
+  system: string;
+  parentBody: string;
+  type: string;
+  icon: string;
+  securityLevel: string;
+  hasArmistice: boolean;
+  specialization: string;
+  description: string;
+}
+
+export interface FlightTimelineItemDto {
+  id: string;
+  time: string;
+  relativeTime: string;
+  kind: string;
+  title: string;
+  subtitle: string;
+  ship?: string;
+  location?: string;
+  isMajor: boolean;
+}
+
+export interface FlightRecorderDto {
+  totalDistanceGm: number;
+  totalDistanceKm: number;
+  totalDistanceText: string;
+  flightDurationText: string;
+  quantumJumps: number;
+  sortieCount: number;
+  shipLosses: number;
+  visitedBodies: string[];
+  usedShips: string[];
+  timeline: FlightTimelineItemDto[];
+}
+
+export interface RsResourceDto {
+  name: string;
+  baseRs: number;
+  tier: string;
+  rarity: string;
+  method: string;
+  estimatedPricePerScu: number;
+  locations: string[];
+}
+
+export interface RsMatchDto {
+  resourceName: string;
+  baseRs: number;
+  tier: string;
+  rarity: string;
+  method: string;
+  estimatedPricePerScu: number;
+  nodes: number;
+  isExact: boolean;
+  errorPct: number;
+  scannedRs: number;
+  estimatedClusterValue: number;
+}
+
+export interface MarketCommodityDto {
+  name: string;
+  category: string;
+  tier: string;
+  avgBuyPrice: number;
+  avgSellPrice: number;
+  margin: number;
+  bestBuyLocation: string;
+  bestSellLocation: string;
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -564,14 +683,366 @@ class PhotinoBridge {
           },
         ] as LoadoutSlotDto[];
 
-      case 'toggle_watcher':
-        return { isLiveWatching: payload?.enable ?? true };
+      case 'get_starmap':
+        return {
+          currentSystem: payload?.system || 'Stanton',
+          objects: [
+            {
+              id: 'stanton_star',
+              name: 'Stanton (Stern)',
+              system: 'Stanton',
+              type: 'Star',
+              orbitRadius: 0,
+              orbitAngleDeg: 0,
+              colorHex: '#FBBF24',
+              size: 28,
+              hasArmistice: true,
+              jurisdiction: 'UEE',
+              securityLevel: 'High',
+              specialization: 'Sonnensystem-Zentrum',
+              resources: 'Solarenergie',
+              description: 'G-Typ Hauptreihenstern mit 4 bewohnten Planeten im UEE-Besitz.',
+              relX: 0,
+              relY: 0,
+            },
+            {
+              id: 'hurston',
+              name: 'Hurston',
+              system: 'Stanton',
+              parentId: 'stanton_star',
+              type: 'Planet',
+              orbitRadius: 90,
+              orbitAngleDeg: 45,
+              colorHex: '#D97706',
+              size: 17,
+              hasArmistice: true,
+              jurisdiction: 'Hurston Dynamics',
+              securityLevel: 'High',
+              specialization: 'Industrie & Waffenbau',
+              resources: 'Beryll, Titan, Wolfram',
+              description: 'Industrieplanet im Besitz von Hurston Dynamics. Hauptstadt: Lorville.',
+              relX: 63.6,
+              relY: 63.6,
+            },
+            {
+              id: 'crusader',
+              name: 'Crusader',
+              system: 'Stanton',
+              parentId: 'stanton_star',
+              type: 'Planet',
+              orbitRadius: 170,
+              orbitAngleDeg: 140,
+              colorHex: '#EC4899',
+              size: 21,
+              hasArmistice: true,
+              jurisdiction: 'Crusader Industries',
+              securityLevel: 'High',
+              specialization: 'Schiffbau & Luxus',
+              resources: 'Gase, Wasserstoff',
+              description: 'Gasriese mit atembarer oberer Atmosphäre. Wolkenstadt Orison.',
+              relX: -130.2,
+              relY: 109.3,
+            },
+            {
+              id: 'arccorp',
+              name: 'ArcCorp',
+              system: 'Stanton',
+              parentId: 'stanton_star',
+              type: 'Planet',
+              orbitRadius: 250,
+              orbitAngleDeg: 235,
+              colorHex: '#F97316',
+              size: 17,
+              hasArmistice: true,
+              jurisdiction: 'ArcCorp',
+              securityLevel: 'High',
+              specialization: 'Megacity & Fusion Engines',
+              resources: 'Komponenten, Technologie',
+              description: 'Vollständig urbanisierter Stadtplanet. Heimat von Area 18.',
+              relX: -143.4,
+              relY: -204.8,
+            },
+            {
+              id: 'microtech',
+              name: 'microTech',
+              system: 'Stanton',
+              parentId: 'stanton_star',
+              type: 'Planet',
+              orbitRadius: 330,
+              orbitAngleDeg: 310,
+              colorHex: '#38BDF8',
+              size: 18,
+              hasArmistice: true,
+              jurisdiction: 'microTech',
+              securityLevel: 'High',
+              specialization: 'High-Tech, mobiGlas & Software',
+              resources: 'Cryo-Mineralien, Titan',
+              description: 'Eisiger Planet mit hochentwickelten Forschungs- & Tech-Kuppeln. Hauptstadt: New Babbage.',
+              relX: 212.1,
+              relY: -252.8,
+            },
+            {
+              id: 'everus',
+              name: 'Everus Harbor',
+              system: 'Stanton',
+              parentId: 'hurston',
+              type: 'SpaceStation',
+              orbitRadius: 90,
+              orbitAngleDeg: 41,
+              colorHex: '#38BDF8',
+              size: 8,
+              hasArmistice: true,
+              jurisdiction: 'Hurston Dynamics',
+              securityLevel: 'High',
+              specialization: 'Raffinerie & Hangars',
+              resources: '',
+              description: 'Orbitale Hauptstation über Hurston mit Raffinerie & Frachtdecks.',
+              relX: 67.9,
+              relY: 59.0,
+            },
+            {
+              id: 'seraphim',
+              name: 'Seraphim Station',
+              system: 'Stanton',
+              parentId: 'crusader',
+              type: 'SpaceStation',
+              orbitRadius: 170,
+              orbitAngleDeg: 136,
+              colorHex: '#38BDF8',
+              size: 8,
+              hasArmistice: true,
+              jurisdiction: 'Crusader Industries',
+              securityLevel: 'High',
+              specialization: 'Frachtdecks & Hangars',
+              resources: '',
+              description: 'Orbitale Raumstation über Crusader mit Fracht- und Hangardecks.',
+              relX: -122.3,
+              relY: 118.1,
+            },
+          ],
+          drives: [
+            { name: 'VK-00', sizeClass: 'S1', topSpeedKmS: 283000, displayText: 'S1 VK-00 (283.000 km/s)' },
+            { name: 'Atlas', sizeClass: 'S1', topSpeedKmS: 152000, displayText: 'S1 Atlas (152.000 km/s)' },
+            { name: 'Crossfield', sizeClass: 'S2', topSpeedKmS: 261000, displayText: 'S2 Crossfield (261.000 km/s)' },
+            { name: 'TS-2', sizeClass: 'S3', topSpeedKmS: 260000, displayText: 'S3 TS-2 (260.000 km/s)' },
+          ],
+        } as StarmapResponseDto;
 
-      case 'scan_logs':
-        return { scannedCount: 24 };
+      case 'calculate_route':
+        return {
+          fromId: payload?.fromId || 'hurston',
+          fromName: 'Hurston',
+          toId: payload?.toId || 'crusader',
+          toName: 'Crusader',
+          driveName: payload?.driveName || 'Atlas',
+          distKm: 29850000,
+          distGm: 29.85,
+          flightTimeSeconds: 208.3,
+          flightTimeFormatted: '3m 28s',
+        } as QuantumRouteResultDto;
 
-      default:
-        return { success: true };
+      case 'get_places':
+        return [
+          {
+            id: 'hurston',
+            name: 'Hurston',
+            system: 'Stanton',
+            parentBody: 'Stanton (Stern)',
+            type: 'Planet',
+            icon: '🪐',
+            securityLevel: 'High',
+            hasArmistice: true,
+            specialization: 'Industrie & Waffen',
+            description: 'Industrieplanet von Hurston Dynamics mit Metropole Lorville.',
+          },
+          {
+            id: 'lorville',
+            name: 'Lorville',
+            system: 'Stanton',
+            parentBody: 'Hurston',
+            type: 'LandingZone',
+            icon: '🏙️',
+            securityLevel: 'High',
+            hasArmistice: true,
+            specialization: 'Großhandelszentrum & CBD',
+            description: 'Hauptstadt von Hurston mit Teasa Spaceport und New Deal Shipyard.',
+          },
+          {
+            id: 'everus',
+            name: 'Everus Harbor',
+            system: 'Stanton',
+            parentBody: 'Hurston',
+            type: 'SpaceStation',
+            icon: '🛰️',
+            securityLevel: 'High',
+            hasArmistice: true,
+            specialization: 'Raffinerie & Frachtdecks',
+            description: 'Orbitale Raumstation über Hurston mit Hangars und Raffineriedeck.',
+          },
+          {
+            id: 'area18',
+            name: 'Area 18',
+            system: 'Stanton',
+            parentBody: 'ArcCorp',
+            type: 'LandingZone',
+            icon: '🏙️',
+            securityLevel: 'High',
+            hasArmistice: true,
+            specialization: 'Astro Armada & TDD',
+            description: 'Zentrale Landezone auf ArcCorp mit Riker Spaceport.',
+          },
+          {
+            id: 'grimhex',
+            name: 'Grim HEX',
+            system: 'Stanton',
+            parentBody: 'Yela (Crusader)',
+            type: 'SpaceStation',
+            icon: '☠️',
+            securityLevel: 'Lawless',
+            hasArmistice: false,
+            specialization: 'Schwarzmarkt & Schmuggel',
+            description: 'Ehemalige Green-HEX-Bergbaubasis im Asteroidenring von Yela.',
+          },
+        ] as PlaceItemDto[];
+
+      case 'get_blackbox':
+        return {
+          totalDistanceGm: 129.5,
+          totalDistanceKm: 129500000,
+          totalDistanceText: '129.5 GM (129.500.000 km)',
+          flightDurationText: '4h 18m',
+          quantumJumps: 14,
+          sortieCount: 3,
+          shipLosses: 0,
+          visitedBodies: ['Hurston', 'Crusader', 'Daymar', 'Arial'],
+          usedShips: ['Drake Vulture', 'Aegis Vanguard Warden'],
+          timeline: [
+            {
+              id: 'bb1',
+              time: '10.09. 18:45:10',
+              relativeTime: '+03:45:10',
+              kind: 'quantum',
+              title: 'Quantum-Sprung',
+              subtitle: 'Sprungziel: Everus Harbor (Hurston)',
+              ship: 'Drake Vulture',
+              location: 'Everus Harbor',
+              isMajor: true,
+            },
+            {
+              id: 'bb2',
+              time: '10.09. 18:15:30',
+              relativeTime: '+03:15:30',
+              kind: 'vehicle',
+              title: 'Schiff ausgelagert',
+              subtitle: 'Drake Vulture auf Hangar 04 bereitgestellt',
+              ship: 'Drake Vulture',
+              location: 'Lorville',
+              isMajor: true,
+            },
+          ],
+        } as FlightRecorderDto;
+
+      case 'get_rs_signatures':
+        return [
+          {
+            name: 'Salvage (Panels)',
+            baseRs: 2000,
+            tier: 'A',
+            rarity: 'uncommon',
+            method: 'salvage',
+            estimatedPricePerScu: 14500,
+            locations: ['Yela Ring', 'Hurston L1 Asteroiden'],
+          },
+          {
+            name: 'Lindinium',
+            baseRs: 3400,
+            tier: 'B',
+            rarity: 'common',
+            method: 'ship',
+            estimatedPricePerScu: 22000,
+            locations: ['Pyro Asteroiden', 'Stanton'],
+          },
+          {
+            name: 'Quantanium',
+            baseRs: 6000,
+            tier: 'S',
+            rarity: 'rare',
+            method: 'ship',
+            estimatedPricePerScu: 88000,
+            locations: ['Lyria', 'Yela Asteroid Ring'],
+          },
+          {
+            name: 'Gold',
+            baseRs: 7200,
+            tier: 'S',
+            rarity: 'uncommon',
+            method: 'ship',
+            estimatedPricePerScu: 44000,
+            locations: ['Daymar', 'Cellin', 'Magda'],
+          },
+        ] as RsResourceDto[];
+
+      case 'decode_rs':
+        const rs = payload?.rs || 2000;
+        return [
+          {
+            resourceName: rs === 2000 ? 'Salvage (Panels)' : 'Erzknoten / Erzcluster',
+            baseRs: rs === 2000 ? 2000 : rs,
+            tier: 'A',
+            rarity: 'uncommon',
+            method: rs === 2000 ? 'salvage' : 'ship',
+            estimatedPricePerScu: 14500,
+            nodes: 1,
+            isExact: true,
+            errorPct: 0,
+            scannedRs: rs,
+            estimatedClusterValue: 174000,
+          },
+        ] as RsMatchDto[];
+
+      case 'get_market':
+        return [
+          {
+            name: 'Laranite',
+            category: 'Minerals',
+            tier: 'S',
+            avgBuyPrice: 28.5,
+            avgSellPrice: 33.2,
+            margin: 4.7,
+            bestBuyLocation: 'Mining Area 045 (Wala)',
+            bestSellLocation: 'Lorville CBD (Hurston)',
+          },
+          {
+            name: 'Recycled Material Composite (RMC)',
+            category: 'Salvage',
+            tier: 'S',
+            avgBuyPrice: 11.8,
+            avgSellPrice: 14.5,
+            margin: 2.7,
+            bestBuyLocation: 'Pickers Field (Hurston)',
+            bestSellLocation: 'Area 18 TDD (ArcCorp)',
+          },
+          {
+            name: 'Beryl',
+            category: 'Minerals',
+            tier: 'A',
+            avgBuyPrice: 3.9,
+            avgSellPrice: 4.85,
+            margin: 0.95,
+            bestBuyLocation: 'HDMS-Ryder (Ita)',
+            bestSellLocation: 'Orison Cloudview (Crusader)',
+          },
+          {
+            name: 'Titanium',
+            category: 'Metals',
+            tier: 'A',
+            avgBuyPrice: 7.8,
+            avgSellPrice: 9.2,
+            margin: 1.4,
+            bestBuyLocation: 'HDMS-Bezdek (Arial)',
+            bestSellLocation: 'New Babbage (microTech)',
+          },
+        ] as MarketCommodityDto[];
     }
   }
 }
