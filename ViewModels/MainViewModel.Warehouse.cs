@@ -25,6 +25,9 @@ public partial class MainViewModel
     [ObservableProperty]
     private ObservableCollection<WarehouseItem> _filteredWarehouseItems = new();
 
+    [ObservableProperty]
+    private WarehouseItem? _selectedWarehouseItem;
+
     private List<WarehouseItem> _allWarehouseItems = new();
 
     [ObservableProperty]
@@ -52,8 +55,45 @@ public partial class MainViewModel
     partial void OnSelectedWarehouseCategoryChanged(string value) => ApplyWarehouseFilter();
     partial void OnSelectedWarehouseLocationChanged(WarehouseLocationGroup? value) => ApplyWarehouseFilter();
 
+    private bool _wikiItemResolvedSubscribed;
+
+    private void EnsureWikiResolvedHook()
+    {
+        if (_wikiItemResolvedSubscribed) return;
+        _wikiItemResolvedSubscribed = true;
+        WikiApiClient.ItemResolved += (className, info) =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                bool updated = false;
+                foreach (var item in _allWarehouseItems)
+                {
+                    if (string.Equals(item.ItemClass, className, StringComparison.OrdinalIgnoreCase))
+                    {
+                        item.ItemName = info.Name;
+                        item.Category = info.Category;
+                        updated = true;
+                    }
+                }
+                if (updated)
+                {
+                    ApplyWarehouseFilter();
+                }
+            });
+        };
+    }
+
+    [RelayCommand]
+    public async Task OpenWikiForWarehouseItem(WarehouseItem? item)
+    {
+        if (item == null) return;
+        var query = !string.IsNullOrWhiteSpace(item.ItemClass) ? item.ItemClass : item.ItemName;
+        await OpenWiki(query);
+    }
+
     public void LoadWarehouseData()
     {
+        EnsureWikiResolvedHook();
         IsLoadingWarehouse = true;
         Task.Run(() =>
         {
@@ -138,6 +178,56 @@ public partial class MainViewModel
         SelectedWarehouseLocation = null;
         SelectedWarehouseCategory = "Alle Kategorien";
         WarehouseSearchText = "";
+    }
+
+    [RelayCommand]
+    public void DecreaseWarehouseItem(WarehouseItem? item)
+    {
+        if (item == null) return;
+        Database.AdjustWarehouseItemQuantity(item.Location, item.ItemClass, -1);
+        Status = $"📦 {item.ItemName} in {item.Location}: Menge um 1 verringert";
+        LoadWarehouseData();
+    }
+
+    [RelayCommand]
+    public void IncreaseWarehouseItem(WarehouseItem? item)
+    {
+        if (item == null) return;
+        Database.AdjustWarehouseItemQuantity(item.Location, item.ItemClass, +1);
+        Status = $"📦 {item.ItemName} in {item.Location}: Menge um 1 erhöht";
+        LoadWarehouseData();
+    }
+
+    [RelayCommand]
+    public void DismantleWarehouseItem(WarehouseItem? item)
+    {
+        if (item == null) return;
+        Database.AdjustWarehouseItemQuantity(item.Location, item.ItemClass, -1);
+        Status = $"🔧 {item.ItemName} in {item.Location} als zerlegt (Dismantled) verbucht (-1)";
+        LoadWarehouseData();
+    }
+
+    [RelayCommand]
+    public void DeleteWarehouseItem(WarehouseItem? item)
+    {
+        if (item == null) return;
+        Database.DeleteWarehouseItem(item.Location, item.ItemClass);
+        Status = $"🗑️ {item.ItemName} aus dem Lagerbestand von {item.Location} entfernt";
+        LoadWarehouseData();
+    }
+
+    [RelayCommand]
+    public void ClearSelectedLocationWarehouse()
+    {
+        if (SelectedWarehouseLocation == null || string.IsNullOrWhiteSpace(SelectedWarehouseLocation.LocationName) || SelectedWarehouseLocation.LocationName == "Alle Standorte")
+        {
+            Status = "ℹ Bitte zuerst einen bestimmten Standort in der Liste links auswählen.";
+            return;
+        }
+        var locName = SelectedWarehouseLocation.LocationName;
+        Database.ClearWarehouseLocation(locName);
+        Status = $"🗑️ Lagerbestand für Standort '{locName}' vollständig geleert";
+        LoadWarehouseData();
     }
 
     [RelayCommand]

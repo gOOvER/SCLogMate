@@ -34,20 +34,15 @@ section in the same commit. Use the Keep a Changelog categories:
 
 **CRITICAL RULE**: `CHANGELOG.md` **MUST ALWAYS BE WRITTEN IN ENGLISH**! Never write changelog entries in German or any other language.
 
-### 2. Test-build
+### 2. Build in Publish
 
-After making changes, always build to verify. **Before building**, check
-whether SCLogMate is already running — the build will fail if the exe is
-locked:
+After making changes, always perform a publish build into `publish/` to verify and produce the ready-to-use release binary. **Before building**, check whether SCLogMate is already running — the build will fail if the exe is locked:
 
 ```powershell
 # Kill running instance if needed (locked exe blocks the build)
 Stop-Process -Name SCLogMate -Force -ErrorAction SilentlyContinue
 
-# Debug build
-dotnet build -v q
-
-# Publish build (single-file exe)
+# Publish build (single-file exe into publish/)
 dotnet publish -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
@@ -56,10 +51,11 @@ dotnet publish -c Release -r win-x64 --self-contained true `
 
 Do **not** start the app after building — Torsten runs it himself.
 
-### 3. Git Commits & Pushes nur auf Aufforderung
+### 3. Git Commits & Pushes
 
-- **Weder Commits noch Pushes eigenständig ausführen**, es sei denn, Torsten fordert ausdrücklich dazu auf ("commit", "push", "pushe", "sichern", etc.).
-- Wenn Torsten dazu auffordert, direkt und minimal ausführen (ohne Umwege, überflüssige Abfragen oder Token-Verschwendung).
+- Änderungen können nach erfolgreichem Publish-Build **immer direkt committet und gepusht werden** (ständige Freigabe durch Torsten erteilt).
+- Immer sauber, minimal und aussagekräftig committen.
+- **Wichtig**: Bei jedem Commit muss zuvor immer der Publish-Build nach `publish/` ausgeführt worden sein!
 
 ---
 

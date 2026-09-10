@@ -4251,6 +4251,12 @@ public partial class MainViewModel : ObservableObject
                         LoadWarehouseData();
                     }
                     break;
+                case EventKind.Hangar:
+                    if (isLive && e.Detail.Contains("bereit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        TriggerAchievementToast(AchievementToastData.ForElevatorReady(e.Detail, e.Ship ?? CurrentLocation));
+                    }
+                    break;
                 case EventKind.Mission:
                     // Wenn eine Notification wie "Contract Complete: ..." oder "Auftrag abgeschlossen: ..." reinkommt
                     if (e.Detail.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||

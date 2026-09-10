@@ -271,6 +271,9 @@ public partial class LogParser
     [GeneratedRegex(@"<OnInventoryStoreItem>\s+Entity\[.*Class\((?<cls>[^)]+)\).*Inventory\[(?<inv>[^\]]+)\]")]
     private static partial Regex OnStoreItemRegex();
 
+    [GeneratedRegex(@"CEntityComponentFreightElevatorUIProvider::FillUnstowRequest.*?Entities:\s*(?<entities>\d+).*?Location:\s*(?<locId>\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex FreightElevatorUnstowRegex();
+
     // Angenommene/aktive Mission mit Auftraggeber + Contract (feuert je Mission viele Male
     // als Objektiv-Marker → wir nehmen je missionId nur EINEN Eintrag).
     [GeneratedRegex(@"missionId \[(?<id>[0-9a-f-]+)\], generator name \[(?<gen>[A-Za-z0-9_]+)\], contract \[(?<con>[A-Za-z0-9_]+)\]")]
@@ -403,6 +406,9 @@ public partial class LogParser
     public sealed record WarehouseMovementRecord(DateTime Time, string Location, string LocationCode, string System, string ParentBody, string ItemClass, string ItemName, string Category, int Delta);
     public List<WarehouseMovementRecord> WarehouseMovements { get; } = new();
     private readonly Dictionary<string, (string ItemClass, string MissionId)> _missionDropoffItems = new(StringComparer.OrdinalIgnoreCase);
+
+    private DateTime _lastElevatorMoveTime = DateTime.MinValue;
+    private string? _lastElevatorType;
 
     private readonly System.Threading.Lock _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
@@ -723,16 +729,20 @@ public partial class LogParser
                 var shopLoc = ExtractLocationFromShop(shop);
                 if (shopLoc != null) _lastLoc = shopLoc;
                 var rawItem = by.Groups["item"].Value;
-                var item = ItemNames.CleanFallback(rawItem);
                 var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
                 var ts = ParseTs(line);
-                _pendingPurchase = new PendingPurchase(ts, shop, item, by.Groups["guid"].Value, price, qty);
+                var itemName = ItemNames.CleanFallback(rawItem);
+                _pendingPurchase = new PendingPurchase(ts, shop, itemName, by.Groups["guid"].Value, price, qty);
 
                 if (!string.IsNullOrWhiteSpace(rawItem))
                 {
                     var locInfo = GetLocationInfo("");
                     var targetLoc = shopLoc ?? locInfo.Name;
                     var resolved = WarehouseCatalog.Resolve(rawItem);
+                    if (!string.IsNullOrWhiteSpace(resolved.Name) && resolved.Name != rawItem)
+                    {
+                        itemName = resolved.Name;
+                    }
                     WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, +qty));
                 }
 
@@ -741,9 +751,9 @@ public partial class LogParser
                     Time = ts,
                     Kind = EventKind.Purchase,
                     Amount = -price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
-                    ItemRef = by.Groups["guid"].Value,
+                    ItemRef = !string.IsNullOrWhiteSpace(rawItem) ? rawItem : by.Groups["guid"].Value,
                     Suffix = suffix,
-                    Detail = $"{item}  {suffix}"
+                    Detail = $"{itemName}  {suffix}"
                 };
             }
         }
@@ -759,15 +769,19 @@ public partial class LogParser
                 var shopLoc = ExtractLocationFromShop(shop);
                 if (shopLoc != null) _lastLoc = shopLoc;
                 var rawItem = se.Groups["item"].Value;
-                var item = ItemNames.CleanFallback(rawItem);
                 var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
                 var ts = ParseTs(line);
+                var itemName = ItemNames.CleanFallback(rawItem);
 
                 if (!string.IsNullOrWhiteSpace(rawItem))
                 {
                     var locInfo = GetLocationInfo("");
                     var targetLoc = shopLoc ?? locInfo.Name;
                     var resolved = WarehouseCatalog.Resolve(rawItem);
+                    if (!string.IsNullOrWhiteSpace(resolved.Name) && resolved.Name != rawItem)
+                    {
+                        itemName = resolved.Name;
+                    }
                     WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, -qty));
                 }
 
@@ -776,9 +790,9 @@ public partial class LogParser
                     Time = ts,
                     Kind = EventKind.Sale,
                     Amount = price,                                        // NICHT ×qty – Preis ist schon der Gesamtbetrag
-                    ItemRef = se.Groups["guid"].Value,
+                    ItemRef = !string.IsNullOrWhiteSpace(rawItem) ? rawItem : se.Groups["guid"].Value,
                     Suffix = suffix,
-                    Detail = $"{item}  {suffix}"
+                    Detail = $"{itemName}  {suffix}"
                 };
             }
         }
@@ -1247,6 +1261,30 @@ public partial class LogParser
             }
         }
 
+        if (line.Contains("FillUnstowRequest", StringComparison.OrdinalIgnoreCase))
+        {
+            var m = FreightElevatorUnstowRegex().Match(line);
+            if (m.Success)
+            {
+                var entitiesStr = m.Groups["entities"].Value;
+                var locId = m.Groups["locId"].Value;
+                if (int.TryParse(entitiesStr, out var count) && count > 0)
+                {
+                    var ts = ParseTs(line);
+                    var locInfo = GetLocationInfo(locId);
+                    var countStr = count == 1 ? "1 Gegenstand" : $"{count} Gegenstände";
+                    return new LogEntry
+                    {
+                        Time = ts,
+                        Kind = EventKind.Inventory,
+                        Amount = -count,
+                        Detail = $"Frachtaufzug: {countStr} angefordert ({locInfo.Name})",
+                        Ship = locInfo.Name
+                    };
+                }
+            }
+        }
+
         if (line.Contains("Inventory[", StringComparison.Ordinal) && line.Contains("Item Count:[", StringComparison.Ordinal))
         {
             var iv = InvRegex().Match(line);
@@ -1405,12 +1443,37 @@ public partial class LogParser
             }
         }
 
-        // SC 4.x Fracht- & Schiffs-Aufzüge (technisches Hintergrundrauschen herausfiltern)
+        // SC 4.x Fracht- & Schiffs-Aufzüge
         if (line.Contains("LoadingPlatformManager", StringComparison.Ordinal))
         {
             var elv = ElevatorStateRegex().Match(line);
             if (elv.Success)
             {
+                var type = elv.Groups["type"].Value;
+                var state = elv.Groups["state"].Value;
+                var typeName = type == "FreightElevator" ? "Frachtaufzug" : "Schiffsaufzug";
+
+                if (state.Equals("RaisingPlatform", StringComparison.OrdinalIgnoreCase) ||
+                    state.Equals("LoweringPlatform", StringComparison.OrdinalIgnoreCase) ||
+                    state.Equals("Moving", StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastElevatorMoveTime = ParseTs(line);
+                    _lastElevatorType = typeName;
+                }
+                else if (state.Equals("OpenIdle", StringComparison.OrdinalIgnoreCase) &&
+                         _lastElevatorMoveTime != DateTime.MinValue &&
+                         (ParseTs(line) - _lastElevatorMoveTime).TotalSeconds < 90)
+                {
+                    _lastElevatorMoveTime = DateTime.MinValue;
+                    var loc = _pendingLocationName ?? (_lastLoc ?? "Hangar");
+                    return new LogEntry
+                    {
+                        Time = ParseTs(line),
+                        Kind = EventKind.Hangar,
+                        Detail = $"{_lastElevatorType ?? typeName} bereit ({loc})",
+                        Ship = loc
+                    };
+                }
                 return null;
             }
         }

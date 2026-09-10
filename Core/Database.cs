@@ -16,8 +16,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 16; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 33; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 17; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
 
@@ -348,6 +348,35 @@ public static class Database
             Exec(db, "PRAGMA user_version = 16;");
             dbSchemaVersion = 16;
             Logger.Log("DB Schema: Migration auf v16 (warehouse_items Tabelle & Indizes) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 17)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS wiki_items_cache (
+                        class_name TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        category TEXT,
+                        manufacturer TEXT,
+                        description_de TEXT,
+                        description_en TEXT,
+                        thumbnail_url TEXT,
+                        image_url TEXT,
+                        web_url TEXT,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_wiki_items_name ON wiki_items_cache(name);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v17 (wiki_items_cache)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 17;");
+            dbSchemaVersion = 17;
+            Logger.Log("DB Schema: Migration auf v17 (wiki_items_cache Tabelle & Indizes) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -741,7 +770,8 @@ public static class Database
                 ["user_pois"] = new[] { "id", "system", "body", "name", "notes", "category", "color", "created_at" },
                 ["reputation"] = new[] { "faction_id", "xp", "completed_missions", "last_updated" },
                 ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" },
-                ["warehouse_items"] = new[] { "location", "location_code", "system", "parent_body", "item_class", "item_name", "category", "quantity", "last_updated" }
+                ["warehouse_items"] = new[] { "location", "location_code", "system", "parent_body", "item_class", "item_name", "category", "quantity", "last_updated" },
+                ["wiki_items_cache"] = new[] { "class_name", "name", "category", "manufacturer", "description_de", "description_en", "thumbnail_url", "image_url", "web_url", "updated_at" }
             };
 
             var existingTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -832,6 +862,7 @@ public static class Database
             diag.PoiCount = SafeCount("user_pois");
             diag.ReputationCount = SafeCount("reputation");
             diag.WarehouseItemCount = SafeCount("warehouse_items");
+            diag.WikiItemCount = SafeCount("wiki_items_cache");
 
             // 6. Physische Integritätsprüfung
             if (runDeepCheck)
@@ -937,6 +968,19 @@ public static class Database
                     );
                     CREATE INDEX IF NOT EXISTS ix_warehouse_location ON warehouse_items(location);
                     CREATE INDEX IF NOT EXISTS ix_warehouse_category ON warehouse_items(category);
+                    CREATE TABLE IF NOT EXISTS wiki_items_cache (
+                        class_name TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        category TEXT,
+                        manufacturer TEXT,
+                        description_de TEXT,
+                        description_en TEXT,
+                        thumbnail_url TEXT,
+                        image_url TEXT,
+                        web_url TEXT,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_wiki_items_name ON wiki_items_cache(name);
                 ");
 
                 // 3. Kritische Spalten nachziehen (falls eine Tabelle älter war)
@@ -1908,6 +1952,81 @@ public static class Database
         cmd.ExecuteNonQuery();
     }
 
+    public static void AdjustWarehouseItemQuantity(string location, string itemClass, int delta)
+    {
+        EnsureInitialized();
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE warehouse_items
+                    SET quantity = quantity + $delta,
+                        last_updated = $lu
+                    WHERE location = $loc AND item_class = $cls;
+
+                    DELETE FROM warehouse_items
+                    WHERE location = $loc AND item_class = $cls AND quantity <= 0;
+                ";
+                cmd.Parameters.AddWithValue("$delta", delta);
+                cmd.Parameters.AddWithValue("$loc", location);
+                cmd.Parameters.AddWithValue("$cls", itemClass);
+                cmd.Parameters.AddWithValue("$lu", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AdjustWarehouseItemQuantity", ex);
+            }
+        }
+    }
+
+    public static void DeleteWarehouseItem(string location, string itemClass)
+    {
+        EnsureInitialized();
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = "DELETE FROM warehouse_items WHERE location = $loc AND item_class = $cls;";
+                cmd.Parameters.AddWithValue("$loc", location);
+                cmd.Parameters.AddWithValue("$cls", itemClass);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("DeleteWarehouseItem", ex);
+            }
+        }
+    }
+
+    public static void ClearWarehouseLocation(string location)
+    {
+        EnsureInitialized();
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = "DELETE FROM warehouse_items WHERE location = $loc;";
+                cmd.Parameters.AddWithValue("$loc", location);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ClearWarehouseLocation", ex);
+            }
+        }
+    }
+
     public static List<WarehouseItem> GetWarehouseItems(string? locationFilter = null, string? categoryFilter = null, string? search = null)
     {
         EnsureInitialized();
@@ -1945,15 +2064,23 @@ public static class Database
             while (reader.Read())
             {
                 DateTime.TryParse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lu);
+                var itemClass = reader.GetString(4);
+                var rawName = reader.GetString(5);
+                var rawCat = reader.GetString(6);
+
+                var (resolvedName, resolvedCat) = WarehouseCatalog.Resolve(itemClass);
+                var finalName = !string.IsNullOrWhiteSpace(resolvedName) && resolvedName != itemClass ? resolvedName : rawName;
+                var finalCat = !string.IsNullOrWhiteSpace(resolvedCat) && resolvedCat != "Sonstiges" ? resolvedCat : rawCat;
+
                 items.Add(new WarehouseItem
                 {
                     Location = reader.GetString(0),
                     LocationCode = reader.GetString(1),
                     System = reader.GetString(2),
                     ParentBody = reader.GetString(3),
-                    ItemClass = reader.GetString(4),
-                    ItemName = reader.GetString(5),
-                    Category = reader.GetString(6),
+                    ItemClass = itemClass,
+                    ItemName = finalName,
+                    Category = finalCat,
                     Quantity = reader.GetInt32(7),
                     LastUpdated = lu
                 });
@@ -2001,6 +2128,118 @@ public static class Database
             Logger.Error("GetWarehouseLocationsSummary", ex);
         }
         return list;
+    }
+
+    public static Dictionary<string, (string Name, string Category)> GetAllCachedWikiItemNames()
+    {
+        EnsureInitialized();
+        var dict = new Dictionary<string, (string Name, string Category)>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT class_name, name, category FROM wiki_items_cache WHERE name != '';";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                dict[reader.GetString(0)] = (reader.GetString(1), reader.IsDBNull(2) ? "Sonstiges" : reader.GetString(2));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetAllCachedWikiItemNames", ex);
+        }
+        return dict;
+    }
+
+    public static WikiInfo? GetCachedWikiItem(string className)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT name, category, manufacturer, description_de, description_en, thumbnail_url, image_url, web_url 
+                FROM wiki_items_cache 
+                WHERE class_name = $cls 
+                LIMIT 1;
+            ";
+            cmd.Parameters.AddWithValue("$cls", className);
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                return new WikiInfo
+                {
+                    Name = reader.GetString(0),
+                    Category = reader.IsDBNull(1) ? "Item" : reader.GetString(1),
+                    Manufacturer = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    DescriptionDe = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    DescriptionEn = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    ThumbnailUrl = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    ImageUrl = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    WebUrl = reader.IsDBNull(7) ? "" : reader.GetString(7)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetCachedWikiItem", ex);
+        }
+        return null;
+    }
+
+    public static void SaveCachedWikiItem(string className, WikiInfo info)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO wiki_items_cache (class_name, name, category, manufacturer, description_de, description_en, thumbnail_url, image_url, web_url, updated_at)
+                VALUES ($cls, $name, $cat, $mfg, $dde, $den, $thumb, $img, $web, $updated)
+                ON CONFLICT(class_name) DO UPDATE SET
+                    name = excluded.name,
+                    category = excluded.category,
+                    manufacturer = excluded.manufacturer,
+                    description_de = excluded.description_de,
+                    description_en = excluded.description_en,
+                    thumbnail_url = excluded.thumbnail_url,
+                    image_url = excluded.image_url,
+                    web_url = excluded.web_url,
+                    updated_at = excluded.updated_at;
+            ";
+            cmd.Parameters.AddWithValue("$cls", className);
+            cmd.Parameters.AddWithValue("$name", info.Name);
+            cmd.Parameters.AddWithValue("$cat", info.Category ?? "Sonstiges");
+            cmd.Parameters.AddWithValue("$mfg", info.Manufacturer ?? "");
+            cmd.Parameters.AddWithValue("$dde", info.DescriptionDe ?? "");
+            cmd.Parameters.AddWithValue("$den", info.DescriptionEn ?? "");
+            cmd.Parameters.AddWithValue("$thumb", info.ThumbnailUrl ?? "");
+            cmd.Parameters.AddWithValue("$img", info.ImageUrl ?? "");
+            cmd.Parameters.AddWithValue("$web", info.WebUrl ?? "");
+            cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("o"));
+            cmd.ExecuteNonQuery();
+
+            using var updateCmd = db.CreateCommand();
+            updateCmd.CommandText = @"
+                UPDATE warehouse_items 
+                SET item_name = $name, category = $cat 
+                WHERE item_class = $cls;
+            ";
+            updateCmd.Parameters.AddWithValue("$name", info.Name);
+            updateCmd.Parameters.AddWithValue("$cat", info.Category ?? "Sonstiges");
+            updateCmd.Parameters.AddWithValue("$cls", className);
+            updateCmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("SaveCachedWikiItem", ex);
+        }
     }
 
     #endregion

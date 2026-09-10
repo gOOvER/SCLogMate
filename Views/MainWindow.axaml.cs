@@ -39,6 +39,15 @@ public partial class MainWindow : Window
             vm.LookupCommand.Execute(null);
     }
 
+    void OnWarehouseGridDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    {
+        if (sender is DataGrid dg && dg.SelectedItem is Models.WarehouseItem item && DataContext is ViewModels.MainViewModel vm)
+        {
+            if (vm.OpenWikiForWarehouseItemCommand.CanExecute(item))
+                vm.OpenWikiForWarehouseItemCommand.Execute(item);
+        }
+    }
+
     void OnBalanceKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
     {
         if (e.Key == Avalonia.Input.Key.Enter && DataContext is ViewModels.MainViewModel vm)

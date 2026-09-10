@@ -40,6 +40,12 @@ public static class WikiApiClient
     };
 
     private static readonly ConcurrentDictionary<string, WikiInfo?> Cache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentQueue<string> _prefetchQueue = new();
+    private static readonly ConcurrentDictionary<string, byte> _queuedOrFetched = new(StringComparer.OrdinalIgnoreCase);
+    private static bool _isPrefetchRunning;
+    private static readonly System.Threading.Lock _prefetchLock = new();
+
+    public static event Action<string, WikiInfo>? ItemResolved;
 
     static WikiApiClient()
     {
@@ -52,11 +58,23 @@ public static class WikiApiClient
         if (string.IsNullOrWhiteSpace(query) || query == "—") return null;
 
         var clean = CleanSearchTerm(query);
-        if (Cache.TryGetValue(clean, out var cached)) return cached;
+        if (Cache.TryGetValue(clean, out var cached) && cached != null) return cached;
 
         try
         {
-            // 1. Zuerst bei Fahrzeugen / Schiffen suchen
+            // 0. Wenn die Anfrage wie eine interne CIG-Item-Klasse aussieht (z.B. mit '_' oder Prefixes)
+            if (clean.Contains('_') || clean.StartsWith("Carryable", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("Harvestable", StringComparison.OrdinalIgnoreCase))
+            {
+                var byClass = await LookupByClassNameAsync(clean);
+                if (byClass != null)
+                {
+                    Cache[clean] = byClass;
+                    return byClass;
+                }
+            }
+
+            // 1. Bei Fahrzeugen / Schiffen suchen
             var vehicle = await SearchVehicleAsync(clean);
             if (vehicle != null)
             {
@@ -64,7 +82,7 @@ public static class WikiApiClient
                 return vehicle;
             }
 
-            // 2. Danach bei Items / Waffen / Komponenten suchen
+            // 2. Bei Items / Waffen / Komponenten nach Namen suchen
             var item = await SearchItemAsync(clean);
             if (item != null)
             {
@@ -79,6 +97,164 @@ public static class WikiApiClient
 
         Cache[clean] = null;
         return null;
+    }
+
+    public static async Task<WikiInfo?> LookupByClassNameAsync(string className)
+    {
+        if (string.IsNullOrWhiteSpace(className)) return null;
+        var clean = className.Trim();
+
+        // 1. In-Memory Cache
+        if (Cache.TryGetValue(clean, out var cached) && cached != null)
+            return cached;
+
+        // 2. Persistent SQLite Cache
+        var dbCached = Database.GetCachedWikiItem(clean);
+        if (dbCached != null)
+        {
+            Cache[clean] = dbCached;
+            return dbCached;
+        }
+
+        // 3. star-citizen.wiki API
+        try
+        {
+            var url = $"items?filter[class_name]={Uri.EscapeDataString(clean)}";
+            var response = await Http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
+                {
+                    var first = data[0];
+                    var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? clean : clean;
+                    var classLabel = first.TryGetProperty("classification_label", out var cl) ? cl.GetString() : null;
+                    var typeLabel = first.TryGetProperty("type_label", out var tl) ? tl.GetString() : null;
+                    var category = MapClassificationToCategory(classLabel, typeLabel);
+
+                    var mfgName = "";
+                    if (first.TryGetProperty("manufacturer", out var mfgObj) && mfgObj.ValueKind == JsonValueKind.Object)
+                    {
+                        if (mfgObj.TryGetProperty("name", out var mn)) mfgName = mn.GetString() ?? "";
+                    }
+
+                    var info = new WikiInfo
+                    {
+                        Name = name,
+                        Category = category,
+                        Manufacturer = mfgName,
+                        WebUrl = first.TryGetProperty("web_url", out var wu) ? wu.GetString() ?? "" : "",
+                        Type = typeLabel ?? classLabel ?? ""
+                    };
+
+                    if (first.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.Object)
+                    {
+                        if (desc.TryGetProperty("de_DE", out var dde)) info.DescriptionDe = dde.GetString() ?? "";
+                        if (desc.TryGetProperty("en_EN", out var den)) info.DescriptionEn = den.GetString() ?? "";
+                    }
+
+                    if (first.TryGetProperty("images", out var imgs) && imgs.ValueKind == JsonValueKind.Array && imgs.GetArrayLength() > 0)
+                    {
+                        var img = imgs[0];
+                        if (img.TryGetProperty("thumbnail_url", out var tu)) info.ThumbnailUrl = tu.GetString() ?? "";
+                        if (img.TryGetProperty("original_url", out var ou)) info.ImageUrl = ou.GetString() ?? "";
+                    }
+
+                    Database.SaveCachedWikiItem(clean, info);
+                    Cache[clean] = info;
+                    ItemResolved?.Invoke(clean, info);
+                    return info;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"WikiApi Lookup Fehler ({clean}): {ex.Message}");
+        }
+
+        // Weder im Wiki noch lokal vorhanden -> Unbekanntes Item für spätere Pflege loggen!
+        UnknownEventsLogger.LogUnknown("ItemClass", clean);
+        return null;
+    }
+
+    public static void EnqueueClassPrefetch(string className)
+    {
+        if (string.IsNullOrWhiteSpace(className)) return;
+        var clean = className.Trim();
+        if (_queuedOrFetched.TryAdd(clean, 0))
+        {
+            _prefetchQueue.Enqueue(clean);
+            StartPrefetchWorker();
+        }
+    }
+
+    private static void StartPrefetchWorker()
+    {
+        lock (_prefetchLock)
+        {
+            if (_isPrefetchRunning) return;
+            _isPrefetchRunning = true;
+        }
+
+        Task.Run(async () =>
+        {
+            while (_prefetchQueue.TryDequeue(out var itemClass))
+            {
+                try
+                {
+                    await LookupByClassNameAsync(itemClass);
+                    await Task.Delay(250); // Sanfte Rate-Limiting-Pause
+                }
+                catch { }
+            }
+            lock (_prefetchLock)
+            {
+                _isPrefetchRunning = false;
+            }
+        });
+    }
+
+    public static string MapClassificationToCategory(string? classification, string? type)
+    {
+        var raw = $"{classification} {type}".ToLowerInvariant();
+        if (raw.Contains("clothing") || raw.Contains("hat") || raw.Contains("jacket") || raw.Contains("shirt") ||
+            raw.Contains("pants") || raw.Contains("shoe") || raw.Contains("boot") || raw.Contains("armor") ||
+            raw.Contains("helmet") || raw.Contains("torso") || raw.Contains("arms") || raw.Contains("legs") ||
+            raw.Contains("backpack") || raw.Contains("undersuit") || raw.Contains("glove"))
+        {
+            return I18n.Instance.IsGerman ? "Rüstung & Kleidung" : "Armor & Clothing";
+        }
+        if (raw.Contains("weapon") || raw.Contains("pistol") || raw.Contains("rifle") || raw.Contains("shotgun") ||
+            raw.Contains("sniper") || raw.Contains("smg") || raw.Contains("lmg") || raw.Contains("knife") || raw.Contains("grenade"))
+        {
+            return I18n.Instance.IsGerman ? "Waffen & Munition" : "Weapons & Ammo";
+        }
+        if (raw.Contains("quantum") || raw.Contains("shield") || raw.Contains("cooler") || raw.Contains("power") ||
+            raw.Contains("engine") || raw.Contains("jump") || raw.Contains("turret") || raw.Contains("missile") ||
+            raw.Contains("qdrv") || raw.Contains("shld") || raw.Contains("cool") || raw.Contains("powr"))
+        {
+            return I18n.Instance.IsGerman ? "Schiffsausrüstung" : "Ship Equipment";
+        }
+        if (raw.Contains("tool") || raw.Contains("tractor") || raw.Contains("mining") || raw.Contains("salvage") || raw.Contains("fabricat"))
+        {
+            return I18n.Instance.IsGerman ? "Werkzeuge & Module" : "Tools & Modules";
+        }
+        if (raw.Contains("mineral") || raw.Contains("ore") || raw.Contains("harvestable") || raw.Contains("gem"))
+        {
+            return I18n.Instance.IsGerman ? "Mineralien & Erze" : "Minerals & Ores";
+        }
+        if (raw.Contains("consumable") || raw.Contains("medical") || raw.Contains("food") || raw.Contains("drink") || raw.Contains("medpen"))
+        {
+            return I18n.Instance.IsGerman ? "Verbrauchsgüter" : "Consumables";
+        }
+        if (raw.Contains("carryable") || raw.Contains("mission") || raw.Contains("valuable") || raw.Contains("container") || raw.Contains("medal"))
+        {
+            return I18n.Instance.IsGerman ? "Quest & Wertsachen" : "Quest & Valuables";
+        }
+        return I18n.Instance.IsGerman ? "Sonstiges" : "Miscellaneous";
     }
 
     private static string CleanSearchTerm(string term)

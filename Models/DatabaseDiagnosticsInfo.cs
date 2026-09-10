@@ -30,8 +30,9 @@ public class DatabaseDiagnosticsInfo
     public int PoiCount { get; set; }
     public int ReputationCount { get; set; }
     public int WarehouseItemCount { get; set; }
+    public int WikiItemCount { get; set; }
 
-    public int TotalRecordsCount => SessionCount + EventCount + ContractCount + FleetShipCount + PoiCount + ReputationCount + WarehouseItemCount;
+    public int TotalRecordsCount => SessionCount + EventCount + ContractCount + FleetShipCount + PoiCount + ReputationCount + WarehouseItemCount + WikiItemCount;
 
     // Tabellen- & Struktur-Validierung
     public List<string> ExistingTables { get; set; } = new();

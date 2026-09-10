@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- **Warehouse Item Management & Manual Stock Adjustments (`Core/Database.cs`, `ViewModels/MainViewModel.Warehouse.cs`, `Views/MainWindow.axaml`)**:
+  - Added direct item adjustment controls (`-` and `+` buttons) directly in the Warehouse grid quantity column for instantaneous manual stock corrections (e.g. when retrieving items via the freight elevator or consuming gear).
+  - Added dedicated warehouse row action buttons and context menu entries:
+    - `📦 Per Frachtaufzug entnehmen (-1)`: Quickly deducts 1 count of the selected item from station or planetary storage.
+    - `➕ Menge um 1 erhöhen (+1)`: Increments the item quantity.
+    - `🔧 Zerlegt / Dismantled (-1)`: Records an item dismantling action and deducts 1 from warehouse inventory.
+    - `🗑️ Gegenstand aus Lagerbestand löschen`: Completely removes obsolete or lingering items from local storage.
+  - Added `🗑️ Standort leeren` button in the warehouse toolbar to purge all inventory for the currently filtered location.
+  - Added `Database.AdjustWarehouseItemQuantity`, `Database.DeleteWarehouseItem`, and `Database.ClearWarehouseLocation` SQLite operations.
+- **Freight Elevator & Ship Elevator Live Event Detection (`Core/LogParser.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Implemented parser recognition for `CEntityComponentFreightElevatorUIProvider::FillUnstowRequest`, logging an `EventKind.Inventory` entry when items are requested and brought up via the freight elevator (`Frachtaufzug: N Gegenstände angefordert / hochgeholt`).
+  - Added freight and ship elevator readiness tracking via `CSCLoadingPlatformManager::OnLoadingPlatformStateChanged` transitioning to `OpenIdle`, firing live `EventKind.Hangar` ready events and triggering the `ElevatorReady` toast notification overlay.
+  - Bumped `CurrentParserVersion` to `34` in `Core/Database.cs`.
+
 ## [1.0.0-rc2] - 2026-09-09
 ### Added
 - **Planetary & Station Warehouse Inventory System (`Models/WarehouseItem.cs`, `Core/WarehouseCatalog.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.Warehouse.cs`, `Views/MainWindow.axaml`, `Core/I18n.cs`)**:
@@ -22,7 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Shop Transactions Ledger Sync**: Integrated shop buy (`SShopBuyRequest`) and sell (`SShopSellRequest`) events into the warehouse ledger (+qty for purchased components, tools, and consumables; -qty for items sold at terminals).
   - **Mission Cargo Deductions via Freight Elevator**: Integrated automatic cargo elevator drop-off deduction when mission delivery objectives complete (`MISSION_OBJECTIVE_STATE_COMPLETED` matching `SMarkerHandler_Hauling::OnItemRegistered`), accurately deducting delivered crates and packages from station/planetary storage.
   - **Refinery Handover Deductions**: Added automatic deduction of raw minerals and unrefined ore delivered to refinery kiosks upon refinery job creation.
-  - **Expanded Item Catalog Coverage**: Added ship components (`QDRV_` Quantum Drives, `SHLD_` Shield Generators, `COOL_` Coolers, `POWR_` Power Plants, `JDRV_` Jump Drives), mining & tractor beam modules, multi-tool attachments, fabricators, base-building tools, minerals (`Beradom`, `Feynmaline`), apparel sets (`alb_`, `ctl_`, `drn_`, `scu_`, `r6p_`, `cbd_`, `nvs_`), and quest valuables (`currency_bar`, `medal`, `blackbox`).
+- **Star Citizen Wiki API Integration & Item Class Resolution (`Core/WikiApiClient.cs`, `Core/WarehouseCatalog.cs`, `Core/Database.cs`, `Core/UnknownEventsLogger.cs`, `ViewModels/MainViewModel.Warehouse.cs`, `Views/MainWindow.axaml`)**:
+  - **Direct SCWiki API Integration**: Integrated `https://api.star-citizen.wiki/api/v2/items?filter[class_name]=...` to resolve cryptic internal CIG asset identifiers (e.g. `alb_hat_01_01_17` -> `Ketchum Beanie Aqua`, `grin_utility_medium_helmet_01_01_04` -> `Aril Helmet Hazard`) with official in-game store names, manufacturers, German descriptions, and render images.
+  - **Persistent SQLite Cache (`wiki_items_cache`, Schema v17)**: Added SQLite schema migration `v17` (`Database.CurrentSchemaVersion = 17`) introducing `wiki_items_cache` table and indexes, ensuring all fetched item definitions are saved locally for instantaneous, zero-latency offline lookups.
+  - **Non-Blocking Background Prefetching**: Engineered a non-blocking queue in `WikiApiClient` that asynchronously prefetches unknown item classes in the background without causing stalls in log parsing or UI thread rendering.
+  - **Intelligent Bilingual Fallback & Apparel Formatting**: Upgraded `WarehouseCatalog` with culture-aware (DE/EN) heuristic parsers formatting apparel design & colorway codes (e.g. `Alb Mütze (Design 01 · Farbe 17)`) and mission cargo containers while awaiting Wiki data.
+  - **Unknown Item Class Diagnostic Logging**: Added automatic tracking of unresolvable item classes to `%APPDATA%\SCLogMate\SCLogMate.unknown.log` via `UnknownEventsLogger.LogUnknown("ItemClass", ...)`, pinpointing missing items for continuous catalog refinement.
+  - **Interactive Wiki Details in Warehouse Tab**: Added double-click navigation and a context menu entry ("🌐 Im Star Citizen Wiki nachschlagen") on warehouse items, opening the full in-app Wiki overlay with 3D photos, stats, German lore, and direct web links.
+  - **Session Log Name Resolution**: Enhanced `LogParser` purchase, sale, and inventory event detail messages to present readable Wiki names in the main session event log.
 
 ### Fixed
 - **Timeline Re-Analysis Feedback & Global Refresh (`ViewModels/MainViewModel.cs`)**:

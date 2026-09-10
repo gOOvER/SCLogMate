@@ -3528,6 +3528,16 @@
                     <TextBlock Text="Export (.md)" FontSize="11" FontWeight="SemiBold" />
                   </StackPanel>
                 </Button>
+
+                <Button Classes="ghost" Padding="8,4" CornerRadius="5"
+                        Command="{Binding ClearSelectedLocationWarehouseCommand}"
+                        IsVisible="{Binding SelectedWarehouseLocation, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="Lagerbestand des aktuell links ausgewählten Standorts vollständig leeren">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="🗑️" FontSize="11" />
+                    <TextBlock Text="Standort leeren" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+                  </StackPanel>
+                </Button>
               </StackPanel>
 
               <!-- Schnellsuche -->
@@ -3563,7 +3573,7 @@
         <Grid ColumnDefinitions="280,10,*">
           
           <!-- Linke Spalte: Standorte / Planeten / Stationen -->
-          <Border Grid.Column="0" Classes="card" Padding="10">
+          <Border Grid.Column="0" Classes="card" Padding="10" MinWidth="240">
             <DockPanel>
               <!-- Kopf der Standort-Liste -->
               <DockPanel DockPanel.Dock="Top" Margin="2,0,2,8">
@@ -3608,11 +3618,35 @@
 
           <!-- Rechte Spalte: Gegenstände-Tabelle -->
           <Border Grid.Column="2" Classes="card" Padding="0">
-            <DataGrid ItemsSource="{Binding FilteredWarehouseItems}"
+            <DataGrid x:Name="WarehouseGrid"
+                      ItemsSource="{Binding FilteredWarehouseItems}"
+                      SelectedItem="{Binding SelectedWarehouseItem, Mode=TwoWay}"
+                      DoubleTapped="OnWarehouseGridDoubleTapped"
                       AutoGenerateColumns="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
+              <DataGrid.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="🌐 Im Star Citizen Wiki nachschlagen"
+                            Command="{Binding OpenWikiForWarehouseItemCommand}"
+                            CommandParameter="{Binding SelectedWarehouseItem}" />
+                  <Separator />
+                  <MenuItem Header="📦 Per Frachtaufzug entnehmen (-1)"
+                            Command="{Binding DecreaseWarehouseItemCommand}"
+                            CommandParameter="{Binding SelectedWarehouseItem}" />
+                  <MenuItem Header="➕ Menge um 1 erhöhen (+1)"
+                            Command="{Binding IncreaseWarehouseItemCommand}"
+                            CommandParameter="{Binding SelectedWarehouseItem}" />
+                  <MenuItem Header="🔧 Zerlegt / Dismantled (-1)"
+                            Command="{Binding DismantleWarehouseItemCommand}"
+                            CommandParameter="{Binding SelectedWarehouseItem}" />
+                  <Separator />
+                  <MenuItem Header="🗑️ Gegenstand aus Lagerbestand löschen"
+                            Command="{Binding DeleteWarehouseItemCommand}"
+                            CommandParameter="{Binding SelectedWarehouseItem}" />
+                </ContextMenu>
+              </DataGrid.ContextMenu>
               <DataGrid.Columns>
                 <!-- Icon & Typ -->
                 <DataGridTemplateColumn Header="Typ" Width="55">
@@ -3664,20 +3698,62 @@
                   </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <!-- Menge Badge -->
-                <DataGridTemplateColumn Header="Menge" Width="90">
+                <!-- Menge & Schnell-Anpassung -->
+                <DataGridTemplateColumn Header="Menge" Width="130">
                   <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                      <Border Background="#0D2818" BorderBrush="#238636" BorderThickness="1"
-                              CornerRadius="6" Padding="8,3" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding QuantityBadge}" FontSize="11" FontWeight="Bold" Foreground="#3FB950" />
-                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button Classes="ghost" Padding="5,2" CornerRadius="4"
+                                Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).DecreaseWarehouseItemCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Menge um 1 verringern (z.B. per Aufzug hochgeholt)">
+                          <TextBlock Text="-" FontSize="12" FontWeight="Bold" Foreground="#F87171" />
+                        </Button>
+                        <Border Background="#0D2818" BorderBrush="#238636" BorderThickness="1"
+                                CornerRadius="6" Padding="6,2" MinWidth="42" HorizontalAlignment="Center">
+                          <TextBlock Text="{Binding QuantityBadge}" FontSize="11" FontWeight="Bold" Foreground="#3FB950" HorizontalAlignment="Center" />
+                        </Border>
+                        <Button Classes="ghost" Padding="5,2" CornerRadius="4"
+                                Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).IncreaseWarehouseItemCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Menge um 1 erhöhen">
+                          <TextBlock Text="+" FontSize="12" FontWeight="Bold" Foreground="#38BDF8" />
+                        </Button>
+                      </StackPanel>
                     </DataTemplate>
                   </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
                 <!-- Zuletzt bewegt -->
                 <DataGridTextColumn Header="Zuletzt aktualisiert" Binding="{Binding FormattedDate}" Width="135" />
+
+                <!-- Aktionen -->
+                <DataGridTemplateColumn Header="Aktionen" Width="110">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button Classes="ghost" Padding="4,2"
+                                Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).DismantleWarehouseItemCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Zerlegen / Dismantle (-1)">
+                          <TextBlock Text="🔧" FontSize="12" />
+                        </Button>
+                        <Button Classes="ghost" Padding="4,2"
+                                Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).OpenWikiForWarehouseItemCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Im Star Citizen Wiki öffnen">
+                          <TextBlock Text="🌐" FontSize="12" />
+                        </Button>
+                        <Button Classes="ghost" Padding="4,2"
+                                Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).DeleteWarehouseItemCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Aus Lagerbestand entfernen">
+                          <TextBlock Text="🗑️" FontSize="12" />
+                        </Button>
+                      </StackPanel>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
               </DataGrid.Columns>
             </DataGrid>
           </Border>
