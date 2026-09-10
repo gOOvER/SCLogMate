@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added freight and ship elevator readiness tracking via `CSCLoadingPlatformManager::OnLoadingPlatformStateChanged` transitioning to `OpenIdle`, firing live `EventKind.Hangar` ready events and triggering the `ElevatorReady` toast notification overlay.
   - Bumped `CurrentParserVersion` to `34` in `Core/Database.cs`.
 
+### Removed
+- **Duplicate Database Indexing Modal Overlay (`Views/MainWindow.axaml`)**:
+  - Removed the redundant full-window modal overlay during database scanning (`IsDatabaseBusy`), retaining the clean, non-blocking top banner to allow uninterrupted UI interaction during background log indexing.
+
 ## [1.0.0-rc2] - 2026-09-09
 ### Added
 - **Planetary & Station Warehouse Inventory System (`Models/WarehouseItem.cs`, `Core/WarehouseCatalog.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.Warehouse.cs`, `Views/MainWindow.axaml`, `Core/I18n.cs`)**:
