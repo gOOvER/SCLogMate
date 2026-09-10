@@ -246,6 +246,159 @@ public class FleetStatDto
     public string LastUsed { get; set; } = "";
 }
 
+public class MissionItemDto
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = "";
+
+    [JsonPropertyName("contractor")]
+    public string Contractor { get; set; } = "";
+
+    [JsonPropertyName("faction")]
+    public string Faction { get; set; } = "";
+
+    [JsonPropertyName("missionType")]
+    public string MissionType { get; set; } = "";
+
+    [JsonPropertyName("baseReward")]
+    public int BaseReward { get; set; }
+
+    [JsonPropertyName("reputationGain")]
+    public int ReputationGain { get; set; }
+
+    [JsonPropertyName("isIllegal")]
+    public bool IsIllegal { get; set; }
+
+    [JsonPropertyName("starSystems")]
+    public string StarSystems { get; set; } = "Stanton";
+
+    [JsonPropertyName("blueprints")]
+    public string[] Blueprints { get; set; } = Array.Empty<string>();
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = "";
+
+    [JsonPropertyName("isActive")]
+    public bool IsActive { get; set; }
+
+    [JsonPropertyName("isCompleted")]
+    public bool IsCompleted { get; set; }
+
+    [JsonPropertyName("time")]
+    public string? Time { get; set; }
+}
+
+public class FactionReputationDto
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("shortName")]
+    public string ShortName { get; set; } = "";
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "Sicherheit";
+
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "🛡";
+
+    [JsonPropertyName("system")]
+    public string System { get; set; } = "Stanton";
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = "";
+
+    [JsonPropertyName("currentXp")]
+    public int CurrentXp { get; set; }
+
+    [JsonPropertyName("completedMissions")]
+    public int CompletedMissions { get; set; }
+
+    [JsonPropertyName("currentLevel")]
+    public int CurrentLevel { get; set; }
+
+    [JsonPropertyName("levelTitle")]
+    public string LevelTitle { get; set; } = "";
+
+    [JsonPropertyName("progressPercent")]
+    public double ProgressPercent { get; set; }
+
+    [JsonPropertyName("progressText")]
+    public string ProgressText { get; set; } = "";
+}
+
+public class BlueprintDto
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "";
+
+    [JsonPropertyName("subCategory")]
+    public string SubCategory { get; set; } = "";
+
+    [JsonPropertyName("rarity")]
+    public string Rarity { get; set; } = "";
+
+    [JsonPropertyName("requiredMaterials")]
+    public string RequiredMaterials { get; set; } = "";
+
+    [JsonPropertyName("unlockInfo")]
+    public string UnlockInfo { get; set; } = "";
+
+    [JsonPropertyName("isLearned")]
+    public bool IsLearned { get; set; }
+
+    [JsonPropertyName("learnedDate")]
+    public string? LearnedDate { get; set; }
+}
+
+public class LoadoutSlotDto
+{
+    [JsonPropertyName("slotKey")]
+    public string SlotKey { get; set; } = "";
+
+    [JsonPropertyName("slotName")]
+    public string SlotName { get; set; } = "";
+
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "📦";
+
+    [JsonPropertyName("itemName")]
+    public string ItemName { get; set; } = "—";
+
+    [JsonPropertyName("rawClass")]
+    public string RawClass { get; set; } = "";
+
+    [JsonPropertyName("armorClass")]
+    public string ArmorClass { get; set; } = "";
+
+    [JsonPropertyName("damageReduction")]
+    public int DamageReduction { get; set; }
+
+    [JsonPropertyName("tempRange")]
+    public string TempRange { get; set; } = "";
+
+    [JsonPropertyName("badgeColor")]
+    public string BadgeColor { get; set; } = "#38BDF8";
+
+    [JsonPropertyName("isEquipped")]
+    public bool IsEquipped { get; set; }
+
+    [JsonPropertyName("lastEquipped")]
+    public string? LastEquipped { get; set; }
+}
+
 public class PhotinoBridge
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -410,6 +563,22 @@ public class PhotinoBridge
 
                 case "get_fleet":
                     SendResponse(req.Id, "fleet_response", GetFleetData());
+                    break;
+
+                case "get_missions":
+                    SendResponse(req.Id, "missions_response", GetMissionsData());
+                    break;
+
+                case "get_reputation":
+                    SendResponse(req.Id, "reputation_response", GetReputationData());
+                    break;
+
+                case "get_blueprints":
+                    SendResponse(req.Id, "blueprints_response", GetBlueprintsData());
+                    break;
+
+                case "get_loadout":
+                    SendResponse(req.Id, "loadout_response", GetLoadoutData());
                     break;
 
                 case "toggle_watcher":
@@ -732,6 +901,201 @@ public class PhotinoBridge
             Losses = s.LossCount,
             LastUsed = s.LastTime.HasValue ? s.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
         }).ToList();
+    }
+
+    private object GetMissionsData()
+    {
+        Database.EnsureInitialized();
+        var catalog = MissionCatalog.AllMissions.Take(250).Select(m => new MissionItemDto
+        {
+            Id = m.Id,
+            Title = m.Title,
+            Contractor = m.Contractor,
+            Faction = m.Faction,
+            MissionType = m.MissionType,
+            BaseReward = m.BaseReward,
+            ReputationGain = m.ReputationGain,
+            IsIllegal = m.IsIllegal,
+            StarSystems = m.StarSystems,
+            Blueprints = m.Blueprints,
+            Description = m.Description,
+        }).ToList();
+
+        var activeContracts = Database.GetActiveContracts().Select(c => new MissionItemDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = c.Title,
+            Contractor = c.ContractedBy,
+            Faction = c.ContractedBy,
+            BaseReward = c.Reward,
+            IsActive = true,
+            Description = c.DisplayText,
+            Time = c.ScannedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
+        }).ToList();
+
+        var history = Database.LoadRecentEvents(2500)
+            .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken)
+            .Reverse()
+            .Take(100)
+            .Select(e => new MissionItemDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Title = e.Detail ?? e.KindText,
+                Contractor = "Star Citizen Auftragsmanager",
+                BaseReward = (int)e.Amount,
+                IsCompleted = e.Kind == EventKind.MissionDone,
+                Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            }).ToList();
+
+        return new
+        {
+            active = activeContracts,
+            history,
+            catalog,
+        };
+    }
+
+    private List<FactionReputationDto> GetReputationData()
+    {
+        Database.EnsureInitialized();
+        var list = ReputationCatalog.CreateFreshFactionList();
+
+        try
+        {
+            var missionEvents = Database.LoadRecentEvents(5000)
+                .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone)
+                .ToList();
+
+            foreach (var ev in missionEvents)
+            {
+                var matched = ReputationCatalog.MatchFaction(ev.Detail);
+                if (matched != null)
+                {
+                    var target = list.FirstOrDefault(f => f.Id == matched.Id);
+                    if (target != null)
+                    {
+                        target.CompletedMissions++;
+                        target.CurrentXp += 250;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.GetReputationData", ex);
+        }
+
+        return list.Select(f => new FactionReputationDto
+        {
+            Id = f.Id,
+            Name = f.Name,
+            ShortName = f.ShortName,
+            Category = f.Category,
+            Icon = f.Icon,
+            System = f.System,
+            Description = f.Description,
+            CurrentXp = f.CurrentXp,
+            CompletedMissions = f.CompletedMissions,
+            CurrentLevel = f.CurrentLevel,
+            LevelTitle = f.LevelTitle,
+            ProgressPercent = f.LevelProgressPercent,
+            ProgressText = f.ProgressText,
+        }).ToList();
+    }
+
+    private List<BlueprintDto> GetBlueprintsData()
+    {
+        Database.EnsureInitialized();
+        var catalog = BlueprintCatalog.CreateFreshCatalog();
+        var learnedDistinct = new HashSet<string>(Database.DistinctBlueprints(), StringComparer.OrdinalIgnoreCase);
+
+        var events = Database.AllBlueprintEvents();
+        var learnedDates = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ev in events)
+        {
+            if (!string.IsNullOrEmpty(ev.Detail) && !learnedDates.ContainsKey(ev.Detail))
+            {
+                learnedDates[ev.Detail] = ev.Time;
+            }
+        }
+
+        var result = new List<BlueprintDto>();
+        foreach (var b in catalog)
+        {
+            bool isLearned = learnedDistinct.Contains(b.Name) || learnedDates.ContainsKey(b.Name);
+            string? dateStr = null;
+            if (learnedDates.TryGetValue(b.Name, out var dt))
+            {
+                dateStr = dt.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+            }
+
+            result.Add(new BlueprintDto
+            {
+                Id = b.Id,
+                Name = b.Name,
+                Category = b.Category,
+                SubCategory = b.SubCategory,
+                Rarity = b.Rarity,
+                RequiredMaterials = b.RequiredMaterials,
+                UnlockInfo = b.UnlockInfo,
+                IsLearned = isLearned,
+                LearnedDate = dateStr,
+            });
+        }
+
+        return result;
+    }
+
+    private List<LoadoutSlotDto> GetLoadoutData()
+    {
+        Database.EnsureInitialized();
+        var slots = new List<LoadoutSlotDto>
+        {
+            new() { SlotKey = "Helmet", SlotName = "Helm", Icon = "🪖" },
+            new() { SlotKey = "Torso", SlotName = "Torso / Core", Icon = "🥋" },
+            new() { SlotKey = "Arms", SlotName = "Arme", Icon = "🦾" },
+            new() { SlotKey = "Legs", SlotName = "Beine", Icon = "🦿" },
+            new() { SlotKey = "Undersuit", SlotName = "Undersuit", Icon = "🩱" },
+            new() { SlotKey = "Backpack", SlotName = "Rucksack", Icon = "🎒" },
+            new() { SlotKey = "Primary1", SlotName = "Primärwaffe 1", Icon = "🎯" },
+            new() { SlotKey = "Primary2", SlotName = "Primärwaffe 2", Icon = "🎯" },
+            new() { SlotKey = "Sidearm", SlotName = "Seitenwaffe", Icon = "🔫" },
+            new() { SlotKey = "MultiTool", SlotName = "Multi-Tool", Icon = "🔧" },
+            new() { SlotKey = "MedItem", SlotName = "Med-Kit / Pen", Icon = "💉" },
+        };
+
+        try
+        {
+            var loadoutEvents = Database.LoadRecentEvents(2500)
+                .Where(e => e.Kind == EventKind.Loadout && !string.IsNullOrWhiteSpace(e.Detail))
+                .ToList();
+
+            foreach (var ev in loadoutEvents)
+            {
+                var (slotType, slotName, _) = LogParser.ClassifyLoadoutSlot(ev.Detail);
+                string slotKey = slotType.ToString();
+                var slot = slots.FirstOrDefault(s => s.SlotKey.Equals(slotKey, StringComparison.OrdinalIgnoreCase));
+                if (slot != null)
+                {
+                    string clean = ItemNames.CleanFallback(ev.Detail);
+                    var (armorClass, dmgRed, tempRange, badgeColor, _, _) = LoadoutCatalog.GetItemMeta(slotType, ev.Detail, clean);
+                    slot.ItemName = clean;
+                    slot.RawClass = ev.Detail;
+                    slot.ArmorClass = armorClass;
+                    slot.DamageReduction = dmgRed;
+                    slot.TempRange = tempRange;
+                    slot.BadgeColor = badgeColor;
+                    slot.IsEquipped = true;
+                    slot.LastEquipped = ev.Time.ToLocalTime().ToString("dd.MM. HH:mm");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.GetLoadoutData", ex);
+        }
+
+        return slots;
     }
 
     private int TriggerScan()

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Photino.NET & React Full Functional Migration — Phase 2 (`frontend/src/views/`)**:
+  - Ported **Aufträge & Missionen View** (`MissionsView.tsx`): Multi-tab mission tracker supporting active OCR contracts from mobiGlas, parsed historical mission completions with aUEC rewards, and the global CIG mission catalog with type filtering (Bounty, Delivery, Mercenary, Salvage, etc.) and search.
+  - Ported **Ansehen & Fraktionen View** (`ReputationView.tsx`): Faction reputation dashboard categorizing organizations (Security & Bounty Hunting, Cargo & Logistics, Industry & Mining, Underworld & Syndicates) with XP progression bars, current rank titles, and total completed contract counts.
+  - Ported **Baupläne & Crafting View** (`BlueprintsView.tsx`): Comprehensive Star Citizen crafting blueprint browser with status filter pills (All, Learned, Missing), category dropdown (Weapons, Armor, Components, Tools), rarity badge highlights, ingredient requirements, unlock sources, and completion progress bars.
+  - Ported **Pilot Ausrüstung & Loadout View** (`LoadoutView.tsx`): Visual gear and pilot inspector with dual-column layout (Armor & Undersuit vs Weapons & Utilities), overall damage reduction calculation (-%), temperature protection ranges, armor class determination (Heavy, Medium, Light), and single-click Markdown export to clipboard.
+  - Integrated all Phase 2 views into `frontend/src/App.tsx` navigation and verified compilation.
 - **Photino.NET & React Full Functional Migration — Phase 1 (`Core/Photino/`, `frontend/`)**:
   - Implemented 16-tab categorized sidebar navigation matching the entire functional landscape of the Avalonia application (Chronik, Finanzen, Lager, Flotte, Aufträge, Ansehen, Starmap, Orte, Flugschreiber, RS Scanner, Markt, Baupläne, Ausrüstung, Werkzeuge, Einstellungen, Über).
   - Ported **Chronik / Events View** (`EventsView.tsx`): Real-time and historical event browsing with filter pills (All, Wallet, Combat, Missions, Ships, Locations, System), search bar, and detailed entry inspector drawer.

@@ -100,6 +100,71 @@ export interface FleetStatDto {
   lastUsed: string;
 }
 
+export interface MissionItemDto {
+  id: string;
+  title: string;
+  contractor: string;
+  faction: string;
+  missionType: string;
+  baseReward: number;
+  reputationGain: number;
+  isIllegal: boolean;
+  starSystems: string;
+  blueprints: string[];
+  description: string;
+  isActive?: boolean;
+  isCompleted?: boolean;
+  time?: string;
+}
+
+export interface MissionsResponseDto {
+  active: MissionItemDto[];
+  history: MissionItemDto[];
+  catalog: MissionItemDto[];
+}
+
+export interface FactionReputationDto {
+  id: string;
+  name: string;
+  shortName: string;
+  category: string;
+  icon: string;
+  system: string;
+  description: string;
+  currentXp: number;
+  completedMissions: number;
+  currentLevel: number;
+  levelTitle: string;
+  progressPercent: number;
+  progressText: string;
+}
+
+export interface BlueprintDto {
+  id: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  rarity: string;
+  requiredMaterials: string;
+  unlockInfo: string;
+  isLearned: boolean;
+  learnedDate?: string;
+}
+
+export interface LoadoutSlotDto {
+  slotKey: string;
+  slotName: string;
+  icon: string;
+  itemName: string;
+  rawClass?: string;
+  armorClass: string;
+  damageReduction: number;
+  tempRange: string;
+  badgeColor: string;
+  isEquipped: boolean;
+  lastEquipped?: string;
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -376,6 +441,128 @@ class PhotinoBridge {
             lastUsed: '08.09.2026 23:10',
           },
         ] as FleetStatDto[];
+
+      case 'get_missions':
+        return {
+          active: [],
+          history: [
+            {
+              id: 'm1',
+              title: 'Covalex Delivery - Stanton Route',
+              contractor: 'Covalex Shipping',
+              faction: 'Covalex',
+              missionType: 'Delivery',
+              baseReward: 25000,
+              reputationGain: 150,
+              isIllegal: false,
+              starSystems: 'Stanton',
+              blueprints: [],
+              description: 'Lieferung von 3 Frachtkisten nach MicroTech',
+              isCompleted: true,
+              time: '10.09. 16:30',
+            },
+          ],
+          catalog: [],
+        } as MissionsResponseDto;
+
+      case 'get_reputation':
+        return [
+          {
+            id: 'rep_hurston',
+            name: 'Hurston Dynamics Security',
+            shortName: 'Hurston Sec',
+            category: 'Sicherheit',
+            icon: '🛡️',
+            system: 'Stanton (Hurston)',
+            description: 'Sicherheits- und Kopfgeldverträge rund um Hurston.',
+            currentXp: 4800,
+            completedMissions: 18,
+            currentLevel: 3,
+            levelTitle: 'Senior Deputy',
+            progressPercent: 65,
+            progressText: '4.800 / 7.000 XP',
+          },
+          {
+            id: 'rep_covalex',
+            name: 'Covalex Shipping',
+            shortName: 'Covalex',
+            category: 'Fracht',
+            icon: '📦',
+            system: 'Stanton',
+            description: 'Offizielle Transport- und Kurieraufträge.',
+            currentXp: 8200,
+            completedMissions: 32,
+            currentLevel: 4,
+            levelTitle: 'Fleet Courier',
+            progressPercent: 82,
+            progressText: '8.200 / 10.000 XP',
+          },
+        ] as FactionReputationDto[];
+
+      case 'get_blueprints':
+        return [
+          {
+            id: 'bp_1',
+            name: 'P8-SC SMG Silencer',
+            category: 'Waffen',
+            subCategory: 'Aufsatz',
+            rarity: 'Rare',
+            requiredMaterials: '2x RMC, 1x Titanium',
+            unlockInfo: 'Pyro Cargo Wreck Salvage',
+            isLearned: true,
+            learnedDate: '10.09.2026',
+          },
+          {
+            id: 'bp_2',
+            name: 'Defiance Core Heavy Armor',
+            category: 'Rüstung',
+            subCategory: 'Torso',
+            rarity: 'Epic',
+            requiredMaterials: '6x RMC, 4x Tungsten',
+            unlockInfo: 'Bunker Security Mission T4',
+            isLearned: false,
+          },
+        ] as BlueprintDto[];
+
+      case 'get_loadout':
+        return [
+          {
+            slotKey: 'Helmet',
+            slotName: 'Helm',
+            icon: '🪖',
+            itemName: 'Defiance Helmet Firestarter',
+            armorClass: 'Heavy',
+            damageReduction: 40,
+            tempRange: '-100°C bis +140°C',
+            badgeColor: '#F59E0B',
+            isEquipped: true,
+            lastEquipped: '10.09. 18:30',
+          },
+          {
+            slotKey: 'Torso',
+            slotName: 'Torso / Core',
+            icon: '🥋',
+            itemName: 'Defiance Core Firestarter',
+            armorClass: 'Heavy',
+            damageReduction: 40,
+            tempRange: '-100°C bis +140°C',
+            badgeColor: '#F59E0B',
+            isEquipped: true,
+            lastEquipped: '10.09. 18:30',
+          },
+          {
+            slotKey: 'Primary1',
+            slotName: 'Primärwaffe 1',
+            icon: '🎯',
+            itemName: 'FS-9 LMG',
+            armorClass: '',
+            damageReduction: 0,
+            tempRange: '',
+            badgeColor: '#38BDF8',
+            isEquipped: true,
+            lastEquipped: '10.09. 18:25',
+          },
+        ] as LoadoutSlotDto[];
 
       case 'toggle_watcher':
         return { isLiveWatching: payload?.enable ?? true };

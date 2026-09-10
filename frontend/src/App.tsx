@@ -12,6 +12,10 @@ import { SessionsView } from './views/SessionsView';
 import { FinancesView } from './views/FinancesView';
 import { WarehouseView } from './views/WarehouseView';
 import { FleetView } from './views/FleetView';
+import { MissionsView } from './views/MissionsView';
+import { ReputationView } from './views/ReputationView';
+import { BlueprintsView } from './views/BlueprintsView';
+import { LoadoutView } from './views/LoadoutView';
 import { PlaceholderView } from './views/PlaceholderView';
 import {
   FolderSync,
@@ -202,17 +206,21 @@ export const App: React.FC = () => {
 
           {activeTab === 'fleet' && <FleetView />}
 
+          {activeTab === 'missions' && <MissionsView />}
+
+          {activeTab === 'reputation' && <ReputationView />}
+
+          {activeTab === 'blueprints' && <BlueprintsView />}
+
+          {activeTab === 'loadout' && <LoadoutView />}
+
           {/* Placeholders for remaining tabs */}
           {[
-            'missions',
-            'reputation',
             'starmap',
             'places',
             'blackbox',
             'orescanner',
             'market',
-            'blueprints',
-            'loadout',
             'tools',
             'settings',
             'about',
