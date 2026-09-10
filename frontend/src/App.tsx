@@ -21,7 +21,9 @@ import { PlacesView } from './views/PlacesView';
 import { BlackboxView } from './views/BlackboxView';
 import { OreScannerView } from './views/OreScannerView';
 import { MarketView } from './views/MarketView';
-import { PlaceholderView } from './views/PlaceholderView';
+import { ToolsView } from './views/ToolsView';
+import { SettingsView } from './views/SettingsView';
+import { AboutView } from './views/AboutView';
 import {
   FolderSync,
   HardDrive,
@@ -229,10 +231,11 @@ export const App: React.FC = () => {
 
           {activeTab === 'market' && <MarketView />}
 
-          {/* Placeholders for remaining tabs */}
-          {['tools', 'settings', 'about'].includes(activeTab) && (
-            <PlaceholderView tab={activeTab} />
-          )}
+          {activeTab === 'tools' && <ToolsView />}
+
+          {activeTab === 'settings' && <SettingsView />}
+
+          {activeTab === 'about' && <AboutView />}
         </main>
 
         {/* Bottom Statusbar */}

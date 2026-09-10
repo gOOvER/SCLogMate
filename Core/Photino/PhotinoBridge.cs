@@ -528,6 +528,42 @@ public class MarketCommodityDto
     [JsonPropertyName("bestSellLocation")] public string BestSellLocation { get; set; } = "";
 }
 
+public class ToolsStatusDto
+{
+    [JsonPropertyName("shaderCacheMb")] public double ShaderCacheMb { get; set; }
+    [JsonPropertyName("crashDumpsMb")] public double CrashDumpsMb { get; set; }
+    [JsonPropertyName("userCfgPath")] public string UserCfgPath { get; set; } = "";
+    [JsonPropertyName("userCfgExists")] public bool UserCfgExists { get; set; }
+    [JsonPropertyName("userCfgContent")] public string UserCfgContent { get; set; } = "";
+    [JsonPropertyName("totalRamGb")] public double TotalRamGb { get; set; }
+    [JsonPropertyName("ramStatus")] public string RamStatus { get; set; } = "32 GB (Optimal)";
+    [JsonPropertyName("driveName")] public string DriveName { get; set; } = "C:";
+    [JsonPropertyName("freeDiskGb")] public double FreeDiskGb { get; set; }
+    [JsonPropertyName("pagefileStatus")] public string PagefileStatus { get; set; } = "Aktiv";
+    [JsonPropertyName("keybindBackups")] public List<string> KeybindBackups { get; set; } = new();
+}
+
+public class SettingsDto
+{
+    [JsonPropertyName("logPath")] public string? LogPath { get; set; }
+    [JsonPropertyName("balance")] public long Balance { get; set; }
+    [JsonPropertyName("autoOcrEnabled")] public bool AutoOcrEnabled { get; set; } = true;
+    [JsonPropertyName("uexApiKey")] public string? UexApiKey { get; set; }
+    [JsonPropertyName("overlayEnabled")] public bool OverlayEnabled { get; set; } = false;
+    [JsonPropertyName("overlayOpacity")] public double OverlayOpacity { get; set; } = 0.92;
+    [JsonPropertyName("toastEnabled")] public bool ToastEnabled { get; set; } = true;
+    [JsonPropertyName("toastBlueprintEnabled")] public bool ToastBlueprintEnabled { get; set; } = true;
+    [JsonPropertyName("toastMissionEnabled")] public bool ToastMissionEnabled { get; set; } = true;
+    [JsonPropertyName("toastReputationEnabled")] public bool ToastReputationEnabled { get; set; } = true;
+    [JsonPropertyName("toastRefineryEnabled")] public bool ToastRefineryEnabled { get; set; } = true;
+    [JsonPropertyName("toastElevatorEnabled")] public bool ToastElevatorEnabled { get; set; } = true;
+    [JsonPropertyName("toastShipDestructionEnabled")] public bool ToastShipDestructionEnabled { get; set; } = true;
+    [JsonPropertyName("auroraIntegrationEnabled")] public bool AuroraIntegrationEnabled { get; set; } = true;
+    [JsonPropertyName("auroraVolume")] public int AuroraVolume { get; set; } = 40;
+    [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
+    [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
+}
+
 public class PhotinoBridge
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -762,6 +798,53 @@ public class PhotinoBridge
 
                 case "get_market":
                     SendResponse(req.Id, "market_response", GetMarketData());
+                    break;
+
+                case "get_tools_status":
+                    SendResponse(req.Id, "tools_status_response", GetToolsStatus());
+                    break;
+
+                case "clear_shader_cache":
+                    SendResponse(req.Id, "clear_shader_cache_response", ClearShaderCache());
+                    break;
+
+                case "clear_crash_dumps":
+                    SendResponse(req.Id, "clear_crash_dumps_response", ClearCrashDumps());
+                    break;
+
+                case "save_user_cfg":
+                    string cfgContent = "";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("content", out var cProp))
+                    {
+                        cfgContent = cProp.GetString() ?? "";
+                    }
+                    SendResponse(req.Id, "save_user_cfg_response", SaveUserCfg(cfgContent));
+                    break;
+
+                case "backup_keybinds":
+                    string? note = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("note", out var nProp))
+                    {
+                        note = nProp.GetString();
+                    }
+                    SendResponse(req.Id, "backup_keybinds_response", BackupKeybinds(note));
+                    break;
+
+                case "get_settings":
+                    SendResponse(req.Id, "settings_response", GetSettingsData());
+                    break;
+
+                case "save_settings":
+                    if (req.Payload.HasValue)
+                    {
+                        var settingsDto = JsonSerializer.Deserialize<SettingsDto>(req.Payload.Value.GetRawText(), JsonOpts);
+                        if (settingsDto != null)
+                        {
+                            SaveSettingsData(settingsDto);
+                        }
+                    }
+                    SendResponse(req.Id, "save_settings_response", GetSettingsData());
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
                     break;
 
                 case "toggle_watcher":
@@ -1600,6 +1683,112 @@ public class PhotinoBridge
             new() { Name = "Quantanium (Raw)", Category = "Volatile", Tier = "S", AvgBuyPrice = 44.00, AvgSellPrice = 88.00, Margin = 44.00, BestBuyLocation = "Lyria Asteroids", BestSellLocation = "ARC-L1 Refinery" },
             new() { Name = "Diamond", Category = "Gems", Tier = "B", AvgBuyPrice = 6.20, AvgSellPrice = 7.15, Margin = 0.95, BestBuyLocation = "HDMS-Lathan (Arial)", BestSellLocation = "Baijini Point (ArcCorp)" },
         };
+    }
+
+    private ToolsStatusDto GetToolsStatus()
+    {
+        double shaderMb = MaintenanceService.GetShaderCacheSizeMb();
+        double crashMb = MaintenanceService.GetCrashDumpsSizeMb();
+        string cfgPath = MaintenanceService.GetUserCfgPath(_currentLogPath);
+        var (cfgExists, cfgContent) = MaintenanceService.ReadUserCfg(_currentLogPath);
+        var diag = MaintenanceService.GetSystemDiagnostics(_currentLogPath);
+        var keybinds = MaintenanceService.ListKeybindBackups().Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList();
+
+        return new ToolsStatusDto
+        {
+            ShaderCacheMb = shaderMb,
+            CrashDumpsMb = crashMb,
+            UserCfgPath = cfgPath,
+            UserCfgExists = cfgExists,
+            UserCfgContent = cfgContent,
+            TotalRamGb = diag.TotalRamGb,
+            RamStatus = diag.RamStatus,
+            DriveName = diag.DriveName,
+            FreeDiskGb = diag.FreeDiskGb,
+            PagefileStatus = diag.PagefileStatus,
+            KeybindBackups = keybinds
+        };
+    }
+
+    private ToolsStatusDto ClearShaderCache()
+    {
+        MaintenanceService.CleanShaderCache();
+        return GetToolsStatus();
+    }
+
+    private ToolsStatusDto ClearCrashDumps()
+    {
+        MaintenanceService.CleanCrashDumps();
+        return GetToolsStatus();
+    }
+
+    private ToolsStatusDto SaveUserCfg(string content)
+    {
+        MaintenanceService.SaveUserCfg(_currentLogPath, content);
+        return GetToolsStatus();
+    }
+
+    private ToolsStatusDto BackupKeybinds(string? note)
+    {
+        MaintenanceService.BackupKeybinds(_currentLogPath, null, note);
+        return GetToolsStatus();
+    }
+
+    private SettingsDto GetSettingsData()
+    {
+        var s = Settings.Load();
+        return new SettingsDto
+        {
+            LogPath = s.LogPath ?? _currentLogPath,
+            Balance = s.Balance,
+            AutoOcrEnabled = s.AutoOcrEnabled,
+            UexApiKey = s.UexApiKey,
+            OverlayEnabled = s.OverlayEnabled,
+            OverlayOpacity = s.OverlayOpacity,
+            ToastEnabled = s.ToastEnabled,
+            ToastBlueprintEnabled = s.ToastBlueprintEnabled,
+            ToastMissionEnabled = s.ToastMissionEnabled,
+            ToastReputationEnabled = s.ToastReputationEnabled,
+            ToastRefineryEnabled = s.ToastRefineryEnabled,
+            ToastElevatorEnabled = s.ToastElevatorEnabled,
+            ToastShipDestructionEnabled = s.ToastShipDestructionEnabled,
+            AuroraIntegrationEnabled = s.AuroraIntegrationEnabled,
+            AuroraVolume = s.AuroraVolume,
+            RsTargetAlertEnabled = s.RsTargetAlertEnabled,
+            RsTargetSoundEnabled = s.RsTargetSoundEnabled
+        };
+    }
+
+    private void SaveSettingsData(SettingsDto dto)
+    {
+        var s = Settings.Load();
+        bool pathChanged = !string.Equals(s.LogPath, dto.LogPath, StringComparison.OrdinalIgnoreCase);
+
+        s.LogPath = dto.LogPath;
+        s.Balance = dto.Balance;
+        s.AutoOcrEnabled = dto.AutoOcrEnabled;
+        s.UexApiKey = dto.UexApiKey;
+        s.OverlayEnabled = dto.OverlayEnabled;
+        s.OverlayOpacity = dto.OverlayOpacity;
+        s.ToastEnabled = dto.ToastEnabled;
+        s.ToastBlueprintEnabled = dto.ToastBlueprintEnabled;
+        s.ToastMissionEnabled = dto.ToastMissionEnabled;
+        s.ToastReputationEnabled = dto.ToastReputationEnabled;
+        s.ToastRefineryEnabled = dto.ToastRefineryEnabled;
+        s.ToastElevatorEnabled = dto.ToastElevatorEnabled;
+        s.ToastShipDestructionEnabled = dto.ToastShipDestructionEnabled;
+        s.AuroraIntegrationEnabled = dto.AuroraIntegrationEnabled;
+        s.AuroraVolume = dto.AuroraVolume;
+        s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
+        s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
+
+        Settings.Save(s);
+
+        if (pathChanged && !string.IsNullOrEmpty(s.LogPath) && File.Exists(s.LogPath))
+        {
+            _currentLogPath = s.LogPath;
+            StartLogTailer(_currentLogPath);
+        }
     }
 
     private void OnLogLineReceived(string rawLine)

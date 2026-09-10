@@ -284,6 +284,40 @@ export interface MarketCommodityDto {
   bestSellLocation: string;
 }
 
+export interface ToolsStatusDto {
+  shaderCacheMb: number;
+  crashDumpsMb: number;
+  userCfgPath: string;
+  userCfgExists: boolean;
+  userCfgContent: string;
+  totalRamGb: number;
+  ramStatus: string;
+  driveName: string;
+  freeDiskGb: number;
+  pagefileStatus: string;
+  keybindBackups: string[];
+}
+
+export interface SettingsDto {
+  logPath?: string;
+  balance: number;
+  autoOcrEnabled: boolean;
+  uexApiKey?: string;
+  overlayEnabled: boolean;
+  overlayOpacity: number;
+  toastEnabled: boolean;
+  toastBlueprintEnabled: boolean;
+  toastMissionEnabled: boolean;
+  toastReputationEnabled: boolean;
+  toastRefineryEnabled: boolean;
+  toastElevatorEnabled: boolean;
+  toastShipDestructionEnabled: boolean;
+  auroraIntegrationEnabled: boolean;
+  auroraVolume: number;
+  rsTargetAlertEnabled: boolean;
+  rsTargetSoundEnabled: boolean;
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -364,6 +398,11 @@ class PhotinoBridge {
       const msg: IpcMessage<TPayload> = { id, type, payload };
       window.external.sendMessage!(JSON.stringify(msg));
     });
+  }
+
+  /** Shorthand for sendRequest */
+  public send<TResult = any, TPayload = any>(type: string, payload?: TPayload): Promise<TResult> {
+    return this.sendRequest<TResult, TPayload>(type, payload);
   }
 
   /** Fire-and-forget notification to C# */
@@ -1043,6 +1082,50 @@ class PhotinoBridge {
             bestSellLocation: 'New Babbage (microTech)',
           },
         ] as MarketCommodityDto[];
+
+      case 'get_tools_status':
+      case 'clear_shader_cache':
+      case 'clear_crash_dumps':
+      case 'save_user_cfg':
+      case 'backup_keybinds':
+        return {
+          shaderCacheMb: type === 'clear_shader_cache' ? 0 : 342.5,
+          crashDumpsMb: type === 'clear_crash_dumps' ? 0 : 85.2,
+          userCfgPath: 'J:\\StarCitizen\\LIVE\\user.cfg',
+          userCfgExists: true,
+          userCfgContent: payload?.cfgContent || 'r_VSync = 0\nr_MotionBlur = 0\nsys_maxfps = 120\nr_TexturesStreamPoolSize = 6144\nr_DisplayInfo = 1\ng_language = english',
+          totalRamGb: 64,
+          ramStatus: '64 GB (Optimal)',
+          driveName: 'J:',
+          freeDiskGb: 485.6,
+          pagefileStatus: 'Aktiv (NVMe SSD)',
+          keybindBackups: [
+            'backup_2026-03-01_dualstick (5 Dateien, 1.2 MB)',
+            'backup_2026-02-15_flight (4 Dateien, 980 KB)',
+          ],
+        } as ToolsStatusDto;
+
+      case 'get_settings':
+      case 'save_settings':
+        return {
+          logPath: payload?.settings?.logPath || 'J:\\StarCitizen\\LIVE\\logbackups\\game.log',
+          balance: payload?.settings?.balance ?? 15420800,
+          autoOcrEnabled: payload?.settings?.autoOcrEnabled ?? true,
+          uexApiKey: payload?.settings?.uexApiKey || '',
+          overlayEnabled: payload?.settings?.overlayEnabled ?? true,
+          overlayOpacity: payload?.settings?.overlayOpacity ?? 0.92,
+          toastEnabled: payload?.settings?.toastEnabled ?? true,
+          toastBlueprintEnabled: payload?.settings?.toastBlueprintEnabled ?? true,
+          toastMissionEnabled: payload?.settings?.toastMissionEnabled ?? true,
+          toastReputationEnabled: payload?.settings?.toastReputationEnabled ?? true,
+          toastRefineryEnabled: payload?.settings?.toastRefineryEnabled ?? true,
+          toastElevatorEnabled: payload?.settings?.toastElevatorEnabled ?? true,
+          toastShipDestructionEnabled: payload?.settings?.toastShipDestructionEnabled ?? true,
+          auroraIntegrationEnabled: payload?.settings?.auroraIntegrationEnabled ?? true,
+          auroraVolume: payload?.settings?.auroraVolume ?? 40,
+          rsTargetAlertEnabled: payload?.settings?.rsTargetAlertEnabled ?? true,
+          rsTargetSoundEnabled: payload?.settings?.rsTargetSoundEnabled ?? true,
+        } as SettingsDto;
     }
   }
 }
