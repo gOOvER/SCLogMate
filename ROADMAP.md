@@ -4,6 +4,31 @@ Dieses Dokument sammelt geplante Erweiterungen, Optimierungen und Feature-Konzep
 
 ---
 
+## 🎯 Prioritäre ToDo: UI/UX Angleichung an SCLogMate RC2 (React + Photino)
+
+Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden Schritte gleichen das React-Frontend Schritt für Schritt an das vertraute, hochdichte Star-Citizen-HUD-Design der Release-Candidate-Version (RC2) an:
+
+- [ ] **Schritt 1: Globaler Rahmen, Master-Header & 2-Zeilen-HUD (Shell)**
+  - **Oberste Leiste:** Star Citizen Prozess-Status Badge (`● LIVE` / `○ Offline`), Overlay-Schnellstarter (`🖥 Mini-HUD`, `🛰 RS-Overlay`), Sprachwähler mit echten Länderflaggen (DE / EN) und Versions-Pill.
+  - **mobiGlas Session-Strip:** Prominenter Session-Auswahlbalken direkt unter dem Header mit Dropdown aller erfassten Spielsitzungen und leuchtender Zeitspannen-Pille (`SessionSpanText`).
+  - **Permanentes 2-Zeilen SC-HUD (oben, einklappbar):**
+    - *Zeile 1:* Pilot & Server (Region, Shard-Nummer, SC-Version) · Standort & Jurisdiktion (mit leuchtendem Waffenruhe/Armistice-Badge) · Aktives Schiff (Hersteller, Typ, Status).
+    - *Zeile 2:* Kontostand & Saldo (Live-aUEC, Session-Delta, OCR-Badge) · Aktiver Auftrag / Mission · Flugdaten & Telemetrie.
+    - Einklapp-Funktion per Toggle für maximalen Platz bei Karten & Tabellen.
+- [ ] **Schritt 2: Chronik & Ereignisse (`EventsView.tsx`)**
+  - Dichte, tabellarische Darstellung der Ereignisse mit farbigen Event-Pills (Finanzen, Kampf, Schiffe, Missionen, Orte).
+  - Such- und Filterleiste wie in RC2 inkl. ausziehbarem Detail-Drawer mit Rohdaten.
+- [ ] **Schritt 3: Finanzen & Saldo (`FinancesView.tsx`)**
+  - Angleichung der Bilanzkarten (Gesamtguthaben, Sitzungs-Delta, Handelsgewinne).
+  - Zeitverlaufs-Chart und tabellarisches Transaktionsbuch für aUEC-Transfers und Rohstoffeinkäufe/-verkäufe.
+- [ ] **Schritt 4: Lagerbestand / Warehouse (`WarehouseView.tsx`)**
+  - Exakte Zwei-Spalten-Struktur: Links Planeten & Raumstationen mit Item-Zählern, rechts Artikeltabelle.
+  - Direkte In-Grid Schnellanpassungen (`+` / `-`) und Frachtaufzug-Aktionen (`📦 Per Frachtaufzug entnehmen`, `🔧 Zerlegt`, `Standort leeren`).
+- [ ] **Schritt 5: Flotte, Aufträge, Ansehen & weitere Detail-Views**
+  - Schrittweise Angleichung von Typografie, Tabellenstilen und Informationsdichte an die Avalonia-Vorlage.
+
+---
+
 ## 🗺 1. Starmap & Navigation (Sternenkarte)
 - [x] **Sprungreise- & Flugzeit-Rechner (Vector Route):**
   - Zeichnen einer dynamischen Fluglinie vom aktuellen Spieler-Standort zum ausgewählten Zielobjekt auf dem Radar.
