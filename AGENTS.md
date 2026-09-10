@@ -104,6 +104,13 @@ When debugging startup errors, crashes, or unhandled exceptions:
 - Fatal exceptions and startup errors are captured there automatically via `Core.Logger`.
 - Always inspect this log directly without asking for confirmation.
 
+## Node.js & Frontend Tooling
+
+- Always strictly use the **NVM-managed Node.js versions** (`C:\Users\goove\AppData\Local\Author Software\nvm\.nodejs`).
+- Prepend NVM to `$env:PATH` before executing node / npm / npx commands:
+  `$env:PATH = "C:\Users\goove\AppData\Local\Author Software\nvm\.nodejs;C:\Users\goove\AppData\Local\Author Software\nvm;$env:PATH"`
+- Never fall back to unmanaged global system Node.js paths.
+
 ## Style & Workflow
 
 - Comments in German or English, both are fine.
