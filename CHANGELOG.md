@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Pilot & Server HUD Card Layout, Vector Flags & RC2 Tooltip Restoration (`HudBar.tsx`, `App.tsx`)**:
+  - Replaced emoji country flags with sharp vector SVGs (`EU`, `US`, `AUS`, `ASIA`, Globe) matching Avalonia RC2, resolving the missing flag issue and duplicated text (`EU EU · LIVE`) on Windows WebView2.
+  - Re-structured the Pilot & Server card subline to cleanly separate version and shard instance using `serverShardNumber` (e.g. `SC 4.10.0-LIVE · Shard #050`), eliminating cramped, long raw shard string overflows (`pub_euw1b_12545750_050`).
+  - Restored full multiline RC2 tooltip (`ServerTooltipText`) across the entire Pilot & Server card, presenting complete Shard Name, Region name & code, RTT ping latency, channel, pilot name, and full Star Citizen version details on hover.
+  - Added latency color coding matching RC2 thresholds (emerald <= 45ms, amber <= 120ms, rose > 120ms).
 - **Auto-Updater & Database/Parser Version Upgrade Synchronization (`UpdateModal.tsx`, `MasterHeader.tsx`, `AboutView.tsx`, `SettingsView.tsx`, `DbUpdateModal.tsx`, `PhotinoBridge.cs`)**:
   - Restored full auto-updater lifecycle matching Avalonia RC2:
     - Added GitHub release updater integration on startup and recurring every 6 hours via `Updater.CheckAsync()` in `PhotinoBridge.cs`.

@@ -53,6 +53,7 @@ export const App: React.FC = () => {
     serverRegionCode: 'EU',
     serverRegionName: 'Europa',
     serverShard: '—',
+    serverShardNumber: '—',
     serverVersion: '—',
     serverPingMs: null,
     locationName: '—',
