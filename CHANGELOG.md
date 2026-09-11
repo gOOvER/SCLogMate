@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a direct **`Chronik`** shortcut button to session rows in `SessionsView.tsx` to jump directly into the event log of any chosen session.
 
 ### Fixed
+- **Photino Window Lifecycle & Startup Crash Prevention (`PhotinoBridge.cs`)**:
+  - Fixed startup crash (`0xc0000005` access violation) caused by `LogTailer` firing `SendWebMessage` from background worker threads before the native Photino window and WebView2 runtime were initialized.
+  - Deferred log tailer initialization until `RegisterWindowCreatedHandler` fires and registered `_isWindowReady` guard flag to ensure IPC web messages are only dispatched once the browser runtime is ready.
 - **Pilot Character Name, Server Shard, and Region Flag Resolution (`HudBar.tsx`, `PhotinoBridge.cs`, `LogParser.cs`, `Database.cs`)**:
   - **Pilot & Player Name Extraction**:
     - Resolved the missing pilot name in the HUD bar by actively scanning the active or selected log file header (up to 3,000 lines) on startup and session selection.

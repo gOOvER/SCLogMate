@@ -678,6 +678,7 @@ public class PhotinoBridge
     private DateTime? _lastEventTime;
     private readonly List<LogEventDto> _liveEvents = new();
     private readonly object _liveEventsLock = new();
+    private volatile bool _isWindowReady = false;
 
     private record SessionMetadataCache(
         string? Pilot,
@@ -700,16 +701,31 @@ public class PhotinoBridge
         // Register Web Message Handler
         _window.RegisterWebMessageReceivedHandler((sender, rawMessage) =>
         {
+            _isWindowReady = true;
             Task.Run(() => HandleIncomingMessage(rawMessage));
         });
 
-        // Initialize background watcher if log file exists
-        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+        // Register Window Created Handler: Native window & WebView2 are fully created
+        _window.RegisterWindowCreatedHandler((sender, args) =>
         {
-            ScanLogHeaderAndMeta(_currentLogPath, _parser);
-            ScanLogTailForShard(_currentLogPath, _parser);
-            StartLogTailer(_currentLogPath);
-        }
+            _isWindowReady = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+                    {
+                        ScanLogHeaderAndMeta(_currentLogPath, _parser);
+                        ScanLogTailForShard(_currentLogPath, _parser);
+                        StartLogTailer(_currentLogPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("PhotinoBridge.WindowCreatedHandler", ex);
+                }
+            });
+        });
     }
 
     public void SendResponse<T>(string? requestId, string type, T payload)
@@ -749,9 +765,14 @@ public class PhotinoBridge
 
     private void SendRaw(string json)
     {
+        if (!_isWindowReady || _window == null) return;
         try
         {
-            _window?.SendWebMessage(json);
+            _window.SendWebMessage(json);
+        }
+        catch (ApplicationException)
+        {
+            // Ignored if window not fully ready in native runtime
         }
         catch (Exception ex)
         {
@@ -2254,24 +2275,43 @@ public class PhotinoBridge
             _tailer.LineEx += (line, isLive) => OnLogLineReceived(line, isLive);
             _tailer.Status += statusMsg =>
             {
-                if (statusMsg != null && statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    List<LogEventDto> snapshot;
-                    lock (_liveEventsLock)
+                    if (statusMsg != null && statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
                     {
-                        snapshot = _liveEvents.Take(100).ToList();
-                    }
-                    Broadcast("LIVE_EVENTS_LOADED", snapshot);
-                    Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                        if (!_isWindowReady) return;
 
-                    if (_parser.Meta.TryGetValue("character", out var charName) && !string.IsNullOrWhiteSpace(charName))
-                    {
-                        Task.Run(async () =>
+                        List<LogEventDto> snapshot;
+                        lock (_liveEventsLock)
                         {
-                            await CitizenProfileService.GetProfileAsync(charName);
-                            Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
-                        });
+                            snapshot = _liveEvents.Take(100).ToList();
+                        }
+                        Broadcast("LIVE_EVENTS_LOADED", snapshot);
+                        Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+
+                        if (_parser.Meta.TryGetValue("character", out var charName) && !string.IsNullOrWhiteSpace(charName))
+                        {
+                            Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await CitizenProfileService.GetProfileAsync(charName);
+                                    if (_isWindowReady)
+                                    {
+                                        Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error("PhotinoBridge.GetProfileAsync", ex);
+                                }
+                            });
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("PhotinoBridge.TailerStatus", ex);
                 }
             };
 
