@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Warehouse Item Table & Category Badge Responsiveness (`WarehouseView.tsx`, `Database.cs`)**:
+  - Fixed category text wrapping and squishing ("Rüstung & Kleidung") on smaller windows by enforcing `whitespace-nowrap`, minimum column widths (`min-w-[160px]`), and increasing the base table min-width to `min-w-[880px]` with smooth horizontal scrolling.
+  - Increased category badge font size to `text-[11px]` font-mono font-medium for crisp readability.
+  - Added collapsible sidebar toggle (`showLocationsSidebar`) for the locations panel, allowing users on compact or split-screen displays to collapse the left 288px panel with a single click.
+  - Synchronized category filter chips to include `'Rüstung & Kleidung'`, `'Waffen & Munition'`, etc., and updated `GetWarehouseItems` in SQLite queries to support prefix/substring category matching.
 - **Pilot & Server HUD Card Layout, Vector Flags & RC2 Tooltip Restoration (`HudBar.tsx`, `App.tsx`)**:
   - Replaced emoji country flags with sharp vector SVGs (`EU`, `US`, `AUS`, `ASIA`, Globe) matching Avalonia RC2, resolving the missing flag issue and duplicated text (`EU EU · LIVE`) on Windows WebView2.
   - Re-structured the Pilot & Server card subline to cleanly separate version and shard instance using `serverShardNumber` (e.g. `SC 4.10.0-LIVE · Shard #050`), eliminating cramped, long raw shard string overflows (`pub_euw1b_12545750_050`).

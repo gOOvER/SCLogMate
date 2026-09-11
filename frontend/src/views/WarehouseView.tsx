@@ -16,6 +16,8 @@ import {
   Trash2,
   Wrench,
   CheckCircle2,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 
 export const WarehouseView: React.FC = () => {
@@ -27,6 +29,7 @@ export const WarehouseView: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showLocationsSidebar, setShowLocationsSidebar] = useState<boolean>(true);
 
   const fetchWarehouse = async () => {
     try {
@@ -143,109 +146,130 @@ export const WarehouseView: React.FC = () => {
 
   const categories = [
     'all',
-    'Rüstung',
-    'Waffen',
+    'Rüstung & Kleidung',
+    'Waffen & Munition',
     'Komponenten',
     'Rohstoffe',
-    'Munition',
+    'Verbrauchsgüter',
     'Sonstiges',
   ];
 
   return (
     <div className="flex min-h-full min-h-[500px] gap-3 font-sans select-none">
       {/* ══ LINKE SPALTE: STANDORTE & STATIONEN ══ */}
-      <div className="w-72 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shrink-0 shadow-sm">
-        {/* Header & System Filter */}
-        <div className="p-3 border-b border-cyan-950 bg-[#061224] space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">
-              <MapPin className="w-3.5 h-3.5 text-cyan-400" /> Standorte ({locations.length})
+      {showLocationsSidebar && (
+        <div className="w-72 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shrink-0 shadow-sm transition-all">
+          {/* Header & System Filter */}
+          <div className="p-3 border-b border-cyan-950 bg-[#061224] space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">
+                <MapPin className="w-3.5 h-3.5 text-cyan-400" /> Standorte ({locations.length})
+              </div>
+              <span className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 font-mono text-[10px] font-bold">
+                {totalAllItems} Items
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 font-mono text-[10px] font-bold">
-              {totalAllItems} Items
-            </span>
+
+            {/* System Pills */}
+            <div className="flex items-center gap-1">
+              {(['all', 'Stanton', 'Pyro'] as const).map((sys) => (
+                <button
+                  key={sys}
+                  onClick={() => setSystemFilter(sys)}
+                  className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
+                    systemFilter === sys
+                      ? 'bg-cyan-950/80 border-cyan-600/70 text-cyan-300 shadow-sm'
+                      : 'bg-[#030914] border-cyan-950/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {sys === 'all' ? 'Alle' : sys}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* System Pills */}
-          <div className="flex items-center gap-1">
-            {(['all', 'Stanton', 'Pyro'] as const).map((sys) => (
-              <button
-                key={sys}
-                onClick={() => setSystemFilter(sys)}
-                className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
-                  systemFilter === sys
-                    ? 'bg-cyan-950/80 border-cyan-600/70 text-cyan-300 shadow-sm'
-                    : 'bg-[#030914] border-cyan-950/60 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {sys === 'all' ? 'Alle' : sys}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Location List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1 divide-y divide-cyan-950/30">
-          <button
-            onClick={() => setSelectedLocation('all')}
-            className={`w-full text-left px-2.5 py-2 rounded text-xs transition cursor-pointer flex items-center justify-between font-mono ${
-              selectedLocation === 'all'
-                ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/60 font-semibold shadow-sm'
-                : 'text-slate-300 hover:bg-[#061224]/80 border border-transparent'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🌌</span>
-              <span className="font-sans font-medium">Alle Standorte</span>
-            </div>
-            <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#020610] text-cyan-400 font-bold">
-              {totalAllItems}
-            </span>
-          </button>
-
-          {filteredLocations.map((loc) => (
+          {/* Location List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1 divide-y divide-cyan-950/30">
             <button
-              key={loc.locationName}
-              onClick={() => setSelectedLocation(loc.locationName)}
-              className={`w-full text-left px-2.5 py-2 rounded text-xs transition cursor-pointer flex items-center justify-between font-mono pt-2 ${
-                selectedLocation === loc.locationName
+              onClick={() => setSelectedLocation('all')}
+              className={`w-full text-left px-2.5 py-2 rounded text-xs transition cursor-pointer flex items-center justify-between font-mono ${
+                selectedLocation === 'all'
                   ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/60 font-semibold shadow-sm'
                   : 'text-slate-300 hover:bg-[#061224]/80 border border-transparent'
               }`}
             >
-              <div className="flex items-center gap-2 truncate">
-                <span className="text-sm shrink-0">{loc.icon}</span>
-                <div className="truncate">
-                  <div className="truncate font-sans font-medium text-slate-200">{loc.locationName}</div>
-                  <div className="text-[10px] text-slate-500 font-mono truncate">
-                    {loc.parentBody ? `${loc.parentBody} · ` : ''}{loc.system}
-                  </div>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🌌</span>
+                <span className="font-sans font-medium">Alle Standorte</span>
               </div>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#020610] text-cyan-400 font-bold shrink-0">
-                {loc.totalItems}
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#020610] text-cyan-400 font-bold">
+                {totalAllItems}
               </span>
             </button>
-          ))}
+
+            {filteredLocations.map((loc) => (
+              <button
+                key={loc.locationName}
+                onClick={() => setSelectedLocation(loc.locationName)}
+                className={`w-full text-left px-2.5 py-2 rounded text-xs transition cursor-pointer flex items-center justify-between font-mono pt-2 ${
+                  selectedLocation === loc.locationName
+                    ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/60 font-semibold shadow-sm'
+                    : 'text-slate-300 hover:bg-[#061224]/80 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-sm shrink-0">{loc.icon}</span>
+                  <div className="truncate">
+                    <div className="truncate font-sans font-medium text-slate-200">{loc.locationName}</div>
+                    <div className="text-[10px] text-slate-500 font-mono truncate">
+                      {loc.parentBody ? `${loc.parentBody} · ` : ''}{loc.system}
+                    </div>
+                  </div>
+                </div>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#020610] text-cyan-400 font-bold shrink-0">
+                  {loc.totalItems}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ══ RECHTE SPALTE: ARTIKELTABELLE ══ */}
       <div className="flex-1 flex flex-col space-y-2.5 min-w-0">
         {/* Toolbar & Filterleiste */}
         <div className="bg-[#040914]/90 rounded-lg p-2.5 border border-cyan-950/80 space-y-2 shrink-0">
           <div className="flex items-center justify-between gap-3">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchWarehouse()}
-                placeholder="Gegenstand, Klasse oder CIG ID suchen..."
-                className="w-full bg-[#071322] border border-cyan-900/60 rounded pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-              />
+            {/* Toggle Sidebar & Search */}
+            <div className="flex items-center gap-2 flex-1 max-w-lg">
+              <button
+                onClick={() => setShowLocationsSidebar(!showLocationsSidebar)}
+                className={`px-2.5 py-1.5 rounded border text-xs font-mono transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  showLocationsSidebar
+                    ? 'border-cyan-950 bg-[#061224] text-slate-400 hover:text-cyan-300 hover:border-cyan-800'
+                    : 'border-cyan-700/80 bg-cyan-950/60 text-cyan-300 shadow-sm'
+                }`}
+                title={showLocationsSidebar ? 'Standorte-Leiste einklappen (mehr Platz für Tabelle)' : 'Standorte-Leiste ausklappen'}
+              >
+                {showLocationsSidebar ? (
+                  <PanelLeftClose className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <PanelLeft className="w-3.5 h-3.5 text-cyan-400" />
+                )}
+                <span className="hidden sm:inline">{showLocationsSidebar ? 'Standorte' : 'Standorte einblenden'}</span>
+              </button>
+
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchWarehouse()}
+                  placeholder="Gegenstand, Klasse oder CIG ID suchen..."
+                  className="w-full bg-[#071322] border border-cyan-900/60 rounded pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
             </div>
 
             {/* Actions */}
@@ -296,16 +320,16 @@ export const WarehouseView: React.FC = () => {
 
         {/* Dichte Artikeltabelle */}
         <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-auto shadow-sm min-h-[300px]">
-          <table className="w-full min-w-[700px] text-left text-xs border-collapse font-mono">
+          <table className="w-full min-w-[880px] text-left text-xs border-collapse font-mono">
             <thead>
-              <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
-                <th className="py-2.5 px-3 w-10 text-center">#</th>
-                <th className="py-2.5 px-4 font-sans">Gegenstand / CIG Klasse</th>
-                <th className="py-2.5 px-4 font-sans">Kategorie</th>
-                <th className="py-2.5 px-4 font-sans">Standort</th>
-                <th className="py-2.5 px-4 text-center w-36">Menge</th>
-                <th className="py-2.5 px-4">Erfasst</th>
-                <th className="py-2.5 px-3 text-right w-12 font-sans">Aktion</th>
+              <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[11px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
+                <th className="py-2.5 px-3 w-10 text-center shrink-0">#</th>
+                <th className="py-2.5 px-4 font-sans min-w-[220px]">Gegenstand / CIG Klasse</th>
+                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[160px] w-44">Kategorie</th>
+                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[140px]">Standort</th>
+                <th className="py-2.5 px-4 text-center whitespace-nowrap w-36 min-w-[120px]">Menge</th>
+                <th className="py-2.5 px-4 whitespace-nowrap w-36 min-w-[120px]">Erfasst</th>
+                <th className="py-2.5 px-3 text-right w-12 font-sans shrink-0">Aktion</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-cyan-950/40">
@@ -323,27 +347,27 @@ export const WarehouseView: React.FC = () => {
 
                   return (
                     <tr key={menuKey} className="hover:bg-[#071628]/60 transition-colors group">
-                      <td className="py-2.5 px-3 text-center text-sm">{it.icon}</td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-3 text-center text-sm shrink-0">{it.icon}</td>
+                      <td className="py-2.5 px-4 min-w-[200px]">
                         <div className="font-semibold text-slate-200 group-hover:text-cyan-300 transition font-sans text-xs">
                           {it.itemName}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-xs">
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-sm" title={it.itemClass}>
                           {it.itemClass}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4">
-                        <span className="px-2 py-0.5 rounded bg-[#030914] border border-cyan-950 text-[10px] text-slate-300">
+                      <td className="py-2.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded bg-[#030a16] border border-cyan-900/60 text-[11px] font-mono font-medium text-slate-200 whitespace-nowrap shadow-xs">
                           {it.category}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-slate-300">
-                        <div className="font-sans text-xs">{it.location}</div>
+                      <td className="py-2.5 px-4 whitespace-nowrap text-slate-300">
+                        <div className="font-sans text-xs font-medium">{it.location}</div>
                         <div className="text-[10px] text-slate-500 font-mono">
                           {it.parentBody ? `${it.parentBody} · ` : ''}{it.system}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-4 whitespace-nowrap">
                         {/* +/- In-Grid Schnellanpassung */}
                         <div className="flex items-center justify-center gap-1.5">
                           <button
@@ -365,7 +389,7 @@ export const WarehouseView: React.FC = () => {
                           </button>
                         </div>
                       </td>
-                      <td className="py-2.5 px-4 font-mono text-slate-400 text-[11px]">
+                      <td className="py-2.5 px-4 whitespace-nowrap font-mono text-slate-400 text-[11px]">
                         {it.lastUpdated}
                       </td>
                       <td className="py-2.5 px-3 text-right relative">

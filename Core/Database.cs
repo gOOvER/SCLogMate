@@ -2104,8 +2104,9 @@ public static class Database
 
             if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "Alle Kategorien")
             {
-                sql += " AND category = $cat";
+                sql += " AND (category = $cat OR category LIKE $catPrefix)";
                 cmd.Parameters.AddWithValue("$cat", categoryFilter);
+                cmd.Parameters.AddWithValue("$catPrefix", $"%{categoryFilter}%");
             }
 
             if (!string.IsNullOrWhiteSpace(search))
