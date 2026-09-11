@@ -1474,7 +1474,7 @@ public partial class LogParser
                         Time = ParseTs(line),
                         Kind = EventKind.Hangar,
                         Detail = $"{_lastElevatorType ?? typeName} bereit ({loc})",
-                        Ship = loc
+                        Ship = null
                     };
                 }
                 return null;
@@ -1558,7 +1558,17 @@ public partial class LogParser
             var at = AttachRegex().Match(line);
             if (at.Success)
             {
-                var name = CleanLoadout(at.Groups["item"].Value);
+                var raw = at.Groups["item"].Value;
+                var name = Localization.ItemName(raw);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    var (wName, _) = WarehouseCatalog.Resolve(raw);
+                    if (!string.IsNullOrWhiteSpace(wName) && wName != "Sonstiges" && wName != "Unbekannter Gegenstand" && wName != raw)
+                        name = wName;
+                }
+                if (string.IsNullOrWhiteSpace(name))
+                    name = CleanLoadout(raw);
+
                 if (name != null && _loadoutSeen.Add(name))
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Loadout, Detail = name };
                 return null;

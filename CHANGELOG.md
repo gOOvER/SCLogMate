@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
 ### Changed
+- **Events Grid & Database Localization Parity (`EventsView.tsx`, `LogParser.cs`, `PhotinoBridge.cs`)**:
+  - Restored crisp, separated table columns with vertical borders for `ZEIT`, `TYP`, `BETRAG`, `SCHIFF`, and `DETAIL`, resolving the merged "BETRAG SCHIFF" header and double-dash `-- --` artifacts.
+  - Aligned empty cell rendering to Avalonia RC2: cells with zero amount or no ship now render clean and empty instead of placeholder dashes (`—`).
+  - Removed redundant `{e.title}: ` prefix in the `DETAIL` column and added status color-coding matching Avalonia RC2's `StatusBrush`.
+  - Linked `Localization.Hint` and `I18n.Instance.SetLanguage` to Photino startup and settings updates so game localization files (`global.ini`) are loaded for the active game path.
+  - Integrated `WarehouseCatalog.Resolve` and `Localization.ItemName` into player attachment loadout and loot parsing to resolve raw internal class names (e.g. `Carryable_2H_..._blackbox` -> `Flugschreiber / Blackbox (Missionsgut)`).
+  - Fixed Hangar elevator events erroneously setting the location name as `Ship`.
+  - Added mission text localization for common English mission status lines into German when the app language is set to German.
 - **Contract Tracking & OCR Parity with RC2 (`SettingsView.tsx`, `MissionsView.tsx`, `PhotinoBridge.cs`)**:
   - Confirmed and reflected that contract OCR scanning is permanently disabled (as in Avalonia RC2 `MainViewModel.cs:3297`) due to mobiGlas transparency and low-contrast font recognition failures, superseded by 100% reliable native `Game.log` notification parsing (`Contract Accepted`, `Contract Complete`, `Contract Failed`).
   - Replaced obsolete contract OCR test and snipping coordinates card in `SettingsView.tsx` with the official RC2 `❖ AKTIVE AUFTRÄGE & MISSIONS-TRACKING` card featuring `✕ Aufträge leeren` and `⚡ Auto-Sync aktiv` status badge.

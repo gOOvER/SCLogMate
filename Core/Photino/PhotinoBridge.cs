@@ -788,6 +788,9 @@ public class PhotinoBridge
         var s = Settings.Load();
         _auroraService.IsEnabled = s.AuroraIntegrationEnabled;
         _auroraService.Volume = s.AuroraVolume;
+        I18n.Instance.SetLanguage(s.AppLanguage ?? "Auto");
+        _currentLogPath = s.LogPath ?? PathFinder.FindBest();
+        Localization.Hint(_currentLogPath);
 
         _walletCapture = new WalletCapture(
             _ocrEngine,
@@ -811,6 +814,7 @@ public class PhotinoBridge
     {
         _window = window;
         _currentLogPath = Settings.Load().LogPath ?? PathFinder.FindBest();
+        Localization.Hint(_currentLogPath);
 
         // Register Web Message Handler (Receives client_ready from frontend React app)
         _window.RegisterWebMessageReceivedHandler((sender, rawMessage) =>
@@ -2148,15 +2152,15 @@ public class PhotinoBridge
             .Select(e => new LogEventDto
             {
                 Id = Guid.NewGuid().ToString("N"),
-                Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm:ss"),
+                Timestamp = e.Time.ToLocalTime().ToString("HH:mm:ss"),
                 Category = MapCategory(e.Kind),
                 Kind = e.Kind.ToString(),
                 KindText = e.KindText,
                 Icon = e.Icon,
                 Title = e.KindText,
-                Description = e.Detail ?? e.KindText,
+                Description = CleanEventDetail(e.Detail, e.Kind),
                 Amount = e.Amount != 0 ? e.Amount : null,
-                Ship = e.Ship,
+                Ship = CleanEventShip(e.Ship, e.Kind),
                 RawText = e.Detail,
             })
             .ToList();
@@ -3144,10 +3148,19 @@ public class PhotinoBridge
 
         Settings.Save(s);
 
-        if (pathChanged && !string.IsNullOrEmpty(s.LogPath) && File.Exists(s.LogPath))
+        if (!string.IsNullOrEmpty(dto.AppLanguage))
         {
-            _currentLogPath = s.LogPath;
-            StartLogTailer(_currentLogPath);
+            I18n.Instance.SetLanguage(dto.AppLanguage);
+        }
+
+        if (pathChanged && !string.IsNullOrEmpty(s.LogPath))
+        {
+            Localization.Hint(s.LogPath);
+            if (File.Exists(s.LogPath))
+            {
+                _currentLogPath = s.LogPath;
+                StartLogTailer(_currentLogPath);
+            }
         }
     }
 
@@ -3254,10 +3267,13 @@ public class PhotinoBridge
                 Id = Guid.NewGuid().ToString("N"),
                 Timestamp = entry.Time.ToLocalTime().ToString("HH:mm:ss"),
                 Category = MapCategory(entry.Kind),
+                Kind = entry.Kind.ToString(),
+                KindText = entry.KindText,
+                Icon = entry.Icon,
                 Title = entry.KindText,
-                Description = entry.Detail ?? entry.KindText,
+                Description = CleanEventDetail(entry.Detail, entry.Kind),
                 Amount = entry.Amount != 0 ? entry.Amount : null,
-                Ship = entry.Ship,
+                Ship = CleanEventShip(entry.Ship, entry.Kind),
                 RawText = rawLine.Length > 120 ? rawLine[..120] + "…" : rawLine,
             };
 
@@ -3293,6 +3309,66 @@ public class PhotinoBridge
         EventKind.Location or EventKind.Jurisdiction => "location",
         _ => "system"
     };
+
+    private static string? CleanEventShip(string? ship, EventKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(ship)) return null;
+        if (kind == EventKind.Hangar) return null;
+        var s = ship.Trim();
+        if (s.Equals("Levski", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Hangar", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("—", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("--", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return Ships.Prettify(s);
+    }
+
+    private static string CleanEventDetail(string? detail, EventKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(detail)) return "";
+        var d = detail.Trim();
+
+        // Ausrüstung & Loot: Rohcodes mit Localization / WarehouseCatalog abgleichen
+        if (kind == EventKind.Loadout || kind == EventKind.Loot)
+        {
+            var locName = Localization.ItemName(d);
+            if (!string.IsNullOrWhiteSpace(locName)) return locName;
+
+            var (catName, _) = WarehouseCatalog.Resolve(d);
+            if (!string.IsNullOrWhiteSpace(catName) && catName != "Sonstiges" && catName != "Unbekannter Gegenstand" && catName != d)
+            {
+                return catName;
+            }
+        }
+
+        // Missionen: Häufige englische Statusmeldungen in die eingestellte Sprache übersetzen (wenn Deutsch aktiv)
+        if (I18n.Instance.IsGerman && (kind == EventKind.Mission || kind == EventKind.MissionReward || kind == EventKind.MissionTaken))
+        {
+            if (d.Equals("Objective Complete", StringComparison.OrdinalIgnoreCase))
+                return "Missionsziel abgeschlossen";
+            if (d.StartsWith("New Objective:", StringComparison.OrdinalIgnoreCase))
+            {
+                var rest = d["New Objective:".Length..].Trim();
+                if (rest.StartsWith("Deliver Flight Recorder To", StringComparison.OrdinalIgnoreCase))
+                    return "Neues Missionsziel: Flugschreiber abliefern bei " + rest["Deliver Flight Recorder To".Length..].Trim();
+                if (rest.StartsWith("Collect Flight Recorder From a wreck site in the", StringComparison.OrdinalIgnoreCase))
+                    return "Neues Missionsziel: Flugschreiber aus Wrack bergen in " + rest["Collect Flight Recorder From a wreck site in the".Length..].Trim();
+                return "Neues Missionsziel: " + rest;
+            }
+            if (d.Equals("Contract Complete", StringComparison.OrdinalIgnoreCase) || d.Equals("Contract Completed", StringComparison.OrdinalIgnoreCase))
+                return "Auftrag erfolgreich abgeschlossen";
+            if (d.Equals("Contract Failed", StringComparison.OrdinalIgnoreCase))
+                return "Auftrag fehlgeschlagen";
+            if (d.Equals("Contract Abandoned", StringComparison.OrdinalIgnoreCase))
+                return "Auftrag abgebrochen";
+            if (d.Equals("Contract Cancelled", StringComparison.OrdinalIgnoreCase))
+                return "Auftrag storniert";
+            if (d.Equals("Contract Withdrawn", StringComparison.OrdinalIgnoreCase))
+                return "Auftrag zurückgezogen";
+        }
+
+        return d;
+    }
 
     public static string GetChannelName(string? path)
     {

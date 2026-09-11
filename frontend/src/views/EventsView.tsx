@@ -214,6 +214,20 @@ export const EventsView: React.FC<EventsViewProps> = ({
     }
   };
 
+  const getDetailColor = (e: LogEventItem) => {
+    const d = e.description || e.title || '';
+    if (e.category === 'combat' || d.includes('fehlgeschlagen') || d.includes('Failed') || d.includes('Tod') || d.includes('Crash') || d.includes('abgebrochen') || d.includes('Abandoned') || d.includes('storniert')) {
+      return 'text-rose-400 font-medium';
+    }
+    if (d.includes('abgeschlossen') || d.includes('Complete') || d.includes('Erfolgreich') || (e.category === 'wallet' && (e.amount || 0) > 0)) {
+      return 'text-emerald-300 font-medium';
+    }
+    if (d.includes('zurückgezogen') || d.includes('Withdrawn') || d.includes('Session') || d.includes('Warnung') || d.includes('Waffen scharf') || d.includes('Ungesetzlich')) {
+      return 'text-amber-300';
+    }
+    return 'text-slate-200';
+  };
+
   return (
     <div className="flex flex-col min-h-full space-y-2.5 select-none">
       {/* ══ 1. Filter-Bar & Schnellsuche (im RC2-Look) ══ */}
@@ -326,10 +340,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
         {/* DataGrid Container */}
         <div className="flex-1 flex flex-col bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-hidden shadow-sm min-w-0">
           {/* DataGrid Header */}
-          <div className="grid grid-cols-[135px_115px_120px_140px_1fr] px-3 py-2 bg-[#061224] border-b border-cyan-950 text-[10.5px] font-mono font-bold text-slate-400 uppercase tracking-wider shrink-0 select-none">
+          <div className="grid grid-cols-[105px_120px_125px_150px_1fr] bg-[#061224] border-b border-cyan-950 text-[10.5px] font-mono font-bold text-slate-400 uppercase tracking-wider shrink-0 select-none">
             <div
               onClick={() => handleSort('timestamp')}
-              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300"
+              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
               <span>ZEIT</span>
               {sortCol === 'timestamp' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -337,7 +351,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div
               onClick={() => handleSort('category')}
-              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300"
+              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
               <span>TYP</span>
               {sortCol === 'category' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -345,7 +359,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div
               onClick={() => handleSort('amount')}
-              className="flex items-center justify-end gap-1 cursor-pointer hover:text-cyan-300 pr-2"
+              className="flex items-center justify-end gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80 text-right"
             >
               <span>BETRAG</span>
               {sortCol === 'amount' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -353,7 +367,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div
               onClick={() => handleSort('ship')}
-              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300"
+              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
               <span>SCHIFF</span>
               {sortCol === 'ship' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -361,7 +375,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div
               onClick={() => handleSort('title')}
-              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300"
+              className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2"
             >
               <span>DETAIL</span>
               {sortCol === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -381,39 +395,40 @@ export const EventsView: React.FC<EventsViewProps> = ({
                   <div
                     key={e.id}
                     onClick={() => setSelectedEvent(e)}
-                    className={`grid grid-cols-[135px_115px_120px_140px_1fr] px-3 py-1.5 items-center cursor-pointer transition-colors ${
+                    className={`grid grid-cols-[105px_120px_125px_150px_1fr] items-center cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-cyan-950/50 text-slate-100 border-l-2 border-l-cyan-400'
                         : 'hover:bg-[#071526]/60 text-slate-300'
                     }`}
                   >
                     {/* Zeit */}
-                    <div className="text-[11px] text-slate-400 truncate">{e.timestamp}</div>
+                    <div className="text-[11px] text-slate-400 truncate px-3 py-1.5 border-r border-cyan-950/40">
+                      {e.timestamp}
+                    </div>
 
                     {/* Typ Badge */}
-                    <div>{getCategoryBadge(e.category)}</div>
+                    <div className="px-3 py-1.5 border-r border-cyan-950/40 flex items-center">
+                      {getCategoryBadge(e.category)}
+                    </div>
 
                     {/* Betrag */}
-                    <div className="text-right pr-2 font-bold text-xs">
+                    <div className="text-right px-3 py-1.5 border-r border-cyan-950/40 font-bold text-xs">
                       {e.amount !== undefined && e.amount !== null && e.amount !== 0 ? (
                         <span className={e.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}>
                           {e.amount > 0 ? '+' : ''}
                           {formatNumber(e.amount)}
                         </span>
-                      ) : (
-                        <span className="text-slate-600">—</span>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Schiff */}
-                    <div className="truncate text-sky-400 font-medium text-[11px]" title={e.ship || ''}>
-                      {e.ship || <span className="text-slate-600">—</span>}
+                    <div className="truncate text-sky-400 font-medium text-[11px] px-3 py-1.5 border-r border-cyan-950/40" title={e.ship || ''}>
+                      {e.ship || null}
                     </div>
 
                     {/* Detail Text */}
-                    <div className="truncate text-slate-300 text-xs pr-2" title={e.description || e.title}>
-                      <span className="font-semibold text-slate-200 mr-2">{e.title}:</span>
-                      <span className="text-slate-400">{e.description}</span>
+                    <div className={`truncate text-xs px-3 py-1.5 ${getDetailColor(e)}`} title={e.description || e.title}>
+                      {e.description || e.title}
                     </div>
                   </div>
                 );
