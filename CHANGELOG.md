@@ -27,7 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Full-Width Live Event Stream on Dashboard (`DashboardView.tsx`)**:
   - Expanded the live event feed across the full width of the start page:
     - Displays high-density Star Citizen events with timestamp, categorized color-coded pills (Finances, Combat, Mission, Ship, Location, System), detailed description, ship context, signed aUEC amounts, and direct navigation to the Chronik view.
-    - Removed redundant intermediate telemetry card for a cleaner, unified dashboard view.
+- **True Standalone Single-File Binary with Embedded Web Frontend (`EmbeddedAssets.cs`, `SCLogMate.csproj`, `Program.cs`)**:
+  - Embedded all compiled web frontend assets (`wwwroot/**`) directly into the `SCLogMate.exe` binary via `<EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />`.
+  - Implemented `EmbeddedAssets.EnsureIndexHtml()` (`Core/Photino/EmbeddedAssets.cs`):
+    - Supports seamless local development overrides if a `wwwroot` directory exists adjacent to the source / binary.
+    - If running standalone, automatically extracts embedded assets to `%APPDATA%/SCLogMate/wwwroot/` with size-matching caching to prevent redundant disk I/O.
+  - Cleaned publish pipeline to remove the `publish/wwwroot` folder post-publish, delivering a 100% self-contained single `SCLogMate.exe` binary with zero external folders or dependencies.
 
 ### Fixed
 - **Single-File Release Web Asset Packaging & Launch Fix (`Program.cs`, `SCLogMate.csproj`)**:

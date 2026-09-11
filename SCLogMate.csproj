@@ -30,6 +30,7 @@
     <AvaloniaResource Include="SCLogMate.ico" />
     <EmbeddedResource Include="Data\blueprints.json" />
     <EmbeddedResource Include="Data\seed_data.json" />
+    <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,20 +48,9 @@
     <PackageReference Include="Photino.NET" Version="4.0.16" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="wwwroot\**">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </Content>
-  </ItemGroup>
-
-  <Target Name="EnsureWwwrootInPublish" AfterTargets="Publish">
-    <ItemGroup>
-      <WwwrootPublishFiles Include="$(MSBuildProjectDirectory)\wwwroot\**\*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(WwwrootPublishFiles)"
-          DestinationFolder="$(PublishDir)wwwroot\%(RecursiveDir)"
-          SkipUnchangedFiles="false" />
+  <!-- Clean any leftover wwwroot directory from publish output to maintain pure single-file exe -->
+  <Target Name="CleanPublishWwwroot" AfterTargets="Publish">
+    <RemoveDir Directories="$(PublishDir)wwwroot" />
   </Target>
 
 </Project>

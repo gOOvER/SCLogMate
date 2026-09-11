@@ -112,34 +112,15 @@ internal static partial class Program
         }
         else
         {
-            var searchPaths = new[]
+            var targetHtmlPath = Core.Photino.EmbeddedAssets.EnsureIndexHtml();
+            if (File.Exists(targetHtmlPath))
             {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "index.html"),
-                Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html"),
-                Path.Combine(Environment.CurrentDirectory, "wwwroot", "index.html"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "wwwroot", "index.html"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "wwwroot", "index.html"),
-                Path.GetFullPath("wwwroot/index.html")
-            };
-
-            string? targetHtmlPath = null;
-            foreach (var candidate in searchPaths)
-            {
-                if (File.Exists(candidate))
-                {
-                    targetHtmlPath = Path.GetFullPath(candidate);
-                    break;
-                }
-            }
-
-            if (targetHtmlPath != null)
-            {
-                Core.Logger.Log($"Photino: Lade lokales wwwroot/index.html ({targetHtmlPath})");
+                Core.Logger.Log($"Photino: Lade Frontend ({targetHtmlPath})");
                 window.Load(targetHtmlPath);
             }
             else
             {
-                Core.Logger.Log($"Photino: FEHLER - index.html in keinem der Pfade gefunden: {string.Join("; ", searchPaths)}");
+                Core.Logger.Log($"Photino: FEHLER - Frontend konnte nicht initialisiert werden: {targetHtmlPath}");
                 var errorHtml = $@"<!DOCTYPE html>
 <html>
 <head><meta charset='utf-8'><title>SCLogMate - Frontend nicht gefunden</title>
@@ -152,9 +133,7 @@ pre {{ background: #1e293b; color: #38bdf8; padding: 16px; border-radius: 8px; b
 </head>
 <body>
 <h1>Frontend-Dateien nicht gefunden</h1>
-<p>Die Datei <code>wwwroot/index.html</code> konnte nicht geladen werden. Bitte sicherstellen, dass der Ordner <code>wwwroot</code> vorhanden ist.</p>
-<p><strong>Gepr&uuml;fte Pfade:</strong></p>
-<pre>{string.Join("\n", searchPaths)}</pre>
+<p>Die Datei <code>{targetHtmlPath}</code> konnte nicht geladen werden.</p>
 <p>Basisverzeichnis: <code>{AppDomain.CurrentDomain.BaseDirectory}</code></p>
 </body>
 </html>";
