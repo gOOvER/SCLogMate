@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **RSI Citizen Dossier & Profile Service (`CitizenProfileService.cs`, `PilotDossierModal.tsx`, `MasterHeader.tsx`, `HudBar.tsx`, `PhotinoBridge.cs`)**:
+  - Created `Core/CitizenProfileService.cs` which asynchronously fetches and caches Star Citizen dossiers directly from RSI (`robertsspaceindustries.com/citizens/<handle>`):
+    - Parses UEE Citizen Record number (e.g. `#593923`), title (e.g. `High Admiral`), enlistment date, fluency languages, avatar image URL, primary organization name, org SID, org rank, org logo, and pilot bio.
+    - Caches profile metadata in-memory with thread-safe `ConcurrentDictionary` to minimize web requests.
+  - **Interactive Glassmorphism Pilot Dossier Modal (`PilotDossierModal.tsx`)**:
+    - Designed an interactive, sci-fi glassmorphism pilot dossier with hologram avatar, UEE citizen record badge, org insignia, enlisted date, fluency badges, bio text, and quick link to the RSI citizen page.
+  - **Pilot Identity Integration across Navigation & HUD (`MasterHeader.tsx`, `HudBar.tsx`, `SessionBar.tsx`)**:
+    - Added pilot avatar thumbnail with fallback icon, player handle, and official RSI title in the `MasterHeader`.
+    - Added avatar thumbnail and click-to-open dossier trigger to the Character/Pilot HUD card.
+- **In-Memory Live Log Ring Buffer & Real-Time Live Feed (`PhotinoBridge.cs`, `App.tsx`, `EventsView.tsx`)**:
+  - Implemented thread-safe `_liveEvents` ring buffer (up to 1,000 entries) in `PhotinoBridge.cs`.
+  - Configured `LogTailer` to start with `fromStart: true` and stream historical lines from the active `Game.log` into the live buffer while monitoring file EOF for real-time live events.
+  - Emitted `LIVE_EVENTS_LOADED` and synced live events with initial load and runtime updates so `DashboardView` and `EventsView` immediately show live log events.
+- **Dedicated Live Session Pinned Dashboard (`SessionBar.tsx`, `App.tsx`, `EventsView.tsx`, `BlackboxView.tsx`, `SessionsView.tsx`)**:
+  - Replaced the session selector dropdown on the main Dashboard view with a glowing `🔴 LIVE-SITZUNG: Game.log` indicator to keep the main view anchored to real-time gameplay.
+  - Added session selector dropdowns to the specific telemetry and log views (`EventsView` and `BlackboxView`), allowing users to inspect historical sessions while the Dashboard stays on the live feed.
+  - Added a direct **`Chronik`** shortcut button to session rows in `SessionsView.tsx` to jump directly into the event log of any chosen session.
+
 ### Fixed
 - **Pilot Character Name, Server Shard, and Region Flag Resolution (`HudBar.tsx`, `PhotinoBridge.cs`, `LogParser.cs`, `Database.cs`)**:
   - **Pilot & Player Name Extraction**:

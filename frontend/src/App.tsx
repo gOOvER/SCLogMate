@@ -29,12 +29,15 @@ import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
+import { PilotDossierModal } from './components/PilotDossierModal';
 import { HardDrive } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
+  const [isPilotDossierOpen, setIsPilotDossierOpen] = useState<boolean>(false);
+  const [eventsSession, setEventsSession] = useState<string>('__live__');
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [scanProgress, setScanProgress] = useState<{
     current: number;
@@ -81,14 +84,16 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusRes, sessionsRes, whRes, hudRes] = await Promise.all([
+      const [statusRes, sessionsRes, whRes, hudRes, eventsRes] = await Promise.all([
         bridge.sendRequest<AppStatus>('get_status'),
         bridge.sendRequest<SessionSummary[]>('get_sessions'),
         bridge.sendRequest<{ locations: any[] }>('get_warehouse'),
         bridge.sendRequest<HudTelemetry>('get_hud'),
+        bridge.sendRequest<LogEventItem[]>('get_events', { session: '__live__', limit: 100 }),
       ]);
       setStatus(statusRes);
       setSessions(sessionsRes);
+      if (eventsRes) setEvents(eventsRes);
       if (hudRes) setTelemetry(hudRes);
       if (whRes?.locations) {
         const total = whRes.locations.reduce((acc: number, l: any) => acc + (l.totalItems || 0), 0);
@@ -107,6 +112,12 @@ export const App: React.FC = () => {
     // Subscribe to live events from C# backend
     const unbindLog = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
       setEvents((prev) => [newEvent, ...prev.slice(0, 99)]);
+    });
+
+    const unbindLiveLoaded = bridge.on<LogEventItem[]>('LIVE_EVENTS_LOADED', (loadedEvents) => {
+      if (Array.isArray(loadedEvents)) {
+        setEvents(loadedEvents);
+      }
     });
 
     const unbindStatus = bridge.on<AppStatus>('STATUS_UPDATE', (newStatus) => {
@@ -145,6 +156,7 @@ export const App: React.FC = () => {
 
     return () => {
       unbindLog();
+      unbindLiveLoaded();
       unbindStatus();
       unbindHud();
       unbindWh();
@@ -152,6 +164,13 @@ export const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  const handleSelectTab = (tab: NavTabId) => {
+    setActiveTab(tab);
+    if (tab === 'dashboard') {
+      handleSelectSession('__live__');
+    }
+  };
 
   const handleTriggerScan = async () => {
     try {
@@ -207,7 +226,7 @@ export const App: React.FC = () => {
       {/* 16-Tab Navigation Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
         warehouseCount={warehouseTotal > 0 ? warehouseTotal : undefined}
@@ -216,12 +235,16 @@ export const App: React.FC = () => {
 
       {/* Main App Container */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-        {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher */}
+        {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher, Pilot Dossier */}
         <MasterHeader
           status={status}
           isGameRunning={telemetry.isGameRunning}
           isScanning={isScanning}
           loading={loading}
+          pilotName={telemetry.pilotName}
+          pilotAvatarUrl={telemetry.pilotAvatarUrl}
+          pilotTitle={telemetry.pilotTitle}
+          onOpenPilotDossier={() => setIsPilotDossierOpen(true)}
           onRefresh={loadData}
           onTriggerScan={handleTriggerScan}
           onReparseAll={handleReparseAll}
@@ -265,6 +288,8 @@ export const App: React.FC = () => {
           selectedSession={telemetry.selectedSession}
           sessionSpanText={telemetry.sessionSpanText}
           isHudCollapsed={isHudCollapsed}
+          isDashboard={activeTab === 'dashboard'}
+          activeSessionName={status?.activeSessionName || undefined}
           onSelectSession={handleSelectSession}
           onToggleHudCollapsed={() => setIsHudCollapsed(!isHudCollapsed)}
         />
@@ -273,9 +298,10 @@ export const App: React.FC = () => {
         {!isHudCollapsed && (
           <HudBar
             telemetry={telemetry}
-            onNavigate={setActiveTab}
+            onNavigate={handleSelectTab}
             onTriggerOcr={handleTriggerOcr}
             onToggleAutoOcr={handleToggleAutoOcr}
+            onOpenPilotDossier={() => setIsPilotDossierOpen(true)}
           />
         )}
 
@@ -286,12 +312,17 @@ export const App: React.FC = () => {
               status={status}
               sessions={sessions}
               events={events}
-              onNavigate={setActiveTab}
+              onNavigate={handleSelectTab}
               warehouseTotal={warehouseTotal}
             />
           )}
 
-          {activeTab === 'events' && <EventsView />}
+          {activeTab === 'events' && (
+            <EventsView
+              initialSession={eventsSession}
+              onSelectSession={setEventsSession}
+            />
+          )}
 
           {activeTab === 'sessions' && (
             <SessionsView
@@ -299,6 +330,10 @@ export const App: React.FC = () => {
               selectedSession={telemetry.selectedSession}
               onSelectSession={handleSelectSession}
               onRefreshData={loadData}
+              onViewChronicle={(sessionName) => {
+                setEventsSession(sessionName);
+                handleSelectTab('events');
+              }}
             />
           )}
 
@@ -332,6 +367,13 @@ export const App: React.FC = () => {
 
           {activeTab === 'about' && <AboutView />}
         </main>
+
+        {/* Pilot Dossier Modal Popup */}
+        <PilotDossierModal
+          isOpen={isPilotDossierOpen}
+          pilotName={telemetry.pilotName}
+          onClose={() => setIsPilotDossierOpen(false)}
+        />
 
         {/* Bottom Statusbar */}
         <footer className="flex items-center justify-between px-5 py-1.5 border-t border-cyan-950/60 bg-[#020610]/95 text-[11px] font-mono text-slate-500 shrink-0">

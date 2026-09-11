@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { bridge, LogEventItem } from '../services/photinoBridge';
+import { bridge, LogEventItem, SessionSummary } from '../services/photinoBridge';
 import {
   Check,
   ChevronDown,
@@ -15,12 +15,23 @@ import {
   Target,
   Terminal,
   X,
+  Zap,
 } from 'lucide-react';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
 
-export const EventsView: React.FC = () => {
+interface EventsViewProps {
+  initialSession?: string;
+  onSelectSession?: (sessionName: string) => void;
+}
+
+export const EventsView: React.FC<EventsViewProps> = ({
+  initialSession = '__live__',
+  onSelectSession,
+}) => {
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string>(initialSession);
   const [events, setEvents] = useState<LogEventItem[]>([]);
   const [category, setCategory] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
@@ -31,10 +42,23 @@ export const EventsView: React.FC = () => {
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const fetchEvents = async (count = limit) => {
+  useEffect(() => {
+    bridge.sendRequest<SessionSummary[]>('get_sessions').then((res) => {
+      if (res) setSessions(res);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (initialSession) {
+      setSelectedSession(initialSession);
+    }
+  }, [initialSession]);
+
+  const fetchEvents = async (count = limit, sessionTarget = selectedSession) => {
     try {
       setLoading(true);
       const res = await bridge.sendRequest<LogEventItem[]>('get_events', {
+        session: sessionTarget,
         category,
         search,
         limit: count,
@@ -52,16 +76,17 @@ export const EventsView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchEvents();
-  }, [category]);
+    fetchEvents(limit, selectedSession);
+  }, [category, selectedSession]);
 
-  // Live log subscription
+  // Live log subscription (active when live session is selected)
   useEffect(() => {
+    if (selectedSession !== '__live__') return;
     const unbind = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
       setEvents((prev) => [newEvent, ...prev.slice(0, limit - 1)]);
     });
     return () => unbind();
-  }, [limit]);
+  }, [selectedSession, limit]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -193,6 +218,36 @@ export const EventsView: React.FC = () => {
     <div className="flex flex-col min-h-full space-y-2.5 select-none">
       {/* ══ 1. Filter-Bar & Schnellsuche (im RC2-Look) ══ */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 rounded-lg bg-[#040914]/90 border border-cyan-950/80 backdrop-blur-md shrink-0">
+        {/* Session Selector Dropdown */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase flex items-center gap-1">
+            <Zap className="w-3 h-3 text-cyan-400" />
+            Sitzung:
+          </span>
+          <div className="relative">
+            <select
+              value={selectedSession}
+              onChange={(e) => {
+                const s = e.target.value;
+                setSelectedSession(s);
+                onSelectSession?.(s);
+              }}
+              className="appearance-none bg-[#071322] border border-cyan-900/70 hover:border-cyan-500 rounded px-2.5 py-1 pr-7 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 transition cursor-pointer max-w-[220px]"
+            >
+              <option value="__live__">🔴 Live-Sitzung (Game.log)</option>
+              <option value="__all__">🌐 Alle Sitzungen</option>
+              {sessions.map((s) => (
+                <option key={s.id || s.name} value={s.name}>
+                  📁 {s.name} ({s.startTime})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="h-4 w-px bg-cyan-950/80 hidden sm:block shrink-0" />
+
         {/* Kategorien Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {[

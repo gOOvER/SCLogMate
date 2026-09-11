@@ -30,6 +30,7 @@ interface SessionsViewProps {
   onSelectSession?: (sessionName: string) => void;
   selectedSession?: string;
   onRefreshData?: () => void;
+  onViewChronicle?: (sessionName: string) => void;
 }
 
 export const SessionsView: React.FC<SessionsViewProps> = ({
@@ -37,6 +38,7 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
   onSelectSession,
   selectedSession = '__live__',
   onRefreshData,
+  onViewChronicle,
 }) => {
 
   // Local state
@@ -790,6 +792,18 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
                           >
                             {isActive ? '✓ Aktiv' : 'Aktivieren'}
                           </button>
+
+                          {/* In Chronik ansehen */}
+                          {onViewChronicle && (
+                            <button
+                              onClick={() => onViewChronicle(sess.name)}
+                              className="px-2 py-1 rounded text-[11px] font-mono font-semibold transition bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/60 border border-cyan-800/60 flex items-center gap-1"
+                              title="Diese Session in der Ereignis-Chronik öffnen"
+                            >
+                              <FileText className="w-3 h-3 text-cyan-400" />
+                              <span>Chronik</span>
+                            </button>
+                          )}
 
                           {/* Neu parsen */}
                           <button

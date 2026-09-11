@@ -134,6 +134,9 @@ public class HudTelemetryDto
 {
     [JsonPropertyName("isGameRunning")] public bool IsGameRunning { get; set; }
     [JsonPropertyName("pilotName")] public string PilotName { get; set; } = "—";
+    [JsonPropertyName("pilotAvatarUrl")] public string? PilotAvatarUrl { get; set; }
+    [JsonPropertyName("pilotTitle")] public string? PilotTitle { get; set; }
+    [JsonPropertyName("pilotOrgName")] public string? PilotOrgName { get; set; }
     [JsonPropertyName("serverRegionCode")] public string ServerRegionCode { get; set; } = "—";
     [JsonPropertyName("serverRegionName")] public string ServerRegionName { get; set; } = "Unbekannt";
     [JsonPropertyName("serverRegionFlag")] public string ServerRegionFlag { get; set; } = "🌐";
@@ -673,6 +676,8 @@ public class PhotinoBridge
     private string? _activeSessionName;
     private string _selectedSession = "__live__";
     private DateTime? _lastEventTime;
+    private readonly List<LogEventDto> _liveEvents = new();
+    private readonly object _liveEventsLock = new();
 
     private record SessionMetadataCache(
         string? Pilot,
@@ -754,7 +759,7 @@ public class PhotinoBridge
         }
     }
 
-    private void HandleIncomingMessage(string raw)
+    private async Task HandleIncomingMessage(string raw)
     {
         try
         {
@@ -767,6 +772,23 @@ public class PhotinoBridge
                     SendResponse(req.Id, "status_response", GetAppStatus());
                     break;
 
+                case "get_pilot_dossier":
+                    string? dHandle = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("handle", out var hProp))
+                    {
+                        dHandle = hProp.GetString();
+                    }
+                    if (string.IsNullOrWhiteSpace(dHandle) || dHandle == "—")
+                    {
+                        if (_parser.Meta.TryGetValue("character", out var cName) && !string.IsNullOrWhiteSpace(cName))
+                            dHandle = cName;
+                        else
+                            dHandle = Database.GetLatestPilotName() ?? "gOOvER";
+                    }
+                    var profile = await CitizenProfileService.GetProfileAsync(dHandle);
+                    SendResponse(req.Id, "pilot_dossier_response", profile);
+                    break;
+
                 case "get_sessions":
                     SendResponse(req.Id, "sessions_response", GetSessions());
                     break;
@@ -774,16 +796,18 @@ public class PhotinoBridge
                 case "get_events":
                     string? category = null;
                     string? search = null;
+                    string? session = null;
                     int limit = 100;
                     int offset = 0;
                     if (req.Payload.HasValue)
                     {
+                        if (req.Payload.Value.TryGetProperty("session", out var sessProp)) session = sessProp.GetString();
                         if (req.Payload.Value.TryGetProperty("category", out var catProp)) category = catProp.GetString();
                         if (req.Payload.Value.TryGetProperty("search", out var sProp)) search = sProp.GetString();
                         if (req.Payload.Value.TryGetProperty("limit", out var limProp)) limit = limProp.GetInt32();
                         if (req.Payload.Value.TryGetProperty("offset", out var offProp)) offset = offProp.GetInt32();
                     }
-                    SendResponse(req.Id, "events_response", GetEvents(category, search, limit, offset));
+                    SendResponse(req.Id, "events_response", GetEvents(session, category, search, limit, offset));
                     break;
 
                 case "get_finance":
@@ -890,7 +914,12 @@ public class PhotinoBridge
                     break;
 
                 case "get_blackbox":
-                    SendResponse(req.Id, "blackbox_response", GetBlackboxData());
+                    string? bbSession = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var bbProp))
+                    {
+                        bbSession = bbProp.GetString();
+                    }
+                    SendResponse(req.Id, "blackbox_response", GetBlackboxData(bbSession));
                     break;
 
                 case "get_rs_signatures":
@@ -1519,15 +1548,54 @@ public class PhotinoBridge
         }
         catch { }
 
+        if (targetSession == "__live__")
+        {
+            lock (_liveEventsLock)
+            {
+                if (_liveEvents.Count > 0)
+                {
+                    var evIncome = _liveEvents.Where(e => e.Amount > 0).Sum(e => e.Amount ?? 0);
+                    var evSpend = Math.Abs(_liveEvents.Where(e => e.Amount < 0).Sum(e => e.Amount ?? 0));
+                    if (evIncome > 0 || evSpend > 0)
+                    {
+                        income = evIncome;
+                        spend = evSpend;
+                        net = income - spend;
+                    }
+
+                    var latest = _liveEvents[0].Timestamp;
+                    var earliest = _liveEvents[^1].Timestamp;
+                    spanText = $"{earliest} → {latest} ({_liveEvents.Count} Events)";
+                }
+            }
+        }
+
+        string? pilotAvatarUrl = null;
+        string? pilotTitle = null;
+        string? pilotOrgName = null;
+        if (!string.IsNullOrWhiteSpace(pilot) && pilot != "—" && pilot != "Kein Pilot erkannt")
+        {
+            var cachedProfile = CitizenProfileService.GetCached(pilot);
+            if (cachedProfile != null)
+            {
+                pilotAvatarUrl = cachedProfile.AvatarUrl;
+                pilotTitle = cachedProfile.Title;
+                pilotOrgName = cachedProfile.OrgName;
+            }
+        }
+
         return new HudTelemetryDto
         {
             IsGameRunning = isGameRunning,
             PilotName = !string.IsNullOrWhiteSpace(pilot) ? pilot : "Kein Pilot erkannt",
+            PilotAvatarUrl = pilotAvatarUrl,
+            PilotTitle = pilotTitle,
+            PilotOrgName = pilotOrgName,
             ServerRegionCode = regionCode,
             ServerRegionName = regionName,
             ServerRegionFlag = regionFlag,
             ServerShard = !string.IsNullOrWhiteSpace(shard) ? shard : "—",
-            ServerShardNumber = !string.IsNullOrWhiteSpace(shardNumber) ? shardNumber : (shard != "—" ? shard : "Kein Server"),
+            ServerShardNumber = !string.IsNullOrWhiteSpace(shardNumber) ? shardNumber : (!string.IsNullOrWhiteSpace(shard) ? shard : "Kein Server"),
             ServerVersion = scVersion,
             ServerPingMs = ping,
             LocationName = locName,
@@ -1683,10 +1751,30 @@ public class PhotinoBridge
         return list;
     }
 
-    private List<LogEventDto> GetEvents(string? categoryFilter, string? searchQuery, int limit, int offset)
+    private List<LogEventDto> GetEvents(string? sessionFilter, string? categoryFilter, string? searchQuery, int limit, int offset)
     {
+        if (sessionFilter == "__live__" || (string.IsNullOrEmpty(sessionFilter) && _selectedSession == "__live__"))
+        {
+            lock (_liveEventsLock)
+            {
+                var liveQuery = _liveEvents.AsEnumerable();
+                if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "all")
+                {
+                    liveQuery = liveQuery.Where(e => e.Category.Equals(categoryFilter, StringComparison.OrdinalIgnoreCase));
+                }
+                if (!string.IsNullOrWhiteSpace(searchQuery))
+                {
+                    liveQuery = liveQuery.Where(e =>
+                        (e.Description != null && e.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                        (e.Ship != null && e.Ship.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                        e.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+                }
+                return liveQuery.Skip(offset).Take(limit).ToList();
+            }
+        }
+
         Database.EnsureInitialized();
-        var rawEvents = Database.LoadRecentEvents(2500);
+        var rawEvents = Database.LoadRecentEvents(2500, sessionFilter == "__all__" ? null : sessionFilter);
         var query = rawEvents.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "all")
@@ -2153,13 +2241,41 @@ public class PhotinoBridge
     {
         try
         {
+            lock (_liveEventsLock)
+            {
+                _liveEvents.Clear();
+            }
+
             ScanLogHeaderAndMeta(path, _parser);
             ScanLogTailForShard(path, _parser);
 
             _tailer?.Stop();
             _tailer = new LogTailer(path);
-            _tailer.Line += OnLogLineReceived;
-            _tailer.Start(fromStart: false);
+            _tailer.LineEx += (line, isLive) => OnLogLineReceived(line, isLive);
+            _tailer.Status += statusMsg =>
+            {
+                if (statusMsg != null && statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
+                {
+                    List<LogEventDto> snapshot;
+                    lock (_liveEventsLock)
+                    {
+                        snapshot = _liveEvents.Take(100).ToList();
+                    }
+                    Broadcast("LIVE_EVENTS_LOADED", snapshot);
+                    Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+
+                    if (_parser.Meta.TryGetValue("character", out var charName) && !string.IsNullOrWhiteSpace(charName))
+                    {
+                        Task.Run(async () =>
+                        {
+                            await CitizenProfileService.GetProfileAsync(charName);
+                            Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                        });
+                    }
+                }
+            };
+
+            _tailer.Start(fromStart: true);
             _activeSessionName = Path.GetFileName(path);
             Logger.Log($"PhotinoBridge: LogTailer gestartet für {path}");
         }
@@ -2306,16 +2422,41 @@ public class PhotinoBridge
         return result;
     }
 
-    private FlightRecorderDto GetBlackboxData()
+    private FlightRecorderDto GetBlackboxData(string? session = null)
     {
         Database.EnsureInitialized();
-        var recentEvents = Database.LoadRecentEvents(800)
-            .OrderBy(e => e.Time)
-            .ToList();
+        string target = !string.IsNullOrEmpty(session) ? session : _selectedSession;
+        List<LogEntry> flightEvents;
 
-        var flightEvents = recentEvents.Where(e =>
-            e.Kind is EventKind.Quantum or EventKind.Vehicle or EventKind.ShipLoss or EventKind.Crash or EventKind.Location
-        ).ToList();
+        if (target == "__all__")
+        {
+            flightEvents = Database.AllTimelineEvents();
+        }
+        else if (target != "__live__")
+        {
+            flightEvents = Database.GetTimelineEventsForSession(target);
+        }
+        else
+        {
+            flightEvents = Database.GetTimelineEventsForSession(_activeSessionName ?? "Game.log");
+            if (flightEvents.Count == 0)
+            {
+                lock (_liveEventsLock)
+                {
+                    flightEvents = _liveEvents
+                        .Where(e => e.Category == "ship" || e.Category == "combat" || e.Category == "location")
+                        .Select(e => new LogEntry
+                        {
+                            Time = DateTime.TryParse(e.Timestamp, out var dt) ? dt : DateTime.UtcNow,
+                            Kind = e.Category == "combat" ? EventKind.ShipLoss : (e.Category == "location" ? EventKind.Location : EventKind.Quantum),
+                            Detail = e.Description,
+                            Ship = e.Ship
+                        })
+                        .OrderBy(e => e.Time)
+                        .ToList();
+                }
+            }
+        }
 
         int quantumJumps = flightEvents.Count(e => e.Kind == EventKind.Quantum);
         int losses = flightEvents.Count(e => e.Kind is EventKind.ShipLoss or EventKind.Crash);
@@ -2556,7 +2697,7 @@ public class PhotinoBridge
         }
     }
 
-    private void OnLogLineReceived(string rawLine)
+    private void OnLogLineReceived(string rawLine, bool isLive = true)
     {
         try
         {
@@ -2577,8 +2718,21 @@ public class PhotinoBridge
                 RawText = rawLine.Length > 120 ? rawLine[..120] + "…" : rawLine,
             };
 
-            Broadcast("LOG_EVENT", dto);
-            Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+            lock (_liveEventsLock)
+            {
+                _liveEvents.Insert(0, dto);
+                if (_liveEvents.Count > 1000)
+                {
+                    _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                }
+            }
+
+            if (isLive)
+            {
+                Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
+                Broadcast("LOG_EVENT", dto);
+                Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+            }
         }
         catch (Exception ex)
         {

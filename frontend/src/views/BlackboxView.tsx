@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { bridge, FlightRecorderDto } from '../services/photinoBridge';
+import { bridge, FlightRecorderDto, SessionSummary } from '../services/photinoBridge';
 import {
   MapPin,
   Rocket,
@@ -10,6 +10,8 @@ import {
   Check,
   Radio,
   Navigation,
+  ChevronDown,
+  Zap,
 } from 'lucide-react';
 
 export const BlackboxView: React.FC = () => {
@@ -17,11 +19,19 @@ export const BlackboxView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [filterKind, setFilterKind] = useState<string>('all');
   const [copied, setCopied] = useState<boolean>(false);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string>('__live__');
 
-  const fetchBlackbox = async () => {
+  useEffect(() => {
+    bridge.sendRequest<SessionSummary[]>('get_sessions').then((res) => {
+      if (res) setSessions(res);
+    }).catch(() => {});
+  }, []);
+
+  const fetchBlackbox = async (targetSession = selectedSession) => {
     try {
       setLoading(true);
-      const res = await bridge.sendRequest<FlightRecorderDto>('get_blackbox');
+      const res = await bridge.sendRequest<FlightRecorderDto>('get_blackbox', { session: targetSession });
       setData(res);
     } catch (err) {
       console.error('Failed to load blackbox data:', err);
@@ -31,8 +41,8 @@ export const BlackboxView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchBlackbox();
-  }, []);
+    fetchBlackbox(selectedSession);
+  }, [selectedSession]);
 
   const timeline = data?.timeline || [];
 
@@ -90,7 +100,51 @@ export const BlackboxView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4 select-none">
+      {/* Session Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[#040914]/90 border border-cyan-950/80 backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-mono text-cyan-400 font-bold uppercase flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-cyan-400" />
+            Flugschreiber Sitzung:
+          </span>
+          <div className="relative">
+            <select
+              value={selectedSession}
+              onChange={(e) => setSelectedSession(e.target.value)}
+              className="appearance-none bg-[#071322] border border-cyan-900/70 hover:border-cyan-500 rounded px-2.5 py-1 pr-7 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 transition cursor-pointer max-w-xs"
+            >
+              <option value="__live__">🔴 Live-Sitzung (Game.log)</option>
+              <option value="__all__">🌐 Alle Flüge (Gesamthistorie)</option>
+              {sessions.map((s) => (
+                <option key={s.id || s.name} value={s.name}>
+                  📁 {s.name} ({s.startTime})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyReport}
+            title="Bericht als Markdown kopieren"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#071322] border border-slate-800 hover:border-cyan-500 text-xs font-mono text-slate-300 hover:text-cyan-300 transition cursor-pointer"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">Kopieren</span>
+          </button>
+          <button
+            onClick={() => fetchBlackbox(selectedSession)}
+            title="Aktualisieren"
+            className="p-1.5 rounded bg-[#071322] border border-slate-800 hover:border-cyan-500 text-slate-300 hover:text-cyan-300 transition cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+          </button>
+        </div>
+      </div>
+
       {/* Top Telemetry KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
@@ -145,7 +199,7 @@ export const BlackboxView: React.FC = () => {
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             </button>
             <button
-              onClick={fetchBlackbox}
+              onClick={() => fetchBlackbox()}
               title="Aktualisieren"
               className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
             >

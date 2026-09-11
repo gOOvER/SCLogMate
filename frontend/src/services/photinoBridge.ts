@@ -28,6 +28,9 @@ export interface AppStatus {
 export interface HudTelemetry {
   isGameRunning: boolean;
   pilotName: string;
+  pilotAvatarUrl?: string;
+  pilotTitle?: string;
+  pilotOrgName?: string;
   serverRegionCode: 'EU' | 'US' | 'AUS' | 'ASIA' | 'PU' | 'OTHER' | string;
   serverRegionName: string;
   serverRegionFlag?: string;
@@ -54,6 +57,22 @@ export interface HudTelemetry {
   activeMissionStatus: string;
   sessionSpanText: string;
   selectedSession: string;
+}
+
+export interface PilotProfile {
+  handle: string;
+  citizenRecord: string;
+  title: string;
+  avatarUrl?: string;
+  enlisted: string;
+  fluency: string;
+  orgName?: string;
+  orgSid?: string;
+  orgRank?: string;
+  orgLogoUrl?: string;
+  profileUrl: string;
+  bio?: string;
+  isVerified: boolean;
 }
 
 export interface SessionSummary {
@@ -524,6 +543,23 @@ class PhotinoBridge {
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'get_pilot_dossier':
+        return {
+          handle: payload?.handle || 'gOOvER',
+          citizenRecord: '#593923',
+          title: 'High Admiral',
+          avatarUrl: 'https://robertsspaceindustries.com/media/000zndy8xaqxjr/heap_infobox/OldNoob.jpg',
+          enlisted: 'Sep 13, 2014',
+          fluency: 'English, German',
+          orgName: 'Stellanebula Project',
+          orgSid: 'SNPX',
+          orgRank: 'Recruit',
+          orgLogoUrl: 'https://robertsspaceindustries.com/media/5txttytjzckkzr/heap_infobox/SNPX-Logo.png',
+          profileUrl: 'https://robertsspaceindustries.com/citizens/gOOvER',
+          bio: 'Star Citizen Enthusiast & Space Commander',
+          isVerified: true,
+        } as PilotProfile;
+
       case 'get_hud':
       case 'select_session':
       case 'trigger_ocr':
@@ -531,6 +567,9 @@ class PhotinoBridge {
         return {
           isGameRunning: true,
           pilotName: 'Commander Torsten',
+          pilotAvatarUrl: 'https://robertsspaceindustries.com/media/000zndy8xaqxjr/heap_infobox/OldNoob.jpg',
+          pilotTitle: 'High Admiral',
+          pilotOrgName: 'Stellanebula Project',
           serverRegionCode: 'EU',
           serverRegionName: 'Europa',
           serverShard: '#1042-EU',

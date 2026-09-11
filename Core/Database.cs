@@ -1056,14 +1056,22 @@ public static class Database
         }
     }
 
-    /// <summary>Liefert die neuesten gespeicherten Events (neueste zuerst, bis maxEntries), chronologisch sortiert.</summary>
-    public static List<LogEntry> LoadRecentEvents(int maxEntries = 15000)
+    /// <summary>Liefert die neuesten gespeicherten Events (neueste zuerst, bis maxEntries), chronologisch sortiert. Optional nach Session gefiltert.</summary>
+    public static List<LogEntry> LoadRecentEvents(int maxEntries = 15000, string? session = null)
     {
         var list = new List<LogEntry>(Math.Min(maxEntries, 2000));
         using var db = new SqliteConnection(Conn);
         db.Open();
         using var cmd = db.CreateCommand();
-        cmd.CommandText = $"SELECT time,kind,amount,detail,ship FROM events ORDER BY time DESC LIMIT {maxEntries}";
+        if (!string.IsNullOrEmpty(session) && session != "__all__")
+        {
+            cmd.CommandText = $"SELECT time,kind,amount,detail,ship FROM events WHERE session = $sess ORDER BY time DESC LIMIT {maxEntries}";
+            cmd.Parameters.AddWithValue("$sess", session);
+        }
+        else
+        {
+            cmd.CommandText = $"SELECT time,kind,amount,detail,ship FROM events ORDER BY time DESC LIMIT {maxEntries}";
+        }
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {

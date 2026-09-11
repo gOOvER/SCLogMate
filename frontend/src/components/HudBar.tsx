@@ -11,6 +11,7 @@ import {
   Wifi,
   Sparkles,
   Zap,
+  User,
 } from 'lucide-react';
 import { HudTelemetry } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
@@ -21,6 +22,7 @@ interface HudBarProps {
   onNavigate: (tab: NavTabId) => void;
   onTriggerOcr?: () => void;
   onToggleAutoOcr?: () => void;
+  onOpenPilotDossier?: () => void;
 }
 
 export const HudBar: React.FC<HudBarProps> = ({
@@ -28,6 +30,7 @@ export const HudBar: React.FC<HudBarProps> = ({
   onNavigate,
   onTriggerOcr,
   onToggleAutoOcr,
+  onOpenPilotDossier,
 }) => {
   const { t } = useI18n();
   // Region Flag Helper
@@ -82,9 +85,29 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
           </div>
 
-          {/* Main Pilot Name */}
-          <div className="text-sm font-bold font-mono text-slate-100 truncate" title={telemetry.pilotName}>
-            {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Kein Pilot erkannt'}
+          {/* Main Pilot Name with Avatar & Dossier Trigger */}
+          <div
+            onClick={onOpenPilotDossier}
+            className="flex items-center gap-2 cursor-pointer group hover:bg-cyan-950/40 p-1 -ml-1 rounded transition"
+            title="Klicken für Piloten-Dossier (RSI Profil)"
+          >
+            <div className="w-6 h-6 rounded-full overflow-hidden border border-cyan-400/80 bg-slate-900 shrink-0 flex items-center justify-center shadow-[0_0_8px_rgba(6,182,212,0.3)]">
+              {telemetry.pilotAvatarUrl ? (
+                <img src={telemetry.pilotAvatarUrl} alt={telemetry.pilotName} className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-3.5 h-3.5 text-cyan-400" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold font-mono text-slate-100 group-hover:text-cyan-300 transition truncate">
+                {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Kein Pilot erkannt'}
+              </div>
+            </div>
+            {telemetry.pilotTitle && (
+              <span className="text-[10px] font-mono font-semibold text-amber-400 shrink-0 hidden sm:inline">
+                {telemetry.pilotTitle}
+              </span>
+            )}
           </div>
 
           {/* Subline: Version & Shard */}
