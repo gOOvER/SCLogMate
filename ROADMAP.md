@@ -93,3 +93,45 @@ Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden S
   - Granulare Checkboxen für alle Toast-Typen (*Baupläne, Missionen, Fraktions-Beförderungen, Raffinerie, Aufzüge, Schiffszerstörung*) inkl. dezentem Audio-Soundeffekt.
 - [x] **Multi-Monitor Profiling:**
   - Automatisches Speichern und Wiederherstellen separater Overlay-Positionen.
+
+---
+
+## 🌐 6. Star Citizen Wiki (SCWiki) Vollintegration & Lokaler Cache
+- [ ] **Lokaler HD-Bilder- & Asset-Cache (`Core/WikiImageCache.cs`):**
+  - Automatischer Download und permanentes Caching aller Schiffs-Render, Item-Grafiken und Thumbnails unter `%APPDATA%\SCLogMate\cache\wiki\images\`.
+  - 100% Offline-Verfügbarkeit und verzögerungsfreie Darstellung in allen Modals und Listen ohne externe Bild-Ladezeiten.
+- [ ] **Erweiterter SQLite-Cache (`wiki_vehicles_cache` & `wiki_items_cache`, Schema v20):**
+  - Persistente Speicherung vollständiger Schiffsspezifikationen: *Rolle, Typ, Fokus, Hersteller, Besatzung (Min/Max), Frachtkapazität (SCU), Quantum-Treibstoff, Triebwerke, Waffen-Hardpoints, Schilde, Abmessungen (L×B×H, Masse), Pledge-Preis (MSRP) und deutscher Beschreibungstext*.
+  - Speicherung detaillierter Item-Werte (Waffen-DPS, Magazingröße, Rüstungsklasse, Temperatur- und Schadenswiderstände).
+- [ ] **In-App SCWiki Dossier Modal (`frontend/src/components/WikiDossierModal.tsx`):**
+  - Modernes In-App Glassmorphism-Dossier anstelle externer Browser-Links:
+    - HD-Render mit Hersteller-Badge und Kategorisierung.
+    - Vollständige Spezifikations-Kacheln (Crew, SCU, Schilde, Quantum Drive, Waffen).
+    - Lokalisierte Lore & Beschreibung (Deutsch priorisiert, Umschalter auf Original-Englisch).
+    - In-Game Kauf- & Mietorte mit aUEC-Preisen (z. B. *New Deal*, *Astro Armada*).
+- [ ] **Universelle Trigger in der gesamten App:**
+  - **HUD (Karte 3 - Aktives Schiff):** 1-Klick auf „Wiki“ öffnet direkt das interne Schiffsdossier.
+  - **Flotte (`FleetView.tsx`):** Klick auf eine Schiffskarte öffnet das vollständige SCWiki-Datenblatt.
+  - **Lager / Warehouse (`WarehouseView.tsx`):** Klick auf einen Gegenstand oder Menüaktion öffnet das Item-Dossier.
+  - **Chronik (`EventsView.tsx`):** Direktes Nachschlagen von Schiffen und Beute aus dem Ereignis-Log.
+
+---
+
+## 💬 7. In-Game Chat-Verlauf & OCR-Protokollierung (Player Reports)
+- [ ] **OCR-basierte Chat-Erfassung (`Core/Ocr/ChatOcrScanner.cs`):**
+  - Dedizierte, ressourcenschonende OCR-Erfassung des Star Citizen Chat-Fensters (Global, Party, Direct Message, Channel).
+  - Robust gegen variierende Transparenzen, Chat-Schriftarten und Hintergründe.
+- [ ] **Strukturierte Chat-Chronik mit Zeitstempel & User-ID (`Core/Database.cs`):**
+  - Automatisches Parsen von:
+    - **Präziser Zeitstempel** (`[YYYY-MM-DD HH:mm:ss]`).
+    - **Sender / Spielername** (`User / Handle`) inkl. Farb-/Kanal-Zuordnung (Global / Party / Flüstern).
+    - **Kanal-Kennung** (`Global`, `Party`, `Direct`).
+    - **Vollständiger Nachrichten-Text**.
+  - Speicherung in dedizierter SQLite-Tabelle `chat_messages` mit Indizes auf Zeitstempel und Spielername.
+- [ ] **Chat-Chronik & Such-Explorer in der UI (`frontend/src/views/ChatLogView.tsx`):**
+  - Durchsuchbarer Chat-Verlauf mit Live-Volltextsuche und Spieler-Filter (z. B. alle Nachrichten eines bestimmten Spielers isolieren).
+  - Schnellauswahl nach Zeitraum / Spielsitzung.
+- [ ] **1-Klick CIG Support-Report Export:**
+  - Einfaches Zusammenstellen und Exportieren von Vorfällen (Griefing, Beleidigungen, Belästigung, Erpressung, Piraterie) für den RSI / CIG Player Support.
+  - Formatierte Zusammenfassung mit exakten Zeitstempeln, Shard-ID, Server-Region, Spielernamen, wörtlichem Chatprotokoll und optionalem Screenshot-Auszug als saubere Text-/Markdown-Vorlage für das Support-Ticket.
+
