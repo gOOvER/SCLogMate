@@ -1212,6 +1212,58 @@ public class PhotinoBridge
                     SendResponse(req.Id, "reputation_response", GetReputationData());
                     break;
 
+                case "set_reputation":
+                    if (req.Payload.HasValue)
+                    {
+                        var p = req.Payload.Value;
+                        string fId = p.TryGetProperty("factionId", out var fProp) ? fProp.GetString() ?? "" : "";
+                        int xp = p.TryGetProperty("xp", out var xpP) ? xpP.GetInt32() : 0;
+                        int missions = p.TryGetProperty("missions", out var mP) ? mP.GetInt32() : 0;
+                        if (p.TryGetProperty("level", out var lvlP))
+                        {
+                            int lvl = Math.Clamp(lvlP.GetInt32(), 1, 6);
+                            int[] thresholds = { 0, 1000, 3000, 7500, 15000, 30000 };
+                            xp = thresholds[lvl - 1];
+                        }
+                        Database.SetFactionReputation(fId, xp, missions, DateTime.UtcNow);
+                        SendResponse(req.Id, "set_reputation_response", new { success = true });
+                        Broadcast("reputation_response", GetReputationData());
+                    }
+                    break;
+
+                case "adjust_reputation_xp":
+                    if (req.Payload.HasValue)
+                    {
+                        var p = req.Payload.Value;
+                        string fId = p.TryGetProperty("factionId", out var fProp) ? fProp.GetString() ?? "" : "";
+                        int delta = p.TryGetProperty("deltaXp", out var dP) ? dP.GetInt32() : 0;
+                        if (delta != 0 && !string.IsNullOrWhiteSpace(fId))
+                        {
+                            var existing = Database.LoadFactionReputations();
+                            int curXp = existing.TryGetValue(fId, out var cur) ? cur.Xp : 0;
+                            int curMissions = existing.TryGetValue(fId, out cur) ? cur.Missions : 0;
+                            int newXp = Math.Max(0, curXp + delta);
+                            Database.SetFactionReputation(fId, newXp, curMissions, DateTime.UtcNow);
+                        }
+                        SendResponse(req.Id, "adjust_reputation_xp_response", new { success = true });
+                        Broadcast("reputation_response", GetReputationData());
+                    }
+                    break;
+
+                case "reset_reputation":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("factionId", out var rFidProp))
+                    {
+                        string rFid = rFidProp.GetString() ?? "";
+                        Database.SetFactionReputation(rFid, 0, 0, DateTime.UtcNow);
+                    }
+                    else
+                    {
+                        Database.ResetFactionReputations();
+                    }
+                    SendResponse(req.Id, "reset_reputation_response", new { success = true });
+                    Broadcast("reputation_response", GetReputationData());
+                    break;
+
                 case "get_blueprints":
                     SendResponse(req.Id, "blueprints_response", GetBlueprintsData());
                     break;
@@ -2806,21 +2858,44 @@ public class PhotinoBridge
 
         try
         {
-            var missionEvents = Database.LoadRecentEvents(5000)
-                .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone)
-                .ToList();
+            var savedRep = Database.LoadFactionReputations();
+            bool hasSavedData = savedRep.Count > 0;
 
-            foreach (var ev in missionEvents)
+            foreach (var f in list)
             {
-                var matched = ReputationCatalog.MatchFaction(ev.Detail);
-                if (matched != null)
+                if (savedRep.TryGetValue(f.Id, out var saved))
                 {
-                    var target = list.FirstOrDefault(f => f.Id == matched.Id);
-                    if (target != null)
+                    f.CurrentXp = saved.Xp;
+                    f.CompletedMissions = saved.Missions;
+                }
+            }
+
+            // Falls in SQLite noch gar keine Daten vorhanden sind (z. B. Neuinstallation),
+            // einmalig historische Missions-Events als Initialwert einlesen und fest in SQLite speichern.
+            if (!hasSavedData)
+            {
+                var missionEvents = Database.LoadRecentEvents(5000)
+                    .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionReward)
+                    .ToList();
+
+                foreach (var ev in missionEvents)
+                {
+                    var matched = ReputationCatalog.MatchFaction(ev.Detail) ?? ReputationCatalog.MatchFaction(ev.Ship);
+                    if (matched != null)
                     {
-                        target.CompletedMissions++;
-                        target.CurrentXp += 250;
+                        var target = list.FirstOrDefault(f => f.Id == matched.Id);
+                        if (target != null)
+                        {
+                            target.CompletedMissions++;
+                            target.CurrentXp += 250;
+                        }
                     }
+                }
+
+                // Initial-Stände fest in SQLite sichern
+                foreach (var f in list.Where(x => x.CurrentXp > 0 || x.CompletedMissions > 0))
+                {
+                    Database.SetFactionReputation(f.Id, f.CurrentXp, f.CompletedMissions, DateTime.UtcNow);
                 }
             }
         }
@@ -3684,6 +3759,18 @@ public class PhotinoBridge
             if (isLive)
             {
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
+
+                if (entry.Kind is EventKind.MissionDone or EventKind.MissionReward)
+                {
+                    var fac = ReputationCatalog.MatchFaction(entry.Detail) ?? ReputationCatalog.MatchFaction(entry.Ship);
+                    if (fac != null)
+                    {
+                        int xpGained = (int)Math.Max(250, Math.Min(3500, entry.Amount > 0 ? entry.Amount / 10 : 500));
+                        Database.AddFactionReputationXp(fac.Id, xpGained, entry.Time);
+                        Broadcast("reputation_response", GetReputationData());
+                    }
+                }
+
                 Broadcast("LOG_EVENT", dto);
                 Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
             }

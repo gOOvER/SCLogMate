@@ -1008,6 +1008,9 @@ class PhotinoBridge {
         } as MissionsResponseDto;
 
       case 'get_reputation':
+      case 'set_reputation':
+      case 'adjust_reputation_xp':
+      case 'reset_reputation':
         return [
           {
             id: 'rep_hurston',

@@ -1814,6 +1814,30 @@ public static class Database
         }
     }
 
+    public static void SetFactionReputation(string factionId, int xp, int completedMissions, DateTime time)
+    {
+        if (string.IsNullOrWhiteSpace(factionId)) return;
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO reputation (faction_id, xp, completed_missions, last_updated)
+                VALUES ($fid, $xp, $missions, $last)
+                ON CONFLICT(faction_id) DO UPDATE SET
+                    xp = $xp,
+                    completed_missions = $missions,
+                    last_updated = $last;";
+            cmd.Parameters.AddWithValue("$fid", factionId);
+            cmd.Parameters.AddWithValue("$xp", Math.Max(0, xp));
+            cmd.Parameters.AddWithValue("$missions", Math.Max(0, completedMissions));
+            cmd.Parameters.AddWithValue("$last", time.ToString("o"));
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     public static void ResetFactionReputations()
     {
         lock (_writeLock)

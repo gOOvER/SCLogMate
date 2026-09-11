@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **mobiGlas Delphi Reputation Calibration & SQLite Persistence (`ReputationView.tsx`, `PhotinoBridge.cs`, `Database.cs`)**:
+  - Solved missing or inaccurate reputation caused by Star Citizen's ephemeral `Game.log` files by persistently backing faction standing in SQLite (`reputation` table).
+  - Added `SetFactionReputation` to `Database.cs` and new RPC handlers `set_reputation`, `adjust_reputation_xp`, and `reset_reputation` to `PhotinoBridge.cs`.
+  - Implemented automatic reputation XP tracking upon live mission completion events (`EventKind.MissionDone` / `MissionReward`), incrementing the persistent SQLite baseline and broadcasting updates in real time.
+  - Redesigned `ReputationView.tsx` into a high-density Star Citizen mobiGlas Delphi console:
+    - Global telemetry strip: Total Factions, Active Relations, Highest Tier reached, and Total Accumulated XP.
+    - 1-click tier quick selectors (`[R1]` to `[R6]`) on each faction card to immediately align reputation with in-game Delphi standing.
+    - Comprehensive Delphi Calibration modal with preset rank buttons, XP fine steppers (`-1.000` to `+1.000 XP`), exact XP and mission counters, reset capability, and direct SQLite persistence.
+    - Filter chips, search bar, and collapsible Delphi synchronization explanation banner.
 - **Finance Scope Switcher (`FinancesView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
   - Integrated a segmented scope selector into the Finances toolbar (`Alle Sessions` vs `Aktuelle Session`), restoring the Avalonia RC2 finance scope architecture (`SetFinanceScopeCommand`).
   - Backend `get_finance` RPC and `GetFinanceOverview(string? scope)` now accept a `scope` parameter (`"all"` vs `"current"`), strictly aggregating the active session (`_activeSessionName` + uncommitted live buffer) when set to `"current"` while preserving full historical aggregation under `"all"`.
