@@ -35,7 +35,6 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
-  const [eventsSession, setEventsSession] = useState<string>('__live__');
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -294,8 +293,7 @@ export const App: React.FC = () => {
         <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4">
           {activeTab === 'events' && (
             <EventsView
-              initialSession={eventsSession}
-              onSelectSession={setEventsSession}
+              selectedSession={telemetry.selectedSession}
             />
           )}
 

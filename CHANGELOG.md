@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
 ### Changed
+- **Events View Modernization & Session Sync (`EventsView.tsx`, `App.tsx`)**:
+  - Removed duplicate session selector dropdown from the `EventsView` filter bar, binding it directly to the global master HUD `SessionBar` (`telemetry.selectedSession`).
+  - Streamlined the filter bar with a sleek active session status pill, giving full horizontal prominence to glowing category chips, search, and live tail controls.
+  - Redesigned the events empty state with an interactive sci-fi HUD empty terminal display and a 1-click filter reset button.
 - **Events Grid & Database Localization Parity (`EventsView.tsx`, `LogParser.cs`, `PhotinoBridge.cs`)**:
   - Restored crisp, separated table columns with vertical borders for `ZEIT`, `TYP`, `BETRAG`, `SCHIFF`, and `DETAIL`, resolving the merged "BETRAG SCHIFF" header and double-dash `-- --` artifacts.
   - Aligned empty cell rendering to Avalonia RC2: cells with zero amount or no ship now render clean and empty instead of placeholder dashes (`—`).
