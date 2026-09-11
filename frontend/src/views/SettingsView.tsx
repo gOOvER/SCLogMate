@@ -49,7 +49,16 @@ export const SettingsView: React.FC = () => {
   const [isCheckingDb, setIsCheckingDb] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
   const [rescanProgress, setRescanProgress] = useState<any>(null);
-  const [rescanStatusMessage, setRescanStatusMessage] = useState<string | null>(null);
+
+  const [activeDbOp, setActiveDbOp] = useState<
+    'none' | 'integrity' | 'vacuum' | 'repair' | 'rescan'
+  >('none');
+  const [dbOpMessage, setDbOpMessage] = useState<string | null>(null);
+  const [dbCompletionBanner, setDbCompletionBanner] = useState<{
+    success: boolean;
+    title: string;
+    details: string;
+  } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -60,7 +69,8 @@ export const SettingsView: React.FC = () => {
     if (isRescanning || isCheckingDb) return;
     try {
       setIsRescanning(true);
-      setRescanStatusMessage('Sammle Log-Dateien für kompletten Re-Scan...');
+      setActiveDbOp('rescan');
+      setDbCompletionBanner(null);
       setRescanProgress({
         current: 0,
         total: 10,
@@ -72,6 +82,7 @@ export const SettingsView: React.FC = () => {
     } catch (err) {
       console.error('Reparse all failed:', err);
       setIsRescanning(false);
+      setActiveDbOp('none');
       showToast('Fehler beim Re-Scan');
     }
   };
@@ -86,9 +97,16 @@ export const SettingsView: React.FC = () => {
     }
     try {
       setIsCheckingDb(true);
+      setActiveDbOp('none');
+      setDbCompletionBanner(null);
       await bridge.sendRequest('reset_database');
       showToast('Datenbank erfolgreich zurückgesetzt.');
-      loadDbDiag();
+      setDbCompletionBanner({
+        success: true,
+        title: 'Datenbank erfolgreich geleert!',
+        details: 'Alle Sessions, Ereignisse und Lagerbestände wurden auf den Anfangszustand zurückgesetzt.',
+      });
+      loadDbDiag(false);
     } catch (err) {
       showToast('Fehler beim Zurücksetzen der Datenbank');
     } finally {
@@ -114,15 +132,41 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const loadDbDiag = async () => {
+  const loadDbDiag = async (isManual = false) => {
     try {
       setIsCheckingDb(true);
+      if (isManual) {
+        setActiveDbOp('integrity');
+        setDbOpMessage('Führe tiefe SQLite-Integritätsprüfung durch (PRAGMA integrity_check)... Bitte warten.');
+        setDbCompletionBanner(null);
+      }
       const diag = await bridge.sendRequest<any>('get_db_diagnostics');
-      if (diag) setDbDiag(diag);
+      if (diag) {
+        setDbDiag(diag);
+        if (isManual) {
+          setDbCompletionBanner({
+            success: diag.integrityCheckOk,
+            title: diag.integrityCheckOk
+              ? '✓ Tiefe Integritätsprüfung: FEHLERFREI'
+              : '⚠️ Integritätsprüfung: Fehler festgestellt',
+            details: `Ergebnis: ${diag.integrityMessage || 'quick_check ok'} · Datenbankgröße: ${diag.formattedSize} · Geprüft um ${new Date().toLocaleTimeString()}`,
+          });
+          showToast(diag.integrityCheckOk ? '✓ Integritätsprüfung: OK' : '⚠️ Integritätsfehler');
+        }
+      }
     } catch (err) {
       console.error('Failed to load db diagnostics:', err);
+      if (isManual) {
+        setDbCompletionBanner({
+          success: false,
+          title: 'Fehler bei der Integritätsprüfung',
+          details: String(err),
+        });
+      }
     } finally {
       setIsCheckingDb(false);
+      setActiveDbOp('none');
+      setDbOpMessage(null);
     }
   };
 
@@ -155,26 +199,57 @@ export const SettingsView: React.FC = () => {
   const handleVacuum = async () => {
     try {
       setIsCheckingDb(true);
+      setActiveDbOp('vacuum');
+      setDbOpMessage('Führe SQLite VACUUM & Bereinigung durch... Bitte warten.');
+      setDbCompletionBanner(null);
       const res = await bridge.sendRequest<any>('cleanup_database');
-      showToast(`SQLite VACUUM abgeschlossen! ${res?.cleanedEvents ?? 0} Events bereinigt (${res?.sizeBefore} → ${res?.sizeAfter})`);
-      loadDbDiag();
+      const diag = await bridge.sendRequest<any>('get_db_diagnostics');
+      if (diag) setDbDiag(diag);
+      setDbCompletionBanner({
+        success: true,
+        title: 'Datenbank-Bereinigung & VACUUM erfolgreich abgeschlossen!',
+        details: `${res?.cleanedEvents ?? 0} verwaiste Events bereinigt · Dateigröße: ${res?.sizeBefore} → ${res?.sizeAfter}`,
+      });
+      showToast(`SQLite VACUUM abgeschlossen! ${res?.sizeBefore} → ${res?.sizeAfter}`);
     } catch (err) {
       showToast('Fehler beim VACUUM');
+      setDbCompletionBanner({
+        success: false,
+        title: 'Fehler beim VACUUM',
+        details: String(err),
+      });
     } finally {
       setIsCheckingDb(false);
+      setActiveDbOp('none');
+      setDbOpMessage(null);
     }
   };
 
   const handleRepairDb = async () => {
     try {
       setIsCheckingDb(true);
+      setActiveDbOp('repair');
+      setDbOpMessage('Repariere SQLite-Tabellenstruktur und aktualisiere Indizes... Bitte warten.');
+      setDbCompletionBanner(null);
       const res = await bridge.sendRequest<any>('repair_db_structure');
       if (res?.diagnostics) setDbDiag(res.diagnostics);
+      setDbCompletionBanner({
+        success: res?.success ?? true,
+        title: 'Struktur- und Index-Reparatur abgeschlossen!',
+        details: res?.message || 'Alle Tabellen und Schema-Indizes wurden erfolgreich überprüft und repariert.',
+      });
       showToast('Datenbank-Struktur und Indizes erfolgreich aktualisiert');
     } catch (err) {
       showToast('Fehler bei der Reparatur');
+      setDbCompletionBanner({
+        success: false,
+        title: 'Fehler bei der Reparatur',
+        details: String(err),
+      });
     } finally {
       setIsCheckingDb(false);
+      setActiveDbOp('none');
+      setDbOpMessage(null);
     }
   };
 
@@ -200,10 +275,17 @@ export const SettingsView: React.FC = () => {
       setRescanProgress(progress);
       if (progress.isCompleted) {
         setIsRescanning(false);
-        const msg = `Re-Scan abgeschlossen: ${progress.indexedSessions ?? 0} Sessions, ${(progress.totalEvents ?? 0).toLocaleString()} Ereignisse neu indexiert.`;
-        setRescanStatusMessage(msg);
-        showToast(`✓ ${msg}`);
-        loadDbDiag();
+        setActiveDbOp('none');
+        setDbCompletionBanner({
+          success: true,
+          title: 'Kompletter Re-Scan erfolgreich abgeschlossen!',
+          details: `${progress.indexedSessions ?? 0} Sessions und ${(progress.totalEvents ?? 0).toLocaleString()} Ereignisse wurden frisch mit neuen Parser-Regeln indexiert.`,
+        });
+        showToast(`✓ Re-Scan abgeschlossen (${progress.indexedSessions ?? 0} Sessions)`);
+        loadDbDiag(false);
+      } else {
+        setIsRescanning(true);
+        setActiveDbOp('rescan');
       }
     });
     return () => unbind();
@@ -701,33 +783,87 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Re-Scan Fortschritts-Banner */}
-            {isRescanning && rescanProgress && (
-              <div className="rounded-lg p-4 border border-cyan-500/50 bg-cyan-950/30 space-y-2 animate-in fade-in font-sans">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <div className="flex items-center space-x-2 text-cyan-300 min-w-0">
-                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
-                    <span className="font-bold shrink-0">
-                      Indexiere Log-Dateien ({rescanProgress.current}/{rescanProgress.total}):
-                    </span>
-                    <span className="text-slate-300 truncate">{rescanProgress.currentFileName}</span>
+            {/* Laufender Vorgang Banner (Integritätsprüfung, VACUUM, Reparatur) */}
+            {isCheckingDb && activeDbOp !== 'none' && activeDbOp !== 'rescan' && (
+              <div className="rounded-xl p-4 border border-cyan-500/60 bg-cyan-950/40 text-cyan-200 flex items-center space-x-3.5 shadow-xl shadow-cyan-950/50 animate-pulse font-sans">
+                <RefreshCw className="w-5 h-5 text-cyan-400 animate-spin shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-xs uppercase tracking-wider text-cyan-300">
+                    {activeDbOp === 'integrity'
+                      ? 'SQLite Integritätsprüfung läuft...'
+                      : activeDbOp === 'vacuum'
+                      ? 'SQLite VACUUM & Bereinigung läuft...'
+                      : 'Datenbank-Struktur Reparatur läuft...'}
                   </div>
-                  <span className="font-bold text-cyan-400 shrink-0 ml-2">{rescanProgress.percent}%</span>
+                  <div className="text-xs text-slate-300 mt-0.5 font-mono">
+                    {dbOpMessage || 'Bitte warten, die Operation wird auf der SQLite-Datenbank ausgeführt...'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Re-Scan Fortschritts-Banner */}
+            {isRescanning && (
+              <div className="rounded-xl p-4 border border-cyan-500/60 bg-cyan-950/40 space-y-2.5 animate-in fade-in font-sans shadow-xl shadow-cyan-950/50">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center space-x-2.5 text-cyan-300 min-w-0">
+                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
+                    <span className="font-bold text-white shrink-0 uppercase tracking-wider">
+                      {rescanProgress && rescanProgress.total > 0
+                        ? `Indexiere Logs (${rescanProgress.current}/${rescanProgress.total}):`
+                        : 'Starte Re-Scan:'}
+                    </span>
+                    <span className="text-cyan-300 truncate font-sans">
+                      {rescanProgress?.currentFileName || 'Sammle Log-Dateien für Re-Scan...'}
+                    </span>
+                  </div>
+                  <span className="font-bold text-cyan-400 shrink-0 ml-2">
+                    {rescanProgress && rescanProgress.total > 0 ? `${rescanProgress.percent}%` : 'Sammle...'}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-cyan-900/60">
                   <div
                     className="bg-gradient-to-r from-cyan-500 to-sky-400 h-full transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
-                    style={{ width: `${Math.max(3, rescanProgress.percent)}%` }}
+                    style={{
+                      width: rescanProgress && rescanProgress.total > 0 ? `${Math.max(3, rescanProgress.percent)}%` : '20%',
+                    }}
                   />
                 </div>
               </div>
             )}
 
-            {/* Erfolgsmeldung */}
-            {rescanStatusMessage && !isRescanning && (
-              <div className="p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2.5 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-semibold">{rescanStatusMessage}</span>
+            {/* Abschluss- / Ergebnis-Banner */}
+            {dbCompletionBanner && !isCheckingDb && !isRescanning && (
+              <div
+                className={`p-4 rounded-xl border flex items-center justify-between space-x-3 shadow-lg animate-in fade-in font-sans ${
+                  dbCompletionBanner.success
+                    ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+                    : 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3 min-w-0">
+                  <CheckCircle2
+                    className={`w-5 h-5 shrink-0 ${
+                      dbCompletionBanner.success ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  />
+                  <div>
+                    <div
+                      className={`font-bold text-xs uppercase tracking-wider ${
+                        dbCompletionBanner.success ? 'text-emerald-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {dbCompletionBanner.title}
+                    </div>
+                    <div className="text-xs text-slate-300 font-mono mt-0.5">{dbCompletionBanner.details}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDbCompletionBanner(null)}
+                  className="text-slate-400 hover:text-white text-xs px-2.5 py-1 rounded bg-slate-900/60 border border-slate-800 cursor-pointer"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
@@ -769,7 +905,8 @@ export const SettingsView: React.FC = () => {
                   disabled={isRescanning || isCheckingDb}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition disabled:opacity-50 cursor-pointer"
                 >
-                  <span>🧹 DB bereinigen &amp; VACUUM</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${activeDbOp === 'vacuum' ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span>{activeDbOp === 'vacuum' ? 'Bereinige...' : '🧹 DB bereinigen & VACUUM'}</span>
                 </button>
               </div>
 
@@ -796,18 +933,20 @@ export const SettingsView: React.FC = () => {
             {/* Diagnose- & Ordner-Aktionen */}
             <div className="flex flex-wrap gap-2.5 pt-3 border-t border-slate-800/80">
               <button
-                onClick={loadDbDiag}
+                onClick={() => loadDbDiag(true)}
                 disabled={isCheckingDb || isRescanning}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer disabled:opacity-50"
               >
-                <span>🔍 Tiefe Integritätsprüfung</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${activeDbOp === 'integrity' ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{activeDbOp === 'integrity' ? 'Prüfe Integrität...' : '🔍 Tiefe Integritätsprüfung'}</span>
               </button>
               <button
                 onClick={handleRepairDb}
                 disabled={isCheckingDb || isRescanning}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-medium border border-cyan-800 transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-medium border border-cyan-800 transition cursor-pointer disabled:opacity-50"
               >
-                <span>⚡ Struktur &amp; Indizes reparieren</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${activeDbOp === 'repair' ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{activeDbOp === 'repair' ? 'Repariere Struktur...' : '⚡ Struktur & Indizes reparieren'}</span>
               </button>
               <button
                 onClick={() => handleOpenFolder('db')}

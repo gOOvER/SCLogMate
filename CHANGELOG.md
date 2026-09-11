@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Global & In-View Live Progress Banners for Database Operations & Scans (`App.tsx`, `SettingsView.tsx`, `EmbeddedAssets.cs`)**:
+  - **Global Log-Scan & Re-Scan Progress Banner (`App.tsx`)**:
+    - Embedded a persistent, glowing progress banner right below the master header whenever a scan or re-parse is active.
+    - Displays the active log file counter `(X/Y)`, current log file name, percentage, and animated gradient progress bar across all views.
+  - **Active Operation Banners in Database Maintenance (`SettingsView.tsx`)**:
+    - Added dedicated live progress banners whenever a database task is executing:
+      - **Deep Integrity Check**: Pulsing banner and button spinner indicating `PRAGMA integrity_check` is analyzing database pages and B-trees.
+      - **VACUUM & Cleanup**: Real-time banner indicating orphaned records are being purged and database pages compacted.
+      - **Structure & Index Repair**: Real-time banner indicating tables, columns, and SQLite indexes are being rebuilt.
+      - **Batch Re-Scan**: Live gradient progress bar with file count and log filename.
+    - **Detailed Completion Banners**: Added dismissible result banners displaying detailed outcome status, timestamps, and cleaned size metrics (`sizeBefore -> sizeAfter`).
+    - Added active spinners and loading labels (`Prüfe Integrität...`, `Bereinige...`, `Repariere Struktur...`) to all maintenance buttons.
+  - **Embedded Asset Freshness Guarantee (`EmbeddedAssets.cs`)**:
+    - Ensured `index.html` is always cleanly overwritten on extraction to avoid stale browser cache bundles.
 - **Full Batch Log Re-Reading & Comprehensive Database Maintenance ("Alle Logs neu einlesen") (`SettingsView.tsx`, `SessionsView.tsx`, `MasterHeader.tsx`, `PhotinoBridge.cs`)**:
   - Brought back the prominent 3-card maintenance center from RC2 in **Settings -> SQLite & Datenbank**:
     - **Kompletter Re-Scan Card**: Action button **`🔄 Alle Logs neu einlesen`** with live animated gradient progress bar (`SCAN_PROGRESS` with indexed file count, filename, and percent) and completion summary banner (`✓ Re-Scan abgeschlossen: X Sessions, Y Ereignisse neu indexiert`).

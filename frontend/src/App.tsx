@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import {
   bridge,
   AppStatus,
@@ -35,6 +36,13 @@ export const App: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
   const [status, setStatus] = useState<AppStatus | null>(null);
+  const [scanProgress, setScanProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+    currentFileName: string;
+    isCompleted: boolean;
+  } | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [events, setEvents] = useState<LogEventItem[]>([]);
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
@@ -116,6 +124,16 @@ export const App: React.FC = () => {
       }
     });
 
+    const unbindScan = bridge.on<any>('SCAN_PROGRESS', (progress) => {
+      setScanProgress(progress);
+      if (progress.isCompleted) {
+        setIsScanning(false);
+        loadData();
+      } else {
+        setIsScanning(true);
+      }
+    });
+
     // Keyboard shortcut Alt + H to toggle HUD collapse
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 'h' || e.key === 'H')) {
@@ -130,6 +148,7 @@ export const App: React.FC = () => {
       unbindStatus();
       unbindHud();
       unbindWh();
+      unbindScan();
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -207,6 +226,38 @@ export const App: React.FC = () => {
           onTriggerScan={handleTriggerScan}
           onReparseAll={handleReparseAll}
         />
+
+        {/* Globaler Re-Scan / Log-Scan Fortschritts-Banner */}
+        {isScanning && (
+          <div className="bg-gradient-to-r from-cyan-950 via-slate-950 to-cyan-950 border-b border-cyan-500/60 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-cyan-200 shadow-xl shadow-cyan-950/50 z-30 animate-in slide-in-from-top-1">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+              <div className="flex items-center space-x-2 truncate">
+                <span className="font-bold text-white uppercase tracking-wider shrink-0">
+                  {scanProgress && scanProgress.total > 0
+                    ? `Log-Scan (${scanProgress.current}/${scanProgress.total}):`
+                    : 'Log-Scan läuft:'}
+                </span>
+                <span className="text-cyan-300 truncate font-sans">
+                  {scanProgress?.currentFileName || 'Lese Star Citizen Log-Dateien ein...'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3 shrink-0 self-end sm:self-auto">
+              <span className="font-bold text-cyan-400">
+                {scanProgress && scanProgress.total > 0 ? `${scanProgress.percent}%` : 'Aktiv...'}
+              </span>
+              <div className="w-36 bg-slate-900 rounded-full h-2 overflow-hidden border border-cyan-900/60">
+                <div
+                  className="bg-gradient-to-r from-cyan-500 to-sky-400 h-full transition-all duration-300 shadow-[0_0_8px_rgba(6,182,212,0.8)]"
+                  style={{
+                    width: scanProgress && scanProgress.total > 0 ? `${Math.max(4, scanProgress.percent)}%` : '50%',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* mobiGlas Session-Strip: Dropdown, Zeitspanne & HUD-Toggle */}
         <SessionBar

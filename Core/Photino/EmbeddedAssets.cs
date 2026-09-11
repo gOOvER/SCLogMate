@@ -94,8 +94,9 @@ public static class EmbeddedAssets
             using var stream = asm.GetManifestResourceStream(resName);
             if (stream == null) continue;
 
-            // Bestehende Datei überspringen, wenn Größe exakt übereinstimmt
-            if (File.Exists(destPath) && new FileInfo(destPath).Length == stream.Length)
+            // index.html immer frisch überschreiben, um veraltete Bundle-Hashes zu vermeiden
+            if (!relativePath.Equals("index.html", StringComparison.OrdinalIgnoreCase) &&
+                File.Exists(destPath) && new FileInfo(destPath).Length == stream.Length)
             {
                 continue;
             }
