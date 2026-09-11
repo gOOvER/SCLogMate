@@ -44,6 +44,9 @@ export const SettingsView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const [dbDiag, setDbDiag] = useState<any>(null);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -63,6 +66,70 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const loadDbDiag = async () => {
+    try {
+      setIsCheckingDb(true);
+      const diag = await bridge.sendRequest<any>('get_db_diagnostics');
+      if (diag) setDbDiag(diag);
+    } catch (err) {
+      console.error('Failed to load db diagnostics:', err);
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
+
+  const handleAutoDetect = async () => {
+    try {
+      const res = await bridge.sendRequest<any>('detect_log_path');
+      if (res?.currentLogPath) {
+        setSettings((prev) => ({ ...prev, logPath: res.currentLogPath }));
+        showToast(`Star Citizen ${res.channel} erkannt: ${res.currentLogPath}`);
+      } else {
+        showToast('Keine Game.log gefunden');
+      }
+    } catch (err) {
+      showToast('Fehler bei der Auto-Erkennung');
+    }
+  };
+
+  const handleBrowse = async () => {
+    try {
+      const res = await bridge.sendRequest<any>('browse_log_file');
+      if (res?.currentLogPath) {
+        setSettings((prev) => ({ ...prev, logPath: res.currentLogPath }));
+        showToast(`Ausgewählt: ${res.currentLogPath}`);
+      }
+    } catch (err) {
+      console.error('Browse failed:', err);
+    }
+  };
+
+  const handleVacuum = async () => {
+    try {
+      setIsCheckingDb(true);
+      const res = await bridge.sendRequest<any>('cleanup_database');
+      showToast(`SQLite VACUUM abgeschlossen! ${res?.cleanedEvents ?? 0} Events bereinigt (${res?.sizeBefore} → ${res?.sizeAfter})`);
+      loadDbDiag();
+    } catch (err) {
+      showToast('Fehler beim VACUUM');
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
+
+  const handleRepairDb = async () => {
+    try {
+      setIsCheckingDb(true);
+      const res = await bridge.sendRequest<any>('repair_db_structure');
+      if (res?.diagnostics) setDbDiag(res.diagnostics);
+      showToast('Datenbank-Struktur und Indizes erfolgreich aktualisiert');
+    } catch (err) {
+      showToast('Fehler bei der Reparatur');
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -79,6 +146,12 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (activeSubTab === 'database' && !dbDiag) {
+      loadDbDiag();
+    }
+  }, [activeSubTab]);
 
   if (loading) {
     return (
@@ -181,14 +254,16 @@ export const SettingsView: React.FC = () => {
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
                 />
                 <button
-                  onClick={() => {
-                    setSettings({
-                      ...settings,
-                      logPath: 'J:\\StarCitizen\\LIVE\\logbackups\\game.log',
-                    });
-                    showToast('LIVE Ordner automatisch zugewiesen');
-                  }}
+                  onClick={handleBrowse}
                   className="px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition shrink-0"
+                  title="Game.log manuell auswählen"
+                >
+                  📁 Durchsuchen
+                </button>
+                <button
+                  onClick={handleAutoDetect}
+                  className="px-3 py-2.5 rounded-lg bg-sky-900/60 hover:bg-sky-800/80 text-sky-300 text-xs font-medium border border-sky-700/60 transition shrink-0"
+                  title="Automatisch auf allen Laufwerken nach Game.log suchen"
                 >
                   ⚡ Auto-Erkennung
                 </button>
@@ -536,33 +611,54 @@ export const SettingsView: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
                 <div className="text-slate-400">Schema Version:</div>
-                <div className="text-sm font-bold text-sky-400 mt-0.5">v17 (Aktuell)</div>
+                <div className="text-sm font-bold text-sky-400 mt-0.5">
+                  v{dbDiag?.installedSchemaVersion ?? 17} (App: v{dbDiag?.currentSchemaVersion ?? 17})
+                </div>
               </div>
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
-                <div className="text-slate-400">Engine:</div>
-                <div className="text-sm font-bold text-emerald-400 mt-0.5">Microsoft.Data.Sqlite</div>
+                <div className="text-slate-400">Parser Version:</div>
+                <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                  v{dbDiag?.installedParserVersion ?? 28} (Engine: v{dbDiag?.currentParserVersion ?? 28})
+                </div>
               </div>
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
                 <div className="text-slate-400">Integrität:</div>
-                <div className="text-sm font-bold text-emerald-400 mt-0.5">OK (PRAGMA verified)</div>
+                <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                  {dbDiag?.integrityCheckOk ? 'OK (quick_check)' : 'Fehler'}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-slate-400">Dateigröße:</div>
+                <div className="text-sm font-bold text-sky-300 mt-0.5">
+                  {dbDiag?.formattedSize || 'sessions.db'}
+                </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
               <button
-                onClick={() => showToast('SQLite VACUUM & PRAGMA optimize erfolgreich durchgeführt!')}
+                onClick={handleVacuum}
+                disabled={isCheckingDb}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
               >
                 🧹 DB bereinigen (VACUUM)
               </button>
               <button
-                onClick={() => showToast('Vollständige Integritätsprüfung bestanden: 0 Fehler')}
+                onClick={loadDbDiag}
+                disabled={isCheckingDb}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
               >
                 🔍 Tiefe Integritätsprüfung
+              </button>
+              <button
+                onClick={handleRepairDb}
+                disabled={isCheckingDb}
+                className="px-4 py-2 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-medium border border-cyan-800 transition"
+              >
+                ⚡ Struktur &amp; Indizes reparieren
               </button>
             </div>
           </div>

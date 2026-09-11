@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Complete Log Parsing & Session Management System (`SessionsView.tsx`, `Core/Photino/PhotinoBridge.cs`, `NativeDialogs.cs`)**:
+  - Implemented the complete log parsing and session management suite in `SCLogMate-Photino` matching and enhancing the RC2 functionality:
+    - **Log Source & Channel Command Bar**: Real-time display of the active `Game.log` path, Star Citizen channel badge (`LIVE`, `PTU`, `EPTU`, `TECH-PREVIEW`, `CUSTOM`), live file size, last modified timestamp, and streaming watcher indicator.
+    - **Channel Quick-Switcher**: Multi-channel pill bar displaying all installed Star Citizen environments detected on the machine for instant 1-click switching.
+    - **Automated Path Detection & Native File Picker**: Integrated `PathFinder.FindBest()` (`detect_log_path`) and native Win32 `comdlg32.dll` open file dialog (`NativeDialogs.cs` / `browse_log_file`).
+    - **Comprehensive Multi-Session Re-Scan**: Added full batch log ingestion across `LogArchive`, active `Game.log`, `logbackups` directories, and all detected channels via `Database.RescanAll`, with real-time IPC progress broadcasting (`SCAN_PROGRESS` with file counter, percent, and file name) and progress bar visualization.
+    - **Interactive Sessions Management Table**: Multi-column DataGrid showing session name, start/end time, duration, income, expenses, net aUEC profit, ships flown, last location, and death/loss status. Includes per-row actions to activate as current session, re-parse individually, or delete from the database.
+    - **Database Diagnostics & Maintenance Center**: Built-in modal providing full SQLite integrity status (`PRAGMA quick_check`), installed vs current schema/parser versions, table row counts, structure repair (`Database.RepairOrUpdateStructure`), VACUUM optimization (`Database.Cleanup`), and database reset.
+    - **Unknown Events Log Viewer**: In-app viewer modal for `SCLogMate.unknown.log` with category statistics and shortcut to open directly in the system text editor.
+    - **CSV & JSON Data Export**: Instant export functionality for all session transactions and event chronologies.
+  - Connected real backend IPC handlers in `SettingsView.tsx` for log path auto-detection, file browsing, and SQLite database maintenance (VACUUM, deep integrity check, and structure repair).
 - **Nyx Star System & Mouse Wheel Zoom in Starmap (`StarmapView.tsx`, `PlacesView.tsx`, `PhotinoBridge.cs`)**:
   - Integrated the complete **Nyx System** (Delamar, Levski free mining port, Keeger Belt, Glaciem Ring, Theta Station, and Jump Points) into the interactive Starmap radar and Places directory.
   - Implemented smooth, non-passive **mouse wheel zooming** on the Starmap SVG canvas, allowing seamless scroll zoom from 0.3x to 3.5x without scrolling the parent view.

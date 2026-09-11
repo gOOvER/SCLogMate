@@ -229,7 +229,14 @@ export const App: React.FC = () => {
 
           {activeTab === 'events' && <EventsView />}
 
-          {activeTab === 'sessions' && <SessionsView sessions={sessions} />}
+          {activeTab === 'sessions' && (
+            <SessionsView
+              sessions={sessions}
+              selectedSession={telemetry.selectedSession}
+              onSelectSession={handleSelectSession}
+              onRefreshData={loadData}
+            />
+          )}
 
           {activeTab === 'finances' && <FinancesView />}
 

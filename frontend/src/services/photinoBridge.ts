@@ -347,6 +347,68 @@ export interface SettingsDto {
   rsTargetSoundEnabled: boolean;
 }
 
+export interface DetectedPath {
+  path: string;
+  channel: string;
+  lastModified: string;
+  sizeBytes: number;
+  isCurrent: boolean;
+}
+
+export interface LogStatus {
+  currentLogPath: string | null;
+  channel: string;
+  exists: boolean;
+  sizeBytes: number;
+  formattedSize: string;
+  lastModified: string | null;
+  isLiveWatching: boolean;
+  activeSession: string;
+  detectedPaths: DetectedPath[];
+  backupsCount: number;
+  archiveCount: number;
+  parserVersion: number;
+  schemaVersion: number;
+}
+
+export interface ScanProgress {
+  current: number;
+  total: number;
+  percent: number;
+  currentFileName: string;
+  isCompleted: boolean;
+  indexedSessions?: number;
+  totalEvents?: number;
+}
+
+export interface DbDiagnostics {
+  databasePath: string;
+  databaseSizeBytes: number;
+  formattedSize: string;
+  sqliteVersion: string;
+  journalMode: string;
+  installedSchemaVersion: number;
+  currentSchemaVersion: number;
+  installedParserVersion: number;
+  currentParserVersion: number;
+  sessionCount: number;
+  eventCount: number;
+  contractCount: number;
+  fleetShipCount: number;
+  poiCount: number;
+  reputationCount: number;
+  warehouseItemCount: number;
+  integrityCheckOk: boolean;
+  integrityMessage: string;
+  checkedAt: string;
+  isSynchronous: boolean;
+}
+
+export interface UnknownEventsData {
+  path: string;
+  lines: string[];
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {

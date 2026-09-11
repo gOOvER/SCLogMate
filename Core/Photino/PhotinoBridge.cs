@@ -594,6 +594,67 @@ public class SettingsDto
     [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
 }
 
+public class DetectedPathDto
+{
+    [JsonPropertyName("path")] public string Path { get; set; } = "";
+    [JsonPropertyName("channel")] public string Channel { get; set; } = "CUSTOM";
+    [JsonPropertyName("lastModified")] public string LastModified { get; set; } = "";
+    [JsonPropertyName("sizeBytes")] public long SizeBytes { get; set; }
+    [JsonPropertyName("isCurrent")] public bool IsCurrent { get; set; }
+}
+
+public class LogStatusDto
+{
+    [JsonPropertyName("currentLogPath")] public string? CurrentLogPath { get; set; }
+    [JsonPropertyName("channel")] public string Channel { get; set; } = "CUSTOM";
+    [JsonPropertyName("exists")] public bool Exists { get; set; }
+    [JsonPropertyName("sizeBytes")] public long SizeBytes { get; set; }
+    [JsonPropertyName("formattedSize")] public string FormattedSize { get; set; } = "—";
+    [JsonPropertyName("lastModified")] public string? LastModified { get; set; }
+    [JsonPropertyName("isLiveWatching")] public bool IsLiveWatching { get; set; }
+    [JsonPropertyName("activeSession")] public string ActiveSession { get; set; } = "Live Session";
+    [JsonPropertyName("detectedPaths")] public List<DetectedPathDto> DetectedPaths { get; set; } = new();
+    [JsonPropertyName("backupsCount")] public int BackupsCount { get; set; }
+    [JsonPropertyName("archiveCount")] public int ArchiveCount { get; set; }
+    [JsonPropertyName("parserVersion")] public int ParserVersion { get; set; }
+    [JsonPropertyName("schemaVersion")] public int SchemaVersion { get; set; }
+}
+
+public class ScanProgressDto
+{
+    [JsonPropertyName("current")] public int Current { get; set; }
+    [JsonPropertyName("total")] public int Total { get; set; }
+    [JsonPropertyName("percent")] public double Percent { get; set; }
+    [JsonPropertyName("currentFileName")] public string CurrentFileName { get; set; } = "";
+    [JsonPropertyName("isCompleted")] public bool IsCompleted { get; set; }
+    [JsonPropertyName("indexedSessions")] public int IndexedSessions { get; set; }
+    [JsonPropertyName("totalEvents")] public int TotalEvents { get; set; }
+}
+
+public class DbDiagnosticsDto
+{
+    [JsonPropertyName("databasePath")] public string DatabasePath { get; set; } = "";
+    [JsonPropertyName("databaseSizeBytes")] public long DatabaseSizeBytes { get; set; }
+    [JsonPropertyName("formattedSize")] public string FormattedSize { get; set; } = "0 B";
+    [JsonPropertyName("sqliteVersion")] public string SqliteVersion { get; set; } = "3.45";
+    [JsonPropertyName("journalMode")] public string JournalMode { get; set; } = "WAL";
+    [JsonPropertyName("installedSchemaVersion")] public int InstalledSchemaVersion { get; set; }
+    [JsonPropertyName("currentSchemaVersion")] public int CurrentSchemaVersion { get; set; }
+    [JsonPropertyName("installedParserVersion")] public int InstalledParserVersion { get; set; }
+    [JsonPropertyName("currentParserVersion")] public int CurrentParserVersion { get; set; }
+    [JsonPropertyName("sessionCount")] public int SessionCount { get; set; }
+    [JsonPropertyName("eventCount")] public int EventCount { get; set; }
+    [JsonPropertyName("contractCount")] public int ContractCount { get; set; }
+    [JsonPropertyName("fleetShipCount")] public int FleetShipCount { get; set; }
+    [JsonPropertyName("poiCount")] public int PoiCount { get; set; }
+    [JsonPropertyName("reputationCount")] public int ReputationCount { get; set; }
+    [JsonPropertyName("warehouseItemCount")] public int WarehouseItemCount { get; set; }
+    [JsonPropertyName("integrityCheckOk")] public bool IntegrityCheckOk { get; set; }
+    [JsonPropertyName("integrityMessage")] public string IntegrityMessage { get; set; } = "OK";
+    [JsonPropertyName("checkedAt")] public string CheckedAt { get; set; } = "";
+    [JsonPropertyName("isSynchronous")] public bool IsSynchronous { get; set; } = true;
+}
+
 public class PhotinoBridge
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -911,7 +972,119 @@ public class PhotinoBridge
                     SendResponse(req.Id, "scan_logs_response", new { scannedCount = scanned });
                     Broadcast("STATUS_UPDATE", GetAppStatus());
                     Broadcast("sessions_response", GetSessions());
+                    Broadcast("log_status_response", GetLogStatus());
                     Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "get_log_status":
+                    SendResponse(req.Id, "log_status_response", GetLogStatus());
+                    break;
+
+                case "detect_log_path":
+                    var detectedStatus = DetectLogPath();
+                    SendResponse(req.Id, "detect_log_path_response", detectedStatus);
+                    Broadcast("log_status_response", detectedStatus);
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "set_log_path":
+                    string newPath = "";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("path", out var pathProp))
+                    {
+                        newPath = pathProp.GetString() ?? "";
+                    }
+                    var updatedLogStatus = SetLogPath(newPath);
+                    SendResponse(req.Id, "set_log_path_response", updatedLogStatus);
+                    Broadcast("log_status_response", updatedLogStatus);
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "browse_log_file":
+                    var browsedStatus = BrowseLogFile();
+                    SendResponse(req.Id, "browse_log_file_response", browsedStatus);
+                    Broadcast("log_status_response", browsedStatus);
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "reparse_all_logs":
+                    var reparseResult = ReparseAllLogs();
+                    SendResponse(req.Id, "reparse_all_logs_response", new { indexedSessions = reparseResult.indexedSessions, totalEvents = reparseResult.totalEvents });
+                    break;
+
+                case "reparse_session":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var repSessProp))
+                    {
+                        string sName = repSessProp.GetString() ?? "";
+                        ReparseSession(sName);
+                    }
+                    SendResponse(req.Id, "reparse_session_response", GetSessions());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "delete_session":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var delSessProp))
+                    {
+                        string sName = delSessProp.GetString() ?? "";
+                        DeleteSession(sName);
+                    }
+                    SendResponse(req.Id, "delete_session_response", GetSessions());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "get_db_diagnostics":
+                    SendResponse(req.Id, "db_diagnostics_response", GetDbDiagnostics());
+                    break;
+
+                case "repair_db_structure":
+                    var repairRes = RepairDbStructure();
+                    SendResponse(req.Id, "repair_db_structure_response", repairRes);
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    break;
+
+                case "cleanup_database":
+                    var cleanupRes = CleanupDatabase();
+                    SendResponse(req.Id, "cleanup_database_response", cleanupRes);
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    break;
+
+                case "reset_database":
+                    Database.ClearAll();
+                    SendResponse(req.Id, "reset_database_response", new { success = true });
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "get_unknown_events":
+                    SendResponse(req.Id, "unknown_events_response", GetUnknownEventsData());
+                    break;
+
+                case "export_events":
+                    string expFmt = "csv";
+                    string? expSess = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("format", out var fProp)) expFmt = fProp.GetString() ?? "csv";
+                        if (req.Payload.Value.TryGetProperty("session", out var sProp)) expSess = sProp.GetString();
+                    }
+                    SendResponse(req.Id, "export_events_response", ExportEvents(expFmt, expSess));
+                    break;
+
+                case "open_folder":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("target", out var targetProp))
+                    {
+                        OpenFolder(targetProp.GetString() ?? "db");
+                    }
+                    SendResponse(req.Id, "open_folder_response", new { success = true });
                     break;
 
                 case "get_hud":
@@ -2168,4 +2341,439 @@ public class PhotinoBridge
         EventKind.Location or EventKind.Jurisdiction => "location",
         _ => "system"
     };
+
+    public static string GetChannelName(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "CUSTOM";
+        var p = path.Replace('\\', '/');
+        if (p.Contains("/LIVE/", StringComparison.OrdinalIgnoreCase)) return "LIVE";
+        if (p.Contains("/PTU/", StringComparison.OrdinalIgnoreCase)) return "PTU";
+        if (p.Contains("/EPTU/", StringComparison.OrdinalIgnoreCase)) return "EPTU";
+        if (p.Contains("/TECH-PREVIEW/", StringComparison.OrdinalIgnoreCase)) return "TECH-PREVIEW";
+        if (p.Contains("/HOTFIX/", StringComparison.OrdinalIgnoreCase)) return "HOTFIX";
+        return "CUSTOM";
+    }
+
+    private LogStatusDto GetLogStatus()
+    {
+        string? path = _currentLogPath;
+        bool exists = !string.IsNullOrEmpty(path) && File.Exists(path);
+        long size = 0;
+        DateTime? lastMod = null;
+
+        if (exists)
+        {
+            try
+            {
+                var fi = new FileInfo(path!);
+                size = fi.Length;
+                lastMod = fi.LastWriteTimeUtc;
+            }
+            catch { }
+        }
+
+        int backupsCount = 0;
+        try
+        {
+            if (!string.IsNullOrEmpty(path))
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    var backupDir = Path.Combine(dir, "logbackups");
+                    if (Directory.Exists(backupDir))
+                    {
+                        backupsCount = Directory.GetFiles(backupDir, "*.log").Length;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        int archiveCount = 0;
+        try
+        {
+            if (Directory.Exists(LogArchive.Dir))
+            {
+                archiveCount = Directory.GetFiles(LogArchive.Dir, "*.log").Length;
+            }
+        }
+        catch { }
+
+        var detectedPaths = new List<DetectedPathDto>();
+        try
+        {
+            foreach (var p in PathFinder.FindAll())
+            {
+                try
+                {
+                    var fi = new FileInfo(p);
+                    detectedPaths.Add(new DetectedPathDto
+                    {
+                        Path = p,
+                        Channel = GetChannelName(p),
+                        LastModified = fi.LastWriteTime.ToString("dd.MM.yyyy HH:mm"),
+                        SizeBytes = fi.Length,
+                        IsCurrent = string.Equals(p, path, StringComparison.OrdinalIgnoreCase)
+                    });
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return new LogStatusDto
+        {
+            CurrentLogPath = path,
+            Channel = GetChannelName(path),
+            Exists = exists,
+            SizeBytes = size,
+            FormattedSize = Database.FormatBytes(size),
+            LastModified = lastMod?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"),
+            IsLiveWatching = _tailer != null,
+            ActiveSession = _activeSessionName ?? "Live Session",
+            DetectedPaths = detectedPaths,
+            BackupsCount = backupsCount,
+            ArchiveCount = archiveCount,
+            ParserVersion = Database.CurrentParserVersion,
+            SchemaVersion = Database.CurrentSchemaVersion
+        };
+    }
+
+    private LogStatusDto DetectLogPath()
+    {
+        var best = PathFinder.FindBest();
+        if (!string.IsNullOrEmpty(best) && File.Exists(best))
+        {
+            _currentLogPath = best;
+            var s = Settings.Load();
+            s.LogPath = best;
+            Settings.Save(s);
+
+            if (_tailer != null)
+            {
+                StartLogTailer(best);
+            }
+        }
+        return GetLogStatus();
+    }
+
+    private LogStatusDto SetLogPath(string path)
+    {
+        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+        {
+            _currentLogPath = path;
+            var s = Settings.Load();
+            s.LogPath = path;
+            Settings.Save(s);
+
+            if (_tailer != null)
+            {
+                StartLogTailer(path);
+            }
+        }
+        return GetLogStatus();
+    }
+
+    private LogStatusDto BrowseLogFile()
+    {
+        string? initial = !string.IsNullOrEmpty(_currentLogPath) ? Path.GetDirectoryName(_currentLogPath) : null;
+        var chosen = NativeDialogs.ShowOpenFileDialog("Game.log auswählen", initial);
+        if (!string.IsNullOrEmpty(chosen) && File.Exists(chosen))
+        {
+            return SetLogPath(chosen);
+        }
+        return GetLogStatus();
+    }
+
+    private (int indexedSessions, int totalEvents) ReparseAllLogs()
+    {
+        var filesByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void AddLogFile(string p)
+        {
+            if (File.Exists(p))
+            {
+                var fn = Path.GetFileName(p);
+                filesByFileName.TryAdd(fn, p);
+            }
+        }
+
+        // 0. SCLogMate eigenes Archiv
+        if (Directory.Exists(LogArchive.Dir))
+        {
+            foreach (var f in Directory.GetFiles(LogArchive.Dir, "*.log"))
+                AddLogFile(f);
+        }
+
+        // 1. Aktuelle Game.log und logbackups
+        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+        {
+            AddLogFile(_currentLogPath);
+            var dir = Path.GetDirectoryName(_currentLogPath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                var backups = Path.Combine(dir, "logbackups");
+                if (Directory.Exists(backups))
+                {
+                    foreach (var f in Directory.GetFiles(backups, "*.log"))
+                        AddLogFile(f);
+                }
+            }
+        }
+
+        // 2. Alle erreichbaren SC-Pfade
+        foreach (var log in PathFinder.FindAll())
+        {
+            AddLogFile(log);
+            var dir = Path.GetDirectoryName(log);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                var backups = Path.Combine(dir, "logbackups");
+                if (Directory.Exists(backups))
+                {
+                    foreach (var f in Directory.GetFiles(backups, "*.log"))
+                        AddLogFile(f);
+                }
+            }
+        }
+
+        int totalCount = filesByFileName.Count;
+        Broadcast("SCAN_PROGRESS", new ScanProgressDto
+        {
+            Current = 0,
+            Total = totalCount,
+            Percent = 0,
+            CurrentFileName = "Starte Re-Scan...",
+            IsCompleted = false
+        });
+
+        var result = Database.RescanAll(filesByFileName.Values, (curr, total, name) =>
+        {
+            double pct = total > 0 ? Math.Round((double)curr / total * 100.0, 1) : 0;
+            Broadcast("SCAN_PROGRESS", new ScanProgressDto
+            {
+                Current = curr,
+                Total = total,
+                Percent = pct,
+                CurrentFileName = name,
+                IsCompleted = false
+            });
+        });
+
+        Broadcast("SCAN_PROGRESS", new ScanProgressDto
+        {
+            Current = totalCount,
+            Total = totalCount,
+            Percent = 100,
+            CurrentFileName = "Re-Scan abgeschlossen",
+            IsCompleted = true,
+            IndexedSessions = result.indexedSessions,
+            TotalEvents = result.totalEvents
+        });
+
+        Broadcast("STATUS_UPDATE", GetAppStatus());
+        Broadcast("sessions_response", GetSessions());
+        Broadcast("log_status_response", GetLogStatus());
+        Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+
+        return result;
+    }
+
+    private void ReparseSession(string sessionName)
+    {
+        try
+        {
+            string? targetFile = null;
+            if (string.Equals(sessionName, Path.GetFileName(_currentLogPath), StringComparison.OrdinalIgnoreCase))
+            {
+                targetFile = _currentLogPath;
+            }
+            else if (!string.IsNullOrEmpty(_currentLogPath))
+            {
+                var dir = Path.GetDirectoryName(_currentLogPath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    var backupPath = Path.Combine(dir, "logbackups", sessionName);
+                    if (File.Exists(backupPath)) targetFile = backupPath;
+                }
+            }
+
+            if (targetFile == null && Directory.Exists(LogArchive.Dir))
+            {
+                var arcPath = Path.Combine(LogArchive.Dir, sessionName);
+                if (File.Exists(arcPath)) targetFile = arcPath;
+            }
+
+            if (!string.IsNullOrEmpty(targetFile) && File.Exists(targetFile))
+            {
+                Database.IndexNew(new[] { targetFile });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.ReparseSession", ex);
+        }
+    }
+
+    private void DeleteSession(string sessionName)
+    {
+        try
+        {
+            using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM events WHERE session = @s; DELETE FROM sessions WHERE name = @s;";
+            cmd.Parameters.AddWithValue("@s", sessionName);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.DeleteSession", ex);
+        }
+    }
+
+    private DbDiagnosticsDto GetDbDiagnostics()
+    {
+        var d = Database.GetDiagnostics(runDeepCheck: true);
+        return new DbDiagnosticsDto
+        {
+            DatabasePath = d.DatabasePath,
+            DatabaseSizeBytes = d.DatabaseSizeBytes,
+            FormattedSize = d.FormattedSize,
+            SqliteVersion = d.SqliteVersion,
+            JournalMode = d.JournalMode,
+            InstalledSchemaVersion = d.InstalledSchemaVersion,
+            CurrentSchemaVersion = d.CurrentSchemaVersion,
+            InstalledParserVersion = d.InstalledParserVersion,
+            CurrentParserVersion = d.CurrentParserVersion,
+            SessionCount = d.SessionCount,
+            EventCount = d.EventCount,
+            ContractCount = d.ContractCount,
+            FleetShipCount = d.FleetShipCount,
+            PoiCount = d.PoiCount,
+            ReputationCount = d.ReputationCount,
+            WarehouseItemCount = d.WarehouseItemCount,
+            IntegrityCheckOk = d.IntegrityCheckOk,
+            IntegrityMessage = d.IntegrityMessage,
+            CheckedAt = d.CheckedAt.ToString("HH:mm:ss"),
+            IsSynchronous = d.InstalledParserVersion == d.CurrentParserVersion && d.InstalledSchemaVersion == d.CurrentSchemaVersion
+        };
+    }
+
+    private object RepairDbStructure()
+    {
+        var res = Database.RepairOrUpdateStructure();
+        var diag = GetDbDiagnostics();
+        return new { success = res.success, message = res.message, diagnostics = diag };
+    }
+
+    private object CleanupDatabase()
+    {
+        var res = Database.Cleanup();
+        return new
+        {
+            cleanedEvents = res.cleanedEvents,
+            cleanedSessions = res.cleanedSessions,
+            sizeBefore = Database.FormatBytes(res.sizeBefore),
+            sizeAfter = Database.FormatBytes(res.sizeAfter)
+        };
+    }
+
+    private object GetUnknownEventsData()
+    {
+        string p = UnknownEventsLogger.Path;
+        var lines = new List<string>();
+        if (File.Exists(p))
+        {
+            try
+            {
+                lines = File.ReadLines(p).TakeLast(300).ToList();
+            }
+            catch { }
+        }
+        return new { path = p, lines };
+    }
+
+    private object ExportEvents(string format, string? session)
+    {
+        try
+        {
+            string exportDir = Path.Combine(Settings.Dir, "exports");
+            Directory.CreateDirectory(exportDir);
+            string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string fileName = $"sclogmate_export_{timeStamp}.{format.ToLowerInvariant()}";
+            string targetPath = Path.Combine(exportDir, fileName);
+
+            var recent = Database.LoadRecentEvents(25000);
+            if (!string.IsNullOrWhiteSpace(session) && session != "__all__")
+            {
+                recent = recent.Where(e => e.Detail != null).ToList();
+            }
+
+            if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+            {
+                var json = JsonSerializer.Serialize(recent, JsonOpts);
+                File.WriteAllText(targetPath, json);
+            }
+            else
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("Zeit;Typ;Betrag;Detail;Schiff");
+                foreach (var ev in recent)
+                {
+                    sb.Append(ev.Time.ToString("yyyy-MM-dd HH:mm:ss")).Append(';')
+                      .Append(ev.KindText).Append(';')
+                      .Append(ev.Amount).Append(';')
+                      .Append(ev.Detail?.Replace(';', ',') ?? "").Append(';')
+                      .Append(ev.Ship?.Replace(';', ',') ?? "").Append('\n');
+                }
+                File.WriteAllText(targetPath, sb.ToString(), System.Text.Encoding.UTF8);
+            }
+
+            return new { success = true, path = targetPath };
+        }
+        catch (Exception ex)
+        {
+            return new { success = false, error = ex.Message };
+        }
+    }
+
+    private void OpenFolder(string target)
+    {
+        try
+        {
+            switch (target.ToLowerInvariant())
+            {
+                case "db":
+                    if (File.Exists(Database.DatabaseFilePath))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = $"/select,\"{Database.DatabaseFilePath}\"", UseShellExecute = true });
+                    break;
+                case "appdata":
+                    if (Directory.Exists(Settings.Dir))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = Settings.Dir, UseShellExecute = true });
+                    break;
+                case "debug_log":
+                    string dLog = Path.Combine(Settings.Dir, "SCLogMate.debug.log");
+                    if (File.Exists(dLog))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dLog, UseShellExecute = true });
+                    break;
+                case "unknown_log":
+                    if (File.Exists(UnknownEventsLogger.Path))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = UnknownEventsLogger.Path, UseShellExecute = true });
+                    break;
+                case "log_folder":
+                    if (!string.IsNullOrEmpty(_currentLogPath))
+                    {
+                        var dir = Path.GetDirectoryName(_currentLogPath);
+                        if (Directory.Exists(dir))
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dir, UseShellExecute = true });
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.OpenFolder", ex);
+        }
+    }
 }
