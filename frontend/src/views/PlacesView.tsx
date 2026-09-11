@@ -107,6 +107,16 @@ export const PlacesView: React.FC = () => {
             >
               Pyro
             </button>
+            <button
+              onClick={() => setSystemFilter('Nyx')}
+              className={`px-3 py-1 text-xs font-semibold rounded cursor-pointer transition ${
+                systemFilter === 'Nyx'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Nyx
+            </button>
           </div>
 
           {/* Type dropdown */}

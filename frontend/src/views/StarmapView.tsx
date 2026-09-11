@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const StarmapView: React.FC = () => {
-  const [system, setSystem] = useState<'Stanton' | 'Pyro'>('Stanton');
+  const [system, setSystem] = useState<'Stanton' | 'Pyro' | 'Nyx'>('Stanton');
   const [objects, setObjects] = useState<StarmapObjectDto[]>([]);
   const [drives, setDrives] = useState<QuantumDriveDto[]>([]);
   const [selectedId, setSelectedId] = useState<string>('hurston');
@@ -36,6 +36,24 @@ export const StarmapView: React.FC = () => {
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+
+  // Non-passive wheel listener for smooth zoom without page scroll
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      setZoom((z) => Math.min(3.5, Math.max(0.3, z * zoomFactor)));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   const fetchStarmap = async (sysName: string) => {
     try {
@@ -46,6 +64,16 @@ export const StarmapView: React.FC = () => {
         if (res.drives && res.drives.length > 0) {
           setDrives(res.drives);
           if (!selectedDrive) setSelectedDrive(res.drives[0].name);
+        }
+
+        // Auto-select valid objects when switching systems
+        const currentExists = res.objects.some((o) => o.id.toLowerCase() === selectedId.toLowerCase());
+        if (!currentExists && res.objects.length > 0) {
+          const firstNonStar = res.objects.find((o) => o.type !== 'Star' && o.type !== 'Stern') || res.objects[0];
+          setSelectedId(firstNonStar.id);
+          setFromId(firstNonStar.id);
+          const secondObj = res.objects.find((o) => o.id !== firstNonStar.id && o.type !== 'Star' && o.type !== 'Stern') || firstNonStar;
+          setToId(secondObj.id);
         }
       }
     } catch (err) {
@@ -147,6 +175,16 @@ export const StarmapView: React.FC = () => {
             >
               Pyro System (Lawless)
             </button>
+            <button
+              onClick={() => setSystem('Nyx')}
+              className={`px-3 py-1 text-xs font-semibold rounded cursor-pointer transition ${
+                system === 'Nyx'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Nyx System (Levski)
+            </button>
           </div>
 
           {/* Layer toggles */}
@@ -187,15 +225,15 @@ export const StarmapView: React.FC = () => {
         {/* View actions: Zoom, Reset, Refresh */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
-            title="Vergrößern"
+            onClick={() => setZoom((z) => Math.min(3.5, z + 0.2))}
+            title="Vergrößern (oder Mausrad)"
             className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setZoom((z) => Math.max(0.4, z - 0.2))}
-            title="Verkleinern"
+            onClick={() => setZoom((z) => Math.max(0.3, z - 0.2))}
+            title="Verkleinern (oder Mausrad)"
             className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
           >
             <ZoomOut className="w-4 h-4" />
@@ -221,6 +259,7 @@ export const StarmapView: React.FC = () => {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0 overflow-hidden">
         {/* SVG Interactive Canvas */}
         <div
+          ref={canvasRef}
           className="lg:col-span-2 sc-glass rounded-lg border border-slate-800 relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing sc-hud-corner"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}

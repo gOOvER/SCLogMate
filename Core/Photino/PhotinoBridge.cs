@@ -1827,6 +1827,7 @@ public class PhotinoBridge
         var allObjs = new List<StarmapObject>();
         allObjs.AddRange(StarmapData.GetSystemObjects("Stanton"));
         allObjs.AddRange(StarmapData.GetSystemObjects("Pyro"));
+        allObjs.AddRange(StarmapData.GetSystemObjects("Nyx"));
 
         var result = new List<PlaceItemDto>();
         foreach (var o in allObjs)

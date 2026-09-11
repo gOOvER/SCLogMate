@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Nyx Star System & Mouse Wheel Zoom in Starmap (`StarmapView.tsx`, `PlacesView.tsx`, `PhotinoBridge.cs`)**:
+  - Integrated the complete **Nyx System** (Delamar, Levski free mining port, Keeger Belt, Glaciem Ring, Theta Station, and Jump Points) into the interactive Starmap radar and Places directory.
+  - Implemented smooth, non-passive **mouse wheel zooming** on the Starmap SVG canvas, allowing seamless scroll zoom from 0.3x to 3.5x without scrolling the parent view.
 - **Full Reactive i18n System & Multi-Language Support (`frontend/src/i18n/`)**:
   - Implemented a complete frontend internationalization engine supporting German (`de`) and English (`en`) with `localStorage` language persistence.
   - Connected the Master Header vector flags (DE 🇩🇪 / EN 🇬🇧) to dynamically translate all top navigation tabs, group headers, 2-line HUD telemetry cards, session selector, and dashboard widgets instantly.
