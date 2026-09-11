@@ -6,6 +6,7 @@ import {
   SessionSummary,
   LogEventItem,
   HudTelemetry,
+  ScanProgress,
 } from './services/photinoBridge';
 import { Sidebar, NavTabId } from './components/Sidebar';
 import { MasterHeader } from './components/MasterHeader';
@@ -30,6 +31,7 @@ import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
 import { PilotDossierModal } from './components/PilotDossierModal';
+import { DbUpdateModal } from './components/DbUpdateModal';
 import { HardDrive } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -39,13 +41,7 @@ export const App: React.FC = () => {
   const [isPilotDossierOpen, setIsPilotDossierOpen] = useState<boolean>(false);
   const [eventsSession, setEventsSession] = useState<string>('__live__');
   const [status, setStatus] = useState<AppStatus | null>(null);
-  const [scanProgress, setScanProgress] = useState<{
-    current: number;
-    total: number;
-    percent: number;
-    currentFileName: string;
-    isCompleted: boolean;
-  } | null>(null);
+  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [events, setEvents] = useState<LogEventItem[]>([]);
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
@@ -373,6 +369,12 @@ export const App: React.FC = () => {
           isOpen={isPilotDossierOpen}
           pilotName={telemetry.pilotName}
           onClose={() => setIsPilotDossierOpen(false)}
+        />
+
+        {/* Database Migration & Scan Progress Modal */}
+        <DbUpdateModal
+          progress={scanProgress}
+          onDismiss={() => setScanProgress(null)}
         />
 
         {/* Bottom Statusbar */}

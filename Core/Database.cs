@@ -20,6 +20,8 @@ public static class Database
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
+    public static bool WasMigrationApplied { get; set; }
+    public static string? LastMigrationReason { get; set; }
 
     public static string DatabaseFilePath => DbPath;
 
@@ -77,6 +79,12 @@ public static class Database
     {
         var versionObj = Scalar(db, "PRAGMA user_version;");
         int dbSchemaVersion = Convert.ToInt32(versionObj ?? 0);
+
+        if (dbSchemaVersion < CurrentSchemaVersion)
+        {
+            WasMigrationApplied = true;
+            LastMigrationReason = $"Datenbank-Schema Upgrade von v{dbSchemaVersion} auf v{CurrentSchemaVersion}";
+        }
 
         if (dbSchemaVersion < 1)
         {
@@ -403,6 +411,7 @@ public static class Database
             Exec(db, "DELETE FROM events; DELETE FROM sessions; DELETE FROM warehouse_items;");
             SetMeta(db, "parserVersion", CurrentParserVersion.ToString(CultureInfo.InvariantCulture));
             WasParserResetRequired = true;
+            LastMigrationReason = $"Parser-Update auf v{CurrentParserVersion} (Vollständige Neu-Indexierung aller Logs)";
             Logger.Log($"DB: Parser-Version auf v{CurrentParserVersion} aktualisiert -> Cache für Re-Indexierung geleert.");
         }
     }

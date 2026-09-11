@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Database & Log Synchronization Modal (`DbUpdateModal.tsx`, `App.tsx`, `PhotinoBridge.cs`)**:
+  - Created a dedicated Glassmorphism `DbUpdateModal` dialog displaying whenever database schema migrations or parser upgrades require a full re-scan, or when indexing newly detected log files.
+  - Features real-time progress animation, processed/total session counters, percentage badge, current filename indicator, and an update reason badge (e.g. schema migration or parser version bump).
+  - Automatically verifies logs against database fingerprints (`Length:LastWriteTimeUtc.Ticks`), skipping unmodified logs in under 10ms to keep the database up-to-date with minimal startup overhead.
+- **Comprehensive Multi-Directory Log Discovery (`PhotinoBridge.cs`)**:
+  - Implemented `DiscoverAllLogFiles()` to discover all Star Citizen logs across all mounted drives, release channels (`LIVE`, `PTU`, `EPTU`, `HOTFIX`, `TECH-PREVIEW`), `logbackups` subfolders, and internal archives.
 - **RSI Citizen Dossier & Profile Service (`CitizenProfileService.cs`, `PilotDossierModal.tsx`, `MasterHeader.tsx`, `HudBar.tsx`, `PhotinoBridge.cs`)**:
   - Created `Core/CitizenProfileService.cs` which asynchronously fetches and caches Star Citizen dossiers directly from RSI (`robertsspaceindustries.com/citizens/<handle>`):
     - Parses UEE Citizen Record number (e.g. `#593923`), title (e.g. `High Admiral`), enlistment date, fluency languages, avatar image URL, primary organization name, org SID, org rank, org logo, and pilot bio.
@@ -26,9 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a direct **`Chronik`** shortcut button to session rows in `SessionsView.tsx` to jump directly into the event log of any chosen session.
 
 ### Fixed
-- **Photino Window Lifecycle & Startup Crash Prevention (`PhotinoBridge.cs`)**:
-  - Fixed startup crash (`0xc0000005` access violation) caused by `LogTailer` firing `SendWebMessage` from background worker threads before the native Photino window and WebView2 runtime were initialized.
-  - Deferred log tailer initialization until `RegisterWindowCreatedHandler` fires and registered `_isWindowReady` guard flag to ensure IPC web messages are only dispatched once the browser runtime is ready.
+- **Critical WebView2 Startup Crash & Native Access Violation (`PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Fixed startup crash (`0xc0000005` access violation in `Photino_SendWebMessage`) caused by IPC messages being sent from background threads before the Photino WebView2 control was fully initialized.
+  - Implemented a robust two-way `client_ready` handshake: the frontend sends `client_ready` upon mounting, and the backend defers background tailers and sync operations until this message is received.
+  - Thread-safe IPC dispatch: marshaled all `SendWebMessage` calls through `_window.Invoke` with a dedicated lock (`_sendLock`), preventing any cross-thread reentrancy or race conditions in native Photino code.
 - **Pilot Character Name, Server Shard, and Region Flag Resolution (`HudBar.tsx`, `PhotinoBridge.cs`, `LogParser.cs`, `Database.cs`)**:
   - **Pilot & Player Name Extraction**:
     - Resolved the missing pilot name in the HUD bar by actively scanning the active or selected log file header (up to 3,000 lines) on startup and session selection.

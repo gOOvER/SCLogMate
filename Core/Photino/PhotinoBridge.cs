@@ -635,6 +635,8 @@ public class ScanProgressDto
     [JsonPropertyName("isCompleted")] public bool IsCompleted { get; set; }
     [JsonPropertyName("indexedSessions")] public int IndexedSessions { get; set; }
     [JsonPropertyName("totalEvents")] public int TotalEvents { get; set; }
+    [JsonPropertyName("isDbUpdate")] public bool IsDbUpdate { get; set; }
+    [JsonPropertyName("updateReason")] public string? UpdateReason { get; set; }
 }
 
 public class DbDiagnosticsDto
@@ -678,7 +680,9 @@ public class PhotinoBridge
     private DateTime? _lastEventTime;
     private readonly List<LogEventDto> _liveEvents = new();
     private readonly object _liveEventsLock = new();
-    private volatile bool _isWindowReady = false;
+    private readonly object _sendLock = new();
+    private volatile bool _isWebviewReady = false;
+    private bool _hasSyncedLogs = false;
 
     private record SessionMetadataCache(
         string? Pilot,
@@ -698,33 +702,10 @@ public class PhotinoBridge
         _window = window;
         _currentLogPath = Settings.Load().LogPath ?? PathFinder.FindBest();
 
-        // Register Web Message Handler
+        // Register Web Message Handler (Receives client_ready from frontend React app)
         _window.RegisterWebMessageReceivedHandler((sender, rawMessage) =>
         {
-            _isWindowReady = true;
             Task.Run(() => HandleIncomingMessage(rawMessage));
-        });
-
-        // Register Window Created Handler: Native window & WebView2 are fully created
-        _window.RegisterWindowCreatedHandler((sender, args) =>
-        {
-            _isWindowReady = true;
-            Task.Run(() =>
-            {
-                try
-                {
-                    if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
-                    {
-                        ScanLogHeaderAndMeta(_currentLogPath, _parser);
-                        ScanLogTailForShard(_currentLogPath, _parser);
-                        StartLogTailer(_currentLogPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error("PhotinoBridge.WindowCreatedHandler", ex);
-                }
-            });
         });
     }
 
@@ -765,18 +746,31 @@ public class PhotinoBridge
 
     private void SendRaw(string json)
     {
-        if (!_isWindowReady || _window == null) return;
-        try
+        if (!_isWebviewReady || _window == null) return;
+        lock (_sendLock)
         {
-            _window.SendWebMessage(json);
-        }
-        catch (ApplicationException)
-        {
-            // Ignored if window not fully ready in native runtime
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("PhotinoBridge.SendRaw", ex);
+            try
+            {
+                _window.Invoke(() =>
+                {
+                    try
+                    {
+                        _window.SendWebMessage(json);
+                    }
+                    catch (ApplicationException)
+                    {
+                        // Ignored if window closed or shutting down
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.SendWebMessage", ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("PhotinoBridge.SendRaw", ex);
+            }
         }
     }
 
@@ -786,6 +780,40 @@ public class PhotinoBridge
         {
             var req = JsonSerializer.Deserialize<IpcMessage>(raw, JsonOpts);
             if (req == null) return;
+
+            if (!_isWebviewReady)
+            {
+                _isWebviewReady = true;
+            }
+
+            if (req.Type == "client_ready")
+            {
+                SendResponse(req.Id, "client_ready_ack", new { ok = true });
+
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+                        {
+                            ScanLogHeaderAndMeta(_currentLogPath, _parser);
+                            ScanLogTailForShard(_currentLogPath, _parser);
+                            StartLogTailer(_currentLogPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.StartLogTailerOnReady", ex);
+                    }
+
+                    if (!_hasSyncedLogs)
+                    {
+                        _hasSyncedLogs = true;
+                        SyncAllLogs(forceRescan: false);
+                    }
+                });
+                return;
+            }
 
             switch (req.Type)
             {
@@ -2136,18 +2164,8 @@ public class PhotinoBridge
     {
         try
         {
-            var targetDir = !string.IsNullOrEmpty(_currentLogPath)
-                ? Path.GetDirectoryName(_currentLogPath)
-                : null;
-
-            if (string.IsNullOrEmpty(targetDir) || !Directory.Exists(targetDir)) return 0;
-
-            var files = Directory.GetFiles(targetDir, "*.log", SearchOption.AllDirectories);
-            if (files.Length == 0) return 0;
-
-            int added = Database.IndexNew(files);
-            Logger.Log($"PhotinoBridge: Scan ausgeführt – {added} neue Sessions indexiert.");
-            return added;
+            var res = SyncAllLogs(forceRescan: false);
+            return res.indexedSessions;
         }
         catch (Exception ex)
         {
@@ -2279,7 +2297,7 @@ public class PhotinoBridge
                 {
                     if (statusMsg != null && statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!_isWindowReady) return;
+                        if (!_isWebviewReady) return;
 
                         List<LogEventDto> snapshot;
                         lock (_liveEventsLock)
@@ -2296,7 +2314,7 @@ public class PhotinoBridge
                                 try
                                 {
                                     await CitizenProfileService.GetProfileAsync(charName);
-                                    if (_isWindowReady)
+                                    if (_isWebviewReady)
                                     {
                                         Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
                                     }
@@ -2935,7 +2953,7 @@ public class PhotinoBridge
         return GetLogStatus();
     }
 
-    private (int indexedSessions, int totalEvents) ReparseAllLogs()
+    public List<string> DiscoverAllLogFiles()
     {
         var filesByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -3045,51 +3063,138 @@ public class PhotinoBridge
             }
         }
 
-        int totalCount = filesByFileName.Count;
-        Broadcast("SCAN_PROGRESS", new ScanProgressDto
-        {
-            Current = 0,
-            Total = totalCount,
-            Percent = 0,
-            CurrentFileName = "Starte Re-Scan...",
-            IsCompleted = false
-        });
+        return filesByFileName.Values.ToList();
+    }
 
-        var result = Database.RescanAll(filesByFileName.Values, (curr, total, name) =>
+    public (int indexedSessions, int totalEvents) SyncAllLogs(bool forceRescan = false)
+    {
+        try
         {
-            double pct = total > 0 ? Math.Round((double)curr / total * 100.0, 1) : 0;
-            Broadcast("SCAN_PROGRESS", new ScanProgressDto
+            var allFiles = DiscoverAllLogFiles();
+            bool isDbUpdate = forceRescan || Database.WasMigrationApplied || Database.WasParserResetRequired;
+            string? reason = Database.LastMigrationReason;
+
+            if (isDbUpdate)
             {
-                Current = curr,
-                Total = total,
-                Percent = pct,
-                CurrentFileName = name,
-                IsCompleted = false
-            });
-        });
+                int totalCount = allFiles.Count;
+                Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                {
+                    Current = 0,
+                    Total = totalCount,
+                    Percent = 0,
+                    CurrentFileName = "Starte vollständige Neu-Indexierung...",
+                    IsCompleted = false,
+                    IsDbUpdate = true,
+                    UpdateReason = reason ?? "Datenbank- oder Parser-Aktualisierung"
+                });
 
-        Broadcast("SCAN_PROGRESS", new ScanProgressDto
-        {
-            Current = totalCount,
-            Total = totalCount,
-            Percent = 100,
-            CurrentFileName = "Re-Scan abgeschlossen",
-            IsCompleted = true,
-            IndexedSessions = result.indexedSessions,
-            TotalEvents = result.totalEvents
-        });
+                var result = Database.RescanAll(allFiles, (curr, total, name) =>
+                {
+                    double pct = total > 0 ? Math.Round((double)curr / total * 100.0, 1) : 0;
+                    Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                    {
+                        Current = curr,
+                        Total = total,
+                        Percent = pct,
+                        CurrentFileName = name,
+                        IsCompleted = false,
+                        IsDbUpdate = true,
+                        UpdateReason = reason ?? "Datenbank- oder Parser-Aktualisierung"
+                    });
+                });
 
-        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
-        {
-            StartLogTailer(_currentLogPath);
+                Database.WasMigrationApplied = false;
+                Database.WasParserResetRequired = false;
+
+                Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                {
+                    Current = totalCount,
+                    Total = totalCount,
+                    Percent = 100,
+                    CurrentFileName = "Datenbank erfolgreich aktualisiert",
+                    IsCompleted = true,
+                    IndexedSessions = result.indexedSessions,
+                    TotalEvents = result.totalEvents,
+                    IsDbUpdate = true,
+                    UpdateReason = reason
+                });
+
+                if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+                {
+                    StartLogTailer(_currentLogPath);
+                }
+
+                Broadcast("STATUS_UPDATE", GetAppStatus());
+                Broadcast("sessions_response", GetSessions());
+                Broadcast("log_status_response", GetLogStatus());
+                Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+
+                return result;
+            }
+            else
+            {
+                int unindexed = Database.GetUnindexedCount(allFiles);
+                if (unindexed > 0)
+                {
+                    Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                    {
+                        Current = 0,
+                        Total = unindexed,
+                        Percent = 0,
+                        CurrentFileName = $"Synchronisiere {unindexed} neue Logs...",
+                        IsCompleted = false,
+                        IsDbUpdate = false
+                    });
+
+                    int added = Database.IndexNew(allFiles, (curr, total, name) =>
+                    {
+                        double pct = total > 0 ? Math.Round((double)curr / total * 100.0, 1) : 0;
+                        Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                        {
+                            Current = curr,
+                            Total = total,
+                            Percent = pct,
+                            CurrentFileName = name,
+                            IsCompleted = false,
+                            IsDbUpdate = false
+                        });
+                    });
+
+                    Broadcast("SCAN_PROGRESS", new ScanProgressDto
+                    {
+                        Current = unindexed,
+                        Total = unindexed,
+                        Percent = 100,
+                        CurrentFileName = "Logs erfolgreich synchronisiert",
+                        IsCompleted = true,
+                        IndexedSessions = added,
+                        TotalEvents = 0,
+                        IsDbUpdate = false
+                    });
+
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                    Broadcast("sessions_response", GetSessions());
+                    Broadcast("log_status_response", GetLogStatus());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+
+                    return (added, 0);
+                }
+                else
+                {
+                    return (0, 0);
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.SyncAllLogs", ex);
+            return (0, 0);
+        }
+    }
 
-        Broadcast("STATUS_UPDATE", GetAppStatus());
-        Broadcast("sessions_response", GetSessions());
-        Broadcast("log_status_response", GetLogStatus());
-        Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
-
-        return result;
+    private (int indexedSessions, int totalEvents) ReparseAllLogs()
+    {
+        return SyncAllLogs(forceRescan: true);
     }
 
     private void ReparseSession(string sessionName)

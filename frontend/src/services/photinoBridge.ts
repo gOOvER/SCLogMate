@@ -400,6 +400,8 @@ export interface ScanProgress {
   isCompleted: boolean;
   indexedSessions?: number;
   totalEvents?: number;
+  isDbUpdate?: boolean;
+  updateReason?: string;
 }
 
 export interface DbDiagnostics {
@@ -450,6 +452,13 @@ class PhotinoBridge {
         window.external.receiveMessage((rawMessage: string) => {
           this.handleIncomingMessage(rawMessage);
         });
+      }
+
+      // Send client_ready handshake signal to C# backend
+      try {
+        window.external.sendMessage(JSON.stringify({ type: 'client_ready' }));
+      } catch (err) {
+        console.error('Failed to send client_ready signal:', err);
       }
     } else {
       console.warn('[PhotinoBridge] Not running inside Photino WebView. Operating in standalone/mock mode.');
