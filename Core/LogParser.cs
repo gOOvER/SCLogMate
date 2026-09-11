@@ -352,6 +352,9 @@ public partial class LogParser
     [GeneratedRegex(@"name (?<n>\S+) - state STATE_CURRENT")]
     private static partial Regex CharRegex();
 
+    [GeneratedRegex(@"nickname=""(?<n>[^""]+)""")]
+    private static partial Regex NicknameRegex();
+
     [GeneratedRegex(@"Join PU>.*shard\[(?<s>[^\]]+)\]")]
     private static partial Regex ShardRegex();
 
@@ -2388,12 +2391,24 @@ public partial class LogParser
         if (!Meta.ContainsKey("character"))
         {
             var m = CharRegex().Match(line);
-            if (m.Success) Meta["character"] = m.Groups["n"].Value;
+            if (m.Success)
+            {
+                Meta["character"] = m.Groups["n"].Value;
+            }
+            else
+            {
+                var mn = NicknameRegex().Match(line);
+                if (mn.Success && !string.Equals(mn.Groups["n"].Value, "Server", StringComparison.OrdinalIgnoreCase))
+                {
+                    Meta["character"] = mn.Groups["n"].Value;
+                }
+            }
         }
-        if (!Meta.ContainsKey("shard"))
+        
+        var mShard = ShardRegex().Match(line);
+        if (mShard.Success)
         {
-            var m = ShardRegex().Match(line);
-            if (m.Success) Meta["shard"] = m.Groups["s"].Value;
+            Meta["shard"] = mShard.Groups["s"].Value;
         }
 
         if (Meta.Count >= 7 && Meta.ContainsKey("shard") && Meta.ContainsKey("character") && Meta.ContainsKey("version") && !Meta["version"].StartsWith("1.0.", StringComparison.Ordinal))

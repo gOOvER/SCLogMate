@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 17; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 18; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -379,6 +379,16 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v17 (wiki_items_cache Tabelle & Indizes) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 18)
+        {
+            try { Exec(db, "ALTER TABLE sessions ADD COLUMN pilot TEXT;"); } catch { }
+            try { Exec(db, "ALTER TABLE sessions ADD COLUMN shard TEXT;"); } catch { }
+            try { Exec(db, "ALTER TABLE sessions ADD COLUMN version TEXT;"); } catch { }
+            Exec(db, "PRAGMA user_version = 18;");
+            dbSchemaVersion = 18;
+            Logger.Log("DB Schema: Migration auf v18 (sessions pilot, shard, version Spalten) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -520,11 +530,14 @@ public static class Database
                     using (var s = db.CreateCommand())
                     {
                         s.Transaction = tx;
-                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
+                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version) VALUES($n,$st,$en,$f,$pi,$sh,$v)";
                         s.Parameters.AddWithValue("$n", name);
                         s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                         s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                         s.Parameters.AddWithValue("$f", fingerprint);
+                        s.Parameters.AddWithValue("$pi", (object?)parser.Meta.GetValueOrDefault("character") ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$sh", (object?)parser.Meta.GetValueOrDefault("shard") ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$v", (object?)parser.Meta.GetValueOrDefault("version") ?? DBNull.Value);
                         s.ExecuteNonQuery();
                     }
                     tx.Commit();
@@ -630,11 +643,14 @@ public static class Database
                         using (var s = db.CreateCommand())
                         {
                             s.Transaction = tx;
-                            s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint) VALUES($n,$st,$en,$f)";
+                            s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version) VALUES($n,$st,$en,$f,$pi,$sh,$v)";
                             s.Parameters.AddWithValue("$n", name);
                             s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                             s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                             s.Parameters.AddWithValue("$f", GetFileFingerprint(file));
+                            s.Parameters.AddWithValue("$pi", (object?)parser.Meta.GetValueOrDefault("character") ?? DBNull.Value);
+                            s.Parameters.AddWithValue("$sh", (object?)parser.Meta.GetValueOrDefault("shard") ?? DBNull.Value);
+                            s.Parameters.AddWithValue("$v", (object?)parser.Meta.GetValueOrDefault("version") ?? DBNull.Value);
                             s.ExecuteNonQuery();
                         }
                         tx.Commit();
@@ -2240,6 +2256,68 @@ public static class Database
         {
             Logger.Error("SaveCachedWikiItem", ex);
         }
+    }
+
+    public static (string? pilot, string? shard, string? version) GetSessionMeta(string sessionName)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT pilot, shard, version FROM sessions WHERE name = @name LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", sessionName);
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                string? p = reader.IsDBNull(0) ? null : reader.GetString(0);
+                string? s = reader.IsDBNull(1) ? null : reader.GetString(1);
+                string? v = reader.IsDBNull(2) ? null : reader.GetString(2);
+                return (p, s, v);
+            }
+        }
+        catch { }
+        return (null, null, null);
+    }
+
+    public static string? GetLatestPilotName()
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT pilot FROM sessions WHERE pilot IS NOT NULL AND pilot != '' AND pilot != '—' ORDER BY start DESC LIMIT 1;";
+            var res = cmd.ExecuteScalar()?.ToString();
+            if (!string.IsNullOrWhiteSpace(res) && res != "—") return res;
+        }
+        catch { }
+        return null;
+    }
+
+    public static void UpdateSessionMeta(string sessionName, string? pilot, string? shard, string? version)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE sessions 
+                SET pilot = COALESCE(@p, pilot), 
+                    shard = COALESCE(@s, shard), 
+                    version = COALESCE(@v, version) 
+                WHERE name = @name;";
+            cmd.Parameters.AddWithValue("@name", sessionName);
+            cmd.Parameters.AddWithValue("@p", (object?)pilot ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@s", (object?)shard ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@v", (object?)version ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+        catch { }
     }
 
     #endregion

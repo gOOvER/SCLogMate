@@ -28,9 +28,11 @@ export interface AppStatus {
 export interface HudTelemetry {
   isGameRunning: boolean;
   pilotName: string;
-  serverRegionCode: 'EU' | 'US' | 'AUS' | 'ASIA' | 'OTHER' | string;
+  serverRegionCode: 'EU' | 'US' | 'AUS' | 'ASIA' | 'PU' | 'OTHER' | string;
   serverRegionName: string;
+  serverRegionFlag?: string;
   serverShard: string;
+  serverShardNumber?: string;
   serverVersion: string;
   serverPingMs?: number | null;
   locationName: string;

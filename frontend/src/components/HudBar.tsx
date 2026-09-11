@@ -31,31 +31,21 @@ export const HudBar: React.FC<HudBarProps> = ({
 }) => {
   const { t } = useI18n();
   // Region Flag Helper
-  const renderRegionFlag = (code: string) => {
-    switch (code) {
+  const renderRegionFlag = (code?: string, flagOverride?: string) => {
+    if (flagOverride && flagOverride !== '🌐') {
+      return <span className="text-sm leading-none select-none">{flagOverride}</span>;
+    }
+    switch (code?.toUpperCase()) {
       case 'EU':
-        return (
-          <span className="inline-flex items-center justify-center w-4 h-2.5 rounded-[1px] bg-[#003399] border border-blue-900 relative overflow-hidden" title="Europa (EU Shard)">
-            <span className="w-1.5 h-1.5 rounded-full border border-yellow-400 border-dashed" />
-          </span>
-        );
+        return <span className="text-sm leading-none select-none" title="Europa (EU Shard)">🇪🇺</span>;
       case 'US':
-        return (
-          <span className="inline-flex flex-col w-4 h-2.5 rounded-[1px] bg-white border border-slate-700 relative overflow-hidden" title="USA / Amerika (US Shard)">
-            <span className="h-1 bg-[#B22234]" />
-            <span className="h-0.5 bg-white" />
-            <span className="h-1 bg-[#B22234]" />
-            <span className="absolute top-0 left-0 w-2 h-1.5 bg-[#3C3B6E]" />
-          </span>
-        );
+        return <span className="text-sm leading-none select-none" title="USA / Amerika (US Shard)">🇺🇸</span>;
       case 'AUS':
-        return (
-          <span className="inline-flex items-center justify-center w-4 h-2.5 rounded-[1px] bg-[#00008B] border border-blue-900 relative overflow-hidden" title="Australien (AUS Shard)">
-            <span className="text-[6px] text-white absolute top-0 left-0.5 font-bold">★</span>
-          </span>
-        );
+        return <span className="text-sm leading-none select-none" title="Australien (AUS Shard)">🇦🇺</span>;
+      case 'ASIA':
+        return <span className="text-sm leading-none select-none" title="Asien (ASIA Shard)">🌏</span>;
       default:
-        return <span className="text-xs" title="Global Shard">🌐</span>;
+        return <span className="text-sm leading-none select-none" title="Global / Persistent Universe">🌐</span>;
     }
   };
 
@@ -78,10 +68,12 @@ export const HudBar: React.FC<HudBarProps> = ({
 
             {/* Region & Ping Badge */}
             <div className="flex items-center gap-1.5 bg-[#030814] px-2 py-0.5 rounded border border-cyan-950 text-[10px] font-mono">
-              {renderRegionFlag(telemetry.serverRegionCode)}
-              <span className="font-bold text-amber-300">{telemetry.serverRegionCode}</span>
+              {renderRegionFlag(telemetry.serverRegionCode, telemetry.serverRegionFlag)}
+              <span className="font-bold text-amber-300">
+                {telemetry.serverRegionCode && telemetry.serverRegionCode !== '—' ? telemetry.serverRegionCode : 'PU'}
+              </span>
               <span className="text-slate-600">·</span>
-              <div className="flex items-center gap-1" title={`Latenz: ${telemetry.serverPingMs ?? '—'} ms`}>
+              <div className="flex items-center gap-1" title={telemetry.serverPingMs ? `Latenz: ${telemetry.serverPingMs} ms` : 'Kein Ping'}>
                 <Wifi className={`w-2.5 h-2.5 ${telemetry.serverPingMs ? 'text-emerald-400' : 'text-slate-500'}`} />
                 <span className={telemetry.serverPingMs ? 'text-emerald-300 font-semibold' : 'text-slate-500'}>
                   {telemetry.serverPingMs ? `${telemetry.serverPingMs}ms` : '—'}
@@ -92,14 +84,18 @@ export const HudBar: React.FC<HudBarProps> = ({
 
           {/* Main Pilot Name */}
           <div className="text-sm font-bold font-mono text-slate-100 truncate" title={telemetry.pilotName}>
-            {telemetry.pilotName}
+            {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Kein Pilot erkannt'}
           </div>
 
           {/* Subline: Version & Shard */}
           <div className="text-[11px] font-mono text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
-            <span className="text-cyan-400">{telemetry.serverVersion}</span>
+            <span className="text-cyan-400">{telemetry.serverVersion && telemetry.serverVersion !== '—' ? telemetry.serverVersion : 'SC LIVE'}</span>
             <span className="text-slate-600">·</span>
-            <span className="text-slate-400">{telemetry.serverShard}</span>
+            <span className="text-slate-400" title={telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : undefined}>
+              {telemetry.serverShardNumber && telemetry.serverShardNumber !== '—'
+                ? telemetry.serverShardNumber
+                : (telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : 'Kein Server')}
+            </span>
           </div>
         </div>
 

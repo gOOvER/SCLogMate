@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Pilot Character Name, Server Shard, and Region Flag Resolution (`HudBar.tsx`, `PhotinoBridge.cs`, `LogParser.cs`, `Database.cs`)**:
+  - **Pilot & Player Name Extraction**:
+    - Resolved the missing pilot name in the HUD bar by actively scanning the active or selected log file header (up to 3,000 lines) on startup and session selection.
+    - Added `NicknameRegex` support to `LogParser.cs` as a seamless fallback to `CharRegex` to capture pilot identity from `nickname="..."` network log entries.
+    - Added database fallback query (`SELECT pilot FROM sessions ...`) to maintain pilot continuity when a fresh session starts before initial character login lines.
+  - **Dynamic Shard Information & Subline Numbering**:
+    - Fixed empty shard display by reading `<Join PU>` events and computing the human-readable shard number (e.g. `Shard #170`) alongside the full shard identifier (`pub_euw1b_12545750_170`).
+    - Added tail scanning (`ScanLogTailForShard`) to ensure shard transitions and server-hops during prolonged gameplay sessions are accurately updated.
+  - **Accurate Region Flags & Default Handling**:
+    - Replaced the hardcoded EU default and inaccurate CSS pseudo-flag with crisp Unicode region flag emojis (`🇪🇺 EU`, `🇺🇸 US`, `🇦🇺 AUS`, `🌏 ASIA`, `🌐 PU / Global`).
+    - Aligned region detection with RC2 `ServerRegionInfo` logic: properly displays `🌐 PU` or `🌐 —` when offline or not connected to a persistent shard instead of falsely showing the EU flag.
+  - **Database Schema Upgrade v18 (`Database.cs`)**:
+    - Bumped `CurrentSchemaVersion` to 18 and applied SQLite migration adding `pilot`, `shard`, and `version` columns to the `sessions` table so historical session telemetry is persisted and loaded with zero file latency.
+
 ### Added
 - **Global & In-View Live Progress Banners for Database Operations & Scans (`App.tsx`, `SettingsView.tsx`, `EmbeddedAssets.cs`)**:
   - **Global Log-Scan & Re-Scan Progress Banner (`App.tsx`)**:

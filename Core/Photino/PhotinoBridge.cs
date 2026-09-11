@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Photino.NET;
 using SCLogMate.Models;
@@ -133,9 +134,11 @@ public class HudTelemetryDto
 {
     [JsonPropertyName("isGameRunning")] public bool IsGameRunning { get; set; }
     [JsonPropertyName("pilotName")] public string PilotName { get; set; } = "—";
-    [JsonPropertyName("serverRegionCode")] public string ServerRegionCode { get; set; } = "EU";
-    [JsonPropertyName("serverRegionName")] public string ServerRegionName { get; set; } = "Europa";
+    [JsonPropertyName("serverRegionCode")] public string ServerRegionCode { get; set; } = "—";
+    [JsonPropertyName("serverRegionName")] public string ServerRegionName { get; set; } = "Unbekannt";
+    [JsonPropertyName("serverRegionFlag")] public string ServerRegionFlag { get; set; } = "🌐";
     [JsonPropertyName("serverShard")] public string ServerShard { get; set; } = "—";
+    [JsonPropertyName("serverShardNumber")] public string ServerShardNumber { get; set; } = "—";
     [JsonPropertyName("serverVersion")] public string ServerVersion { get; set; } = "—";
     [JsonPropertyName("serverPingMs")] public int? ServerPingMs { get; set; }
     [JsonPropertyName("locationName")] public string LocationName { get; set; } = "—";
@@ -671,6 +674,19 @@ public class PhotinoBridge
     private string _selectedSession = "__live__";
     private DateTime? _lastEventTime;
 
+    private record SessionMetadataCache(
+        string? Pilot,
+        string? Shard,
+        string? Version,
+        string? ShardNumber,
+        string RegionCode,
+        string RegionName,
+        string RegionFlag
+    );
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SessionMetadataCache> _sessionMetaCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _knownSessionFiles = new(StringComparer.OrdinalIgnoreCase);
+
     public void Initialize(PhotinoWindow window)
     {
         _window = window;
@@ -685,6 +701,8 @@ public class PhotinoBridge
         // Initialize background watcher if log file exists
         if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
         {
+            ScanLogHeaderAndMeta(_currentLogPath, _parser);
+            ScanLogTailForShard(_currentLogPath, _parser);
             StartLogTailer(_currentLogPath);
         }
     }
@@ -1169,38 +1187,168 @@ public class PhotinoBridge
         }
         catch { }
 
-        // Pilot Handle
-        string pilot = _parser.Meta.TryGetValue("character", out var c) && !string.IsNullOrWhiteSpace(c)
-            ? c
-            : "—";
+        string? pilot = null;
+        string? shard = null;
+        string? scVersion = null;
 
-        // Shard & Region
-        string shard = _parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s)
-            ? s
-            : "—";
+        if (targetSession == "__live__")
+        {
+            if ((!_parser.Meta.ContainsKey("character") || !_parser.Meta.ContainsKey("shard"))
+                && !string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+            {
+                ScanLogHeaderAndMeta(_currentLogPath, _parser);
+                ScanLogTailForShard(_currentLogPath, _parser);
+            }
 
-        string regionCode = "EU";
-        string regionName = "Europa";
-        if (shard.Contains("use", StringComparison.OrdinalIgnoreCase) || shard.Contains("usw", StringComparison.OrdinalIgnoreCase) || shard.Contains("us", StringComparison.OrdinalIgnoreCase))
-        {
-            regionCode = "US";
-            regionName = "Nordamerika";
+            if (_parser.Meta.TryGetValue("character", out var c) && !string.IsNullOrWhiteSpace(c))
+                pilot = c;
+            else
+                pilot = Database.GetLatestPilotName();
+
+            if (_parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s))
+                shard = s;
+
+            if (_parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v))
+                scVersion = v;
         }
-        else if (shard.Contains("ap", StringComparison.OrdinalIgnoreCase) || shard.Contains("aus", StringComparison.OrdinalIgnoreCase))
+        else if (targetSession == "__all__")
         {
-            regionCode = "AUS";
-            regionName = "Australien";
+            if (_parser.Meta.TryGetValue("character", out var c) && !string.IsNullOrWhiteSpace(c))
+                pilot = c;
+            else
+                pilot = Database.GetLatestPilotName();
+
+            shard = "Alle Sessions";
+            if (_parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v))
+                scVersion = v;
         }
-        else if (shard.Contains("asia", StringComparison.OrdinalIgnoreCase))
+        else
         {
-            regionCode = "ASIA";
-            regionName = "Asien";
+            // Historical session by name
+            if (_sessionMetaCache.TryGetValue(targetSession, out var cachedMeta))
+            {
+                pilot = cachedMeta.Pilot;
+                shard = cachedMeta.Shard;
+                scVersion = cachedMeta.Version;
+            }
+            else
+            {
+                var dbMeta = Database.GetSessionMeta(targetSession);
+                pilot = dbMeta.pilot;
+                shard = dbMeta.shard;
+                scVersion = dbMeta.version;
+
+                if (string.IsNullOrWhiteSpace(pilot) || string.IsNullOrWhiteSpace(shard) || string.IsNullOrWhiteSpace(scVersion))
+                {
+                    var filePath = ResolveSessionFilePath(targetSession);
+                    if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                    {
+                        var tempParser = new LogParser();
+                        ScanLogHeaderAndMeta(filePath, tempParser);
+                        ScanLogTailForShard(filePath, tempParser);
+
+                        tempParser.Meta.TryGetValue("character", out var cp);
+                        tempParser.Meta.TryGetValue("shard", out var sp);
+                        tempParser.Meta.TryGetValue("version", out var vp);
+
+                        if (!string.IsNullOrWhiteSpace(cp)) pilot = cp;
+                        if (!string.IsNullOrWhiteSpace(sp)) shard = sp;
+                        if (!string.IsNullOrWhiteSpace(vp)) scVersion = vp;
+
+                        Database.UpdateSessionMeta(targetSession, pilot, shard, scVersion);
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(pilot) || pilot == "—")
+                {
+                    pilot = Database.GetLatestPilotName();
+                }
+            }
         }
 
-        // SC Version
-        string scVersion = _parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v)
-            ? v
-            : "SC 3.24.3-LIVE";
+        // Format clean SC Version text (aligned with RC2 ScVersionText)
+        if (string.IsNullOrWhiteSpace(scVersion) || scVersion == "—" || scVersion.StartsWith("1.0.", StringComparison.Ordinal) || scVersion.StartsWith("v1.0.", StringComparison.Ordinal))
+        {
+            if (_parser.Meta.TryGetValue("base_version", out var bv) && !string.IsNullOrWhiteSpace(bv))
+            {
+                _parser.Meta.TryGetValue("env", out var en);
+                var env = string.IsNullOrWhiteSpace(en) || en.Trim().Equals("PUB", StringComparison.OrdinalIgnoreCase) ? "LIVE" : en.Trim().ToUpperInvariant();
+                scVersion = $"SC {bv}-{env}";
+            }
+            else
+            {
+                scVersion = "SC 3.24.3-LIVE";
+            }
+        }
+        else if (!scVersion.StartsWith("SC ", StringComparison.OrdinalIgnoreCase))
+        {
+            scVersion = $"SC {scVersion}";
+        }
+
+        // Shard Number extraction (e.g. pub_euw1b_12545750_170 -> Shard #170)
+        string shardNumber = "—";
+        if (!string.IsNullOrWhiteSpace(shard) && shard != "—" && shard != "Alle Sessions")
+        {
+            var match = Regex.Match(shard, @"(?:_|\b)(\d+)$");
+            shardNumber = match.Success ? $"Shard #{match.Groups[1].Value}" : shard;
+        }
+        else if (shard == "Alle Sessions")
+        {
+            shardNumber = "Archiv";
+        }
+
+        // Region code, flag, name (aligned with RC2 ServerRegionInfo)
+        string regionCode = "—";
+        string regionName = "Unbekannt";
+        string regionFlag = "🌐";
+
+        if (!string.IsNullOrWhiteSpace(shard) && shard != "—" && shard != "Alle Sessions")
+        {
+            var sLower = shard.ToLowerInvariant();
+            if (sLower.Contains("euw") || sLower.Contains("euc") || sLower.Contains("eu") || sLower.Contains("fra") || sLower.Contains("lon"))
+            {
+                regionFlag = "🇪🇺";
+                regionCode = "EU";
+                regionName = "Europa";
+            }
+            else if (sLower.Contains("use") || sLower.Contains("usw") || sLower.Contains("us") || sLower.Contains("na") || sLower.Contains("va"))
+            {
+                regionFlag = "🇺🇸";
+                regionCode = "US";
+                regionName = "USA / Nordamerika";
+            }
+            else if (sLower.Contains("aus") || sLower.Contains("oce") || sLower.Contains("ap") || sLower.Contains("syd"))
+            {
+                regionFlag = "🇦🇺";
+                regionCode = "AUS";
+                regionName = "Australien / APAC";
+            }
+            else if (sLower.Contains("asia") || sLower.Contains("jp") || sLower.Contains("sg") || sLower.Contains("tyo"))
+            {
+                regionFlag = "🌏";
+                regionCode = "ASIA";
+                regionName = "Asien";
+            }
+            else
+            {
+                regionFlag = "🌐";
+                regionCode = "PU";
+                regionName = "Persistent Universe";
+            }
+        }
+        else if (shard == "Alle Sessions")
+        {
+            regionFlag = "🌐";
+            regionCode = "ALL";
+            regionName = "Alle Sessions";
+        }
+
+        if (targetSession != "__live__" && targetSession != "__all__")
+        {
+            _sessionMetaCache[targetSession] = new SessionMetadataCache(
+                pilot, shard, scVersion, shardNumber, regionCode, regionName, regionFlag
+            );
+        }
 
         int? ping = isGameRunning ? 28 : null;
 
@@ -1374,10 +1522,12 @@ public class PhotinoBridge
         return new HudTelemetryDto
         {
             IsGameRunning = isGameRunning,
-            PilotName = pilot,
+            PilotName = !string.IsNullOrWhiteSpace(pilot) ? pilot : "Kein Pilot erkannt",
             ServerRegionCode = regionCode,
             ServerRegionName = regionName,
-            ServerShard = shard,
+            ServerRegionFlag = regionFlag,
+            ServerShard = !string.IsNullOrWhiteSpace(shard) ? shard : "—",
+            ServerShardNumber = !string.IsNullOrWhiteSpace(shardNumber) ? shardNumber : (shard != "—" ? shard : "Kein Server"),
             ServerVersion = scVersion,
             ServerPingMs = ping,
             LocationName = locName,
@@ -1897,10 +2047,115 @@ public class PhotinoBridge
         }
     }
 
+    private void ScanLogHeaderAndMeta(string? filePath, LogParser? targetParser = null)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        try
+        {
+            var p = targetParser ?? _parser;
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
+
+            int lineCount = 0;
+            string? line;
+            while ((line = reader.ReadLine()) != null && lineCount < 3000)
+            {
+                lineCount++;
+                p.Feed(line);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"PhotinoBridge.ScanLogHeaderAndMeta({filePath})", ex);
+        }
+    }
+
+    private void ScanLogTailForShard(string? filePath, LogParser? targetParser = null)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        try
+        {
+            var p = targetParser ?? _parser;
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fs.Length > 50_000)
+            {
+                long offset = Math.Max(0, fs.Length - 150_000);
+                fs.Seek(offset, SeekOrigin.Begin);
+                using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
+                reader.ReadLine(); // discard potential partial line
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(line, @"shard\[(?<s>[^\]]+)\]");
+                        if (m.Success)
+                        {
+                            p.Meta["shard"] = m.Groups["s"].Value;
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private string? ResolveSessionFilePath(string sessionName)
+    {
+        if (string.IsNullOrWhiteSpace(sessionName)) return null;
+
+        if (_knownSessionFiles.TryGetValue(sessionName, out var kp) && File.Exists(kp))
+            return kp;
+
+        if (!string.IsNullOrEmpty(_currentLogPath) && string.Equals(Path.GetFileName(_currentLogPath), sessionName, StringComparison.OrdinalIgnoreCase) && File.Exists(_currentLogPath))
+            return _currentLogPath;
+
+        if (Directory.Exists(LogArchive.Dir))
+        {
+            var arc = Path.Combine(LogArchive.Dir, sessionName);
+            if (File.Exists(arc)) return arc;
+        }
+
+        if (!string.IsNullOrEmpty(_currentLogPath))
+        {
+            var parent = Path.GetDirectoryName(_currentLogPath);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                var p1 = Path.Combine(parent, "logbackups", sessionName);
+                if (File.Exists(p1)) return p1;
+
+                var grandParent = Directory.GetParent(parent)?.FullName;
+                if (!string.IsNullOrEmpty(grandParent))
+                {
+                    var p2 = Path.Combine(grandParent, "logbackups", sessionName);
+                    if (File.Exists(p2)) return p2;
+                }
+            }
+        }
+
+        try
+        {
+            var s = Settings.Load();
+            if (!string.IsNullOrEmpty(s.CloudStoragePath))
+            {
+                var cp = Path.Combine(s.CloudStoragePath, "logbackups", sessionName);
+                if (File.Exists(cp)) return cp;
+                var cp2 = Path.Combine(s.CloudStoragePath, sessionName);
+                if (File.Exists(cp2)) return cp2;
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
     private void StartLogTailer(string path)
     {
         try
         {
+            ScanLogHeaderAndMeta(path, _parser);
+            ScanLogTailForShard(path, _parser);
+
             _tailer?.Stop();
             _tailer = new LogTailer(path);
             _tailer.Line += OnLogLineReceived;
@@ -2499,6 +2754,7 @@ public class PhotinoBridge
                 {
                     var fn = Path.GetFileName(p);
                     filesByFileName.TryAdd(fn, p);
+                    _knownSessionFiles[fn] = p;
                 }
             }
             catch { }
