@@ -10,7 +10,6 @@ import {
   Database,
   Globe,
   CheckCircle2,
-  Sliders,
   Radio,
   FileCheck,
   Shield,
@@ -415,35 +414,6 @@ export const SettingsView: React.FC = () => {
               <div className="text-[11px] text-slate-500">
                 Hinweis: SCLogMate liest die Datei im Non-Locking Shared Stream und tailt Live-Events verzögerungsfrei.
               </div>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Sliders className="w-4 h-4" />
-                <span>START-KONTOSTAND (aUEC)</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Referenzkontostand für die Saldo-Berechnung und OCR-Deltas.
-              </p>
-            </div>
-
-            <div className="max-w-md space-y-2">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="number"
-                  value={settings.balance}
-                  onChange={(e) =>
-                    setSettings({ ...settings, balance: parseInt(e.target.value, 10) || 0 })
-                  }
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-sky-500"
-                />
-                <span className="text-xs text-slate-400 font-bold">aUEC</span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Wird bei aktivem Auto-OCR automatisch abgeglichen, wenn der mobiGlas Kontostand erkannt wird.
-              </p>
             </div>
           </div>
         </div>

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Replaced Windows-incompatible flag emoji (which rendered as raw letters `EU`) with a sleek Globe icon and single region code, completely eliminating duplicate `EU EU` output.
     - Enhanced bottom subline with game version, complete shard ID, and pilot rank title.
 
+### Removed
+- **Manual Start Balance Setting Card (`SettingsView.tsx`)**:
+  - Removed unnecessary "Start-Kontostand (aUEC)" input box from General Settings since the player's wallet is automatically tracked through game log events and live OCR.
+
 ### Added
 - **Database & Log Synchronization Modal (`DbUpdateModal.tsx`, `App.tsx`, `PhotinoBridge.cs`)**:
   - Created a dedicated Glassmorphism `DbUpdateModal` dialog displaying whenever database schema migrations or parser upgrades require a full re-scan, or when indexing newly detected log files.
