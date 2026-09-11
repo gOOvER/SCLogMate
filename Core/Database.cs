@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 18; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 19; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -395,6 +395,39 @@ public static class Database
             Exec(db, "PRAGMA user_version = 18;");
             dbSchemaVersion = 18;
             Logger.Log("DB Schema: Migration auf v18 (sessions pilot, shard, version Spalten) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 19)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS pilot_profiles (
+                        handle TEXT PRIMARY KEY,
+                        citizen_record TEXT,
+                        title TEXT,
+                        avatar_url TEXT,
+                        enlisted TEXT,
+                        fluency TEXT,
+                        org_name TEXT,
+                        org_sid TEXT,
+                        org_rank TEXT,
+                        org_logo_url TEXT,
+                        website TEXT,
+                        profile_url TEXT,
+                        bio TEXT,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_pilot_profiles_citizen_record ON pilot_profiles(citizen_record);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v19 (pilot_profiles)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 19;");
+            dbSchemaVersion = 19;
+            Logger.Log("DB Schema: Migration auf v19 (pilot_profiles Tabelle & Indizes) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -796,7 +829,8 @@ public static class Database
                 ["reputation"] = new[] { "faction_id", "xp", "completed_missions", "last_updated" },
                 ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" },
                 ["warehouse_items"] = new[] { "location", "location_code", "system", "parent_body", "item_class", "item_name", "category", "quantity", "last_updated" },
-                ["wiki_items_cache"] = new[] { "class_name", "name", "category", "manufacturer", "description_de", "description_en", "thumbnail_url", "image_url", "web_url", "updated_at" }
+                ["wiki_items_cache"] = new[] { "class_name", "name", "category", "manufacturer", "description_de", "description_en", "thumbnail_url", "image_url", "web_url", "updated_at" },
+                ["pilot_profiles"] = new[] { "handle", "citizen_record", "title", "avatar_url", "enlisted", "fluency", "org_name", "org_sid", "org_rank", "org_logo_url", "website", "profile_url", "bio", "updated_at" }
             };
 
             var existingTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -888,6 +922,7 @@ public static class Database
             diag.ReputationCount = SafeCount("reputation");
             diag.WarehouseItemCount = SafeCount("warehouse_items");
             diag.WikiItemCount = SafeCount("wiki_items_cache");
+            diag.PilotProfileCount = SafeCount("pilot_profiles");
 
             // 6. Physische Integritätsprüfung
             if (runDeepCheck)
@@ -1006,6 +1041,23 @@ public static class Database
                         updated_at TEXT NOT NULL
                     );
                     CREATE INDEX IF NOT EXISTS ix_wiki_items_name ON wiki_items_cache(name);
+                    CREATE TABLE IF NOT EXISTS pilot_profiles (
+                        handle TEXT PRIMARY KEY,
+                        citizen_record TEXT,
+                        title TEXT,
+                        avatar_url TEXT,
+                        enlisted TEXT,
+                        fluency TEXT,
+                        org_name TEXT,
+                        org_sid TEXT,
+                        org_rank TEXT,
+                        org_logo_url TEXT,
+                        website TEXT,
+                        profile_url TEXT,
+                        bio TEXT,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_pilot_profiles_citizen_record ON pilot_profiles(citizen_record);
                 ");
 
                 // 3. Kritische Spalten nachziehen (falls eine Tabelle älter war)
@@ -2360,6 +2412,101 @@ public static class Database
             cmd.ExecuteNonQuery();
         }
         catch { }
+    }
+
+    public static PilotProfile? GetPilotProfile(string handle)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT handle, citizen_record, title, avatar_url, enlisted, fluency, 
+                       org_name, org_sid, org_rank, org_logo_url, website, profile_url, bio, updated_at
+                FROM pilot_profiles 
+                WHERE handle = @h 
+                LIMIT 1;
+            ";
+            cmd.Parameters.AddWithValue("@h", handle);
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                DateTime.TryParse(reader.GetString(13), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var upd);
+                return new PilotProfile
+                {
+                    Handle = reader.GetString(0),
+                    CitizenRecord = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Title = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    AvatarUrl = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    Enlisted = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    Fluency = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    OrgName = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    OrgSid = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    OrgRank = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                    OrgLogoUrl = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                    Website = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                    ProfileUrl = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    Bio = reader.IsDBNull(12) ? "" : reader.GetString(12),
+                    UpdatedAt = upd
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Database.GetPilotProfile({handle})", ex);
+        }
+        return null;
+    }
+
+    public static void SavePilotProfile(PilotProfile profile)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO pilot_profiles (handle, citizen_record, title, avatar_url, enlisted, fluency, 
+                                           org_name, org_sid, org_rank, org_logo_url, website, profile_url, bio, updated_at)
+                VALUES (@h, @cr, @ti, @av, @enl, @flu, @on, @os, @or, @ol, @ws, @pu, @bio, @upd)
+                ON CONFLICT(handle) DO UPDATE SET
+                    citizen_record = excluded.citizen_record,
+                    title = excluded.title,
+                    avatar_url = excluded.avatar_url,
+                    enlisted = excluded.enlisted,
+                    fluency = excluded.fluency,
+                    org_name = excluded.org_name,
+                    org_sid = excluded.org_sid,
+                    org_rank = excluded.org_rank,
+                    org_logo_url = excluded.org_logo_url,
+                    website = excluded.website,
+                    profile_url = excluded.profile_url,
+                    bio = excluded.bio,
+                    updated_at = excluded.updated_at;
+            ";
+            cmd.Parameters.AddWithValue("@h", profile.Handle);
+            cmd.Parameters.AddWithValue("@cr", (object?)profile.CitizenRecord ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ti", (object?)profile.Title ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@av", (object?)profile.AvatarUrl ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@enl", (object?)profile.Enlisted ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@flu", (object?)profile.Fluency ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@on", (object?)profile.OrgName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@os", (object?)profile.OrgSid ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@or", (object?)profile.OrgRank ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ol", (object?)profile.OrgLogoUrl ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ws", (object?)profile.Website ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pu", (object?)profile.ProfileUrl ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bio", (object?)profile.Bio ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@upd", profile.UpdatedAt.ToString("o"));
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Database.SavePilotProfile({profile.Handle})", ex);
+        }
     }
 
     #endregion

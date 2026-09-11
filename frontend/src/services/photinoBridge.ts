@@ -31,6 +31,12 @@ export interface HudTelemetry {
   pilotAvatarUrl?: string;
   pilotTitle?: string;
   pilotOrgName?: string;
+  citizenRecord?: string;
+  pilotOrgSid?: string;
+  pilotOrgRank?: string;
+  pilotOrgLogoUrl?: string;
+  pilotEnlisted?: string;
+  pilotProfileUrl?: string;
   serverRegionCode: 'EU' | 'US' | 'AUS' | 'ASIA' | 'PU' | 'OTHER' | string;
   serverRegionName: string;
   serverRegionFlag?: string;
@@ -71,6 +77,7 @@ export interface PilotProfile {
   orgRank?: string;
   orgLogoUrl?: string;
   profileUrl: string;
+  website?: string;
   bio?: string;
   isVerified: boolean;
 }
@@ -696,6 +703,10 @@ class PhotinoBridge {
 
   public openExternalUrl(url: string): void {
     this.send('open_external_url', { url });
+  }
+
+  public getPilotDossier(handle?: string): Promise<PilotProfile> {
+    return this.sendRequest<PilotProfile>('get_pilot_dossier', { handle });
   }
 
   // Mock implementation for browser-only development

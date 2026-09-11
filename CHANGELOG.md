@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Full CitizenID & RSI Citizen Dossier Integration (`CitizenService.cs`, `PilotProfile.cs`, `Database.cs`, `HudBar.tsx`, `PilotDossierModal.tsx`, `PhotinoBridge.cs`)**:
+  - Integrated public RSI Citizen Dossier lookup (`https://robertsspaceindustries.com/citizens/{handle}`) and CitizenID Space fallback API to automatically retrieve official Star Citizen pilot profiles:
+    - Extracted UEE Citizen Record number badge (e.g. `#593923`), high-resolution pilot avatar image, handle, honorary title (`High Admiral`, `Wing Commander`, etc.), enlistment date, language fluency, personal website, and main organization credentials (org name, SID badge, rank, and crest logo).
+  - Bumped SQLite database schema to `CurrentSchemaVersion = 19` with a dedicated `pilot_profiles` table, indexing citizen records and caching pilot data for 7 days to provide 0ms latency offline-ready startup.
+  - Added background prefetch queue with polite rate-limiting in `CitizenService.cs` and real-time reactive `ProfileResolved` event dispatching to automatically update the UI whenever a profile is resolved.
+  - Revamped Startseite card 1 (**PILOT & SERVER** in `HudBar.tsx`):
+    - Added live RSI avatar with fallback icon, official Citizen Record badge (`#593923`), title, and primary organization tag (`[SNPX] Stellanebula Project`) with mini org insignia.
+    - Preserved crisp vector region flags (`EU`, `US`, `AUS`, `ASIA`), channel, RTT latency, SC version, and shard number.
+  - Created interactive Glassmorphism **Citizen Dossier Modal (`PilotDossierModal.tsx`)**:
+    - Clicking on the pilot card opens a full mobiGlas-styled citizen dossier displaying pilot status, registration date, languages, full organization credentials, personal website launcher, and direct 1-click link to the official RSI citizen dossier.
 - **Warehouse Item Table & Category Badge Responsiveness (`WarehouseView.tsx`, `Database.cs`)**:
   - Fixed category text wrapping and squishing ("Rüstung & Kleidung") on smaller windows by enforcing `whitespace-nowrap`, minimum column widths (`min-w-[160px]`), and increasing the base table min-width to `min-w-[880px]` with smooth horizontal scrolling.
   - Increased category badge font size to `text-[11px]` font-mono font-medium for crisp readability.

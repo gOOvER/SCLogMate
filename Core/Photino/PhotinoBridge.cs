@@ -148,6 +148,12 @@ public class HudTelemetryDto
     [JsonPropertyName("pilotAvatarUrl")] public string? PilotAvatarUrl { get; set; }
     [JsonPropertyName("pilotTitle")] public string? PilotTitle { get; set; }
     [JsonPropertyName("pilotOrgName")] public string? PilotOrgName { get; set; }
+    [JsonPropertyName("citizenRecord")] public string? CitizenRecord { get; set; }
+    [JsonPropertyName("pilotOrgSid")] public string? PilotOrgSid { get; set; }
+    [JsonPropertyName("pilotOrgRank")] public string? PilotOrgRank { get; set; }
+    [JsonPropertyName("pilotOrgLogoUrl")] public string? PilotOrgLogoUrl { get; set; }
+    [JsonPropertyName("pilotEnlisted")] public string? PilotEnlisted { get; set; }
+    [JsonPropertyName("pilotProfileUrl")] public string? PilotProfileUrl { get; set; }
     [JsonPropertyName("serverRegionCode")] public string ServerRegionCode { get; set; } = "—";
     [JsonPropertyName("serverRegionName")] public string ServerRegionName { get; set; } = "Unbekannt";
     [JsonPropertyName("serverRegionFlag")] public string ServerRegionFlag { get; set; } = "🌐";
@@ -873,6 +879,18 @@ public class PhotinoBridge
             () => Settings.Load().WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(),
             () => Settings.Load().AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
+
+        CitizenService.ProfileResolved += profile =>
+        {
+            try
+            {
+                Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("CitizenService.ProfileResolved", ex);
+            }
+        };
     }
 
     private void OnBalanceCaptured(long newBalance)
@@ -1898,6 +1916,21 @@ public class PhotinoBridge
                     SendResponse(req.Id, "hud_response", GetHudTelemetry(reqSess));
                     break;
 
+                case "get_pilot_dossier":
+                    string? dHandle = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("handle", out var dhProp))
+                    {
+                        dHandle = dhProp.GetString();
+                    }
+                    if (string.IsNullOrWhiteSpace(dHandle) || dHandle == "—" || dHandle == "Unbekannter Pilot")
+                    {
+                        var curHud = GetHudTelemetry(_selectedSession);
+                        dHandle = curHud.PilotName;
+                    }
+                    var pProfile = await CitizenService.FetchProfileAsync(dHandle ?? "");
+                    SendResponse(req.Id, "get_pilot_dossier_response", pProfile);
+                    break;
+
                 case "select_session":
                     if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var selProp))
                     {
@@ -2328,10 +2361,47 @@ public class PhotinoBridge
             }
         }
 
+        // Pilot Profile Integration (CitizenID & RSI Dossier)
+        string? citizenRecord = null;
+        string? pilotAvatarUrl = null;
+        string? pilotTitle = null;
+        string? pilotOrgName = null;
+        string? pilotOrgSid = null;
+        string? pilotOrgRank = null;
+        string? pilotOrgLogoUrl = null;
+        string? pilotEnlisted = null;
+        string? pilotProfileUrl = null;
+
+        if (!string.IsNullOrWhiteSpace(pilot) && pilot != "—" && pilot != "Unbekannter Pilot" && pilot != "Kein Pilot erkannt")
+        {
+            var profile = CitizenService.GetCachedProfile(pilot);
+            if (profile != null)
+            {
+                citizenRecord = profile.CitizenRecord;
+                pilotAvatarUrl = profile.AvatarUrl;
+                pilotTitle = profile.Title;
+                pilotOrgName = profile.OrgName;
+                pilotOrgSid = profile.OrgSid;
+                pilotOrgRank = profile.OrgRank;
+                pilotOrgLogoUrl = profile.OrgLogoUrl;
+                pilotEnlisted = profile.Enlisted;
+                pilotProfileUrl = profile.ProfileUrl;
+            }
+        }
+
         return new HudTelemetryDto
         {
             IsGameRunning = isGameRunning,
             PilotName = !string.IsNullOrWhiteSpace(pilot) ? pilot : "Kein Pilot erkannt",
+            PilotAvatarUrl = pilotAvatarUrl,
+            PilotTitle = pilotTitle,
+            PilotOrgName = pilotOrgName,
+            CitizenRecord = citizenRecord,
+            PilotOrgSid = pilotOrgSid,
+            PilotOrgRank = pilotOrgRank,
+            PilotOrgLogoUrl = pilotOrgLogoUrl,
+            PilotEnlisted = pilotEnlisted,
+            PilotProfileUrl = pilotProfileUrl,
             ServerRegionCode = regionCode,
             ServerRegionName = regionName,
             ServerRegionFlag = regionFlag,

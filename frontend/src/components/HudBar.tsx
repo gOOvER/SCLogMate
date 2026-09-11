@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Compass,
   CreditCard,
@@ -15,9 +15,10 @@ import {
   User,
   Server,
 } from 'lucide-react';
-import { HudTelemetry } from '../services/photinoBridge';
+import { HudTelemetry, PilotProfile, bridge } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
 import { useI18n } from '../i18n';
+import { PilotDossierModal } from './PilotDossierModal';
 
 interface HudBarProps {
   telemetry: HudTelemetry;
@@ -168,18 +169,55 @@ export const HudBar: React.FC<HudBarProps> = ({
     return `Vollständiger Shard-Name:\n${telemetry.serverShard}\n\nRegion: ${regionText}\nLatenz (RTT): ${pingText}\nKanal: LIVE\nSpieler: ${pilotText}\nStar Citizen Version: ${versionText}`;
   }, [telemetry]);
 
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
+  const [dossierData, setDossierData] = useState<PilotProfile | null>(null);
+
+  const handleOpenDossier = async () => {
+    if (!telemetry.pilotName || telemetry.pilotName === '—' || telemetry.pilotName === 'Unbekannter Pilot' || telemetry.pilotName === 'Kein Pilot erkannt') {
+      return;
+    }
+
+    // Sofort mit Telemetry-Daten vorbefüllen für 0ms Latenz
+    const immediateProfile: PilotProfile = {
+      handle: telemetry.pilotName,
+      citizenRecord: telemetry.citizenRecord || '',
+      title: telemetry.pilotTitle || '',
+      avatarUrl: telemetry.pilotAvatarUrl,
+      enlisted: telemetry.pilotEnlisted || '',
+      fluency: '',
+      orgName: telemetry.pilotOrgName,
+      orgSid: telemetry.pilotOrgSid,
+      orgRank: telemetry.pilotOrgRank,
+      orgLogoUrl: telemetry.pilotOrgLogoUrl,
+      profileUrl: telemetry.pilotProfileUrl || `https://robertsspaceindustries.com/citizens/${encodeURIComponent(telemetry.pilotName)}`,
+      isVerified: true,
+    };
+    setDossierData(immediateProfile);
+    setIsDossierOpen(true);
+
+    try {
+      const full = await bridge.getPilotDossier(telemetry.pilotName);
+      if (full) {
+        setDossierData(full);
+      }
+    } catch (e) {
+      console.error('Error fetching dossier:', e);
+    }
+  };
+
   return (
     <div className="px-5 pt-2.5 pb-1 flex flex-col gap-2.5 shrink-0 bg-gradient-to-b from-[#030814]/90 to-[#020610]/95 border-b border-cyan-950/60 transition-all select-none">
       {/* ══ ZEILE 1: 3 KARTEN (Server & Instanz, Standort, Schiff) ══ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         {/* KARTE 1: PILOT & SERVER */}
         <div
-          className="bg-[#051122]/80 border border-cyan-950/80 hover:border-cyan-800/60 rounded-lg p-2.5 flex flex-col justify-between backdrop-blur-sm transition-all shadow-sm cursor-default"
-          title={serverTooltipText}
+          onClick={handleOpenDossier}
+          className="bg-[#051122]/80 border border-cyan-950/80 hover:border-cyan-700/80 rounded-lg p-2.5 flex flex-col justify-between backdrop-blur-sm transition-all shadow-sm cursor-pointer group relative"
+          title={`${serverTooltipText}\n\nKlicken für vollständiges RSI Citizen Dossier`}
         >
           {/* Header: Label + Region-Badge mit Flagge & Ping */}
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 group-hover:text-cyan-300 transition-colors">
               <Server className="w-3 h-3 text-cyan-400" />
               PILOT & SERVER
             </span>
@@ -202,16 +240,69 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
           </div>
 
-          {/* Hauptwert: Spieler / Account Name */}
-          <div className="text-sm font-bold font-mono text-slate-100 truncate flex items-center gap-1.5 my-0.5">
-            <User className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span className="text-white tracking-wide">
-              {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Unbekannter Pilot'}
-            </span>
+          {/* Hauptbereich: Pilot Avatar + Name + Citizen Record + Title + Org */}
+          <div className="flex items-center gap-2 my-0.5 min-w-0">
+            {/* Avatar */}
+            <div className="w-8 h-8 rounded-full bg-cyan-950/80 border border-cyan-700/60 flex items-center justify-center text-cyan-400 shrink-0 overflow-hidden shadow-xs">
+              {telemetry.pilotAvatarUrl ? (
+                <img
+                  src={telemetry.pilotAvatarUrl}
+                  alt={telemetry.pilotName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <User className="w-4 h-4" />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {/* Handle + Citizen Record Badge */}
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-sm font-bold font-mono text-white tracking-wide truncate group-hover:text-cyan-300 transition-colors">
+                  {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Unbekannter Pilot'}
+                </span>
+                {telemetry.citizenRecord && (
+                  <span className="px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-600/60 text-amber-300 font-mono text-[9px] font-bold shrink-0">
+                    {telemetry.citizenRecord}
+                  </span>
+                )}
+              </div>
+
+              {/* Title & Primary Org */}
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 truncate">
+                {telemetry.pilotTitle && (
+                  <span className="text-amber-400 font-medium truncate">
+                    {telemetry.pilotTitle}
+                  </span>
+                )}
+                {telemetry.pilotTitle && telemetry.pilotOrgName && (
+                  <span className="text-slate-600 shrink-0">·</span>
+                )}
+                {telemetry.pilotOrgName && (
+                  <span className="text-cyan-300/90 truncate flex items-center gap-1">
+                    {telemetry.pilotOrgLogoUrl && (
+                      <img src={telemetry.pilotOrgLogoUrl} alt="" className="w-2.5 h-2.5 object-contain shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {telemetry.pilotOrgSid ? `[${telemetry.pilotOrgSid}] ` : ''}
+                      {telemetry.pilotOrgName}
+                    </span>
+                  </span>
+                )}
+                {!telemetry.pilotTitle && !telemetry.pilotOrgName && (
+                  <span className="text-slate-500 italic text-[10px]">
+                    Citizen Dossier
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Subline: SC Version · Shard Nummer */}
-          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center gap-2 mt-0.5">
+          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center gap-2 mt-0.5 pt-1 border-t border-cyan-950/40">
             <span className="text-cyan-400 font-semibold shrink-0">{cleanVersion}</span>
             <span className="text-slate-600 shrink-0">·</span>
             <span className="text-slate-300 font-medium truncate">
@@ -448,6 +539,13 @@ export const HudBar: React.FC<HudBarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Pilot Citizen Dossier Modal */}
+      <PilotDossierModal
+        isOpen={isDossierOpen}
+        profile={dossierData}
+        onClose={() => setIsDossierOpen(false)}
+      />
     </div>
   );
 };
