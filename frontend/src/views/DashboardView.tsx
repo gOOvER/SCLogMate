@@ -4,12 +4,11 @@ import {
   Activity,
   Box,
   Coins,
-  Compass,
+  ExternalLink,
   Layers,
   Radio,
   Rocket,
-  ShieldCheck,
-  Target,
+  Scroll,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -37,11 +36,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return num.toLocaleString('de-DE');
   };
 
-  const activeSession = sessions.find((s) => s.name === status?.activeSessionName) || sessions[0];
   const uniqueShips = Array.from(new Set(sessions.flatMap((s) => s.ships || [])));
 
+  const getCategoryBadge = (category: string) => {
+    switch (category) {
+      case 'wallet':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
+            💰 Finanzen
+          </span>
+        );
+      case 'combat':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/60 border border-rose-800/60 text-rose-300">
+            ⚔️ Kampf
+          </span>
+        );
+      case 'mission':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-800/60 text-amber-300">
+            🎯 Auftrag
+          </span>
+        );
+      case 'ship':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950/60 border border-sky-800/60 text-sky-300">
+            🚀 Schiff
+          </span>
+        );
+      case 'location':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">
+            📍 Ort
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 border border-slate-800 text-slate-400">
+            ⚙️ System
+          </span>
+        );
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full space-y-3 font-sans select-none overflow-y-auto pr-1">
+    <div className="flex flex-col h-full space-y-3 font-sans select-none overflow-hidden">
       {/* ══ 4 METRIC TOP CARDS ══ */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0">
         {/* Finanzsaldo Netto */}
@@ -127,150 +166,91 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* ══ DUAL COLUMN: FLIGHT DECK TELEMETRIE & LIVE FEED ══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-0">
-        {/* Linke Spalte: Flight Deck & Telemetrie */}
-        <div className="bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm">
-          <div className="p-2.5 border-b border-cyan-950 bg-[#061224] flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">
-              <Compass className="w-3.5 h-3.5 text-cyan-400" /> {t('dashboard.flightDeck')}
-            </div>
-            <span className="text-[10px] font-mono text-slate-500">
-              {activeSession?.lastLocation || 'Stanton'} · Live
+      {/* ══ FULL-WIDTH LIVE EVENT STREAM ══ */}
+      <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm min-h-0">
+        <div className="p-2.5 border-b border-cyan-950 bg-[#061224] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-amber-400" /> {t('dashboard.liveEvents')}
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/40 text-[10px] font-mono text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE TAIL
+            </span>
+            <span className="text-[10.5px] font-mono text-slate-500 hidden sm:inline">
+              ({events.length} Ereignisse in aktueller Session)
             </span>
           </div>
 
-          <div className="p-3.5 flex-1 overflow-y-auto space-y-3">
-            {/* Schiff & Status */}
-            <div className="p-3 rounded-lg bg-[#071322] border border-cyan-950/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded bg-cyan-950/50 border border-cyan-800/40 flex items-center justify-center text-cyan-400">
-                  <Rocket className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                    {t('dashboard.currentShip')}
-                  </div>
-                  <div className="text-sm font-bold text-slate-100 font-sans">
-                    {uniqueShips[0] || 'Kein Schiff aktiv'}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('fleet')}
-                className="px-2.5 py-1 rounded bg-[#0a1b33] hover:bg-cyan-950/80 border border-cyan-800/40 text-[11px] font-mono text-cyan-300 transition cursor-pointer"
-              >
-                Hangar →
-              </button>
-            </div>
-
-            {/* Standort & Sicherheitszone */}
-            <div className="p-3 rounded-lg bg-[#071322] border border-cyan-950/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded bg-emerald-950/50 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                    {t('dashboard.currentLocation')}
-                  </div>
-                  <div className="text-sm font-bold text-slate-100 font-sans">
-                    {activeSession?.lastLocation || 'Stanton Orbit'}
-                  </div>
-                  <div className="text-[10px] font-mono text-emerald-400 mt-0.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>{t('dashboard.safeZone')}</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('starmap')}
-                className="px-2.5 py-1 rounded bg-[#0a1b33] hover:bg-cyan-950/80 border border-cyan-800/40 text-[11px] font-mono text-cyan-300 transition cursor-pointer"
-              >
-                Starmap →
-              </button>
-            </div>
-
-            {/* Aktiver Auftrag */}
-            <div className="p-3 rounded-lg bg-[#071322] border border-cyan-950/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded bg-amber-950/50 border border-amber-800/40 flex items-center justify-center text-amber-400">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                    {t('dashboard.activeContract')}
-                  </div>
-                  <div className="text-xs font-semibold text-slate-200 font-sans">
-                    {events.find((e) => e.category === 'mission')?.title || 'Bereit für neue Aufträge'}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                    mobiGlas Contract Manager
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('missions')}
-                className="px-2.5 py-1 rounded bg-[#0a1b33] hover:bg-amber-950/80 border border-amber-800/40 text-[11px] font-mono text-amber-300 transition cursor-pointer"
-              >
-                Aufträge →
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => onNavigate('events')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#071322] hover:bg-cyan-950/60 border border-cyan-900/60 hover:border-cyan-700 text-xs font-mono text-cyan-300 hover:text-cyan-100 transition cursor-pointer"
+          >
+            <Scroll className="w-3 h-3 text-cyan-400" />
+            <span>Zur Chronik</span>
+            <ExternalLink className="w-2.5 h-2.5" />
+          </button>
         </div>
 
-        {/* Rechte Spalte: Live Event Feed */}
-        <div className="bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm">
-          <div className="p-2.5 border-b border-cyan-950 bg-[#061224] flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-amber-300">
-              <Activity className="w-3.5 h-3.5 text-amber-400" /> {t('dashboard.liveEvents')}
+        {/* Events Table */}
+        <div className="flex-1 overflow-y-auto">
+          {events.length === 0 ? (
+            <div className="py-24 text-center text-slate-500 font-mono text-xs">
+              <Radio className="w-6 h-6 text-cyan-500/40 mx-auto mb-2 animate-pulse" />
+              {t('dashboard.noEventsYet')}
             </div>
-            <button
-              onClick={() => onNavigate('events')}
-              className="text-[11px] font-mono text-cyan-400 hover:text-cyan-200 cursor-pointer transition"
-            >
-              {t('common.showAll')}
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
-            {events.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 font-mono text-xs">
-                <Radio className="w-5 h-5 text-cyan-500/40 mx-auto mb-2 animate-pulse" />
-                {t('dashboard.noEventsYet')}
-              </div>
-            ) : (
-              events.slice(0, 8).map((e) => (
-                <div
-                  key={e.id}
-                  onClick={() => onNavigate('events')}
-                  className="p-2 rounded bg-[#071322] border border-cyan-950/60 hover:border-cyan-700/60 transition cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{e.timestamp}</span>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-xs text-slate-200 group-hover:text-cyan-300 transition truncate">
+          ) : (
+            <table className="w-full text-left text-xs border-collapse font-mono">
+              <thead>
+                <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
+                  <th className="py-2 px-3 w-28">ZEIT</th>
+                  <th className="py-2 px-3 w-28">TYP</th>
+                  <th className="py-2 px-3 font-sans">DETAIL</th>
+                  <th className="py-2 px-3 w-36 hidden md:table-cell">SCHIFF</th>
+                  <th className="py-2 px-4 text-right w-36">BETRAG</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cyan-950/40">
+                {events.map((e) => (
+                  <tr
+                    key={e.id}
+                    onClick={() => onNavigate('events')}
+                    className="hover:bg-[#071628]/60 transition-colors cursor-pointer group"
+                  >
+                    <td className="py-2 px-3 text-slate-400 text-[11px] whitespace-nowrap">
+                      {e.timestamp}
+                    </td>
+                    <td className="py-2 px-3 whitespace-nowrap">
+                      {getCategoryBadge(e.category)}
+                    </td>
+                    <td className="py-2 px-3 font-sans text-xs">
+                      <div className="font-semibold text-slate-200 group-hover:text-cyan-300 transition">
                         {e.title}
                       </div>
-                      <div className="text-[10.5px] font-sans text-slate-400 truncate max-w-sm">
-                        {e.description}
-                      </div>
-                    </div>
-                  </div>
-                  {e.amount !== undefined && e.amount !== null && e.amount !== 0 && (
-                    <span
-                      className={`font-mono text-xs font-bold shrink-0 ml-2 ${
-                        e.amount > 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {e.amount > 0 ? '+' : ''}
-                      {formatNumber(e.amount)}
-                    </span>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
+                      {e.description && (
+                        <div className="text-[11px] text-slate-400 truncate max-w-xl">
+                          {e.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 hidden md:table-cell text-slate-400 text-[11px] truncate max-w-[140px]">
+                      {e.ship || '—'}
+                    </td>
+                    <td className="py-2 px-4 text-right whitespace-nowrap font-mono font-bold">
+                      {e.amount !== undefined && e.amount !== null && e.amount !== 0 ? (
+                        <span className={e.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                          {e.amount > 0 ? '+' : ''}
+                          {formatNumber(e.amount)} aUEC
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

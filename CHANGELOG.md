@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Full Reactive i18n System & Multi-Language Support (`frontend/src/i18n/`)**:
   - Implemented a complete frontend internationalization engine supporting German (`de`) and English (`en`) with `localStorage` language persistence.
   - Connected the Master Header vector flags (DE 🇩🇪 / EN 🇬🇧) to dynamically translate all top navigation tabs, group headers, 2-line HUD telemetry cards, session selector, and dashboard widgets instantly.
-- **Flight Deck Dashboard Modernization (`DashboardView.tsx`)**:
-  - Redesigned the start page to eliminate redundant session listings:
-    - Replaced the previous "Recent Sessions" list with a dedicated **Flight Deck & Live Telemetry** control card (active ship status, current location & armistice safety zone indicator, active mission preview with direct navigation links to Hangar, Starmap, and Missions).
-    - Expanded the **Live Event Feed** with categorized event entries, signed amounts, and direct navigation to the Chronik view.
+- **Full-Width Live Event Stream on Dashboard (`DashboardView.tsx`)**:
+  - Expanded the live event feed across the full width of the start page:
+    - Displays high-density Star Citizen events with timestamp, categorized color-coded pills (Finances, Combat, Mission, Ship, Location, System), detailed description, ship context, signed aUEC amounts, and direct navigation to the Chronik view.
+    - Removed redundant intermediate telemetry card for a cleaner, unified dashboard view.
 
 ### Changed
 - **Master Header Cleanup (`MasterHeader.tsx`, `App.tsx`)**:
