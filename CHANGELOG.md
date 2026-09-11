@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
 ### Changed
+- **Session Architecture & Live-Only Start Page (`SessionBar.tsx`, `App.tsx`, `EventsView.tsx`)**:
+  - Removed global session dropdown from the master `SessionBar` header, transforming it into a clean, permanent Live-Stream companion status bar (`LIVE-STREAM`, `Game.log`, active time span, and HUD collapse toggle).
+  - Ensured the start page (`EventsView`) is strictly dedicated to monitoring the active live session (`Game.log`), preventing accidental switching of global live telemetry to historical sessions.
+  - Contextually relocated historical session selection to `EventsView` under `Sitzungsarchiv` mode, where users can select and inspect any of the archived sessions or all sessions on demand.
 - **Finances Chart Overhaul & Modernization (`FinancesView.tsx`)**:
   - Removed misleading legacy "Quantum Timeline" badge and terminology, replacing it with an informative `SALDEN- & TRANSAKTIONSVERLAUF` header.
   - Eliminated dense static point circles that caused lumpy caterpillar-like stroke artifacts across dense ledger datasets.

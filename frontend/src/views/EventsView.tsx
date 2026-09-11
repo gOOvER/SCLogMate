@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { bridge, LogEventItem } from '../services/photinoBridge';
+import { bridge, LogEventItem, SessionSummary } from '../services/photinoBridge';
 import {
+  Archive,
   Check,
   ChevronDown,
   ChevronUp,
@@ -21,13 +22,15 @@ type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
 
 interface EventsViewProps {
-  selectedSession?: string;
+  sessions?: SessionSummary[];
 }
 
 export const EventsView: React.FC<EventsViewProps> = ({
-  selectedSession = '__live__',
+  sessions = [],
 }) => {
   const [events, setEvents] = useState<LogEventItem[]>([]);
+  const [viewMode, setViewMode] = useState<'live' | 'archive'>('live');
+  const [archiveSession, setArchiveSession] = useState<string>('__all__');
   const [category, setCategory] = useState<string>('Alle');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -37,15 +40,16 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const fetchEvents = async (count = limit, sessionTarget = selectedSession) => {
+  const activeSession = viewMode === 'live' ? '__live__' : archiveSession;
+
+  const fetchEvents = async (count = limit, sessionTarget = activeSession) => {
     try {
       setLoading(true);
       const res = await bridge.sendRequest<LogEventItem[]>('get_events', {
         session: sessionTarget,
         category,
-        search,
+        search: search.trim() || undefined,
         limit: count,
-        offset: 0,
       });
       setEvents(res);
       if (res.length > 0 && !selectedEvent) {
@@ -59,17 +63,17 @@ export const EventsView: React.FC<EventsViewProps> = ({
   };
 
   useEffect(() => {
-    fetchEvents(limit, selectedSession);
-  }, [category, selectedSession]);
+    fetchEvents(limit, activeSession);
+  }, [category, activeSession]);
 
-  // Live log subscription (active when live session is selected)
+  // Live log subscription (active only in live stream mode)
   useEffect(() => {
-    if (selectedSession !== '__live__') return;
+    if (activeSession !== '__live__') return;
     const unbind = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
       setEvents((prev) => [newEvent, ...prev.slice(0, limit - 1)]);
     });
     return () => unbind();
-  }, [selectedSession, limit]);
+  }, [activeSession, limit]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -217,34 +221,58 @@ export const EventsView: React.FC<EventsViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[#040914]/90 border border-cyan-950/80 backdrop-blur-md shrink-0">
         {/* Left: Active Mode Pill & Filter Chips */}
         <div className="flex items-center gap-3 min-w-0 flex-1 overflow-x-auto no-scrollbar">
-          {/* Active Mode Pill */}
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded bg-[#061426] border border-cyan-800/50 shadow-sm shrink-0">
-            {selectedSession === '__live__' ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-emerald-400 font-mono text-[11px] font-bold tracking-wider">
-                  LIVE-STREAM
-                </span>
-              </>
-            ) : selectedSession === '__all__' ? (
-              <>
-                <span className="text-xs">🌐</span>
-                <span className="text-cyan-300 font-mono text-[11px] font-bold tracking-wider">
-                  ALLE SITZUNGEN
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-xs text-sky-400">📁</span>
-                <span className="text-slate-300 font-mono text-[11px] font-semibold truncate max-w-[150px]" title={selectedSession}>
-                  {selectedSession}
-                </span>
-              </>
-            )}
+          {/* Mode Switch: Live-Stream vs Sitzungsarchiv */}
+          <div className="flex items-center gap-1.5 shrink-0 bg-[#030814] p-0.5 rounded border border-cyan-950">
+            <button
+              type="button"
+              onClick={() => setViewMode('live')}
+              className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === 'live'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/70 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                  : 'text-slate-400 hover:text-white border border-transparent'
+              }`}
+              title="Startseite: Live-Stream der aktuellen Star Citizen Sitzung"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Live-Stream</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('archive')}
+              className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === 'archive'
+                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-white border border-transparent'
+              }`}
+              title="Sitzungsarchiv: Frühere Logdateien auswählen und durchsuchen"
+            >
+              <Archive className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Sitzungsarchiv</span>
+            </button>
           </div>
+
+          {/* Wenn Archiv gewählt ist: Dropdown für archivierte Sitzungen */}
+          {viewMode === 'archive' && (
+            <div className="relative shrink-0 animate-in fade-in duration-200">
+              <select
+                value={archiveSession}
+                onChange={(e) => setArchiveSession(e.target.value)}
+                className="appearance-none bg-[#071322] border border-cyan-900/80 hover:border-cyan-500 rounded px-2.5 py-1 pr-7 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 transition cursor-pointer max-w-[220px] sm:max-w-xs truncate"
+              >
+                <option value="__all__">🌐 Alle Sitzungen (Gesamthistorie)</option>
+                {sessions.map((s) => (
+                  <option key={s.id || s.name} value={s.name}>
+                    📁 {s.name} ({s.startTime} · {s.duration})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )}
 
           <div className="h-4 w-px bg-cyan-950/80 hidden sm:block shrink-0" />
 

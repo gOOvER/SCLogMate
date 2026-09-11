@@ -184,14 +184,6 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSelectSession = async (sessionName: string) => {
-    try {
-      const res = await bridge.sendRequest<HudTelemetry>('select_session', { session: sessionName });
-      if (res) setTelemetry(res);
-    } catch (err) {
-      console.error('Failed to select session:', err);
-    }
-  };
 
   const handleTriggerOcr = async () => {
     try {
@@ -267,15 +259,11 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* mobiGlas Session-Strip: Dropdown, Zeitspanne & HUD-Toggle */}
+        {/* Live-Status Strip: Aktive Sitzung, Zeitspanne & HUD-Toggle */}
         <SessionBar
-          sessions={sessions}
-          selectedSession={telemetry.selectedSession}
           sessionSpanText={telemetry.sessionSpanText}
           isHudCollapsed={isHudCollapsed}
-          isDashboard={false}
           activeSessionName={status?.activeSessionName || undefined}
-          onSelectSession={handleSelectSession}
           onToggleHudCollapsed={() => setIsHudCollapsed(!isHudCollapsed)}
         />
 
@@ -293,7 +281,7 @@ export const App: React.FC = () => {
         <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4">
           {activeTab === 'events' && (
             <EventsView
-              selectedSession={telemetry.selectedSession}
+              sessions={sessions}
             />
           )}
 
