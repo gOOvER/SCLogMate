@@ -17,6 +17,11 @@ import {
   FolderOpen,
   Sparkles,
   Wrench,
+  Cloud,
+  RotateCcw,
+  Archive,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import { bridge, ToolsStatusDto } from '../services/photinoBridge';
 
@@ -26,9 +31,15 @@ export const ToolsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [cfgContent, setCfgContent] = useState('');
-  const [backupNote, setBackupNote] = useState('');
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Backups & Tresor state
+  const [selectedKeybindIndex, setSelectedKeybindIndex] = useState<number>(0);
+  const [selectedConfigIndex, setSelectedConfigIndex] = useState<number>(0);
+  const [cloudPath, setCloudPath] = useState('');
+  const [keybindNote, setKeybindNote] = useState('');
+  const [configNote, setConfigNote] = useState('');
 
   // Presets & Tuning controls
   const [vsyncOff, setVsyncOff] = useState(true);
@@ -50,6 +61,9 @@ export const ToolsView: React.FC = () => {
       const data = await bridge.send<ToolsStatusDto>('get_tools_status');
       setStatus(data);
       setCfgContent(data.userCfgContent || '');
+      if (data.cloudStoragePath !== undefined) {
+        setCloudPath(data.cloudStoragePath || '');
+      }
       parseCfgContent(data.userCfgContent || '');
     } catch (err) {
       console.error('Failed to load tools status:', err);
@@ -189,18 +203,140 @@ export const ToolsView: React.FC = () => {
     }
   };
 
-  const handleCreateBackup = async () => {
-    setActionLoading('backup');
+  const handleCreateKeybindBackup = async () => {
+    setActionLoading('backupKeybind');
     try {
-      const res = await bridge.send<ToolsStatusDto>('backup_keybinds', { note: backupNote });
+      const res = await bridge.send<ToolsStatusDto>('backup_keybinds', { note: keybindNote });
       setStatus(res);
-      setBackupNote('');
+      setKeybindNote('');
       showToast('Keybind-Backup erfolgreich angelegt!');
     } catch (err) {
       console.error(err);
       showToast('Fehler beim Erstellen des Keybind-Backups');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleRestoreKeybind = async () => {
+    const keybinds = status?.keybindItems || [];
+    const item = keybinds[selectedKeybindIndex];
+    if (!item) {
+      showToast('Bitte wähle zuerst ein Keybind-Backup aus.');
+      return;
+    }
+
+    setActionLoading('restoreKeybind');
+    try {
+      const res = await bridge.send<{ success: boolean; message: string; tools?: ToolsStatusDto }>('restore_keybinds', {
+        name: item.name,
+        folderPath: item.folderPath,
+      });
+      if (res.tools) setStatus(res.tools);
+      showToast(res.message || 'Keybinds erfolgreich wiederhergestellt!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Wiederherstellen der Keybinds');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBackupUserCfgSnapshot = async () => {
+    setActionLoading('backupCfg');
+    try {
+      const res = await bridge.send<{ success: boolean; message: string; tools?: ToolsStatusDto }>('backup_user_cfg', {
+        note: configNote || 'Manuell',
+      });
+      if (res.tools) setStatus(res.tools);
+      setConfigNote('');
+      showToast(res.message || 'user.cfg Snapshot archiviert!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Archivieren des user.cfg Snapshots');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestoreConfigSnapshot = async () => {
+    const configs = status?.configBackups || [];
+    const item = configs[selectedConfigIndex];
+    if (!item) {
+      showToast('Bitte wähle zuerst eine Version aus.');
+      return;
+    }
+
+    setActionLoading('restoreCfg');
+    try {
+      const res = await bridge.send<{ success: boolean; message: string; tools?: ToolsStatusDto }>('restore_user_cfg', {
+        name: item.name,
+        filePath: item.filePath,
+      });
+      if (res.tools) {
+        setStatus(res.tools);
+        setCfgContent(res.tools.userCfgContent || '');
+      }
+      showToast(res.message || 'user.cfg Stand wiederhergestellt!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Wiederherstellen der Version');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSaveCloudPath = async () => {
+    setActionLoading('saveCloud');
+    try {
+      const res = await bridge.send<{ success: boolean; tools?: ToolsStatusDto }>('save_cloud_storage_path', {
+        path: cloudPath,
+      });
+      if (res.tools) setStatus(res.tools);
+      showToast('Cloud-Speicherpfad gespeichert!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Speichern des Cloud-Pfads');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleExportLogsZip = async () => {
+    setActionLoading('exportZip');
+    try {
+      const res = await bridge.send<{ success: boolean; message: string; zipPath?: string }>('export_logs_zip');
+      showToast(res.message || 'Logs erfolgreich als ZIP exportiert!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Exportieren der Logs');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSyncLogsCloud = async () => {
+    setActionLoading('syncCloud');
+    try {
+      const res = await bridge.send<{ success: boolean; message: string }>('sync_logs_cloud');
+      showToast(res.message || 'Logs erfolgreich in Cloud gesichert!');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Synchronisieren in die Cloud');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleOpenFolder = async (folderType: 'keybinds' | 'config' | 'cloud' | 'logbackups') => {
+    try {
+      const res = await bridge.send<{ success: boolean; error?: string }>('open_folder', { folderType });
+      if (!res.success && res.error) {
+        showToast(res.error);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Öffnen des Ordners');
     }
   };
 
@@ -261,7 +397,7 @@ export const ToolsView: React.FC = () => {
             <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} />
             <span>Neu laden</span>
           </button>
-          {activeSubTab === 'maintenance' && (
+          {activeSubTab === 'maintenance' ? (
             <button
               onClick={handleSaveUserCfg}
               disabled={actionLoading !== null}
@@ -269,6 +405,15 @@ export const ToolsView: React.FC = () => {
             >
               <Save className="w-4 h-4" />
               <span>user.cfg Speichern</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleCreateKeybindBackup}
+              disabled={actionLoading !== null}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 border border-purple-400 transition cursor-pointer"
+            >
+              <Archive className="w-4 h-4" />
+              <span>✦ Keybinds sichern</span>
             </button>
           )}
         </div>
@@ -291,12 +436,12 @@ export const ToolsView: React.FC = () => {
           onClick={() => setActiveSubTab('backups')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
             activeSubTab === 'backups'
-              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
               : 'bg-slate-900/40 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-transparent'
           }`}
         >
-          <Key className="w-4 h-4" />
-          <span>Backups (ActionMaps)</span>
+          <Archive className="w-4 h-4" />
+          <span>💾 Backups &amp; Tresor</span>
         </button>
       </div>
 
@@ -639,16 +784,16 @@ export const ToolsView: React.FC = () => {
               <input
                 type="text"
                 placeholder="Optionale Notiz (z. B. HOSAS Dual-Stick 3.24)..."
-                value={backupNote}
-                onChange={(e) => setBackupNote(e.target.value)}
-                className="flex-1 bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                value={keybindNote}
+                onChange={(e) => setKeybindNote(e.target.value)}
+                className="flex-1 bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
               />
               <button
-                onClick={handleCreateBackup}
-                disabled={actionLoading === 'backup'}
-                className="px-3 py-2 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 text-xs font-semibold border border-sky-500/40 transition shrink-0"
+                onClick={handleCreateKeybindBackup}
+                disabled={actionLoading === 'backupKeybind'}
+                className="px-3 py-2 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 text-xs font-semibold border border-sky-500/40 transition shrink-0 cursor-pointer"
               >
-                {actionLoading === 'backup' ? 'Sichere...' : '+ Backup'}
+                {actionLoading === 'backupKeybind' ? 'Sichere...' : '+ Backup'}
               </button>
             </div>
 
@@ -744,94 +889,390 @@ export const ToolsView: React.FC = () => {
     </div>
   )}
 
-      {/* SubTab 2: Backups (ActionMaps & Keybinds) */}
+      {/* SubTab 2: Backups & Tresor (RC2 Star Citizen Tresor & Backup-Zentrale) */}
       {activeSubTab === 'backups' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Top Banner */}
+          <div className="p-5 rounded-xl bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-sky-950/40 border border-purple-800/40 backdrop-blur shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
+                <Archive className="w-6 h-6" />
+              </div>
               <div>
-                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                  <Key className="w-4 h-4" />
-                  <span>STAR CITIZEN ACTIONMAPS & KEYBIND-ARCHIV</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Sichert deine Steuerungsprofile (Tastatur, Maus, HOTAS, HOSAS, Rudder) vor großen Patches oder versehentlichem Überschreiben.
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-base font-bold text-white tracking-wide">
+                    STAR CITIZEN TRESOR &amp; BACKUP-ZENTRALE
+                  </h1>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-purple-950 text-purple-300 border border-purple-800">
+                    RC2 Standard
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1 font-mono">
+                  Zentrale Verwaltung aller Steuerungsbelegungen, user.cfg-Snapshots und Cloud-Replikation.
                 </p>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <span className="text-xs px-3 py-1 rounded-full bg-sky-950 text-sky-400 border border-sky-800 font-mono">
-                  {status?.keybindBackups?.length || 0} Gesicherte Profile
-                </span>
-              </div>
             </div>
 
-            {/* Neues Backup anlegen */}
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
-              <div className="text-xs font-semibold text-slate-200">
-                Neues Keybind-Backup erstellen
-              </div>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="text"
-                  placeholder="Optionale Notiz (z. B. HOSAS Dual-Stick Alpha 4.8)..."
-                  value={backupNote}
-                  onChange={(e) => setBackupNote(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
-                />
-                <button
-                  onClick={handleCreateBackup}
-                  disabled={actionLoading === 'backup'}
-                  className="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer shrink-0 disabled:opacity-50"
-                >
-                  {actionLoading === 'backup' ? 'Sichere...' : '+ Backup jetzt anlegen'}
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => handleOpenFolder('keybinds')}
+                title="Öffnet den lokalen Keybind-Backup-Ordner"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-purple-950/50 hover:bg-purple-900/70 text-purple-300 text-xs font-semibold border border-purple-800/60 transition cursor-pointer"
+              >
+                <span>🎮 Keybinds-Ordner</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => handleOpenFolder('config')}
+                title="Öffnet den lokalen Config-Backup-Ordner"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-sky-950/50 hover:bg-sky-900/70 text-sky-300 text-xs font-semibold border border-sky-800/60 transition cursor-pointer"
+              >
+                <span>⚙️ Config-Ordner</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => handleOpenFolder('cloud')}
+                title="Öffnet den konfigurierten Cloud-Speicherordner"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+              >
+                <span>☁️ Cloud-Ordner</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
             </div>
+          </div>
 
-            {/* Backups List */}
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-slate-300">
-                Vorhandene Sicherungen
-              </div>
-              {status?.keybindBackups && status.keybindBackups.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {status.keybindBackups.map((b, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between transition group"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-lg bg-sky-950/80 border border-sky-800/60 flex items-center justify-center text-sky-400 shrink-0">
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-200 group-hover:text-sky-300 font-mono">
-                            {b}
-                          </div>
-                          <div className="text-[11px] text-slate-500">
-                            actionmaps.xml Sicherung
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">
-                        Aktiv gesichert
-                      </span>
+          {/* 2-Spalten Layout: Keybind-Tresor links, user.cfg & Cloud rechts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Linke Spalte: Keybind-Tresor */}
+            <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                      <Key className="w-4 h-4" />
                     </div>
-                  ))}
+                    <h2 className="text-xs font-bold text-purple-300 tracking-wider">
+                      KEYBIND-TRESOR (ACTIONMAPS.XML)
+                    </h2>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
+                      {status?.keybindItems?.length ?? status?.keybindBackups?.length ?? 0} Gesichert
+                    </span>
+                    <button
+                      onClick={() => handleOpenFolder('keybinds')}
+                      title="Keybind-Ordner im Windows Explorer öffnen"
+                      className="p-1.5 rounded-md bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800/60 transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="p-8 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic">
-                  Noch keine manuellen Keybind-Backups vorhanden. Klicke auf "+ Backup jetzt anlegen", um deine Belegungen vor Patches zu sichern.
+
+                <p className="text-xs text-slate-400">
+                  Sichert alle Steuerungs-Mappings &amp; Joystick-Profile vor Spiel-Updates – lokal und in deiner Cloud.
+                </p>
+
+                {/* Neues Keybind-Backup anlegen */}
+                <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2.5">
+                  <div className="text-xs font-semibold text-slate-300">
+                    Neues Keybind-Backup erstellen
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      placeholder="Optionale Notiz (z. B. HOSAS VKB Patch 4.0)..."
+                      value={keybindNote}
+                      onChange={(e) => setKeybindNote(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                    <button
+                      onClick={handleCreateKeybindBackup}
+                      disabled={actionLoading !== null}
+                      className="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 border border-purple-400 transition cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      <Archive className={`w-3.5 h-3.5 ${actionLoading === 'backupKeybind' ? 'animate-spin' : ''}`} />
+                      <span>✦ Jetzt sichern</span>
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                {/* Backup-Liste */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                    <span>Gespeicherte Profile</span>
+                    <span className="text-[11px] text-slate-500 font-normal">Klicke zum Auswählen</span>
+                  </div>
+
+                  {status?.keybindItems && status.keybindItems.length > 0 ? (
+                    <div className="space-y-2 overflow-y-auto max-h-[260px] pr-1">
+                      {status.keybindItems.map((item, idx) => {
+                        const isSelected = selectedKeybindIndex === idx;
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => setSelectedKeybindIndex(idx)}
+                            className={`p-3 rounded-lg border transition cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-purple-950/40 border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                : 'bg-slate-950/80 border-slate-800/80 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                                  isSelected
+                                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-400'
+                                }`}
+                              >
+                                <Key className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-slate-200 truncate font-mono">
+                                  {item.name}
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  Erstellt: {item.createdAt}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2 shrink-0">
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${
+                                  item.locationType.includes('Cloud')
+                                    ? 'bg-sky-950/80 text-sky-400 border-sky-800'
+                                    : 'bg-slate-900 text-slate-300 border-slate-700'
+                                }`}
+                              >
+                                {item.locationType}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {item.sizeFormatted}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : status?.keybindBackups && status.keybindBackups.length > 0 ? (
+                    <div className="space-y-2 overflow-y-auto max-h-[260px] pr-1">
+                      {status.keybindBackups.map((name, idx) => {
+                        const isSelected = selectedKeybindIndex === idx;
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => setSelectedKeybindIndex(idx)}
+                            className={`p-3 rounded-lg border transition cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-purple-950/40 border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                : 'bg-slate-950/80 border-slate-800/80 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0">
+                                <Key className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-slate-200 truncate font-mono">
+                                  {name}
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  actionmaps.xml Sicherung
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-semibold border bg-slate-900 text-slate-300 border-slate-700">
+                              Lokal
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic">
+                      Noch keine Keybind-Backups vorhanden. Klicke auf "✦ Jetzt sichern", um deine Belegungen vor Patches zu sichern.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Wiederherstellen Bar */}
+              <div className="pt-3 border-t border-slate-800/80 space-y-3">
+                <div className="p-3 rounded-lg bg-slate-950/90 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-xs text-slate-400">
+                    <span>Ausgewähltes Profil wiederherstellen:</span>
+                    {status?.keybindItems && status.keybindItems[selectedKeybindIndex] && (
+                      <span className="ml-1.5 text-purple-300 font-mono font-semibold">
+                        {status.keybindItems[selectedKeybindIndex].name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleRestoreKeybind}
+                    disabled={actionLoading !== null || !status?.keybindItems?.length}
+                    className="flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 border border-purple-400 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === 'restoreKeybind' ? 'animate-spin' : ''}`} />
+                    <span>↺ Wiederherstellen</span>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-lg bg-purple-950/20 border border-purple-900/30 flex items-start space-x-2.5 text-xs text-slate-400">
+                  <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-relaxed">
+                    Backups werden sicher in <code className="text-purple-300">USER\Client\0\Controls\Mappings</code> und im SCLogMate-Tresor verwahrt.
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Info Banner */}
-            <div className="p-4 rounded-xl bg-sky-950/20 border border-sky-900/30 flex items-start space-x-3 text-xs text-slate-400">
-              <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">
-                Backups werden im Unterordner <code className="text-sky-300">USER\Client\0\Controls\Mappings\Backups</code> deiner Star Citizen Installation gespeichert und können jederzeit im Spiel unter "Options → Keybindings → Import Action Maps" wieder geladen werden.
+            {/* Rechte Spalte: user.cfg Snapshots & Cloud-Speicher */}
+            <div className="space-y-6">
+              
+              {/* Card 1: user.cfg Snapshots */}
+              <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <h2 className="text-xs font-bold text-sky-400 tracking-wider">
+                      USER.CFG VERSIONS-ARCHIV
+                    </h2>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800 font-mono font-semibold">
+                      {status?.configBackups?.length || 0} Versionen
+                    </span>
+                    <button
+                      onClick={() => handleOpenFolder('config')}
+                      title="Config-Ordner im Windows Explorer öffnen"
+                      className="p-1.5 rounded-md bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 border border-sky-800/60 transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Historische Versionen deiner Tuning-Konfiguration. Schneller Rollback auf bewährte Setups.
+                </p>
+
+                {/* Dropdown & Rollback */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <select
+                    value={selectedConfigIndex}
+                    onChange={(e) => setSelectedConfigIndex(parseInt(e.target.value, 10) || 0)}
+                    className="sm:col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+                  >
+                    {status?.configBackups && status.configBackups.length > 0 ? (
+                      status.configBackups.map((c, idx) => (
+                        <option key={idx} value={idx}>
+                          {c.name} ({c.createdAt}) [{c.locationType}]
+                        </option>
+                      ))
+                    ) : (
+                      <option value={0}>Keine Versionen vorhanden</option>
+                    )}
+                  </select>
+
+                  <button
+                    onClick={handleRestoreConfigSnapshot}
+                    disabled={actionLoading !== null || !status?.configBackups?.length}
+                    className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-sky-600/90 hover:bg-sky-500 text-white text-xs font-bold border border-sky-400 shadow-md shadow-sky-600/20 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === 'restoreCfg' ? 'animate-spin' : ''}`} />
+                    <span>↺ Rollback</span>
+                  </button>
+                </div>
+
+                {/* Snapshot archivieren */}
+                <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="Optionale Notiz (z. B. Vor 4.0 Patch)..."
+                    value={configNote}
+                    onChange={(e) => setConfigNote(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
+                  />
+                  <button
+                    onClick={handleBackupUserCfgSnapshot}
+                    disabled={actionLoading !== null}
+                    className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5 text-sky-400" />
+                    <span>⤓ Stand archivieren</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Cloud-Speicher & Log-Archiv */}
+              <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                      <Cloud className="w-3.5 h-3.5" />
+                    </div>
+                    <h2 className="text-xs font-bold text-sky-400 tracking-wider">
+                      CLOUD-SPEICHER &amp; LOG-ARCHIV
+                    </h2>
+                  </div>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                    OneDrive / Dropbox
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Synchronisiere Sicherungen und exportiere Log-Historien direkt in deinen Cloud-Dienst.
+                </p>
+
+                {/* Cloud Path Input */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Cloud-Pfad (z. B. C:\Users\...\OneDrive\StarCitizen)..."
+                    value={cloudPath}
+                    onChange={(e) => setCloudPath(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                  />
+                  <button
+                    onClick={handleSaveCloudPath}
+                    disabled={actionLoading !== null}
+                    title="Pfad in Einstellungen speichern"
+                    className="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold border border-sky-400 transition cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    Speichern
+                  </button>
+                  <button
+                    onClick={() => handleOpenFolder('cloud')}
+                    title="Im Windows Explorer öffnen"
+                    className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 transition cursor-pointer shrink-0"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+                  <button
+                    onClick={handleExportLogsZip}
+                    disabled={actionLoading !== null}
+                    className="flex items-center justify-center space-x-2 p-2.5 rounded-lg bg-slate-950 hover:bg-slate-850 text-slate-200 text-xs font-semibold border border-slate-800 hover:border-slate-700 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-400" />
+                    <span>⤓ Logs als ZIP</span>
+                  </button>
+                  <button
+                    onClick={handleSyncLogsCloud}
+                    disabled={actionLoading !== null}
+                    className="flex items-center justify-center space-x-2 p-2.5 rounded-lg bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 text-xs font-bold border border-sky-800/60 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                    <span>☁ In Cloud sichern</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

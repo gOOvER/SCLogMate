@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Star Citizen Tresor & Backup-Zentrale Full RC2 Restoration (`ToolsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Restored complete two-column **Star Citizen Tresor & Backup-Zentrale** layout in `ToolsView.tsx` matching Avalonia RC2 (`MainWindow.axaml:4400-4640`).
+  - Added dedicated header banner with 1-click explorer buttons for `Keybinds-Ordner ↗`, `Config-Ordner ↗`, and `Cloud-Ordner ↗`.
+  - Implemented **Keybind-Tresor (`actionmaps.xml`)**:
+    - Selectable backup list with creation date, location badges (`Lokal`, `Cloud`, `Lokal + Cloud`), file count, and formatted size.
+    - Backup creation with custom user notes (`✦ Jetzt sichern` / `backup_keybinds`).
+    - One-click restore to active Star Citizen LIVE folder (`↺ Wiederherstellen` / `restore_keybinds`).
+    - Windows Explorer direct link for the keybinds directory.
+  - Implemented **user.cfg Versions-Archiv**:
+    - Historical version dropdown selector with timestamp and size details.
+    - One-click rollback button to restore chosen configuration (`restore_user_cfg`).
+    - Snapshot archive button with custom note input (`⤓ Stand archivieren` / `backup_user_cfg`).
+  - Implemented **Cloud-Speicher & Log-Archiv**:
+    - Cloud path configuration with direct validation and persistence (`save_cloud_storage_path`).
+    - Windows Explorer opening for cloud storage folder.
+    - One-click ZIP exporter compressing all game and archive logs into a desktop/cloud zip file (`export_logs_zip`).
+    - Automatic cloud synchronization replicating new log backups into the configured cloud destination (`sync_logs_cloud`).
 - **mobiGlas Delphi Reputation Calibration & SQLite Persistence (`ReputationView.tsx`, `PhotinoBridge.cs`, `Database.cs`)**:
   - Solved missing or inaccurate reputation caused by Star Citizen's ephemeral `Game.log` files by persistently backing faction standing in SQLite (`reputation` table).
   - Added `SetFactionReputation` to `Database.cs` and new RPC handlers `set_reputation`, `adjust_reputation_xp`, and `reset_reputation` to `PhotinoBridge.cs`.

@@ -394,6 +394,23 @@ export interface MarketCommodityDto {
   bestSellLocation: string;
 }
 
+export interface KeybindBackupItemDto {
+  name: string;
+  folderPath: string;
+  createdAt: string;
+  fileCount: number;
+  locationType: string;
+  sizeFormatted: string;
+}
+
+export interface ConfigBackupItemDto {
+  name: string;
+  filePath: string;
+  createdAt: string;
+  locationType: string;
+  sizeFormatted: string;
+}
+
 export interface ToolsStatusDto {
   shaderCacheMb: number;
   crashDumpsMb: number;
@@ -406,6 +423,11 @@ export interface ToolsStatusDto {
   freeDiskGb: number;
   pagefileStatus: string;
   keybindBackups: string[];
+  cloudStoragePath?: string;
+  keybindItems?: KeybindBackupItemDto[];
+  configBackups?: ConfigBackupItemDto[];
+  keybindsDir?: string;
+  configDir?: string;
 }
 
 export interface ScanRegionDto {
@@ -1475,6 +1497,13 @@ class PhotinoBridge {
       case 'clear_crash_dumps':
       case 'save_user_cfg':
       case 'backup_keybinds':
+      case 'restore_keybinds':
+      case 'backup_user_cfg':
+      case 'restore_user_cfg':
+      case 'save_cloud_storage_path':
+      case 'export_logs_zip':
+      case 'sync_logs_cloud':
+      case 'open_folder':
         return {
           shaderCacheMb: type === 'clear_shader_cache' ? 0 : 342.5,
           crashDumpsMb: type === 'clear_crash_dumps' ? 0 : 85.2,
@@ -1486,10 +1515,47 @@ class PhotinoBridge {
           driveName: 'J:',
           freeDiskGb: 485.6,
           pagefileStatus: 'Aktiv (NVMe SSD)',
+          cloudStoragePath: 'C:\\Users\\Pilot\\OneDrive\\StarCitizen',
           keybindBackups: [
             'backup_2026-03-01_dualstick (5 Dateien, 1.2 MB)',
             'backup_2026-02-15_flight (4 Dateien, 980 KB)',
           ],
+          keybindItems: [
+            {
+              name: 'backup_2026-03-01_dualstick',
+              folderPath: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\keybind_backups\\backup_2026-03-01_dualstick',
+              createdAt: '01.03.2026 18:30',
+              fileCount: 5,
+              locationType: 'Lokal + Cloud',
+              sizeFormatted: '1.2 MB',
+            },
+            {
+              name: 'backup_2026-02-15_flight',
+              folderPath: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\keybind_backups\\backup_2026-02-15_flight',
+              createdAt: '15.02.2026 14:15',
+              fileCount: 4,
+              locationType: 'Lokal',
+              sizeFormatted: '980 KB',
+            },
+          ],
+          configBackups: [
+            {
+              name: 'user_2026-03-01_18-30-00.cfg',
+              filePath: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\config_backups\\user_2026-03-01_18-30-00.cfg',
+              createdAt: '01.03.2026 18:30',
+              locationType: 'Lokal + Cloud',
+              sizeFormatted: '1.4 KB',
+            },
+            {
+              name: 'user_2026-02-15_14-15-00.cfg',
+              filePath: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\config_backups\\user_2026-02-15_14-15-00.cfg',
+              createdAt: '15.02.2026 14:15',
+              locationType: 'Lokal',
+              sizeFormatted: '1.2 KB',
+            },
+          ],
+          keybindsDir: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\keybind_backups',
+          configDir: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\config_backups',
         } as ToolsStatusDto;
 
       case 'get_settings':

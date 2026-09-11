@@ -649,6 +649,25 @@ public class MarketCommodityDto
     [JsonPropertyName("bestSellLocation")] public string BestSellLocation { get; set; } = "";
 }
 
+public class KeybindBackupItemDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("folderPath")] public string FolderPath { get; set; } = "";
+    [JsonPropertyName("createdAt")] public string CreatedAt { get; set; } = "";
+    [JsonPropertyName("fileCount")] public int FileCount { get; set; }
+    [JsonPropertyName("locationType")] public string LocationType { get; set; } = "Lokal";
+    [JsonPropertyName("sizeFormatted")] public string SizeFormatted { get; set; } = "";
+}
+
+public class ConfigBackupItemDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("filePath")] public string FilePath { get; set; } = "";
+    [JsonPropertyName("createdAt")] public string CreatedAt { get; set; } = "";
+    [JsonPropertyName("locationType")] public string LocationType { get; set; } = "Lokal";
+    [JsonPropertyName("sizeFormatted")] public string SizeFormatted { get; set; } = "";
+}
+
 public class ToolsStatusDto
 {
     [JsonPropertyName("shaderCacheMb")] public double ShaderCacheMb { get; set; }
@@ -662,6 +681,11 @@ public class ToolsStatusDto
     [JsonPropertyName("freeDiskGb")] public double FreeDiskGb { get; set; }
     [JsonPropertyName("pagefileStatus")] public string PagefileStatus { get; set; } = "Aktiv";
     [JsonPropertyName("keybindBackups")] public List<string> KeybindBackups { get; set; } = new();
+    [JsonPropertyName("cloudStoragePath")] public string? CloudStoragePath { get; set; }
+    [JsonPropertyName("keybindItems")] public List<KeybindBackupItemDto> KeybindItems { get; set; } = new();
+    [JsonPropertyName("configBackups")] public List<ConfigBackupItemDto> ConfigBackups { get; set; } = new();
+    [JsonPropertyName("keybindsDir")] public string KeybindsDir { get; set; } = MaintenanceService.LocalKeybindsBackupDir;
+    [JsonPropertyName("configDir")] public string ConfigDir { get; set; } = MaintenanceService.LocalConfigBackupDir;
 }
 
 public class SettingsDto
@@ -1361,6 +1385,90 @@ public class PhotinoBridge
                     SendResponse(req.Id, "backup_keybinds_response", BackupKeybinds(note));
                     break;
 
+                case "restore_keybinds":
+                    if (req.Payload.HasValue)
+                    {
+                        string bName = req.Payload.Value.TryGetProperty("name", out var bnProp) ? bnProp.GetString() ?? "" : "";
+                        string bPath = req.Payload.Value.TryGetProperty("folderPath", out var bpProp) ? bpProp.GetString() ?? "" : "";
+                        var s = Settings.Load();
+                        var allKeybinds = MaintenanceService.ListKeybindBackups(s.CloudStoragePath);
+                        var targetBackup = allKeybinds.FirstOrDefault(k => (!string.IsNullOrEmpty(bPath) && k.FolderPath.Equals(bPath, StringComparison.OrdinalIgnoreCase)) || k.Name.Equals(bName, StringComparison.OrdinalIgnoreCase));
+                        if (targetBackup != null)
+                        {
+                            var res = MaintenanceService.RestoreKeybinds(targetBackup, _currentLogPath);
+                            SendResponse(req.Id, "restore_keybinds_response", new { success = res.success, message = res.message, tools = GetToolsStatus() });
+                        }
+                        else
+                        {
+                            SendResponse(req.Id, "restore_keybinds_response", new { success = false, message = "Steuerungs-Backup nicht gefunden.", tools = GetToolsStatus() });
+                        }
+                    }
+                    break;
+
+                case "backup_user_cfg":
+                    string? cfgNote = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("note", out var cnProp))
+                    {
+                        cfgNote = cnProp.GetString();
+                    }
+                    var setts = Settings.Load();
+                    var bRes = MaintenanceService.BackupUserCfg(_currentLogPath, setts.CloudStoragePath, cfgNote ?? "Manuell");
+                    SendResponse(req.Id, "backup_user_cfg_response", new { success = bRes.success, message = bRes.message, tools = GetToolsStatus() });
+                    break;
+
+                case "restore_user_cfg":
+                    if (req.Payload.HasValue)
+                    {
+                        string cName = req.Payload.Value.TryGetProperty("name", out var cNameProp) ? cNameProp.GetString() ?? "" : "";
+                        string cPath = req.Payload.Value.TryGetProperty("filePath", out var cPathProp) ? cPathProp.GetString() ?? "" : "";
+                        var st = Settings.Load();
+                        var allCfgs = MaintenanceService.ListConfigBackups(st.CloudStoragePath);
+                        var targetCfg = allCfgs.FirstOrDefault(c => (!string.IsNullOrEmpty(cPath) && c.FilePath.Equals(cPath, StringComparison.OrdinalIgnoreCase)) || c.Name.Equals(cName, StringComparison.OrdinalIgnoreCase));
+                        if (targetCfg != null)
+                        {
+                            var rRes = MaintenanceService.RestoreConfigBackup(targetCfg, _currentLogPath);
+                            SendResponse(req.Id, "restore_user_cfg_response", new { success = rRes.success, message = rRes.message, tools = GetToolsStatus() });
+                        }
+                        else
+                        {
+                            SendResponse(req.Id, "restore_user_cfg_response", new { success = false, message = "user.cfg Backup nicht gefunden.", tools = GetToolsStatus() });
+                        }
+                    }
+                    break;
+
+                case "save_cloud_storage_path":
+                    if (req.Payload.HasValue)
+                    {
+                        string cPath = req.Payload.Value.TryGetProperty("path", out var cpProp) ? cpProp.GetString() ?? "" : "";
+                        var s = Settings.Load();
+                        s.CloudStoragePath = string.IsNullOrWhiteSpace(cPath) ? null : cPath.Trim();
+                        Settings.Save(s);
+                        SendResponse(req.Id, "save_cloud_storage_path_response", new { success = true, tools = GetToolsStatus() });
+                    }
+                    break;
+
+                case "export_logs_zip":
+                    var sCloud = Settings.Load();
+                    string destZipFolder = !string.IsNullOrWhiteSpace(sCloud.CloudStoragePath) && Directory.Exists(sCloud.CloudStoragePath)
+                        ? Path.Combine(sCloud.CloudStoragePath, "SCLogMate", "Logs")
+                        : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    var zRes = MaintenanceService.ExportLogsToZip(destZipFolder, _currentLogPath);
+                    SendResponse(req.Id, "export_logs_zip_response", new { success = zRes.success, message = zRes.message, zipPath = zRes.zipPath });
+                    break;
+
+                case "sync_logs_cloud":
+                    var sc = Settings.Load();
+                    if (string.IsNullOrWhiteSpace(sc.CloudStoragePath))
+                    {
+                        SendResponse(req.Id, "sync_logs_cloud_response", new { success = false, message = "Bitte hinterlege zuerst einen gültigen Cloud-Speicherpfad." });
+                    }
+                    else
+                    {
+                        var syncRes = MaintenanceService.SyncLogsToCloud(sc.CloudStoragePath, _currentLogPath);
+                        SendResponse(req.Id, "sync_logs_cloud_response", new { success = syncRes.success, message = syncRes.message });
+                    }
+                    break;
+
                 case "get_settings":
                     SendResponse(req.Id, "settings_response", GetSettingsData());
                     break;
@@ -1717,12 +1825,22 @@ public class PhotinoBridge
                     break;
 
                 case "open_folder":
-                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("target", out var targetProp))
                     {
-                        OpenFolder(targetProp.GetString() ?? "db");
+                        if (req.Payload.HasValue)
+                        {
+                            string target = "";
+                            if (req.Payload.Value.TryGetProperty("folderType", out var ofFtProp))
+                                target = ofFtProp.GetString() ?? "";
+                            else if (req.Payload.Value.TryGetProperty("target", out var ofTargetProp))
+                                target = ofTargetProp.GetString() ?? "";
+                            else if (req.Payload.Value.TryGetProperty("path", out var ofPathProp))
+                                target = ofPathProp.GetString() ?? "";
+
+                            OpenFolder(target);
+                        }
+                        SendResponse(req.Id, "open_folder_response", new { success = true });
+                        break;
                     }
-                    SendResponse(req.Id, "open_folder_response", new { success = true });
-                    break;
 
                 case "get_hud":
                     string? reqSess = null;
@@ -3489,12 +3607,14 @@ public class PhotinoBridge
 
     private ToolsStatusDto GetToolsStatus()
     {
+        var settings = Settings.Load();
         double shaderMb = MaintenanceService.GetShaderCacheSizeMb();
         double crashMb = MaintenanceService.GetCrashDumpsSizeMb();
         string cfgPath = MaintenanceService.GetUserCfgPath(_currentLogPath);
         var (cfgExists, cfgContent) = MaintenanceService.ReadUserCfg(_currentLogPath);
         var diag = MaintenanceService.GetSystemDiagnostics(_currentLogPath);
-        var keybinds = MaintenanceService.ListKeybindBackups().Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList();
+        var keybindList = MaintenanceService.ListKeybindBackups(settings.CloudStoragePath);
+        var configList = MaintenanceService.ListConfigBackups(settings.CloudStoragePath);
 
         return new ToolsStatusDto
         {
@@ -3508,7 +3628,27 @@ public class PhotinoBridge
             DriveName = diag.DriveName,
             FreeDiskGb = diag.FreeDiskGb,
             PagefileStatus = diag.PagefileStatus,
-            KeybindBackups = keybinds
+            CloudStoragePath = settings.CloudStoragePath,
+            KeybindBackups = keybindList.Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList(),
+            KeybindItems = keybindList.Select(k => new KeybindBackupItemDto
+            {
+                Name = k.Name,
+                FolderPath = k.FolderPath,
+                CreatedAt = k.CreatedAt.ToString("dd.MM.yyyy HH:mm"),
+                FileCount = k.FileCount,
+                LocationType = k.LocationType,
+                SizeFormatted = k.SizeFormatted
+            }).ToList(),
+            ConfigBackups = configList.Select(c => new ConfigBackupItemDto
+            {
+                Name = c.Name,
+                FilePath = c.FilePath,
+                CreatedAt = c.CreatedAt.ToString("dd.MM.yyyy HH:mm"),
+                LocationType = c.LocationType,
+                SizeFormatted = c.SizeFormatted
+            }).ToList(),
+            KeybindsDir = MaintenanceService.LocalKeybindsBackupDir,
+            ConfigDir = MaintenanceService.LocalConfigBackupDir
         };
     }
 
@@ -3526,13 +3666,15 @@ public class PhotinoBridge
 
     private ToolsStatusDto SaveUserCfg(string content)
     {
-        MaintenanceService.SaveUserCfg(_currentLogPath, content);
+        var s = Settings.Load();
+        MaintenanceService.SaveUserCfg(_currentLogPath, content, s.CloudStoragePath);
         return GetToolsStatus();
     }
 
     private ToolsStatusDto BackupKeybinds(string? note)
     {
-        MaintenanceService.BackupKeybinds(_currentLogPath, null, note);
+        var s = Settings.Load();
+        MaintenanceService.BackupKeybinds(_currentLogPath, s.CloudStoragePath, note);
         return GetToolsStatus();
     }
 
@@ -4429,6 +4571,35 @@ public class PhotinoBridge
                         if (Directory.Exists(dir))
                             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dir, UseShellExecute = true });
                     }
+                    break;
+                case "keybinds":
+                    if (Directory.Exists(MaintenanceService.LocalKeybindsBackupDir))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = MaintenanceService.LocalKeybindsBackupDir, UseShellExecute = true });
+                    break;
+                case "config":
+                    if (Directory.Exists(MaintenanceService.LocalConfigBackupDir))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = MaintenanceService.LocalConfigBackupDir, UseShellExecute = true });
+                    break;
+                case "cloud":
+                    var sCloud = Settings.Load();
+                    if (!string.IsNullOrWhiteSpace(sCloud.CloudStoragePath) && Directory.Exists(sCloud.CloudStoragePath))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = sCloud.CloudStoragePath, UseShellExecute = true });
+                    break;
+                case "logbackups":
+                    if (!string.IsNullOrEmpty(_currentLogPath))
+                    {
+                        var liveDir = Path.GetDirectoryName(_currentLogPath);
+                        if (!string.IsNullOrEmpty(liveDir))
+                        {
+                            var backups = Path.Combine(liveDir, "logbackups");
+                            if (Directory.Exists(backups))
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = backups, UseShellExecute = true });
+                        }
+                    }
+                    break;
+                default:
+                    if (Directory.Exists(target) || File.Exists(target))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
                     break;
             }
         }
