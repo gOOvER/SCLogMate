@@ -18,13 +18,13 @@ Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden S
 - [x] **Schritt 2: Chronik & Ereignisse (`EventsView.tsx`)**
   - Dichte, tabellarische Darstellung der Ereignisse mit farbigen Event-Pills (Finanzen, Kampf, Schiffe, Missionen, Orte).
   - Such- und Filterleiste wie in RC2 inkl. ausziehbarem Detail-Drawer mit Rohdaten.
-- [ ] **Schritt 3: Finanzen & Saldo (`FinancesView.tsx`)**
+- [x] **Schritt 3: Finanzen & Saldo (`FinancesView.tsx`)**
   - Angleichung der Bilanzkarten (Gesamtguthaben, Sitzungs-Delta, Handelsgewinne).
   - Zeitverlaufs-Chart und tabellarisches Transaktionsbuch für aUEC-Transfers und Rohstoffeinkäufe/-verkäufe.
-- [ ] **Schritt 4: Lagerbestand / Warehouse (`WarehouseView.tsx`)**
+- [x] **Schritt 4: Lagerbestand / Warehouse (`WarehouseView.tsx`)**
   - Exakte Zwei-Spalten-Struktur: Links Planeten & Raumstationen mit Item-Zählern, rechts Artikeltabelle.
   - Direkte In-Grid Schnellanpassungen (`+` / `-`) und Frachtaufzug-Aktionen (`📦 Per Frachtaufzug entnehmen`, `🔧 Zerlegt`, `Standort leeren`).
-- [ ] **Schritt 5: Flotte, Aufträge, Ansehen & weitere Detail-Views**
+- [x] **Schritt 5: Flotte, Aufträge, Ansehen & weitere Detail-Views**
   - Schrittweise Angleichung von Typografie, Tabellenstilen und Informationsdichte an die Avalonia-Vorlage.
 
 ---

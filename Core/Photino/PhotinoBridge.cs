@@ -955,6 +955,24 @@ public class PhotinoBridge
                     SendResponse(req.Id, "open_rs_overlay_response", new { success = true });
                     break;
 
+                case "record_expense":
+                    {
+                        if (req.Payload.HasValue)
+                        {
+                            string cat = req.Payload.Value.GetProperty("category").GetString() ?? "Wartung & Reparatur";
+                            string expenseNote = req.Payload.Value.TryGetProperty("note", out var expNoteProp) ? expNoteProp.GetString() ?? cat : cat;
+                            long amount = req.Payload.Value.GetProperty("amount").GetInt64();
+                            string loc = req.Payload.Value.TryGetProperty("location", out var lProp) ? lProp.GetString() ?? "—" : "—";
+                            string? ship = req.Payload.Value.TryGetProperty("ship", out var sProp) ? sProp.GetString() : null;
+
+                            Database.InsertCustomEvent(_activeSessionName ?? "Game.log", DateTime.UtcNow, Models.EventKind.Purchase, -Math.Abs(amount), $"{cat}: {expenseNote} @ {loc}", ship);
+                            SendResponse(req.Id, "record_expense_response", new { success = true });
+                            Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                            Broadcast("finance_response", GetFinanceOverview());
+                        }
+                        break;
+                    }
+
                 default:
                     SendResponse(req.Id, $"{req.Type}_ack", new { success = true });
                     break;

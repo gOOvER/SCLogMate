@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **RC2 UI/UX Alignment — Step 5: Fleet Registry & High-Density Ship Statistics (`FleetView.tsx`)**:
+  - Refactored Fleet view (`FleetView.tsx`) with a high-density, multi-column Star Citizen hangar dashboard:
+    - **Fleet KPI Summary Cards**: 4 top cards displaying total registered ship types, total flight sorties, successful Quantum Jumps, and estimated fleet net worth in aUEC.
+    - **Interactive Fleet DataGrid**: High-density table featuring ship name, sortie counter, QT jump counter, loss/destruction badge, last flown session timestamp, and direct link to Star Citizen Wiki.
+    - **Instant Filter & Search**: Client-side filtering by ship model name.
+- **RC2 UI/UX Alignment — Step 4: Warehouse & Storage Management (`WarehouseView.tsx`)**:
+  - Redesigned Warehouse inventory view (`WarehouseView.tsx`) to strictly match the RC2 two-column Star Citizen layout:
+    - **Left Column — Location Selector**: Planetary hubs and space stations grouped with Star System pills (`STANTON`, `PYRO`, `NYX`), item counters, total stored value in aUEC, and 1-click filter.
+    - **Right Column — High-Density Inventory DataGrid**: Direct in-grid quantity adjustments (`+` / `-`), color-coded item categories (`Commodity`, `Component`, `Weapon`, `Armor`, `Consumable`), unit prices, and total value.
+    - **Freight Elevator Quick Actions**: Contextual quick action bar with `📦 Per Frachtaufzug entnehmen`, `🔧 Zerlegt`, and `Standort leeren` with confirmation dialogs.
+- **RC2 UI/UX Alignment — Step 3: Financial Dashboard, Balance History & Ledger (`FinancesView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Overhauled Finances view (`FinancesView.tsx`) with a comprehensive Star Citizen financial suite:
+    - **Top Financial KPIs**: 5 cards displaying current live wallet balance, total session income, total session expenses, net session profit/loss, and trade transaction volume.
+    - **Interactive Balance Trend**: Glowing Sci-Fi SVG balance progression chart tracking aUEC over time with interactive hover points.
+    - **Categorized Sub-Tabs**: Multi-tab layout featuring Overview & Trends, Transaction Ledger, Cargo & Commodity Trade, Top Expenses breakdown, and Manual Bookings.
+    - **Manual Booking Terminal**: Integrated custom financial entry modal and backend bridge endpoint `record_expense` (`PhotinoBridge.cs`) allowing pilots to record custom expenses (fuel, repair, re-arm, fines) directly into SQLite.
 - **RC2 UI/UX Alignment — Step 2: High-Density Events DataGrid & Inspector (`EventsView.tsx`)**:
   - Rebuilt the Events log view (`EventsView.tsx`) into a high-density, multi-column Star Citizen event table matching RC2 while modernizing UX:
     - **Interactive Multi-Column DataGrid**: Cleanly aligned columns for timestamp (`ZEIT`), category badge (`TYP`), signed monetary delta (`BETRAG`), active ship name (`SCHIFF`), and detailed description (`DETAIL`).
