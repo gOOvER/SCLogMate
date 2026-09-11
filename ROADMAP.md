@@ -136,3 +136,18 @@ Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden S
   - Einfaches Zusammenstellen und Exportieren von Vorfällen (Griefing, Beleidigungen, Belästigung, Erpressung, Piraterie) für den RSI / CIG Player Support.
   - Formatierte Zusammenfassung mit exakten Zeitstempeln, Shard-ID, Server-Region, Spielernamen, wörtlichem Chatprotokoll und optionalem Screenshot-Auszug als saubere Text-/Markdown-Vorlage für das Support-Ticket.
 
+---
+
+## 🕹 8. Ausstehende RC2-Parität (Avalonia vs. Photino)
+- [ ] **Native Desktop-Overlays:**
+  - *Floating Mini-HUD Overlay (`Alt + H`):* Separates, transparentes Always-on-Top Fenster mit Click-Through Modus (`WS_EX_TRANSPARENT`) über dem Vollbild-Spiel.
+  - *RS-Scan Overlay Window:* Transparente Signatur- und Radaranzeige direkt über Star Citizen.
+  - *Desktop OCR Region-Selector:* Interaktiver Bildschirm-Rahmen auf dem Desktop zum Auswählen der Scan-Region per Maus.
+  - *Scan-Indicator:* Kurzer optischer Blitz am Monitorrand bei erfolgreichem Wallet-OCR-Scan.
+  - *In-Game Desktop Toasts:* Native Desktop-Toasts außerhalb des App-Fensters über dem Spiel (Frachtaufzüge, Schiff zerstört).
+- [ ] **Rechtsklick-Kontextmenüs in Tabellen:**
+  - Zeilenaktionen für Chronik-, Flotten-, Finanz- und Lagertabellen (Wiki aufrufen, Werte in Zwischenablage kopieren, Schnellfilter setzen).
+- [ ] **Tiefenprüfung der Datenbank:**
+  - Tabellen- und Spalten-Integritätsprüfung (`PRAGMA quick_check;`) und 1-Klick Reparatur in der UI.
+
+
