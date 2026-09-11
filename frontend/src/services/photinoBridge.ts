@@ -839,6 +839,9 @@ class PhotinoBridge {
           },
         ] as FleetStatDto[];
 
+      case 'clear_contracts':
+        return { success: true };
+
       case 'get_missions':
         return {
           active: [],

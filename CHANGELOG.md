@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
 ### Changed
+- **Contract Tracking & OCR Parity with RC2 (`SettingsView.tsx`, `MissionsView.tsx`, `PhotinoBridge.cs`)**:
+  - Confirmed and reflected that contract OCR scanning is permanently disabled (as in Avalonia RC2 `MainViewModel.cs:3297`) due to mobiGlas transparency and low-contrast font recognition failures, superseded by 100% reliable native `Game.log` notification parsing (`Contract Accepted`, `Contract Complete`, `Contract Failed`).
+  - Replaced obsolete contract OCR test and snipping coordinates card in `SettingsView.tsx` with the official RC2 `❖ AKTIVE AUFTRÄGE & MISSIONS-TRACKING` card featuring `✕ Aufträge leeren` and `⚡ Auto-Sync aktiv` status badge.
+  - Implemented `clear_contracts` RPC in `PhotinoBridge.cs` calling `Database.ClearActiveContracts()`.
+  - Updated `MissionsView.tsx` labels from `Aktive OCR-Verträge` to `Aktive Aufträge (Live)`.
 - **Navigation & Sidebar (`Sidebar.tsx`, `App.tsx`, `AboutView.tsx`)**:
   - Restored exact 16 tabs in RC2 order (`events`, `finances`, `missions`, `reputation`, `starmap`, `places`, `blackbox`, `orescanner`, `market`, `fleet`, `warehouse`, `blueprints`, `loadout`, `tools`, `settings`, `about`).
   - Default tab set to `events` (`Ereignisse`), matching Avalonia RC2 startup behavior.

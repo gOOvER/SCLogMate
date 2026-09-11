@@ -71,14 +71,14 @@ export const MissionsView: React.FC = () => {
         <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Aktive Aufträge (OCR / Live)
+              Aktive Aufträge (Live)
             </span>
             <Radio className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-emerald-300">
             {data.active.length} <span className="text-xs font-normal text-slate-400">angenommen</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">Aus dem mobiGlas Contract Manager</div>
+          <div className="mt-1 text-xs text-slate-400">Aus Game.log &amp; SQLite Master-DB</div>
         </div>
 
         <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">
@@ -130,7 +130,7 @@ export const MissionsView: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Radio className="w-3.5 h-3.5" /> Aktive OCR-Verträge ({data.active.length})
+            <Radio className="w-3.5 h-3.5" /> Aktive Aufträge ({data.active.length})
           </button>
 
           <button

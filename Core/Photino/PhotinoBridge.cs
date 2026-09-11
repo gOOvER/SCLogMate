@@ -1010,6 +1010,12 @@ public class PhotinoBridge
                     SendResponse(req.Id, "missions_response", GetMissionsData());
                     break;
 
+                case "clear_contracts":
+                    Database.ClearActiveContracts();
+                    SendResponse(req.Id, "clear_contracts_response", new { success = true });
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
                 case "get_reputation":
                     SendResponse(req.Id, "reputation_response", GetReputationData());
                     break;

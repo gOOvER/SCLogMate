@@ -146,7 +146,6 @@ export const SettingsView: React.FC = () => {
   const [isTestingScan, setIsTestingScan] = useState<string | null>(null);
   const [testScanResult, setTestScanResult] = useState<OcrTestResult | null>(null);
   const [manualWallet, setManualWallet] = useState<ScanRegionDto>({ x: 1300, y: 415, width: 500, height: 80 });
-  const [manualContract, setManualContract] = useState<ScanRegionDto>({ x: 576, y: 32, width: 1306, height: 1015 });
 
   const loadOcrConfig = async () => {
     try {
@@ -155,8 +154,6 @@ export const SettingsView: React.FC = () => {
         setOcrConfig(cfg);
         const curW = cfg.walletRegion || cfg.defaultWalletRegion;
         if (curW) setManualWallet(curW);
-        const curC = cfg.contractRegion || cfg.defaultContractRegion;
-        if (curC) setManualContract(curC);
       }
     } catch (err) {
       console.error('Failed to load OCR config:', err);
@@ -173,7 +170,6 @@ export const SettingsView: React.FC = () => {
         if (res.config) {
           setOcrConfig(res.config);
           if (target === 'wallet') setManualWallet(res.region);
-          if (target === 'contract') setManualContract(res.region);
         } else {
           loadOcrConfig();
         }
@@ -217,7 +213,6 @@ export const SettingsView: React.FC = () => {
       if (cfg) {
         setOcrConfig(cfg);
         if (target === 'wallet') setManualWallet(cfg.defaultWalletRegion);
-        if (target === 'contract') setManualContract(cfg.defaultContractRegion);
       }
       showToast('Bereich auf Standard (Auto-Erkennung) zurückgesetzt');
     } catch (err) {
@@ -241,7 +236,6 @@ export const SettingsView: React.FC = () => {
       if (cfg) {
         setOcrConfig(cfg);
         if (target === 'wallet') setManualWallet(preset);
-        if (target === 'contract') setManualContract(preset);
       }
       showToast(`Preset angewendet: ${preset.width}×${preset.height} @ (${preset.x}, ${preset.y})`);
     } catch (err) {
@@ -390,6 +384,15 @@ export const SettingsView: React.FC = () => {
       showToast('✓ [DEBUG] Debug-Logdatei geleert.');
     } catch (err) {
       showToast('Fehler beim Leeren des Logs');
+    }
+  };
+
+  const handleClearContracts = async () => {
+    try {
+      await bridge.sendRequest('clear_contracts');
+      showToast('Aktive Auftragsliste geleert.');
+    } catch (err) {
+      showToast('Fehler beim Leeren der Aufträge');
     }
   };
 
@@ -1245,211 +1248,41 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Sektion 2: mobiGlas Auftragsmanager (Contract Manager) Bereich */}
+          {/* Sektion 2: Aktive Aufträge & Missions-Tracking (100% Game.log & SQLite) */}
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                    <FileText className="w-4 h-4" />
-                    <span>MOBIGLAS AUFTRAGSMANAGER-BEREICH (CONTRACTS)</span>
-                  </h2>
-                  {ocrConfig?.contractRegion ? (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-sky-950 text-sky-300 border border-sky-800">
-                      BENUTZERDEFINIERT: {ocrConfig.contractRegion.width}×{ocrConfig.contractRegion.height} @ ({ocrConfig.contractRegion.x},{ocrConfig.contractRegion.y})
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
-                      STANDARD AUTO-ERKENNUNG ({ocrConfig?.defaultContractRegion ? `${ocrConfig.defaultContractRegion.width}×${ocrConfig.defaultContractRegion.height}` : '30%–98% Breite'})
-                    </span>
-                  )}
-                </div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <FileText className="w-4 h-4" />
+                  <span>❖  AKTIVE AUFTRÄGE & MISSIONS-TRACKING</span>
+                </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  Definiert das Bildschirm-Rechteck der rechten Auftrags-Detailkarte (blendet linke Sidebar automatisch aus).
+                  Missionsdaten, Belohnungen und Baupläne werden 100% automatisch aus dem Game.log und der SQLite-Master-Datenbank abgeglichen (Auftrags-OCR wurde dauerhaft deaktiviert, da Star Citizen alle Vertragsstatus nativ im Log protokolliert).
                 </p>
               </div>
 
-              {ocrConfig?.isContractScanBoxVisible && (
-                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-pulse shrink-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span>Auftrags-Rahmen aktiv</span>
-                </span>
-              )}
-            </div>
-
-            {/* Auftrags-Aktionsleiste */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <button
-                onClick={() => handleSelectRegion('contract')}
-                disabled={isSelectingRegion !== null}
-                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-sky-600/20 border border-sky-400 transition"
+                onClick={handleClearContracts}
+                className="px-3.5 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-800/80 transition cursor-pointer shrink-0"
+                title="Aktive Auftragsliste leeren"
               >
-                {isSelectingRegion === 'contract' ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Overlay aktiv...</span>
-                  </>
-                ) : (
-                  <>
-                    <Crop className="w-4 h-4" />
-                    <span>Auftragsbereich markieren</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => handleTestScan('contract')}
-                disabled={isTestingScan !== null}
-                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sky-300 text-xs font-bold border border-sky-500/30 transition shadow-sm"
-              >
-                {isTestingScan === 'contract' ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
-                    <span>Scanne Auftrag...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 text-amber-400" />
-                    <span>Test-Scan Auftrag</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => handleToggleScanBox('contract')}
-                className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-xs font-bold border transition shadow-sm ${
-                  ocrConfig?.isContractScanBoxVisible
-                    ? 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-600'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                }`}
-              >
-                <Eye className="w-4 h-4" />
-                <span>
-                  {ocrConfig?.isContractScanBoxVisible
-                    ? 'Scan-Rahmen ausblenden'
-                    : 'Scan-Rahmen im Spiel anzeigen'}
-                </span>
-              </button>
-
-              <button
-                onClick={() => handleResetRegion('contract')}
-                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition"
-              >
-                <RotateCcw className="w-4 h-4 text-slate-400" />
-                <span>Standard (Auto)</span>
+                ✕ Aufträge leeren
               </button>
             </div>
 
-            {/* Test-Scan Feedback Box für Aufträge */}
-            {testScanResult && testScanResult.target === 'contract' && (
-              <div
-                className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in slide-in-from-top-2 ${
-                  testScanResult.success
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold">
-                  <div className="flex items-center space-x-2">
-                    {testScanResult.success ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    )}
-                    <span>
-                      {testScanResult.success
-                        ? 'Auftrags-Scan erfolgreich'
-                        : 'Auftrags-Scan: Kein Text erkannt'}
-                    </span>
-                  </div>
-                  <span className="font-mono text-[11px] opacity-80">
-                    {testScanResult.durationMs} ms
-                  </span>
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-200">
+                  Game.log Notification Parser & Master-DB
                 </div>
-                <div className="bg-slate-950/60 p-2.5 rounded border border-slate-800/60 text-[11px] font-mono text-slate-300 max-h-24 overflow-y-auto whitespace-pre-wrap">
-                  {testScanResult.recognizedText || 'Kein Text im ausgewählten Bereich.'}
+                <div className="text-[11px] text-slate-400">
+                  Erkennt automatisch <code className="text-sky-300">Contract Accepted</code>, <code className="text-emerald-300">Contract Complete</code> und <code className="text-rose-300">Contract Failed</code> mit MissionId direkt aus Star Citizen.
                 </div>
               </div>
-            )}
-
-            {/* Presets für Aufträge */}
-            <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Auftragsmanager Voreinstellungen:</span>
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: '1080p (Standard)', x: 576, y: 32, width: 1306, height: 1015 },
-                  { label: '1440p (WQHD)', x: 768, y: 43, width: 1741, height: 1354 },
-                  { label: '4K (UHD)', x: 1152, y: 65, width: 2611, height: 2030 },
-                  { label: '3440×1440 (21:9)', x: 1032, y: 43, width: 2339, height: 1354 },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    onClick={() => handleApplyPreset('contract', preset)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-sky-300 text-xs font-medium border border-slate-700/80 hover:border-sky-500/50 transition"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Pixel-Feinjustierung Aufträge */}
-            <div className="p-4 rounded-lg bg-slate-950/40 border border-slate-800/80 space-y-3">
-              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                <Sliders className="w-3.5 h-3.5 text-slate-400" />
-                <span>Pixel-Feinabstimmung Aufträge:</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-400 font-mono block mb-1">X-Position (Links):</label>
-                  <input
-                    type="number"
-                    value={manualContract.x}
-                    onChange={(e) => setManualContract({ ...manualContract, x: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Y-Position (Oben):</label>
-                  <input
-                    type="number"
-                    value={manualContract.y}
-                    onChange={(e) => setManualContract({ ...manualContract, y: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Breite (Pixel):</label>
-                  <input
-                    type="number"
-                    value={manualContract.width}
-                    onChange={(e) => setManualContract({ ...manualContract, width: Math.max(10, parseInt(e.target.value) || 10) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Höhe (Pixel):</label>
-                  <input
-                    type="number"
-                    value={manualContract.height}
-                    onChange={(e) => setManualContract({ ...manualContract, height: Math.max(10, parseInt(e.target.value) || 10) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end pt-1">
-                <button
-                  onClick={() => handleApplyManualCoords('contract', manualContract)}
-                  className="px-4 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-white text-xs font-semibold shadow border border-sky-500 transition"
-                >
-                  Koordinaten speichern & anwenden
-                </button>
-              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-bold flex items-center space-x-1.5 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>⚡ Auto-Sync aktiv</span>
+              </span>
             </div>
           </div>
 
