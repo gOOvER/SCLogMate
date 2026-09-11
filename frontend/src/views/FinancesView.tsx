@@ -21,6 +21,7 @@ import {
   BarChart3,
   LineChart,
   Info,
+  Database,
 } from 'lucide-react';
 
 export const FinancesView: React.FC = () => {
@@ -28,27 +29,35 @@ export const FinancesView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>('overview');
   const [search, setSearch] = useState<string>('');
   const [copiedDiscord, setCopiedDiscord] = useState<boolean>(false);
+  const [scope, setScope] = useState<'all' | 'current'>('all');
 
   // Chart Controls
   const [chartMode, setChartMode] = useState<'cumulative' | 'income_spend' | 'cashflow'>('cumulative');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const fetchFinance = async () => {
+  const fetchFinance = async (targetScope: 'all' | 'current' = scope) => {
     try {
-      const res = await bridge.sendRequest<FinanceOverviewDto>('get_finance');
+      const res = await bridge.sendRequest<FinanceOverviewDto>('get_finance', { scope: targetScope });
       setData(res);
     } catch (err) {
       console.error('Failed to load finance data:', err);
     }
   };
 
+  const handleScopeChange = (newScope: 'all' | 'current') => {
+    setScope(newScope);
+    fetchFinance(newScope);
+  };
+
   useEffect(() => {
-    fetchFinance();
+    fetchFinance(scope);
     const unbind = bridge.on<FinanceOverviewDto>('finance_response', (newData) => {
-      setData(newData);
+      if (!newData.scope || newData.scope === scope) {
+        setData(newData);
+      }
     });
     return () => unbind();
-  }, []);
+  }, [scope]);
 
   const formatNumber = (num?: number | null) => {
     if (num === undefined || num === null) return '0';
@@ -61,7 +70,8 @@ export const FinancesView: React.FC = () => {
     const spend = formatNumber(data.totalSpend);
     const net = formatNumber(data.totalNet);
     const sign = data.totalNet >= 0 ? '+' : '';
-    const text = `**📊 SCLogMate Finanzbericht**
+    const scopeLabel = scope === 'current' ? 'Aktuelle Session' : 'Alle Sessions';
+    const text = `**📊 SCLogMate Finanzbericht (${scopeLabel})**
 > ↗ Einnahmen: \`${income} aUEC\`
 > ↘ Ausgaben: \`${spend} aUEC\`
 > 💰 Bilanz: \`${sign}${net} aUEC\` (${data.profitMargin}% Marge)
@@ -413,6 +423,34 @@ export const FinancesView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Scope-Switcher: Alle Sessions vs. Aktuelle Session */}
+          <div className="flex items-center bg-[#071322] border border-cyan-950 rounded p-0.5 text-xs font-mono">
+            <button
+              onClick={() => handleScopeChange('all')}
+              className={`px-2.5 py-1 rounded cursor-pointer transition flex items-center gap-1.5 ${
+                scope === 'all'
+                  ? 'bg-cyan-950/90 text-cyan-300 border border-cyan-700/80 shadow-[0_0_6px_rgba(6,182,212,0.25)] font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
+              title="Finanzdaten über alle historischen Sessions aggregieren"
+            >
+              <Database className="w-3 h-3 text-cyan-400" />
+              <span>Alle Sessions</span>
+            </button>
+            <button
+              onClick={() => handleScopeChange('current')}
+              className={`px-2.5 py-1 rounded cursor-pointer transition flex items-center gap-1.5 ${
+                scope === 'current'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-600/80 shadow-[0_0_6px_rgba(16,185,129,0.25)] font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
+              title="Nur Geldbuchungen der aktuell aktiven Session anzeigen"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${scope === 'current' ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-600'}`} />
+              <span>Aktuelle Session</span>
+            </button>
+          </div>
+
           <button
             onClick={handleCopyDiscord}
             title="Finanzbericht für Discord kopieren"
@@ -439,7 +477,7 @@ export const FinancesView: React.FC = () => {
                     <span>SALDEN- & TRANSAKTIONSVERLAUF</span>
                   </div>
                   <span className="text-xs font-mono font-bold text-slate-200">
-                    Finanzhistorie & Buchungsentwicklung
+                    {scope === 'current' ? 'Aktuelle Session' : 'Gesamte Historie (Alle Sessions)'}
                   </span>
                 </div>
 
@@ -514,7 +552,7 @@ export const FinancesView: React.FC = () => {
                       Bewege die Maus über das Diagramm für exakte Buchungsdetails
                     </span>
                     <span className="text-[10px] text-slate-600">
-                      {timelinePoints.length} Buchungszeitpunkte erfasst
+                      {timelinePoints.length} Buchungszeitpunkte ({scope === 'current' ? 'Aktuelle Session' : 'Alle Sessions'})
                     </span>
                   </div>
                 )}
@@ -739,9 +777,18 @@ export const FinancesView: React.FC = () => {
                   </svg>
                 </div>
               ) : (
-                <div className="h-44 flex flex-col items-center justify-center text-xs font-mono text-slate-500 space-y-1">
+                <div className="h-44 flex flex-col items-center justify-center text-xs font-mono text-slate-500 space-y-1.5 p-4 text-center">
                   <Activity className="w-6 h-6 text-slate-600 mb-1" />
-                  <div>Keine historischen Finanztransaktionen vorhanden.</div>
+                  <div className="text-slate-400 font-semibold">
+                    {scope === 'current'
+                      ? 'Keine Geldbuchungen in der aktuellen Session erfasst.'
+                      : 'Keine historischen Finanztransaktionen vorhanden.'}
+                  </div>
+                  {scope === 'current' && (
+                    <div className="text-[11px] text-slate-500 max-w-sm">
+                      Klicke oben auf <span className="text-cyan-400 font-bold">„Alle Sessions“</span>, um deine gesamten historischen Einnahmen, Ausgaben und den Saldenverlauf einzusehen.
+                    </div>
+                  )}
                 </div>
               )}
 

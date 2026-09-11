@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Finance Scope Switcher (`FinancesView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Integrated a segmented scope selector into the Finances toolbar (`Alle Sessions` vs `Aktuelle Session`), restoring the Avalonia RC2 finance scope architecture (`SetFinanceScopeCommand`).
+  - Backend `get_finance` RPC and `GetFinanceOverview(string? scope)` now accept a `scope` parameter (`"all"` vs `"current"`), strictly aggregating the active session (`_activeSessionName` + uncommitted live buffer) when set to `"current"` while preserving full historical aggregation under `"all"`.
+  - Chart header subtitle, telemetry inspector strip, booking counters, empty state notifications, and Discord copy reports now dynamically reflect the active scope.
 - **Full Parity with SCLogMate 1.0.0-rc2 Structure & Subtabs**:
   - **Settings Subtabs (`SettingsView.tsx`, `PhotinoBridge.cs`)**:
     - Restored exact 8 subtabs in RC2 order: `📁 Allgemein`, `⏳ Wipe & Filter`, `🖥 Overlays & HUD`, `👁 mobiGlas & OCR`, `🌐 UEX Integration`, `🎙 VoiceAttack & Aurora`, `💾 Datenbank & Wartung`, and `🧪 Entwickler` (conditional on `debugMode`).

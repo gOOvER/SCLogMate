@@ -140,6 +140,7 @@ export interface WarehouseLocationDto {
 }
 
 export interface FinanceOverviewDto {
+  scope?: 'all' | 'current';
   totalIncome: number;
   totalSpend: number;
   totalNet: number;

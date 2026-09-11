@@ -247,6 +247,9 @@ public class FinanceChartPointDto
 
 public class FinanceOverviewDto
 {
+    [JsonPropertyName("scope")]
+    public string Scope { get; set; } = "all";
+
     [JsonPropertyName("totalIncome")]
     public long TotalIncome { get; set; }
 
@@ -1002,7 +1005,12 @@ public class PhotinoBridge
                     break;
 
                 case "get_finance":
-                    SendResponse(req.Id, "finance_response", GetFinanceOverview());
+                    string? finScope = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("scope", out var scpProp))
+                    {
+                        finScope = scpProp.GetString();
+                    }
+                    SendResponse(req.Id, "finance_response", GetFinanceOverview(finScope));
                     break;
 
                 case "get_warehouse":
@@ -2346,18 +2354,87 @@ public class PhotinoBridge
             .ToList();
     }
 
-    private FinanceOverviewDto GetFinanceOverview()
+    private FinanceOverviewDto GetFinanceOverview(string? scope = "all")
     {
         Database.EnsureInitialized();
-        var agg = Database.Aggregate(since: null, filterMoney: true, filterContracts: true, filterFleet: false);
+        bool isCurrentScope = string.Equals(scope, "current", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(scope, "session", StringComparison.OrdinalIgnoreCase);
 
-        var allFinance = Database.AllFinanceEvents();
-        var sorted = allFinance.OrderBy(x => x.Time).ToList();
+        List<LogEntry> financeEntries = new();
+        Database.Agg agg;
+        long totalTradeAuec = 0;
+
+        if (isCurrentScope)
+        {
+            agg = new Database.Agg();
+            string targetSession = _selectedSession;
+
+            if (targetSession == "__live__")
+            {
+                if (!string.IsNullOrEmpty(_activeSessionName))
+                {
+                    var sessDb = Database.LoadRecentEvents(5000, _activeSessionName);
+                    financeEntries.AddRange(sessDb.Where(e => e.Kind is EventKind.TransferIn or EventKind.TransferOut or
+                                                               EventKind.MissionReward or EventKind.Purchase or
+                                                               EventKind.Sale or EventKind.Trade or EventKind.Fine or EventKind.Maintenance));
+                }
+
+                lock (_liveEventsLock)
+                {
+                    foreach (var le in _liveEvents)
+                    {
+                        if (Enum.TryParse<EventKind>(le.Kind, out var ek) &&
+                            (ek is EventKind.TransferIn or EventKind.TransferOut or EventKind.MissionReward or
+                                   EventKind.Purchase or EventKind.Sale or EventKind.Trade or EventKind.Fine or EventKind.Maintenance))
+                        {
+                            DateTime dt = DateTime.Now;
+                            if (DateTime.TryParse(le.Timestamp, out var parsedDt)) dt = parsedDt;
+
+                            financeEntries.Add(new LogEntry
+                            {
+                                Time = dt,
+                                Kind = ek,
+                                Amount = le.Amount ?? 0,
+                                Detail = le.Description ?? le.Title ?? "",
+                                Ship = le.Ship
+                            });
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var sessionRaw = Database.LoadRecentEvents(5000, targetSession);
+                financeEntries = sessionRaw
+                    .Where(e => e.Kind is EventKind.TransferIn or EventKind.TransferOut or EventKind.MissionReward or
+                                         EventKind.Purchase or EventKind.Sale or EventKind.Trade or EventKind.Fine or EventKind.Maintenance)
+                    .ToList();
+            }
+
+            foreach (var e in financeEntries)
+            {
+                switch (e.Kind)
+                {
+                    case EventKind.TransferIn: agg.In += e.Amount; break;
+                    case EventKind.TransferOut: agg.Out += Math.Abs(e.Amount); break;
+                    case EventKind.MissionReward: agg.Reward += e.Amount; break;
+                    case EventKind.Purchase: agg.Purchases += Math.Abs(e.Amount); break;
+                    case EventKind.Sale: agg.Sales += e.Amount; break;
+                    case EventKind.Trade: agg.Trade += Math.Abs(e.Amount); break;
+                }
+            }
+        }
+        else
+        {
+            agg = Database.Aggregate(since: null, filterMoney: true, filterContracts: true, filterFleet: false);
+            financeEntries = Database.AllFinanceEvents();
+        }
+
+        var sorted = financeEntries.OrderBy(x => x.Time).ToList();
 
         long runningInc = 0;
         long runningSpd = 0;
         long runningNet = 0;
-        long totalTradeAuec = 0;
         var timelinePts = new List<FinanceChartPointDto>();
 
         if (sorted.Count > 0)
@@ -2409,7 +2486,7 @@ public class PhotinoBridge
             Ship = e.Ship,
         }).ToList();
 
-        var cargoEvents = Database.AllTrades().Take(100).Select(e => new LogEventDto
+        var cargoEvents = sorted.Where(e => e.Kind == EventKind.Trade).Take(100).Select(e => new LogEventDto
         {
             Id = Guid.NewGuid().ToString("N"),
             Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
@@ -2458,6 +2535,7 @@ public class PhotinoBridge
 
         return new FinanceOverviewDto
         {
+            Scope = isCurrentScope ? "current" : "all",
             TotalIncome = totInc,
             TotalSpend = totSpd,
             TotalNet = totNet,
