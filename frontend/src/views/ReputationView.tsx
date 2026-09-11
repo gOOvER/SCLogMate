@@ -1,21 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { bridge, FactionReputationDto } from '../services/photinoBridge';
-import { RefreshCw } from 'lucide-react';
 
 export const ReputationView: React.FC = () => {
   const [factions, setFactions] = useState<FactionReputationDto[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [loading, setLoading] = useState<boolean>(false);
 
   const fetchReputation = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<FactionReputationDto[]>('get_reputation');
       setFactions(res);
     } catch (err) {
       console.error('Failed to load reputation:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -54,14 +49,6 @@ export const ReputationView: React.FC = () => {
             </button>
           ))}
         </div>
-
-        <button
-          onClick={fetchReputation}
-          title="Aktualisieren"
-          className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
       </div>
 
       {/* Faction Cards Grid */}

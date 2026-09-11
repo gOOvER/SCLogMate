@@ -9,7 +9,6 @@ import {
   Copy,
   ExternalLink,
   MapPin,
-  RefreshCw,
   Rocket,
   Search,
   Swords,
@@ -33,7 +32,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [archiveSession, setArchiveSession] = useState<string>('__all__');
   const [category, setCategory] = useState<string>('Alle');
   const [search, setSearch] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedEvent, setSelectedEvent] = useState<LogEventItem | null>(null);
   const [limit, setLimit] = useState<number>(200);
   const [sortCol, setSortCol] = useState<SortColumn>('timestamp');
@@ -44,7 +42,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
   const fetchEvents = async (count = limit, sessionTarget = activeSession) => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<LogEventItem[]>('get_events', {
         session: sessionTarget,
         category,
@@ -57,8 +54,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
       }
     } catch (err) {
       console.error('Failed to load events:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -329,15 +324,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 </button>
               )}
             </div>
-
-            <button
-              type="button"
-              onClick={() => fetchEvents()}
-              className="p-1.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 hover:bg-cyan-900/80 transition cursor-pointer"
-              title="Aktualisieren"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
           </form>
         </div>
       </div>

@@ -3,14 +3,12 @@ import { bridge, PlaceItemDto } from '../services/photinoBridge';
 import {
   Compass,
   Search,
-  RefreshCw,
   Copy,
   Check,
 } from 'lucide-react';
 
 export const PlacesView: React.FC = () => {
   const [places, setPlaces] = useState<PlaceItemDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -18,13 +16,10 @@ export const PlacesView: React.FC = () => {
 
   const fetchPlaces = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<PlaceItemDto[]>('get_places');
       setPlaces(res || []);
     } catch (err) {
       console.error('Failed to load places:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -144,14 +139,6 @@ export const PlacesView: React.FC = () => {
               className="bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-56 lg:w-72 font-mono"
             />
           </div>
-
-          <button
-            onClick={fetchPlaces}
-            title="Aktualisieren"
-            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          </button>
         </div>
       </div>
 

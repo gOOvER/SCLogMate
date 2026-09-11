@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Clock,
   Radio,
-  RefreshCw,
   Search,
   Target,
 } from 'lucide-react';
@@ -18,17 +17,13 @@ export const MissionsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>('history');
   const [search, setSearch] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [loading, setLoading] = useState<boolean>(false);
 
   const fetchMissions = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<MissionsResponseDto>('get_missions');
       setData(res);
     } catch (err) {
       console.error('Failed to load missions:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -171,14 +166,6 @@ export const MissionsView: React.FC = () => {
               className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-48"
             />
           </div>
-
-          <button
-            onClick={fetchMissions}
-            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
-            title="Aktualisieren"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 

@@ -12,7 +12,6 @@ import {
   MoreVertical,
   Package,
   Plus,
-  RefreshCw,
   Search,
   Trash2,
   Wrench,
@@ -26,13 +25,11 @@ export const WarehouseView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<'all' | 'Stanton' | 'Pyro'>('all');
   const [search, setSearch] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchWarehouse = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<{
         locations: WarehouseLocationDto[];
         items: WarehouseItemDto[];
@@ -45,8 +42,6 @@ export const WarehouseView: React.FC = () => {
       setItems(res.items);
     } catch (err) {
       console.error('Failed to load warehouse data:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -277,14 +272,6 @@ export const WarehouseView: React.FC = () => {
                 className="px-2.5 py-1.5 rounded text-xs font-mono font-semibold border border-cyan-950 hover:border-cyan-800 bg-[#061224] text-slate-300 hover:text-cyan-300 transition cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" /> Export (.md)
-              </button>
-
-              <button
-                onClick={fetchWarehouse}
-                title="Aktualisieren"
-                className="p-1.5 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
               </button>
             </div>
           </div>

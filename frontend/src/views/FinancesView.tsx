@@ -4,7 +4,6 @@ import {
   Coins,
   CreditCard,
   Package,
-  RefreshCw,
   TrendingDown,
   TrendingUp,
   Search,
@@ -27,7 +26,6 @@ import {
 export const FinancesView: React.FC = () => {
   const [data, setData] = useState<FinanceOverviewDto | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>('overview');
-  const [loading, setLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [copiedDiscord, setCopiedDiscord] = useState<boolean>(false);
 
@@ -37,13 +35,10 @@ export const FinancesView: React.FC = () => {
 
   const fetchFinance = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<FinanceOverviewDto>('get_finance');
       setData(res);
     } catch (err) {
       console.error('Failed to load finance data:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -425,14 +420,6 @@ export const FinancesView: React.FC = () => {
           >
             {copiedDiscord ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
             <span>{copiedDiscord ? 'Kopiert!' : 'Discord Copy'}</span>
-          </button>
-
-          <button
-            onClick={fetchFinance}
-            title="Finanzdaten aktualisieren"
-            className="p-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
         </div>
       </div>

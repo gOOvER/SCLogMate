@@ -2,14 +2,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { bridge, RsResourceDto, RsMatchDto } from '../services/photinoBridge';
 import {
   Search,
-  RefreshCw,
   Radar,
   HelpCircle,
 } from 'lucide-react';
 
 export const OreScannerView: React.FC = () => {
   const [resources, setResources] = useState<RsResourceDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [inputRs, setInputRs] = useState<string>('2000');
   const [matches, setMatches] = useState<RsMatchDto[]>([]);
   const [search, setSearch] = useState<string>('');
@@ -18,13 +16,10 @@ export const OreScannerView: React.FC = () => {
 
   const fetchSignatures = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<RsResourceDto[]>('get_rs_signatures');
       setResources(res || []);
     } catch (err) {
       console.error('Failed to load RS signatures:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -224,14 +219,6 @@ export const OreScannerView: React.FC = () => {
               className="bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-56 font-mono"
             />
           </div>
-
-          <button
-            onClick={fetchSignatures}
-            title="Aktualisieren"
-            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          </button>
         </div>
       </div>
 

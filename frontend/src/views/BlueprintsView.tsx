@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Search,
-  RefreshCw,
   Hammer,
   Shield,
   Crosshair,
@@ -16,20 +15,16 @@ import {
 
 export const BlueprintsView: React.FC = () => {
   const [blueprints, setBlueprints] = useState<BlueprintDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'learned' | 'missing'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const fetchBlueprints = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<BlueprintDto[]>('get_blueprints');
       setBlueprints(res || []);
     } catch (err) {
       console.error('Failed to load blueprints:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -211,14 +206,6 @@ export const BlueprintsView: React.FC = () => {
               className="bg-slate-900/90 border border-slate-700 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-48 lg:w-64 placeholder:text-slate-600 font-mono"
             />
           </div>
-
-          <button
-            onClick={fetchBlueprints}
-            title="Aktualisieren"
-            className="p-1.5 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          </button>
         </div>
       </div>
 

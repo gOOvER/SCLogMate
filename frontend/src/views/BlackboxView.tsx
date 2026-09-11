@@ -5,7 +5,6 @@ import {
   Rocket,
   Compass,
   AlertTriangle,
-  RefreshCw,
   Copy,
   Check,
   Radio,
@@ -16,7 +15,6 @@ import {
 
 export const BlackboxView: React.FC = () => {
   const [data, setData] = useState<FlightRecorderDto | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const [filterKind, setFilterKind] = useState<string>('all');
   const [copied, setCopied] = useState<boolean>(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -30,13 +28,10 @@ export const BlackboxView: React.FC = () => {
 
   const fetchBlackbox = async (targetSession = selectedSession) => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<FlightRecorderDto>('get_blackbox', { session: targetSession });
       setData(res);
     } catch (err) {
-      console.error('Failed to load blackbox data:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load flight recorder data:', err);
     }
   };
 
@@ -135,13 +130,6 @@ export const BlackboxView: React.FC = () => {
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">Kopieren</span>
           </button>
-          <button
-            onClick={() => fetchBlackbox(selectedSession)}
-            title="Aktualisieren"
-            className="p-1.5 rounded bg-[#071322] border border-slate-800 hover:border-cyan-500 text-slate-300 hover:text-cyan-300 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          </button>
         </div>
       </div>
 
@@ -197,13 +185,6 @@ export const BlackboxView: React.FC = () => {
               className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => fetchBlackbox()}
-              title="Aktualisieren"
-              className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
           </div>
         </div>

@@ -14,8 +14,8 @@ interface MasterHeaderProps {
   status: AppStatus | null;
   isGameRunning?: boolean;
   isScanning: boolean;
-  loading: boolean;
-  onRefresh: () => void;
+  loading?: boolean;
+  onRefresh?: () => void;
   onTriggerScan: () => void;
   onReparseAll?: () => void;
 }
@@ -24,8 +24,6 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
   status,
   isGameRunning = false,
   isScanning,
-  loading,
-  onRefresh,
   onTriggerScan,
   onReparseAll,
 }) => {
@@ -195,15 +193,6 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
             </button>
           )}
         </div>
-
-        {/* Refresh Button */}
-        <button
-          onClick={onRefresh}
-          title={t('header.refreshTooltip')}
-          className="p-1.5 rounded border border-slate-800 hover:border-cyan-800 bg-[#06101e] text-slate-400 hover:text-cyan-300 transition cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-        </button>
       </div>
     </header>
   );

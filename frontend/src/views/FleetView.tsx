@@ -13,14 +13,12 @@ import {
   Edit2,
   ExternalLink,
   Search,
-  RefreshCw,
   Coins,
   Warehouse,
 } from 'lucide-react';
 
 export const FleetView: React.FC = () => {
   const [fleetData, setFleetData] = useState<FleetResponseDto | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'hangar' | 'history'>('hangar');
   const [search, setSearch] = useState<string>('');
   const [selectedAcquisition, setSelectedAcquisition] = useState<string>('Alle');
@@ -40,13 +38,10 @@ export const FleetView: React.FC = () => {
 
   const fetchFleet = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<FleetResponseDto>('get_fleet');
       setFleetData(res);
     } catch (err) {
       console.error('Failed to load fleet data:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -304,15 +299,6 @@ export const FleetView: React.FC = () => {
                 {(fleetData?.totalQuantumJumps ?? 0).toLocaleString()}
               </span>
             </div>
-
-            {/* Refresh */}
-            <button
-              onClick={fetchFleet}
-              title="Flotte aktualisieren"
-              className="p-1.5 rounded-md bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer transition"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-            </button>
           </div>
         </div>
 

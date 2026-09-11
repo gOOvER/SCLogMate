@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Version aligned to `v1.0.0-rc2` matching `SCLogMate.csproj`.
 
 ### Removed
+- **Redundant Manual Toolbar Refresh Buttons Across All Views**:
+  - Removed obsolete circular refresh (`RefreshCw`) buttons from `FleetView`, `EventsView`, `WarehouseView`, `ReputationView`, `PlacesView`, `OreScannerView`, `MissionsView`, `MarketView`, `LoadoutView`, `FinancesView`, `BlueprintsView`, `BlackboxView`, `StarmapView`, and `MasterHeader`.
+  - All views receive instantaneous real-time push updates via LogTailer, reactive SQLite queries, and bidirectional IPC broadcasts (`FLEET_UPDATED`, `HUD_UPDATE`, `WAREHOUSE_UPDATED`, etc.), rendering manual page-level refresh buttons completely unnecessary.
 - **Unauthorized Scraping & Long-Removed Features**:
   - Removed unauthorized RSI citizen web scraper (`CitizenProfileService.cs`) and `PilotDossierModal.tsx`.
   - Removed obsolete standalone `DashboardView` and `SessionsView` tabs (dashboard is docked in HUD rows 1-2, and sessions are switched globally in the header).

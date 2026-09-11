@@ -3,21 +3,18 @@ import { bridge, MarketCommodityDto } from '../services/photinoBridge';
 import {
   ShoppingBag,
   Search,
-  RefreshCw,
   TrendingUp,
   ArrowRight,
 } from 'lucide-react';
 
 export const MarketView: React.FC = () => {
   const [commodities, setCommodities] = useState<MarketCommodityDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [selectedCommodityName, setSelectedCommodityName] = useState<string>('Laranite');
   const [cargoScu, setCargoScu] = useState<number>(696); // Default C2 Hercules
 
   const fetchMarket = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<MarketCommodityDto[]>('get_market');
       setCommodities(res || []);
       if (res && res.length > 0 && !selectedCommodityName) {
@@ -25,8 +22,6 @@ export const MarketView: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load market commodities:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -199,14 +194,6 @@ export const MarketView: React.FC = () => {
               className="bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-56 font-mono"
             />
           </div>
-
-          <button
-            onClick={fetchMarket}
-            title="Aktualisieren"
-            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          </button>
         </div>
       </div>
 

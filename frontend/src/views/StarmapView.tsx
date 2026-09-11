@@ -8,7 +8,6 @@ import {
 } from '../services/photinoBridge';
 import {
   Navigation,
-  RefreshCw,
   Sparkles,
   ZoomIn,
   ZoomOut,
@@ -24,7 +23,6 @@ export const StarmapView: React.FC = () => {
   const [toId, setToId] = useState<string>('crusader');
   const [selectedDrive, setSelectedDrive] = useState<string>('Atlas');
   const [routeResult, setRouteResult] = useState<QuantumRouteResultDto | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
 
   // Layer filters
   const [showStations, setShowStations] = useState<boolean>(true);
@@ -57,7 +55,6 @@ export const StarmapView: React.FC = () => {
 
   const fetchStarmap = async (sysName: string) => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<StarmapResponseDto>('get_starmap', { system: sysName });
       if (res?.objects) {
         setObjects(res.objects);
@@ -78,8 +75,6 @@ export const StarmapView: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load starmap:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -244,13 +239,6 @@ export const StarmapView: React.FC = () => {
             className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
           >
             <Maximize2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => fetchStarmap(system)}
-            title="Aktualisieren"
-            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
         </div>
       </div>

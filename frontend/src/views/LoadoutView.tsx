@@ -5,7 +5,6 @@ import {
   Crosshair,
   Thermometer,
   Sparkles,
-  RefreshCw,
   Copy,
   Check,
   Zap,
@@ -14,18 +13,14 @@ import {
 
 export const LoadoutView: React.FC = () => {
   const [slots, setSlots] = useState<LoadoutSlotDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
   const fetchLoadout = async () => {
     try {
-      setLoading(true);
       const res = await bridge.sendRequest<LoadoutSlotDto[]>('get_loadout');
       setSlots(res || []);
     } catch (err) {
       console.error('Failed to load loadout:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -190,13 +185,6 @@ export const LoadoutView: React.FC = () => {
               className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={fetchLoadout}
-              title="Aktualisieren"
-              className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
           </div>
         </div>
