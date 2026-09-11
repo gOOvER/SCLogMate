@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Photino.NET;
+using SCLogMate.Core.Ocr;
 using SCLogMate.Models;
 
 namespace SCLogMate.Core.Photino;
@@ -598,6 +599,34 @@ public class SettingsDto
     [JsonPropertyName("auroraVolume")] public int AuroraVolume { get; set; } = 40;
     [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
     [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
+    [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
+    [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
+    [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
+}
+
+public class OcrRegionsConfigDto
+{
+    [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
+    [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
+    [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
+    [JsonPropertyName("defaultWalletRegion")] public ScanRegion DefaultWalletRegion { get; set; } = new();
+    [JsonPropertyName("defaultContractRegion")] public ScanRegion DefaultContractRegion { get; set; } = new();
+    [JsonPropertyName("defaultRsRegion")] public ScanRegion DefaultRsRegion { get; set; } = new();
+    [JsonPropertyName("screenWidth")] public int ScreenWidth { get; set; } = 1920;
+    [JsonPropertyName("screenHeight")] public int ScreenHeight { get; set; } = 1080;
+    [JsonPropertyName("isWalletScanBoxVisible")] public bool IsWalletScanBoxVisible { get; set; }
+    [JsonPropertyName("isContractScanBoxVisible")] public bool IsContractScanBoxVisible { get; set; }
+}
+
+public class OcrTestResultDto
+{
+    [JsonPropertyName("success")] public bool Success { get; set; }
+    [JsonPropertyName("target")] public string Target { get; set; } = "";
+    [JsonPropertyName("recognizedText")] public string RecognizedText { get; set; } = "";
+    [JsonPropertyName("extractedValue")] public long? ExtractedValue { get; set; }
+    [JsonPropertyName("durationMs")] public int DurationMs { get; set; }
+    [JsonPropertyName("region")] public ScanRegion? Region { get; set; }
+    [JsonPropertyName("error")] public string? Error { get; set; }
 }
 
 public class DetectedPathDto
@@ -696,6 +725,31 @@ public class PhotinoBridge
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SessionMetadataCache> _sessionMetaCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _knownSessionFiles = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly OcrEngineService _ocrEngine = new();
+    private readonly WalletCapture _walletCapture;
+    private readonly NativeScanIndicator _walletScanIndicator = new("mobiGlas aUEC Scan", 0x22D3EE);
+    private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
+
+    public PhotinoBridge()
+    {
+        _walletCapture = new WalletCapture(
+            _ocrEngine,
+            () => Settings.Load().WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(),
+            () => Settings.Load().AutoOcrEnabled);
+        _walletCapture.BalanceCaptured += OnBalanceCaptured;
+    }
+
+    private void OnBalanceCaptured(long newBalance)
+    {
+        var s = Settings.Load();
+        s.Balance = newBalance;
+        s.BalanceSetAt = DateTime.UtcNow;
+        Settings.Save(s);
+        _walletScanIndicator.FlashGreen();
+        Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+        Broadcast("STATUS_UPDATE", GetAppStatus());
+    }
 
     public void Initialize(PhotinoWindow window)
     {
@@ -1033,6 +1087,127 @@ public class PhotinoBridge
                     }
                     SendResponse(req.Id, "save_settings_response", GetSettingsData());
                     Broadcast("STATUS_UPDATE", GetAppStatus());
+                    break;
+
+                case "get_ocr_regions":
+                    SendResponse(req.Id, "ocr_regions_response", GetOcrRegionsConfig());
+                    break;
+
+                case "save_ocr_region":
+                    if (req.Payload.HasValue)
+                    {
+                        string target = "wallet";
+                        ScanRegion? region = null;
+                        if (req.Payload.Value.TryGetProperty("target", out var tProp)) target = tProp.GetString() ?? "wallet";
+                        if (req.Payload.Value.TryGetProperty("region", out var rProp) && rProp.ValueKind != JsonValueKind.Null)
+                        {
+                            region = JsonSerializer.Deserialize<ScanRegion>(rProp.GetRawText(), JsonOpts);
+                        }
+                        var s = Settings.Load();
+                        if (target == "wallet")
+                        {
+                            s.WalletRegion = region;
+                            _walletScanIndicator.SetRegion(region ?? ScreenCapture.GetDefaultWalletRegion());
+                        }
+                        else if (target == "contract")
+                        {
+                            s.ContractRegion = region;
+                            _contractScanIndicator.SetRegion(region ?? ScreenCapture.GetDefaultContractRegion());
+                        }
+                        else if (target == "rs")
+                        {
+                            s.RsScanRegion = region;
+                        }
+                        Settings.Save(s);
+                    }
+                    SendResponse(req.Id, "save_ocr_region_response", GetOcrRegionsConfig());
+                    break;
+
+                case "select_ocr_region":
+                    string selTarget = "wallet";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("target", out var stProp))
+                    {
+                        selTarget = stProp.GetString() ?? "wallet";
+                    }
+                    string selTitle = selTarget switch
+                    {
+                        "contract" => "Auftragsmanager (Contracts)",
+                        "rs" => "RS Signal Radar",
+                        _ => "mobiGlas aUEC"
+                    };
+                    var selected = await NativeRegionSelector.SelectRegionAsync(selTitle);
+                    if (selected != null)
+                    {
+                        var s = Settings.Load();
+                        if (selTarget == "wallet")
+                        {
+                            s.WalletRegion = selected;
+                            _walletScanIndicator.SetRegion(selected);
+                        }
+                        else if (selTarget == "contract")
+                        {
+                            s.ContractRegion = selected;
+                            _contractScanIndicator.SetRegion(selected);
+                        }
+                        else if (selTarget == "rs")
+                        {
+                            s.RsScanRegion = selected;
+                        }
+                        Settings.Save(s);
+                        SendResponse(req.Id, "select_ocr_region_response", new { success = true, cancelled = false, region = selected, config = GetOcrRegionsConfig() });
+                    }
+                    else
+                    {
+                        SendResponse(req.Id, "select_ocr_region_response", new { success = false, cancelled = true, config = GetOcrRegionsConfig() });
+                    }
+                    break;
+
+                case "test_ocr_scan":
+                    string testTarget = "wallet";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("target", out var ttProp))
+                    {
+                        testTarget = ttProp.GetString() ?? "wallet";
+                    }
+                    var testResult = await ExecuteOcrTestAsync(testTarget);
+                    SendResponse(req.Id, "test_ocr_scan_response", testResult);
+                    break;
+
+                case "toggle_scan_indicator":
+                    string indTarget = "wallet";
+                    bool? showOverride = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("target", out var itProp)) indTarget = itProp.GetString() ?? "wallet";
+                        if (req.Payload.Value.TryGetProperty("show", out var shProp)) showOverride = shProp.GetBoolean();
+                    }
+                    var sObj = Settings.Load();
+                    if (indTarget == "contract")
+                    {
+                        bool show = showOverride ?? !_contractScanIndicator.IsVisible;
+                        if (show)
+                        {
+                            _contractScanIndicator.SetRegion(sObj.ContractRegion ?? ScreenCapture.GetDefaultContractRegion());
+                            _contractScanIndicator.Show();
+                        }
+                        else
+                        {
+                            _contractScanIndicator.Hide();
+                        }
+                    }
+                    else
+                    {
+                        bool show = showOverride ?? !_walletScanIndicator.IsVisible;
+                        if (show)
+                        {
+                            _walletScanIndicator.SetRegion(sObj.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion());
+                            _walletScanIndicator.Show();
+                        }
+                        else
+                        {
+                            _walletScanIndicator.Hide();
+                        }
+                    }
+                    SendResponse(req.Id, "toggle_scan_indicator_response", GetOcrRegionsConfig());
                     break;
 
                 case "toggle_watcher":
@@ -2719,7 +2894,10 @@ public class PhotinoBridge
             AuroraIntegrationEnabled = s.AuroraIntegrationEnabled,
             AuroraVolume = s.AuroraVolume,
             RsTargetAlertEnabled = s.RsTargetAlertEnabled,
-            RsTargetSoundEnabled = s.RsTargetSoundEnabled
+            RsTargetSoundEnabled = s.RsTargetSoundEnabled,
+            WalletRegion = s.WalletRegion,
+            ContractRegion = s.ContractRegion,
+            RsScanRegion = s.RsScanRegion
         };
     }
 
@@ -2745,6 +2923,9 @@ public class PhotinoBridge
         s.AuroraVolume = dto.AuroraVolume;
         s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
         s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
+        s.WalletRegion = dto.WalletRegion;
+        s.ContractRegion = dto.ContractRegion;
+        s.RsScanRegion = dto.RsScanRegion;
 
         Settings.Save(s);
 
@@ -2755,10 +2936,98 @@ public class PhotinoBridge
         }
     }
 
+    private OcrRegionsConfigDto GetOcrRegionsConfig()
+    {
+        var (sw, sh) = ScreenCapture.GetPrimaryScreenSize();
+        var s = Settings.Load();
+        return new OcrRegionsConfigDto
+        {
+            WalletRegion = s.WalletRegion,
+            ContractRegion = s.ContractRegion,
+            RsScanRegion = s.RsScanRegion,
+            DefaultWalletRegion = ScreenCapture.GetDefaultWalletRegion(),
+            DefaultContractRegion = ScreenCapture.GetDefaultContractRegion(),
+            DefaultRsRegion = ScreenCapture.GetDefaultRsRegion(),
+            ScreenWidth = sw,
+            ScreenHeight = sh,
+            IsWalletScanBoxVisible = _walletScanIndicator.IsVisible,
+            IsContractScanBoxVisible = _contractScanIndicator.IsVisible
+        };
+    }
+
+    private async Task<OcrTestResultDto> ExecuteOcrTestAsync(string target)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var s = Settings.Load();
+
+        if (!_ocrEngine.IsAvailable)
+        {
+            return new OcrTestResultDto
+            {
+                Success = false,
+                Target = target,
+                Error = "Windows OCR Engine (Windows.Media.Ocr) ist auf diesem System nicht verfügbar."
+            };
+        }
+
+        if (target == "contract")
+        {
+            var region = s.ContractRegion ?? ScreenCapture.GetDefaultContractRegion();
+            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+            if (raw == null)
+            {
+                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
+            }
+            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 12);
+            sw.Stop();
+            return new OcrTestResultDto
+            {
+                Success = !string.IsNullOrWhiteSpace(text),
+                Target = target,
+                RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
+                DurationMs = (int)sw.ElapsedMilliseconds,
+                Region = region
+            };
+        }
+        else
+        {
+            var region = s.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion();
+            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+            if (raw == null)
+            {
+                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
+            }
+            var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 6, padding: 24, boostContrast: false);
+            var bestText = WalletOcrTrigger.BestRead(invText, plainText);
+            var val = WalletOcrTrigger.ExtractBalance(bestText);
+            sw.Stop();
+
+            if (val.HasValue)
+            {
+                _walletScanIndicator.FlashGreen();
+                OnBalanceCaptured(val.Value);
+            }
+
+            return new OcrTestResultDto
+            {
+                Success = val.HasValue,
+                Target = target,
+                RecognizedText = bestText?.Trim() ?? (!string.IsNullOrEmpty(invText) ? invText.Trim() : "(Kein Text erkannt)"),
+                ExtractedValue = val,
+                DurationMs = (int)sw.ElapsedMilliseconds,
+                Region = region
+            };
+        }
+    }
+
     private void OnLogLineReceived(string rawLine, bool isLive = true)
     {
         try
         {
+            if (isLive)
+            {
+                _walletCapture.ProcessLine(rawLine);
+            }
             var entry = _parser.Feed(rawLine);
             if (entry == null) return;
 

@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed unnecessary "Start-Kontostand (aUEC)" input box from General Settings since the player's wallet is automatically tracked through game log events and live OCR.
 
 ### Added
+- **Interactive OCR Region Selection & Calibration Subsystem (`NativeRegionSelector.cs`, `NativeScanIndicator.cs`, `SettingsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Implemented interactive on-screen snipping tool (`NativeRegionSelector.cs`) using pure Win32 layered overlay with live drag-rectangle, real-time pixel dimensions badge, ESC cancellation, and multi-monitor switching (`Tab` or `M`).
+  - Added click-through on-screen scan indicator frame (`NativeScanIndicator.cs`) rendering a persistent cyan border and label over Star Citizen or desktop with `FlashGreen` visual feedback upon successful OCR balance extraction.
+  - Comprehensive OCR configuration view in `SettingsView.tsx` (`mobiGlas & OCR` tab):
+    - Dedicated configuration cards for both **mobiGlas Wallet (aUEC)** and **Auftragsmanager (Contract Manager)**.
+    - Quick 1-click resolution presets for 1080p, 1440p (WQHD), 4K (UHD), 3440×1440 (21:9 Ultrawide), and 5120×1440 (32:9 Super Ultrawide).
+    - Manual coordinate fine-tuning inputs for X, Y, Width, and Height with instant save.
+    - Interactive "⚡ Test-Scan" button that runs real-time OCR and returns recognized text, extracted aUEC amount, and millisecond latency.
+    - "👁 Scan-Rahmen im Spiel anzeigen" toggle to preview bounding box directly over the game client.
+    - Reset buttons to return to dynamic resolution-based auto-detection.
 - **Database & Log Synchronization Modal (`DbUpdateModal.tsx`, `App.tsx`, `PhotinoBridge.cs`)**:
   - Created a dedicated Glassmorphism `DbUpdateModal` dialog displaying whenever database schema migrations or parser upgrades require a full re-scan, or when indexing newly detected log files.
   - Features real-time progress animation, processed/total session counters, percentage badge, current filename indicator, and an update reason badge (e.g. schema migration or parser version bump).

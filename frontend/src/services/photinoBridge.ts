@@ -348,6 +348,36 @@ export interface ToolsStatusDto {
   keybindBackups: string[];
 }
 
+export interface ScanRegionDto {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface OcrRegionsConfig {
+  walletRegion: ScanRegionDto | null;
+  contractRegion: ScanRegionDto | null;
+  rsScanRegion: ScanRegionDto | null;
+  defaultWalletRegion: ScanRegionDto;
+  defaultContractRegion: ScanRegionDto;
+  defaultRsRegion: ScanRegionDto;
+  screenWidth: number;
+  screenHeight: number;
+  isWalletScanBoxVisible: boolean;
+  isContractScanBoxVisible: boolean;
+}
+
+export interface OcrTestResult {
+  success: boolean;
+  target: string;
+  recognizedText: string;
+  extractedValue?: number | null;
+  durationMs: number;
+  region?: ScanRegionDto;
+  error?: string;
+}
+
 export interface SettingsDto {
   logPath?: string;
   balance: number;
@@ -366,6 +396,9 @@ export interface SettingsDto {
   auroraVolume: number;
   rsTargetAlertEnabled: boolean;
   rsTargetSoundEnabled: boolean;
+  walletRegion?: ScanRegionDto | null;
+  contractRegion?: ScanRegionDto | null;
+  rsScanRegion?: ScanRegionDto | null;
 }
 
 export interface DetectedPath {

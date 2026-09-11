@@ -11,11 +11,24 @@ import {
   Globe,
   CheckCircle2,
   Radio,
-  FileCheck,
   Shield,
   FileText,
+  Crop,
+  RotateCcw,
+  Zap,
+  Monitor,
+  Sliders,
+  Check,
+  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
-import { bridge, SettingsDto } from '../services/photinoBridge';
+import {
+  bridge,
+  SettingsDto,
+  ScanRegionDto,
+  OcrRegionsConfig,
+  OcrTestResult,
+} from '../services/photinoBridge';
 
 export const SettingsView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<
@@ -117,6 +130,124 @@ export const SettingsView: React.FC = () => {
     bridge.send('open_folder', { target });
   };
 
+  const [ocrConfig, setOcrConfig] = useState<OcrRegionsConfig | null>(null);
+  const [isSelectingRegion, setIsSelectingRegion] = useState<string | null>(null);
+  const [isTestingScan, setIsTestingScan] = useState<string | null>(null);
+  const [testScanResult, setTestScanResult] = useState<OcrTestResult | null>(null);
+  const [manualWallet, setManualWallet] = useState<ScanRegionDto>({ x: 1300, y: 415, width: 500, height: 80 });
+  const [manualContract, setManualContract] = useState<ScanRegionDto>({ x: 576, y: 32, width: 1306, height: 1015 });
+
+  const loadOcrConfig = async () => {
+    try {
+      const cfg = await bridge.sendRequest<OcrRegionsConfig>('get_ocr_regions');
+      if (cfg) {
+        setOcrConfig(cfg);
+        const curW = cfg.walletRegion || cfg.defaultWalletRegion;
+        if (curW) setManualWallet(curW);
+        const curC = cfg.contractRegion || cfg.defaultContractRegion;
+        if (curC) setManualContract(curC);
+      }
+    } catch (err) {
+      console.error('Failed to load OCR config:', err);
+    }
+  };
+
+  const handleSelectRegion = async (target: 'wallet' | 'contract' | 'rs') => {
+    try {
+      setIsSelectingRegion(target);
+      showToast('Bildschirm-Auswahl gestartet: Ziehe mit der Maus ein Rechteck...');
+      const res = await bridge.sendRequest<any>('select_ocr_region', { target });
+      if (res?.success && res.region) {
+        showToast(`Scan-Bereich gespeichert: ${res.region.width}×${res.region.height} @ (${res.region.x}, ${res.region.y})`);
+        if (res.config) {
+          setOcrConfig(res.config);
+          if (target === 'wallet') setManualWallet(res.region);
+          if (target === 'contract') setManualContract(res.region);
+        } else {
+          loadOcrConfig();
+        }
+      } else if (res?.cancelled) {
+        showToast('Auswahl abgebrochen');
+      }
+    } catch (err) {
+      console.error('Region select failed:', err);
+      showToast('Fehler bei der Bildschirmauswahl');
+    } finally {
+      setIsSelectingRegion(null);
+    }
+  };
+
+  const handleTestScan = async (target: 'wallet' | 'contract') => {
+    try {
+      setIsTestingScan(target);
+      setTestScanResult(null);
+      const res = await bridge.sendRequest<OcrTestResult>('test_ocr_scan', { target });
+      if (res) {
+        setTestScanResult(res);
+        if (res.success) {
+          showToast(res.extractedValue != null
+            ? `✓ Kontostand erkannt: ${res.extractedValue.toLocaleString('de-DE')} aUEC (${res.durationMs}ms)`
+            : `✓ Text erkannt: ${res.recognizedText.slice(0, 35)}... (${res.durationMs}ms)`);
+        } else {
+          showToast(`⚠️ OCR Test: Kein gültiger Wert erkannt (${res.recognizedText || 'leer'})`);
+        }
+      }
+    } catch (err) {
+      console.error('Test scan failed:', err);
+      showToast('Fehler beim OCR Test-Scan');
+    } finally {
+      setIsTestingScan(null);
+    }
+  };
+
+  const handleResetRegion = async (target: 'wallet' | 'contract' | 'rs') => {
+    try {
+      const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: null });
+      if (cfg) {
+        setOcrConfig(cfg);
+        if (target === 'wallet') setManualWallet(cfg.defaultWalletRegion);
+        if (target === 'contract') setManualContract(cfg.defaultContractRegion);
+      }
+      showToast('Bereich auf Standard (Auto-Erkennung) zurückgesetzt');
+    } catch (err) {
+      showToast('Fehler beim Zurücksetzen');
+    }
+  };
+
+  const handleToggleScanBox = async (target: 'wallet' | 'contract') => {
+    try {
+      const cfg = await bridge.sendRequest<OcrRegionsConfig>('toggle_scan_indicator', { target });
+      if (cfg) setOcrConfig(cfg);
+      showToast('Scan-Rahmen Anzeige umgeschaltet');
+    } catch (err) {
+      showToast('Fehler beim Umschalten des Scan-Rahmens');
+    }
+  };
+
+  const handleApplyPreset = async (target: 'wallet' | 'contract', preset: ScanRegionDto) => {
+    try {
+      const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: preset });
+      if (cfg) {
+        setOcrConfig(cfg);
+        if (target === 'wallet') setManualWallet(preset);
+        if (target === 'contract') setManualContract(preset);
+      }
+      showToast(`Preset angewendet: ${preset.width}×${preset.height} @ (${preset.x}, ${preset.y})`);
+    } catch (err) {
+      showToast('Fehler beim Anwenden des Presets');
+    }
+  };
+
+  const handleApplyManualCoords = async (target: 'wallet' | 'contract' | 'rs', coords: ScanRegionDto) => {
+    try {
+      const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: coords });
+      if (cfg) setOcrConfig(cfg);
+      showToast(`Koordinaten gespeichert: ${coords.width}×${coords.height} @ (${coords.x}, ${coords.y})`);
+    } catch (err) {
+      showToast('Fehler beim Speichern der Koordinaten');
+    }
+  };
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -124,6 +255,7 @@ export const SettingsView: React.FC = () => {
       if (data) {
         setSettings(data);
       }
+      await loadOcrConfig();
     } catch (err) {
       console.error('Failed to load settings:', err);
     } finally {
@@ -541,14 +673,483 @@ export const SettingsView: React.FC = () => {
       {/* Tab 3: mobiGlas & OCR */}
       {activeSubTab === 'ocr' && (
         <div className="space-y-6">
+          {/* Resolution & System Banner */}
+          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                <Monitor className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white flex items-center space-x-2">
+                  <span>ERKANNTES SYSTEM-DISPLAY:</span>
+                  <span className="font-mono text-sky-400">
+                    {ocrConfig ? `${ocrConfig.screenWidth} × ${ocrConfig.screenHeight}` : '1920 × 1080'}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                    ONLINE
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Windows.Media.Ocr Engine aktiv · Multi-Monitor & DPI-Skalierung unterstützt
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => loadOcrConfig()}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition shrink-0"
+              title="Aktuelle Regionen und Displaymaße neu abfragen"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Neu laden</span>
+            </button>
+          </div>
+
+          {/* Sektion 1: mobiGlas aUEC Kontostand Scan-Bereich */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                    <Crop className="w-4 h-4" />
+                    <span>MOBIGLAS WALLET SCAN-BEREICH (aUEC)</span>
+                  </h2>
+                  {ocrConfig?.walletRegion ? (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-sky-950 text-sky-300 border border-sky-800">
+                      BENUTZERDEFINIERT: {ocrConfig.walletRegion.width}×{ocrConfig.walletRegion.height} @ ({ocrConfig.walletRegion.x},{ocrConfig.walletRegion.y})
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                      STANDARD AUTO-ERKENNUNG ({ocrConfig?.defaultWalletRegion ? `${ocrConfig.defaultWalletRegion.width}×${ocrConfig.defaultWalletRegion.height}` : '500×80'})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Definiert das Bildschirm-Rechteck, in dem dein Kontostand beim Drücken von F1 im mobiGlas ausgelesen wird.
+                </p>
+              </div>
+
+              {ocrConfig?.isWalletScanBoxVisible && (
+                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-pulse shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>Scan-Rahmen aktiv</span>
+                </span>
+              )}
+            </div>
+
+            {/* Haupt-Aktionsleiste */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <button
+                onClick={() => handleSelectRegion('wallet')}
+                disabled={isSelectingRegion !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-sky-600/20 border border-sky-400 transition"
+              >
+                {isSelectingRegion === 'wallet' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Overlay aktiv...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crop className="w-4 h-4" />
+                    <span>Bereich am Bildschirm markieren</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleTestScan('wallet')}
+                disabled={isTestingScan !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sky-300 text-xs font-bold border border-sky-500/30 transition shadow-sm"
+              >
+                {isTestingScan === 'wallet' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+                    <span>Scanne Bildschirm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>Test-Scan ausführen</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleToggleScanBox('wallet')}
+                className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-xs font-bold border transition shadow-sm ${
+                  ocrConfig?.isWalletScanBoxVisible
+                    ? 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-600'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                <span>
+                  {ocrConfig?.isWalletScanBoxVisible
+                    ? 'Scan-Rahmen ausblenden'
+                    : 'Scan-Rahmen im Spiel anzeigen'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleResetRegion('wallet')}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-400" />
+                <span>Standard (Auto)</span>
+              </button>
+            </div>
+
+            {/* Test-Scan Feedback Box */}
+            {testScanResult && testScanResult.target === 'wallet' && (
+              <div
+                className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in slide-in-from-top-2 ${
+                  testScanResult.success
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-2">
+                    {testScanResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    )}
+                    <span>
+                      {testScanResult.success
+                        ? 'Test-Scan erfolgreich abgeschlossen'
+                        : 'Test-Scan: Kontostand konnte nicht verifiziert werden'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] opacity-80">
+                    {testScanResult.durationMs} ms
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono mt-1">
+                  <div className="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+                    <span className="text-slate-400 block text-[10px]">ERKANNTES ERGEBNIS:</span>
+                    <span className="font-bold text-sm text-sky-400">
+                      {testScanResult.extractedValue != null
+                        ? `${testScanResult.extractedValue.toLocaleString('de-DE')} aUEC`
+                        : 'Kein Betrag extrahierbar'}
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+                    <span className="text-slate-400 block text-[10px]">ROHTEXT (OCR):</span>
+                    <span className="text-slate-200 truncate block">
+                      {testScanResult.recognizedText || '—'}
+                    </span>
+                  </div>
+                </div>
+                {testScanResult.region && (
+                  <div className="text-[10px] text-slate-400">
+                    Gescannter Bereich: {testScanResult.region.width}×{testScanResult.region.height} Pixel bei X:{testScanResult.region.x}, Y:{testScanResult.region.y}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Schnellauswahl: Bildschirm-Presets */}
+            <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Auflösungs-Voreinstellungen (Schnellauswahl):</span>
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">1-Klick Optimierung</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '1080p (Full HD)', x: 1300, y: 415, width: 500, height: 80 },
+                  { label: '1440p (WQHD)', x: 1733, y: 553, width: 667, height: 107 },
+                  { label: '4K (UHD 2160p)', x: 2600, y: 830, width: 1000, height: 160 },
+                  { label: '3440×1440 (21:9 UW)', x: 2173, y: 553, width: 667, height: 107 },
+                  { label: '5120×1440 (32:9 SUW)', x: 3013, y: 553, width: 667, height: 107 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleApplyPreset('wallet', preset)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-sky-300 text-xs font-medium border border-slate-700/80 hover:border-sky-500/50 transition"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pixel-Feinjustierung manuell */}
+            <div className="p-4 rounded-lg bg-slate-950/40 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                <Sliders className="w-3.5 h-3.5 text-slate-400" />
+                <span>Pixel-Feinabstimmung (Manuelle Koordinaten):</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">X-Position (Links):</label>
+                  <input
+                    type="number"
+                    value={manualWallet.x}
+                    onChange={(e) => setManualWallet({ ...manualWallet, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Y-Position (Oben):</label>
+                  <input
+                    type="number"
+                    value={manualWallet.y}
+                    onChange={(e) => setManualWallet({ ...manualWallet, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Breite (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualWallet.width}
+                    onChange={(e) => setManualWallet({ ...manualWallet, width: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Höhe (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualWallet.height}
+                    onChange={(e) => setManualWallet({ ...manualWallet, height: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => handleApplyManualCoords('wallet', manualWallet)}
+                  className="px-4 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-white text-xs font-semibold shadow border border-sky-500 transition"
+                >
+                  Koordinaten speichern & anwenden
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sektion 2: mobiGlas Auftragsmanager (Contract Manager) Bereich */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                    <FileText className="w-4 h-4" />
+                    <span>MOBIGLAS AUFTRAGSMANAGER-BEREICH (CONTRACTS)</span>
+                  </h2>
+                  {ocrConfig?.contractRegion ? (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-sky-950 text-sky-300 border border-sky-800">
+                      BENUTZERDEFINIERT: {ocrConfig.contractRegion.width}×{ocrConfig.contractRegion.height} @ ({ocrConfig.contractRegion.x},{ocrConfig.contractRegion.y})
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                      STANDARD AUTO-ERKENNUNG ({ocrConfig?.defaultContractRegion ? `${ocrConfig.defaultContractRegion.width}×${ocrConfig.defaultContractRegion.height}` : '30%–98% Breite'})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Definiert das Bildschirm-Rechteck der rechten Auftrags-Detailkarte (blendet linke Sidebar automatisch aus).
+                </p>
+              </div>
+
+              {ocrConfig?.isContractScanBoxVisible && (
+                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-pulse shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>Auftrags-Rahmen aktiv</span>
+                </span>
+              )}
+            </div>
+
+            {/* Auftrags-Aktionsleiste */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <button
+                onClick={() => handleSelectRegion('contract')}
+                disabled={isSelectingRegion !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-sky-600/20 border border-sky-400 transition"
+              >
+                {isSelectingRegion === 'contract' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Overlay aktiv...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crop className="w-4 h-4" />
+                    <span>Auftragsbereich markieren</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleTestScan('contract')}
+                disabled={isTestingScan !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sky-300 text-xs font-bold border border-sky-500/30 transition shadow-sm"
+              >
+                {isTestingScan === 'contract' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+                    <span>Scanne Auftrag...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>Test-Scan Auftrag</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleToggleScanBox('contract')}
+                className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-xs font-bold border transition shadow-sm ${
+                  ocrConfig?.isContractScanBoxVisible
+                    ? 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-600'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                <span>
+                  {ocrConfig?.isContractScanBoxVisible
+                    ? 'Scan-Rahmen ausblenden'
+                    : 'Scan-Rahmen im Spiel anzeigen'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleResetRegion('contract')}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-400" />
+                <span>Standard (Auto)</span>
+              </button>
+            </div>
+
+            {/* Test-Scan Feedback Box für Aufträge */}
+            {testScanResult && testScanResult.target === 'contract' && (
+              <div
+                className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in slide-in-from-top-2 ${
+                  testScanResult.success
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-2">
+                    {testScanResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    )}
+                    <span>
+                      {testScanResult.success
+                        ? 'Auftrags-Scan erfolgreich'
+                        : 'Auftrags-Scan: Kein Text erkannt'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] opacity-80">
+                    {testScanResult.durationMs} ms
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-2.5 rounded border border-slate-800/60 text-[11px] font-mono text-slate-300 max-h-24 overflow-y-auto whitespace-pre-wrap">
+                  {testScanResult.recognizedText || 'Kein Text im ausgewählten Bereich.'}
+                </div>
+              </div>
+            )}
+
+            {/* Presets für Aufträge */}
+            <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Auftragsmanager Voreinstellungen:</span>
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '1080p (Standard)', x: 576, y: 32, width: 1306, height: 1015 },
+                  { label: '1440p (WQHD)', x: 768, y: 43, width: 1741, height: 1354 },
+                  { label: '4K (UHD)', x: 1152, y: 65, width: 2611, height: 2030 },
+                  { label: '3440×1440 (21:9)', x: 1032, y: 43, width: 2339, height: 1354 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleApplyPreset('contract', preset)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-sky-300 text-xs font-medium border border-slate-700/80 hover:border-sky-500/50 transition"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pixel-Feinjustierung Aufträge */}
+            <div className="p-4 rounded-lg bg-slate-950/40 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                <Sliders className="w-3.5 h-3.5 text-slate-400" />
+                <span>Pixel-Feinabstimmung Aufträge:</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">X-Position (Links):</label>
+                  <input
+                    type="number"
+                    value={manualContract.x}
+                    onChange={(e) => setManualContract({ ...manualContract, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Y-Position (Oben):</label>
+                  <input
+                    type="number"
+                    value={manualContract.y}
+                    onChange={(e) => setManualContract({ ...manualContract, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Breite (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualContract.width}
+                    onChange={(e) => setManualContract({ ...manualContract, width: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Höhe (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualContract.height}
+                    onChange={(e) => setManualContract({ ...manualContract, height: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => handleApplyManualCoords('contract', manualContract)}
+                  className="px-4 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-white text-xs font-semibold shadow border border-sky-500 transition"
+                >
+                  Koordinaten speichern & anwenden
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sektion 3: Auto-OCR Wächter & Schutzmechanismen */}
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
             <div>
               <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Radio className="w-4 h-4" />
-                <span>MOBIGLAS WALLET & KONTOSTAND-OCR</span>
+                <Shield className="w-4 h-4" />
+                <span>AUTO-OCR WÄCHTER & SCHUTZMECHANISMEN</span>
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                Liest den aUEC-Kontostand aus dem geöffneten mobiGlas über Win32 GDI & Tesseract Engine 5.
+                Hintergrund-Synchronisation und NexusApp-Sicherheitslayer gegen Fehlscans.
               </p>
             </div>
 
@@ -563,7 +1164,7 @@ export const SettingsView: React.FC = () => {
                 <div>
                   <div className="text-xs font-semibold text-white">Auto-OCR Wächter aktiv</div>
                   <div className="text-[11px] text-slate-400">
-                    Prüft bei mobiGlas-Events automatisch den Bildschirmbereich und aktualisiert den Saldo
+                    Scannt beim Öffnen des mobiGlas (F1) vollautomatisch den Kontostand und aktualisiert deinen Saldo
                   </div>
                 </div>
               </label>
@@ -574,12 +1175,12 @@ export const SettingsView: React.FC = () => {
                 </div>
                 <div className="text-xs text-slate-400 leading-relaxed space-y-1.5">
                   <div className="flex items-center space-x-2 text-emerald-400">
-                    <Shield className="w-4 h-4 shrink-0" />
-                    <span>Cross-Grab Bestätigung: Doppelter Abgleich desselben Betrags verhindert Fehlscans</span>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>Cross-Grab Bestätigung: Derselbe Wert muss mindestens 2× in einer Burst-Sequenz übereinstimmen</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sky-400">
-                    <FileCheck className="w-4 h-4 shrink-0" />
-                    <span>Adaptive Schwellenwert-Invertierung & Kontrast-Filter für hohe Erkennungsgenauigkeit</span>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>Adaptive Schwellenwert-Invertierung & Kontrast-Filter für kristallklare Textextraktion</span>
                   </div>
                 </div>
               </div>
