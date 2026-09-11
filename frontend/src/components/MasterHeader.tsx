@@ -6,8 +6,9 @@ import {
   Monitor,
   Radio,
   Sparkles,
+  ArrowUpCircle,
 } from 'lucide-react';
-import { bridge, AppStatus } from '../services/photinoBridge';
+import { bridge, AppStatus, UpdateInfoDto } from '../services/photinoBridge';
 import { useI18n } from '../i18n';
 
 interface MasterHeaderProps {
@@ -15,6 +16,8 @@ interface MasterHeaderProps {
   isGameRunning?: boolean;
   isScanning: boolean;
   loading?: boolean;
+  updateInfo?: UpdateInfoDto | null;
+  onOpenUpdateModal?: () => void;
   onRefresh?: () => void;
   onTriggerScan: () => void;
   onReparseAll?: () => void;
@@ -24,6 +27,8 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
   status,
   isGameRunning = false,
   isScanning,
+  updateInfo,
+  onOpenUpdateModal,
   onTriggerScan,
   onReparseAll,
 }) => {
@@ -66,6 +71,16 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
           <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-mono text-[11px] font-bold">
             {status?.version || 'v1.0.0-rc2'}
           </span>
+          {updateInfo?.updateAvailable && (
+            <button
+              onClick={onOpenUpdateModal}
+              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[11px] font-bold shadow-[0_0_12px_rgba(16,185,129,0.5)] border border-emerald-400 animate-pulse transition cursor-pointer shrink-0"
+              title="Klicken für Update-Details &amp; Installation"
+            >
+              <ArrowUpCircle className="w-3.5 h-3.5" />
+              <span>Update {updateInfo.newVersion}</span>
+            </button>
+          )}
         </div>
 
         {/* Star Citizen Prozess Status Badge */}

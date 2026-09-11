@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   ExternalLink,
@@ -8,9 +8,32 @@ import {
   Shield,
   Bot,
   Globe,
+  RefreshCw,
 } from 'lucide-react';
+import { bridge } from '../services/photinoBridge';
 
 export const AboutView: React.FC = () => {
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+
+  const handleCheckUpdate = async () => {
+    try {
+      setIsCheckingUpdate(true);
+      setUpdateStatusMsg(null);
+      const res = await bridge.checkUpdate();
+      if (res && res.updateAvailable) {
+        setUpdateStatusMsg(`Update ${res.newVersion} verfügbar!`);
+      } else {
+        setUpdateStatusMsg(`SCLogMate ist auf dem neuesten Stand (${res?.currentVersion || 'v1.0.0-rc2'}).`);
+      }
+    } catch (e) {
+      setUpdateStatusMsg('Fehler bei der Update-Prüfung');
+    } finally {
+      setIsCheckingUpdate(false);
+      setTimeout(() => setUpdateStatusMsg(null), 6000);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       {/* 1. Hero Brand Header */}
@@ -41,7 +64,15 @@ export const AboutView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleCheckUpdate}
+              disabled={isCheckingUpdate}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-semibold border border-cyan-800 transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+              <span>{isCheckingUpdate ? 'Prüfe...' : 'Auf Updates prüfen'}</span>
+            </button>
             <a
               href="https://github.com/gOOvER/SCLogMate"
               target="_blank"
@@ -65,6 +96,18 @@ export const AboutView: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {updateStatusMsg && (
+          <div className="mt-4 p-3 rounded-lg bg-slate-950/80 border border-cyan-500/40 text-cyan-300 text-xs font-mono animate-in fade-in flex items-center justify-between">
+            <span>ℹ {updateStatusMsg}</span>
+            <button
+              onClick={() => setUpdateStatusMsg(null)}
+              className="text-slate-400 hover:text-white text-xs ml-2 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. Ko-fi Community Support Card */}

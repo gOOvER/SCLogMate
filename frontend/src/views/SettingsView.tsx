@@ -468,6 +468,7 @@ export const SettingsView: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
+    loadDbDiag(false);
   }, []);
 
   useEffect(() => {
@@ -1476,13 +1477,13 @@ export const SettingsView: React.FC = () => {
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
                 <div className="text-slate-400">Schema Version:</div>
                 <div className="text-sm font-bold text-sky-400 mt-0.5">
-                  v{dbDiag?.installedSchemaVersion ?? 17} (App: v{dbDiag?.currentSchemaVersion ?? 17})
+                  v{dbDiag?.installedSchemaVersion ?? 18} (App: v{dbDiag?.currentSchemaVersion ?? 18})
                 </div>
               </div>
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
                 <div className="text-slate-400">Parser Version:</div>
                 <div className="text-sm font-bold text-emerald-400 mt-0.5">
-                  v{dbDiag?.installedParserVersion ?? 28} (Engine: v{dbDiag?.currentParserVersion ?? 28})
+                  v{dbDiag?.installedParserVersion ?? 34} (Engine: v{dbDiag?.currentParserVersion ?? 34})
                 </div>
               </div>
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
@@ -1498,6 +1499,30 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Versions-Hinweis falls Schema oder Parser nicht synchron */}
+            {dbDiag && !dbDiag.isSynchronous && (
+              <div className="rounded-xl p-4 border border-amber-500/60 bg-amber-950/40 text-amber-200 flex items-center justify-between shadow-xl shadow-amber-950/50 animate-in fade-in">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <div className="font-bold text-xs uppercase tracking-wider text-amber-300">
+                      Datenbank-Aktualisierung empfohlen
+                    </div>
+                    <div className="text-xs text-slate-300 mt-0.5 font-mono">
+                      Schema (v{dbDiag.installedSchemaVersion} vs v{dbDiag.currentSchemaVersion}) oder Parser (v{dbDiag.installedParserVersion} vs v{dbDiag.currentParserVersion}) weicht ab. Ein Re-Scan aktualisiert alle Tabellen.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleRescanAll}
+                  disabled={isRescanning || isCheckingDb}
+                  className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shrink-0 cursor-pointer disabled:opacity-50"
+                >
+                  Jetzt neu einlesen
+                </button>
+              </div>
+            )}
 
             {/* Laufender Vorgang Banner (Integritätsprüfung, VACUUM, Reparatur) */}
             {isCheckingDb && activeDbOp !== 'none' && activeDbOp !== 'rescan' && (

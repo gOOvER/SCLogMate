@@ -29,13 +29,17 @@ import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
 import { DbUpdateModal } from './components/DbUpdateModal';
+import { UpdateModal } from './components/UpdateModal';
 import { HardDrive } from 'lucide-react';
+import { UpdateInfoDto } from './services/photinoBridge';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
   const [status, setStatus] = useState<AppStatus | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfoDto | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [events, setEvents] = useState<LogEventItem[]>([]);
@@ -136,6 +140,13 @@ export const App: React.FC = () => {
       }
     });
 
+    const unbindUpdate = bridge.on<UpdateInfoDto>('UPDATE_AVAILABLE', (info) => {
+      if (info && info.updateAvailable) {
+        setUpdateInfo(info);
+        setIsUpdateModalOpen(true);
+      }
+    });
+
     // Keyboard shortcut Alt + H to toggle HUD collapse
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 'h' || e.key === 'H')) {
@@ -152,6 +163,7 @@ export const App: React.FC = () => {
       unbindHud();
       unbindWh();
       unbindScan();
+      unbindUpdate();
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -222,6 +234,8 @@ export const App: React.FC = () => {
           isGameRunning={telemetry.isGameRunning}
           isScanning={isScanning}
           loading={loading}
+          updateInfo={updateInfo}
+          onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
           onRefresh={loadData}
           onTriggerScan={handleTriggerScan}
           onReparseAll={handleReparseAll}
@@ -320,6 +334,13 @@ export const App: React.FC = () => {
         <DbUpdateModal
           progress={scanProgress}
           onDismiss={() => setScanProgress(null)}
+        />
+
+        {/* Application Release Update Modal */}
+        <UpdateModal
+          isOpen={isUpdateModalOpen}
+          updateInfo={updateInfo}
+          onClose={() => setIsUpdateModalOpen(false)}
         />
 
         {/* Bottom Statusbar */}

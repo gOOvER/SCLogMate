@@ -11,12 +11,20 @@ export const DbUpdateModal: React.FC<DbUpdateModalProps> = ({ progress, onDismis
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (progress?.isDbUpdate && !progress.isCompleted) {
+    if (progress && !progress.isCompleted) {
       setDismissed(false);
+    } else if (progress?.isCompleted && !progress.isDbUpdate) {
+      // Bei normaler Hintergrund-Indexierung nach kurzer Bestätigung automatisch schließen
+      const timer = setTimeout(() => {
+        setDismissed(true);
+        if (onDismiss) onDismiss();
+      }, 1500);
+      return () => clearTimeout(timer);
     }
-  }, [progress?.isDbUpdate, progress?.isCompleted]);
+  }, [progress?.isCompleted, progress?.isDbUpdate]);
 
-  if (!progress?.isDbUpdate || dismissed) return null;
+  if (!progress || dismissed) return null;
+  if (!progress.isDbUpdate && progress.isCompleted) return null;
 
   const handleClose = () => {
     setDismissed(true);

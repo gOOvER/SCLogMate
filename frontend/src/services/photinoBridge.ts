@@ -533,6 +533,14 @@ export interface ScanProgress {
   updateReason?: string;
 }
 
+export interface UpdateInfoDto {
+  updateAvailable: boolean;
+  currentVersion: string;
+  newVersion: string;
+  releaseNotes?: string;
+  htmlUrl?: string;
+}
+
 export interface DbDiagnostics {
   databasePath: string;
   databaseSizeBytes: number;
@@ -678,9 +686,37 @@ class PhotinoBridge {
     };
   }
 
+  public checkUpdate(): Promise<UpdateInfoDto> {
+    return this.sendRequest<UpdateInfoDto>('check_update');
+  }
+
+  public applyUpdate(): Promise<{ success: boolean; message?: string }> {
+    return this.sendRequest<{ success: boolean; message?: string }>('apply_update');
+  }
+
+  public openExternalUrl(url: string): void {
+    this.send('open_external_url', { url });
+  }
+
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'check_update':
+        return {
+          updateAvailable: false,
+          currentVersion: 'v1.0.0-rc2',
+          newVersion: 'v1.0.0-rc2',
+          releaseNotes: '',
+          htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
+        } as UpdateInfoDto;
+
+      case 'apply_update':
+        return { success: true, message: 'Update gestartet' };
+
+      case 'open_external_url':
+        if (payload?.url) window.open(payload.url, '_blank');
+        return { ok: true };
+
       case 'get_pilot_dossier':
         return {
           handle: payload?.handle || 'gOOvER',

@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Photino.NET;
 using SCLogMate.Core.Ocr;
@@ -855,6 +856,9 @@ public class PhotinoBridge
     private readonly NativeScanIndicator _walletScanIndicator = new("mobiGlas aUEC Scan", 0x22D3EE);
     private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
 
+    private Updater.Info? _latestUpdateInfo;
+    private System.Threading.Timer? _updateCheckTimer;
+
     public PhotinoBridge()
     {
         var s = Settings.Load();
@@ -893,6 +897,12 @@ public class PhotinoBridge
         {
             Task.Run(() => HandleIncomingMessage(rawMessage));
         });
+
+        // Regelmäßige Update-Prüfung alle 6 Stunden
+        _updateCheckTimer = new System.Threading.Timer(async _ =>
+        {
+            await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
+        }, null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
     }
 
     public void SendResponse<T>(string? requestId, string type, T payload)
@@ -976,7 +986,7 @@ public class PhotinoBridge
             {
                 SendResponse(req.Id, "client_ready_ack", new { ok = true });
 
-                _ = Task.Run(() =>
+                _ = Task.Run(async () =>
                 {
                     try
                     {
@@ -997,12 +1007,52 @@ public class PhotinoBridge
                         _hasSyncedLogs = true;
                         SyncAllLogs(forceRescan: false);
                     }
+
+                    // Auto-Check auf App-Updates nach Start
+                    try
+                    {
+                        await Task.Delay(2500);
+                        await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.AutoCheckUpdateOnReady", ex);
+                    }
                 });
                 return;
             }
 
             switch (req.Type)
             {
+                case "check_update":
+                    var updResult = await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
+                    SendResponse(req.Id, "check_update_response", updResult);
+                    break;
+
+                case "apply_update":
+                    var applyRes = await ApplyAppUpdateAsync();
+                    SendResponse(req.Id, "apply_update_response", applyRes);
+                    break;
+
+                case "open_external_url":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("url", out var urlProp))
+                    {
+                        var uStr = urlProp.GetString();
+                        if (!string.IsNullOrEmpty(uStr))
+                        {
+                            try
+                            {
+                                Process.Start(new ProcessStartInfo { FileName = uStr, UseShellExecute = true });
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error("OpenExternalUrl", ex);
+                            }
+                        }
+                    }
+                    SendResponse(req.Id, "open_external_url_response", new { ok = true });
+                    break;
+
                 case "get_status":
                     SendResponse(req.Id, "status_response", GetAppStatus());
                     break;
@@ -4188,12 +4238,27 @@ public class PhotinoBridge
             ScanDir(dir);
             if (!string.IsNullOrEmpty(dir))
             {
+                var buDir = Path.Combine(dir, "logbackups");
+                ScanDir(buDir);
                 var parent = Directory.GetParent(dir)?.FullName;
                 if (!string.IsNullOrEmpty(parent))
                 {
                     ScanDir(parent);
                     ScanDir(Path.Combine(parent, "logbackups"));
                 }
+
+                // Star Citizen Backups im LogArchive sichern
+                try
+                {
+                    var backups = new List<string>();
+                    if (Directory.Exists(buDir))
+                        backups.AddRange(Directory.GetFiles(buDir, "*.log"));
+                    if (!string.IsNullOrEmpty(parent) && Directory.Exists(Path.Combine(parent, "logbackups")))
+                        backups.AddRange(Directory.GetFiles(Path.Combine(parent, "logbackups"), "*.log"));
+                    if (backups.Count > 0)
+                        LogArchive.Sync(backups);
+                }
+                catch { }
             }
         }
 
@@ -4256,8 +4321,25 @@ public class PhotinoBridge
         try
         {
             var allFiles = DiscoverAllLogFiles();
-            bool isDbUpdate = forceRescan || Database.WasMigrationApplied || Database.WasParserResetRequired;
+            int currentSessionCount = Database.GetSessionCount();
+            bool needsFullRescan = Database.WasMigrationApplied 
+                                   || Database.WasParserResetRequired 
+                                   || (currentSessionCount == 0 && allFiles.Count > 0);
+            bool isDbUpdate = forceRescan || needsFullRescan;
             string? reason = Database.LastMigrationReason;
+            if (string.IsNullOrEmpty(reason))
+            {
+                if (Database.WasParserResetRequired)
+                    reason = $"Parser-Update auf v{Database.CurrentParserVersion} (Vollständige Neu-Indexierung aller Logs)";
+                else if (Database.WasMigrationApplied)
+                    reason = $"Datenbank-Schema Upgrade auf v{Database.CurrentSchemaVersion}";
+                else if (currentSessionCount == 0 && allFiles.Count > 0)
+                    reason = "Initialisierung & Indexierung aller Star Citizen Logs";
+                else if (forceRescan)
+                    reason = "Manueller Re-Scan aller Star Citizen Logs";
+                else
+                    reason = "Datenbank- oder Parser-Aktualisierung";
+            }
 
             if (isDbUpdate)
             {
@@ -4290,6 +4372,7 @@ public class PhotinoBridge
 
                 Database.WasMigrationApplied = false;
                 Database.WasParserResetRequired = false;
+                Database.LastMigrationReason = null;
 
                 Broadcast("SCAN_PROGRESS", new ScanProgressDto
                 {
@@ -4328,7 +4411,8 @@ public class PhotinoBridge
                         Percent = 0,
                         CurrentFileName = $"Synchronisiere {unindexed} neue Logs...",
                         IsCompleted = false,
-                        IsDbUpdate = false
+                        IsDbUpdate = false,
+                        UpdateReason = $"Indexiere {unindexed} neue Star Citizen Session(s)..."
                     });
 
                     int added = Database.IndexNew(allFiles, (curr, total, name) =>
@@ -4341,7 +4425,8 @@ public class PhotinoBridge
                             Percent = pct,
                             CurrentFileName = name,
                             IsCompleted = false,
-                            IsDbUpdate = false
+                            IsDbUpdate = false,
+                            UpdateReason = $"Indexiere {unindexed} neue Star Citizen Session(s)..."
                         });
                     });
 
@@ -4350,11 +4435,12 @@ public class PhotinoBridge
                         Current = unindexed,
                         Total = unindexed,
                         Percent = 100,
-                        CurrentFileName = "Logs erfolgreich synchronisiert",
+                        CurrentFileName = $"{added} Sessions erfolgreich synchronisiert",
                         IsCompleted = true,
                         IndexedSessions = added,
                         TotalEvents = 0,
-                        IsDbUpdate = false
+                        IsDbUpdate = false,
+                        UpdateReason = "Indexierung abgeschlossen"
                     });
 
                     Broadcast("STATUS_UPDATE", GetAppStatus());
@@ -4374,6 +4460,86 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.SyncAllLogs", ex);
             return (0, 0);
+        }
+    }
+
+    public async Task<object?> CheckForAppUpdatesAsync(bool broadcastIfAvailable = true)
+    {
+        try
+        {
+            var info = await Updater.CheckAsync();
+            if (info != null)
+            {
+                _latestUpdateInfo = info;
+                var dto = new
+                {
+                    updateAvailable = true,
+                    currentVersion = $"v{Updater.CurrentVersion}",
+                    newVersion = $"v{info.Version}",
+                    releaseNotes = info.ReleaseNotes ?? "Ein neues SCLogMate Update ist auf GitHub verfügbar.",
+                    htmlUrl = info.HtmlUrl ?? "https://github.com/gOOvER/SCLogMate/releases"
+                };
+
+                if (broadcastIfAvailable)
+                {
+                    Broadcast("UPDATE_AVAILABLE", dto);
+                }
+                return dto;
+            }
+            else
+            {
+                var dto = new
+                {
+                    updateAvailable = false,
+                    currentVersion = $"v{Updater.CurrentVersion}",
+                    newVersion = $"v{Updater.CurrentVersion}",
+                    releaseNotes = "",
+                    htmlUrl = "https://github.com/gOOvER/SCLogMate/releases"
+                };
+                return dto;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("CheckForAppUpdatesAsync", ex);
+            return new
+            {
+                updateAvailable = false,
+                currentVersion = $"v{Updater.CurrentVersion}",
+                newVersion = $"v{Updater.CurrentVersion}",
+                releaseNotes = "",
+                htmlUrl = "https://github.com/gOOvER/SCLogMate/releases"
+            };
+        }
+    }
+
+    public async Task<object> ApplyAppUpdateAsync()
+    {
+        if (_latestUpdateInfo == null)
+        {
+            var info = await Updater.CheckAsync();
+            if (info != null) _latestUpdateInfo = info;
+            else return new { success = false, message = "Kein Update verfügbar." };
+        }
+
+        try
+        {
+            Broadcast("UPDATE_INSTALLING", new { status = $"Lade Update {_latestUpdateInfo.Version} herunter..." });
+            await Updater.ApplyAsync(_latestUpdateInfo);
+            Broadcast("UPDATE_INSTALLING", new { status = "Update wird installiert – SCLogMate startet neu..." });
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1500);
+                Environment.Exit(0);
+            });
+
+            return new { success = true, message = "Update gestartet." };
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("ApplyAppUpdateAsync", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 

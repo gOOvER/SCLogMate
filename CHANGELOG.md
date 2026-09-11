@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Auto-Updater & Database/Parser Version Upgrade Synchronization (`UpdateModal.tsx`, `MasterHeader.tsx`, `AboutView.tsx`, `SettingsView.tsx`, `DbUpdateModal.tsx`, `PhotinoBridge.cs`)**:
+  - Restored full auto-updater lifecycle matching Avalonia RC2:
+    - Added GitHub release updater integration on startup and recurring every 6 hours via `Updater.CheckAsync()` in `PhotinoBridge.cs`.
+    - Added pulsating emerald green update notification pill (`⬆ Update v{newVersion}`) to `MasterHeader.tsx` when a new release is available.
+    - Created dedicated Glassmorphism `UpdateModal.tsx` displaying current version vs new version, full scrollable release notes/changelog, "Auf GitHub ansehen" button, "Später erinnern" dismiss, and "Jetzt aktualisieren & neu starten" (`Updater.ApplyAsync()`) with real-time download and self-extracting batch restart progress.
+    - Added manual "Auf Updates prüfen" check button to `AboutView.tsx` with instant feedback and modal launch.
+    - Added RPC handlers `check_update`, `apply_update`, and `open_external_url` to `PhotinoBridge.cs` and TypeScript methods to `photinoBridge.ts`.
+  - Restored comprehensive database & parser version upgrade synchronization:
+    - When database schema (`CurrentSchemaVersion`) or log parser (`CurrentParserVersion`) is upgraded, or when `Database.WasParserResetRequired` / `WasMigrationApplied` is set, `SyncAllLogs` automatically triggers a full re-indexing of all Star Citizen logs (`Database.RescanAll`).
+    - Configured `SCAN_PROGRESS` to broadcast `isDbUpdate: true` with descriptive upgrade reasons (`Parser-Update auf v34`, `Datenbank-Schema Upgrade auf v18`, `Initialisierung & Indexierung aller Logs`), displaying the central `DbUpdateModal` overlay during re-indexing.
+    - Enhanced `DbUpdateModal.tsx` to remain visible during all active scans and to smoothly auto-dismiss for routine background syncs while requiring manual acknowledgment for schema/parser migrations.
+    - Added version discrepancy detection and warning banner in `SettingsView.tsx` (Database tab) if `installedSchemaVersion` or `installedParserVersion` deviates from engine versions, with a 1-click "Jetzt neu einlesen" action.
+    - Added automatic backup log ingestion into `LogArchive.Sync()` during log discovery to preserve historical logs.
 - **Star Citizen Tresor & Backup-Zentrale Full RC2 Restoration (`ToolsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
   - Restored complete two-column **Star Citizen Tresor & Backup-Zentrale** layout in `ToolsView.tsx` matching Avalonia RC2 (`MainWindow.axaml:4400-4640`).
   - Added dedicated header banner with 1-click explorer buttons for `Keybinds-Ordner ↗`, `Config-Ordner ↗`, and `Cloud-Ordner ↗`.
