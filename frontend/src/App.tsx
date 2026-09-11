@@ -184,7 +184,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main App Container */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher */}
         <MasterHeader
           status={status}
@@ -216,7 +216,7 @@ export const App: React.FC = () => {
         )}
 
         {/* View Body */}
-        <main className="flex-1 overflow-hidden p-4">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4">
           {activeTab === 'dashboard' && (
             <DashboardView
               status={status}

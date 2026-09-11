@@ -80,7 +80,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-3 font-sans select-none overflow-hidden">
+    <div className="flex flex-col min-h-full space-y-3 font-sans select-none">
       {/* ══ 4 METRIC TOP CARDS ══ */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0">
         {/* Finanzsaldo Netto */}
@@ -167,7 +167,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* ══ FULL-WIDTH LIVE EVENT STREAM ══ */}
-      <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm min-h-0">
+      <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm min-h-[360px]">
         <div className="p-2.5 border-b border-cyan-950 bg-[#061224] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">

@@ -116,7 +116,7 @@ export const FinancesView: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-full space-y-3 font-sans select-none overflow-hidden">
+    <div className="flex flex-col min-h-full space-y-3 font-sans select-none">
       {/* ══ 1. TOP 5 KPI SUMMARY CARDS (Exakt nach RC2) ══ */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 shrink-0">
         {/* Karte 1: Einnahmen Total */}
@@ -234,7 +234,7 @@ export const FinancesView: React.FC = () => {
       </div>
 
       {/* ══ 3. SUBTAB INHALTE ══ */}
-      <div className="flex-1 bg-[#040914]/90 rounded-b-lg border border-cyan-950/80 overflow-hidden flex flex-col p-3 shadow-sm">
+      <div className="flex-1 bg-[#040914]/90 rounded-b-lg border border-cyan-950/80 overflow-hidden flex flex-col p-3 shadow-sm min-h-[400px]">
         {/* SUBTAB 1: ÜBERSICHT & SCI-FI CHART */}
         {activeSubTab === 'overview' && (
           <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">

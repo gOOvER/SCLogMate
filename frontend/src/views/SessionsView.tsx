@@ -336,7 +336,7 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
     });
 
   return (
-    <div className="flex flex-col h-full space-y-4 font-sans">
+    <div className="flex flex-col min-h-full space-y-4 font-sans">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-lg bg-slate-900 border border-cyan-500/50 shadow-xl shadow-cyan-500/10 text-cyan-200 animate-in fade-in slide-in-from-bottom-2 text-xs">
@@ -659,9 +659,9 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
       </div>
 
       {/* ══ SESSION TABELLE ══ */}
-      <div className="sc-glass rounded-xl overflow-hidden border border-slate-800 flex-1 flex flex-col min-h-[380px]">
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-left text-xs border-collapse">
+      <div className="sc-glass rounded-xl overflow-hidden border border-slate-800 flex-1 flex flex-col min-h-[360px]">
+        <div className="flex-1 overflow-auto">
+          <table className="w-full min-w-[920px] text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-mono uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
                 <th className="py-3 px-4">Session / Zeitraum</th>

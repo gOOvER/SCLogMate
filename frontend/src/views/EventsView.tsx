@@ -190,7 +190,7 @@ export const EventsView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2.5 select-none overflow-hidden">
+    <div className="flex flex-col min-h-full space-y-2.5 select-none">
       {/* ══ 1. Filter-Bar & Schnellsuche (im RC2-Look) ══ */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 rounded-lg bg-[#040914]/90 border border-cyan-950/80 backdrop-blur-md shrink-0">
         {/* Kategorien Chips */}
@@ -253,28 +253,21 @@ export const EventsView: React.FC = () => {
             </div>
 
             <button
-              type="submit"
-              className="px-2.5 py-1 rounded bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/60 text-cyan-300 text-xs font-mono font-medium cursor-pointer"
-            >
-              Suchen
-            </button>
-
-            <button
               type="button"
               onClick={() => fetchEvents()}
-              className="p-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer"
+              className="p-1.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 hover:bg-cyan-900/80 transition cursor-pointer"
               title="Aktualisieren"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </form>
         </div>
       </div>
 
       {/* ══ 2. Hauptbereich: DataGrid Tabelle + ausziehbarer Detail-Drawer ══ */}
-      <div className="flex-1 flex gap-3 overflow-hidden">
+      <div className="flex-1 flex gap-3 min-h-[350px]">
         {/* DataGrid Container */}
-        <div className="flex-1 flex flex-col bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-hidden shadow-sm">
+        <div className="flex-1 flex flex-col bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-hidden shadow-sm min-w-0">
           {/* DataGrid Header */}
           <div className="grid grid-cols-[135px_115px_120px_140px_1fr] px-3 py-2 bg-[#061224] border-b border-cyan-950 text-[10.5px] font-mono font-bold text-slate-400 uppercase tracking-wider shrink-0 select-none">
             <div

@@ -157,7 +157,7 @@ export const WarehouseView: React.FC = () => {
   ];
 
   return (
-    <div className="flex h-full gap-3 font-sans select-none overflow-hidden">
+    <div className="flex min-h-full min-h-[500px] gap-3 font-sans select-none">
       {/* ══ LINKE SPALTE: STANDORTE & STATIONEN ══ */}
       <div className="w-72 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shrink-0 shadow-sm">
         {/* Header & System Filter */}
@@ -236,7 +236,7 @@ export const WarehouseView: React.FC = () => {
       </div>
 
       {/* ══ RECHTE SPALTE: ARTIKELTABELLE ══ */}
-      <div className="flex-1 flex flex-col space-y-2.5 overflow-hidden">
+      <div className="flex-1 flex flex-col space-y-2.5 min-w-0">
         {/* Toolbar & Filterleiste */}
         <div className="bg-[#040914]/90 rounded-lg p-2.5 border border-cyan-950/80 space-y-2 shrink-0">
           <div className="flex items-center justify-between gap-3">
@@ -308,8 +308,8 @@ export const WarehouseView: React.FC = () => {
         </div>
 
         {/* Dichte Artikeltabelle */}
-        <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-y-auto shadow-sm">
-          <table className="w-full text-left text-xs border-collapse font-mono">
+        <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-auto shadow-sm min-h-[300px]">
+          <table className="w-full min-w-[700px] text-left text-xs border-collapse font-mono">
             <thead>
               <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
                 <th className="py-2.5 px-3 w-10 text-center">#</th>

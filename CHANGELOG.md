@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cleaned publish pipeline to remove the `publish/wwwroot` folder post-publish, delivering a 100% self-contained single `SCLogMate.exe` binary with zero external folders or dependencies.
 
 ### Fixed
+- **Responsive Viewport Scrolling & Custom Sci-Fi Scrollbars (`App.tsx`, `index.css`, and all views)**:
+  - Fixed content clipping and missing scrollbars on smaller windows across all 16 views:
+    - Added `min-h-0 min-w-0 overflow-y-auto overflow-x-auto` to the main viewport container in `App.tsx` and resolved the flexbox height collapsing bug.
+    - Updated all individual views (`DashboardView`, `EventsView`, `SessionsView`, `FinancesView`, `FleetView`, `WarehouseView`, `StarmapView`, `PlacesView`, `OreScannerView`, `MarketView`, `MissionsView`, `ReputationView`, `BlueprintsView`, `LoadoutView`, `BlackboxView`) from rigid `h-full overflow-hidden` to responsive `min-h-full` containers.
+    - Implemented modern CSS standard `scrollbar-color: rgba(0, 240, 255, 0.4) rgba(3, 7, 18, 0.85)` and `scrollbar-width: thin` with high-contrast glowing WebKit fallbacks in `index.css`.
+    - Added horizontal scroll handling and minimum table column widths (`min-w-[700px]` to `min-w-[920px]`) for dense multi-column DataGrids in `SessionsView`, `EventsView`, `FleetView`, `WarehouseView`, `OreScannerView`, and `MarketView`.
 - **Single-File Release Web Asset Packaging & Launch Fix (`Program.cs`, `SCLogMate.csproj`)**:
   - Fixed application failing to start in release builds (`ERR_CONNECTION_REFUSED`):
     - Added an automatic MSBuild post-publish target (`EnsureWwwrootInPublish`) and `<CopyToPublishDirectory>Always</CopyToPublishDirectory>` in `SCLogMate.csproj` so all compiled web assets (`wwwroot/index.html` and `assets/*`) are guaranteed to be copied into the single-file publish directory (`publish/wwwroot/`).

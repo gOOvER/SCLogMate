@@ -71,7 +71,7 @@ export const PlacesView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4">
       {/* Top Filter & Search Bar */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">

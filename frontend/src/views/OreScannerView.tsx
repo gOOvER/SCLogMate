@@ -91,7 +91,7 @@ export const OreScannerView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4">
       {/* Top RS Decoder / Calculator Tool */}
       <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -236,9 +236,9 @@ export const OreScannerView: React.FC = () => {
       </div>
 
       {/* Catalog Table */}
-      <div className="flex-1 overflow-y-auto pr-1">
-        <div className="sc-glass rounded-lg border border-slate-800 overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs font-mono">
+      <div className="flex-1 overflow-auto pr-1">
+        <div className="sc-glass rounded-lg border border-slate-800 overflow-auto">
+          <table className="w-full min-w-[650px] text-left border-collapse text-xs font-mono">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
                 <th className="py-2.5 px-3">RESSOURCE</th>

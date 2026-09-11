@@ -65,7 +65,7 @@ export const MissionsView: React.FC = () => {
       : getFilteredList(data.catalog);
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">

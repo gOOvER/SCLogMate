@@ -44,7 +44,7 @@ export const FleetView: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-full space-y-3 font-sans select-none overflow-hidden">
+    <div className="flex flex-col min-h-full space-y-3 font-sans select-none">
       {/* ══ KPI SUMMARY CARDS ══ */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0">
         {/* Schiffe */}
@@ -107,7 +107,7 @@ export const FleetView: React.FC = () => {
       </div>
 
       {/* ══ TOOLBAR & FLEET TABLE ══ */}
-      <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm">
+      <div className="flex-1 bg-[#040914]/90 rounded-lg border border-cyan-950/80 flex flex-col overflow-hidden shadow-sm min-h-[350px]">
         <div className="p-2.5 border-b border-cyan-950 bg-[#061224] flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">
             <Rocket className="w-3.5 h-3.5 text-cyan-400" /> Schiffsflotte & Hangar ({filteredFleet.length})
@@ -137,8 +137,8 @@ export const FleetView: React.FC = () => {
         </div>
 
         {/* DataGrid */}
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-left text-xs border-collapse font-mono">
+        <div className="flex-1 overflow-auto">
+          <table className="w-full min-w-[700px] text-left text-xs border-collapse font-mono">
             <thead>
               <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
                 <th className="py-2.5 px-4 font-sans">Schiff / Modell</th>

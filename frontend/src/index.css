@@ -115,18 +115,28 @@ body {
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
 }
 
-/* Custom Scrollbar */
+/* Custom Sci-Fi Scrollbar (Modern CSS standard + WebKit) */
+* {
+  scrollbar-color: rgba(0, 240, 255, 0.4) rgba(3, 7, 18, 0.85);
+  scrollbar-width: thin;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(3, 7, 18, 0.6);
+  background: rgba(3, 7, 18, 0.85);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.2);
-  border-radius: 3px;
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 240, 255, 0.15);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.4);
+  background: rgba(0, 240, 255, 0.65);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+::-webkit-scrollbar-corner {
+  background: rgba(3, 7, 18, 0.95);
 }

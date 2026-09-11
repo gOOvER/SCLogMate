@@ -36,7 +36,7 @@ export const ReputationView: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4">
       {/* Category Filter Toolbar */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2 overflow-x-auto">

@@ -143,7 +143,7 @@ export const LoadoutView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4">
       {/* Top Header & Summary KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">

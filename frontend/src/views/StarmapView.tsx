@@ -149,7 +149,7 @@ export const StarmapView: React.FC = () => {
   const scale = 0.65 * zoom;
 
   return (
-    <div className="flex flex-col h-full space-y-4 select-none">
+    <div className="flex flex-col min-h-full space-y-4 select-none">
       {/* Top Toolbar: System Selector & Quick Filters */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export const StarmapView: React.FC = () => {
       </div>
 
       {/* Main Starmap Area: Radar Canvas (Left) + Inspector / Route Planner (Right) */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[520px]">
         {/* SVG Interactive Canvas */}
         <div
           ref={canvasRef}
