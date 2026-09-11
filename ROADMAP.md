@@ -15,7 +15,7 @@ Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden S
     - *Zeile 1:* Pilot & Server (Region, Shard-Nummer, SC-Version) · Standort & Jurisdiktion (mit leuchtendem Waffenruhe/Armistice-Badge) · Aktives Schiff (Hersteller, Typ, Status).
     - *Zeile 2:* Kontostand & Saldo (Live-aUEC, Session-Delta, OCR-Badge) · Aktiver Auftrag / Mission · Flugdaten & Telemetrie.
     - Einklapp-Funktion per Toggle für maximalen Platz bei Karten & Tabellen.
-- [ ] **Schritt 2: Chronik & Ereignisse (`EventsView.tsx`)**
+- [x] **Schritt 2: Chronik & Ereignisse (`EventsView.tsx`)**
   - Dichte, tabellarische Darstellung der Ereignisse mit farbigen Event-Pills (Finanzen, Kampf, Schiffe, Missionen, Orte).
   - Such- und Filterleiste wie in RC2 inkl. ausziehbarem Detail-Drawer mit Rohdaten.
 - [ ] **Schritt 3: Finanzen & Saldo (`FinancesView.tsx`)**

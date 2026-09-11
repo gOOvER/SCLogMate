@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **RC2 UI/UX Alignment — Step 2: High-Density Events DataGrid & Inspector (`EventsView.tsx`)**:
+  - Rebuilt the Events log view (`EventsView.tsx`) into a high-density, multi-column Star Citizen event table matching RC2 while modernizing UX:
+    - **Interactive Multi-Column DataGrid**: Cleanly aligned columns for timestamp (`ZEIT`), category badge (`TYP`), signed monetary delta (`BETRAG`), active ship name (`SCHIFF`), and detailed description (`DETAIL`).
+    - **Interactive Column Sorting**: 1-click sorting on time, category, amount, ship, or title with directional arrows.
+    - **Keyboard Navigation**: Native `Up` / `Down` arrow key navigation across events and `Escape` to close inspector.
+    - **Categorized Filter Chips**: Quick filtering by All, Finances (`💰 Finanzen`), Combat (`⚔️ Kampf`), Contracts (`🎯 Aufträge`), Ships (`🚀 Schiffe`), Locations (`📍 Standorte`), and System (`⚙️ System`).
+    - **Real-Time Search & Live Tail**: Search input with instant clear button `✕`, live hit counter, and glowing `● LIVE TAIL` indicator.
+    - **Side Inspector Drawer**: Slide-out event detail card featuring structured fields, 1-click clipboard actions (`Copy Detail`, `Copy Raw Line` with checkmark feedback), Wiki link, and raw log syntax block.
 - **RC2 UI/UX Alignment — Step 1: Global Shell, Master Header & 2-Line SC-HUD (`MasterHeader.tsx`, `SessionBar.tsx`, `HudBar.tsx`, `App.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
   - Implemented high-density Star Citizen mobiGlas top shell aligned with SCLogMate RC2 while delivering a modern, clean glassmorphism aesthetic:
     - **Master Header (`MasterHeader.tsx`)**: Live `StarCitizen.exe` process detection badge (`● LIVE GAME` pulsing green vs `○ OFFLINE`), active Game.log path indicator, quick overlay launch controls (`🖥 Mini-HUD`, `🛰 RS-Overlay`), language toggle with vector flags (DE 🇩🇪 / EN 🇬🇧), live log watcher toggle, and manual log directory scan trigger.
