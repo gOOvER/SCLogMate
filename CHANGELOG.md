@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Displays high-density Star Citizen events with timestamp, categorized color-coded pills (Finances, Combat, Mission, Ship, Location, System), detailed description, ship context, signed aUEC amounts, and direct navigation to the Chronik view.
     - Removed redundant intermediate telemetry card for a cleaner, unified dashboard view.
 
+### Fixed
+- **Single-File Release Web Asset Packaging & Launch Fix (`Program.cs`, `SCLogMate.csproj`)**:
+  - Fixed application failing to start in release builds (`ERR_CONNECTION_REFUSED`):
+    - Added an automatic MSBuild post-publish target (`EnsureWwwrootInPublish`) and `<CopyToPublishDirectory>Always</CopyToPublishDirectory>` in `SCLogMate.csproj` so all compiled web assets (`wwwroot/index.html` and `assets/*`) are guaranteed to be copied into the single-file publish directory (`publish/wwwroot/`).
+    - Fixed path resolution in `Program.cs` by inspecting all candidate paths (`AppContext.BaseDirectory`, `AppDomain.CurrentDomain.BaseDirectory`, `Environment.CurrentDirectory`, parent relative directories).
+    - Removed blind fallback to `http://localhost:5173` which triggered Edge WebView2 network error screens when no Vite dev server was running. If static assets are missing, a structured diagnostic error page is now displayed via `window.LoadRawString()`.
+    - Synced `Environment.CurrentDirectory` to `BaseDirectory` on startup to ensure consistent relative file resolution across all execution methods.
+
 ### Changed
 - **Master Header Cleanup (`MasterHeader.tsx`, `App.tsx`)**:
   - Removed manual Stop/Watcher toggle button from the top master bar to align with SCLogMate RC2 architecture, which relies on fully automated `StarCitizen.exe` process tracking and `Game.log` streaming.

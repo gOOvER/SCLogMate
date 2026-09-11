@@ -78,6 +78,8 @@ internal static partial class Program
             .SetMinSize(1024, 700)
             .Center();
 
+        try { Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory; } catch { }
+
         var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.ico");
         if (File.Exists(iconPath))
         {
@@ -87,7 +89,7 @@ internal static partial class Program
         var bridge = new Core.Photino.PhotinoBridge();
         bridge.Initialize(window);
 
-        // Prüfen, ob Vite Dev-Server läuft (http://localhost:5173)
+        // Prüfen, ob Vite Dev-Server explizit per --dev angefordert wurde oder aktiv lauscht
         bool useDevServer = args.Contains("--dev");
         if (!useDevServer)
         {
@@ -110,21 +112,53 @@ internal static partial class Program
         }
         else
         {
-            var wwwrootIndex = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "index.html");
-            if (File.Exists(wwwrootIndex))
+            var searchPaths = new[]
             {
-                Core.Logger.Log($"Photino: Lade lokales wwwroot/index.html ({wwwrootIndex})");
-                window.Load(wwwrootIndex);
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "index.html"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html"),
+                Path.Combine(Environment.CurrentDirectory, "wwwroot", "index.html"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "wwwroot", "index.html"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "wwwroot", "index.html"),
+                Path.GetFullPath("wwwroot/index.html")
+            };
+
+            string? targetHtmlPath = null;
+            foreach (var candidate in searchPaths)
+            {
+                if (File.Exists(candidate))
+                {
+                    targetHtmlPath = Path.GetFullPath(candidate);
+                    break;
+                }
             }
-            else if (File.Exists("wwwroot/index.html"))
+
+            if (targetHtmlPath != null)
             {
-                Core.Logger.Log("Photino: Lade relatives wwwroot/index.html");
-                window.Load("wwwroot/index.html");
+                Core.Logger.Log($"Photino: Lade lokales wwwroot/index.html ({targetHtmlPath})");
+                window.Load(targetHtmlPath);
             }
             else
             {
-                Core.Logger.Log("Photino: Fallback zu http://localhost:5173");
-                window.Load(new Uri("http://localhost:5173"));
+                Core.Logger.Log($"Photino: FEHLER - index.html in keinem der Pfade gefunden: {string.Join("; ", searchPaths)}");
+                var errorHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'><title>SCLogMate - Frontend nicht gefunden</title>
+<style>
+body {{ font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 40px; line-height: 1.6; }}
+h1 {{ color: #ef4444; font-size: 22px; margin-bottom: 12px; }}
+p {{ font-size: 14px; color: #cbd5e1; }}
+pre {{ background: #1e293b; color: #38bdf8; padding: 16px; border-radius: 8px; border: 1px solid #334155; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }}
+</style>
+</head>
+<body>
+<h1>Frontend-Dateien nicht gefunden</h1>
+<p>Die Datei <code>wwwroot/index.html</code> konnte nicht geladen werden. Bitte sicherstellen, dass der Ordner <code>wwwroot</code> vorhanden ist.</p>
+<p><strong>Gepr&uuml;fte Pfade:</strong></p>
+<pre>{string.Join("\n", searchPaths)}</pre>
+<p>Basisverzeichnis: <code>{AppDomain.CurrentDomain.BaseDirectory}</code></p>
+</body>
+</html>";
+                window.LoadRawString(errorHtml);
             }
         }
 
