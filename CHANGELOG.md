@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed the unnecessary internal `"RC2 Standard"` badge from the Star Citizen Tresor & Backup-Zentrale header.
 
 ### Added
+- **Comprehensive Feature & Migration ToDo List (`TODO.md`)**:
+  - Authored a dedicated, persistent `TODO.md` roadmap covering full Star Citizen Wiki (SCWiki) integration with local image caching and vehicle/item SQLite specifications, open Avalonia RC2 feature parity items, and an OCR-based in-game chat logging system with 1-click CIG player support reporting.
 - **Full CitizenID & RSI Citizen Dossier Integration (`CitizenService.cs`, `PilotProfile.cs`, `Database.cs`, `HudBar.tsx`, `PilotDossierModal.tsx`, `PhotinoBridge.cs`)**:
   - Integrated public RSI Citizen Dossier lookup (`https://robertsspaceindustries.com/citizens/{handle}`) and CitizenID Space fallback API to automatically retrieve official Star Citizen pilot profiles:
     - Extracted UEE Citizen Record number badge (e.g. `#593923`), high-resolution pilot avatar image, handle, honorary title (`High Admiral`, `Wing Commander`, etc.), enlistment date, language fluency, personal website, and main organization credentials (org name, SID badge, rank, and crest logo).
