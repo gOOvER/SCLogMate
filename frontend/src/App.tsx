@@ -146,6 +146,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleReparseAll = async () => {
+    try {
+      setIsScanning(true);
+      await bridge.sendRequest('reparse_all_logs');
+      await loadData();
+    } catch (err) {
+      console.error('Reparse all failed:', err);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const handleSelectSession = async (sessionName: string) => {
     try {
       const res = await bridge.sendRequest<HudTelemetry>('select_session', { session: sessionName });
@@ -193,6 +205,7 @@ export const App: React.FC = () => {
           loading={loading}
           onRefresh={loadData}
           onTriggerScan={handleTriggerScan}
+          onReparseAll={handleReparseAll}
         />
 
         {/* mobiGlas Session-Strip: Dropdown, Zeitspanne & HUD-Toggle */}

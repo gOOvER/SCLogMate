@@ -414,11 +414,11 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
           <button
             onClick={handleReparseAll}
             disabled={isScanning}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/20 border border-cyan-400 transition disabled:opacity-50"
-            title="Liest alle Logs frisch mit neuen Parser-Regeln ein"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/20 border border-cyan-400 transition disabled:opacity-50 cursor-pointer"
+            title="Liest alle Logs frisch mit neuen Parser-Regeln ein (Kompletter Re-Scan)"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-            <span>{isScanning ? 'Scanne Logs...' : '🔄 Kompletter Re-Scan'}</span>
+            <span>{isScanning ? 'Lese Logs ein...' : '🔄 Alle Logs neu einlesen'}</span>
           </button>
 
           {/* DB-Wartung & Diagnose */}
@@ -909,9 +909,21 @@ export const SessionsView: React.FC<SessionsViewProps> = ({
             {/* Aktionsbuttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
               <button
+                onClick={() => {
+                  setIsMaintenanceOpen(false);
+                  handleReparseAll();
+                }}
+                disabled={isScanning || isCheckingDb}
+                className="col-span-1 sm:col-span-2 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-400 text-xs font-bold shadow-lg shadow-cyan-600/20 transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+                <span>🔄 Alle Logs neu einlesen (Kompletter Re-Scan)</span>
+              </button>
+
+              <button
                 onClick={handleRepairStructure}
                 disabled={isCheckingDb}
-                className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/60 text-xs font-semibold transition"
+                className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/60 text-xs font-semibold transition cursor-pointer"
               >
                 <RefreshCw className={`w-4 h-4 ${isCheckingDb ? 'animate-spin' : ''}`} />
                 <span>⚡ Struktur &amp; Indizes reparieren</span>

@@ -14,6 +14,7 @@ import {
   Radio,
   FileCheck,
   Shield,
+  FileText,
 } from 'lucide-react';
 import { bridge, SettingsDto } from '../services/photinoBridge';
 
@@ -46,10 +47,57 @@ export const SettingsView: React.FC = () => {
 
   const [dbDiag, setDbDiag] = useState<any>(null);
   const [isCheckingDb, setIsCheckingDb] = useState(false);
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [rescanProgress, setRescanProgress] = useState<any>(null);
+  const [rescanStatusMessage, setRescanStatusMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleRescanAll = async () => {
+    if (isRescanning || isCheckingDb) return;
+    try {
+      setIsRescanning(true);
+      setRescanStatusMessage('Sammle Log-Dateien für kompletten Re-Scan...');
+      setRescanProgress({
+        current: 0,
+        total: 10,
+        percent: 0,
+        currentFileName: 'Sammle Logs...',
+        isCompleted: false,
+      });
+      await bridge.sendRequest('reparse_all_logs');
+    } catch (err) {
+      console.error('Reparse all failed:', err);
+      setIsRescanning(false);
+      showToast('Fehler beim Re-Scan');
+    }
+  };
+
+  const handleResetDb = async () => {
+    if (
+      !window.confirm(
+        'Möchtest du die SQLite-Datenbank wirklich komplett zurücksetzen? Alle indexierten Sessions und Ereignisse werden gelöscht!'
+      )
+    ) {
+      return;
+    }
+    try {
+      setIsCheckingDb(true);
+      await bridge.sendRequest('reset_database');
+      showToast('Datenbank erfolgreich zurückgesetzt.');
+      loadDbDiag();
+    } catch (err) {
+      showToast('Fehler beim Zurücksetzen der Datenbank');
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
+
+  const handleOpenFolder = (target: string) => {
+    bridge.send('open_folder', { target });
   };
 
   const loadSettings = async () => {
@@ -145,6 +193,20 @@ export const SettingsView: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const unbind = bridge.on<any>('SCAN_PROGRESS', (progress) => {
+      setRescanProgress(progress);
+      if (progress.isCompleted) {
+        setIsRescanning(false);
+        const msg = `Re-Scan abgeschlossen: ${progress.indexedSessions ?? 0} Sessions, ${(progress.totalEvents ?? 0).toLocaleString()} Ereignisse neu indexiert.`;
+        setRescanStatusMessage(msg);
+        showToast(`✓ ${msg}`);
+        loadDbDiag();
+      }
+    });
+    return () => unbind();
   }, []);
 
   useEffect(() => {
@@ -604,13 +666,14 @@ export const SettingsView: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
                 <Database className="w-4 h-4" />
-                <span>SQLITE DATENBANK & WARTUNG</span>
+                <span>SQLITE DATENBANK-VERWALTUNG &amp; WARTUNG</span>
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                Lokaler persistenter Speicher für Session-Historie, Finanz-Transaktionen, Warenbestände und Starmap-Wegpunkte.
+                Verwalte das lokale SQLite-Archiv, starte einen vollständigen Re-Scan aller Logs oder bereinige die Datenbank.
               </p>
             </div>
 
+            {/* Status-Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
               <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
                 <div className="text-slate-400">Schema Version:</div>
@@ -638,27 +701,127 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
-                onClick={handleVacuum}
-                disabled={isCheckingDb}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
-              >
-                🧹 DB bereinigen (VACUUM)
-              </button>
+            {/* Re-Scan Fortschritts-Banner */}
+            {isRescanning && rescanProgress && (
+              <div className="rounded-lg p-4 border border-cyan-500/50 bg-cyan-950/30 space-y-2 animate-in fade-in font-sans">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center space-x-2 text-cyan-300 min-w-0">
+                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
+                    <span className="font-bold shrink-0">
+                      Indexiere Log-Dateien ({rescanProgress.current}/{rescanProgress.total}):
+                    </span>
+                    <span className="text-slate-300 truncate">{rescanProgress.currentFileName}</span>
+                  </div>
+                  <span className="font-bold text-cyan-400 shrink-0 ml-2">{rescanProgress.percent}%</span>
+                </div>
+                <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-cyan-900/60">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-sky-400 h-full transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
+                    style={{ width: `${Math.max(3, rescanProgress.percent)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Erfolgsmeldung */}
+            {rescanStatusMessage && !isRescanning && (
+              <div className="p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2.5 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{rescanStatusMessage}</span>
+              </div>
+            )}
+
+            {/* 3 Haupt-Wartungskarten (wie in RC2) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {/* Karte 1: Re-Scan */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-cyan-900/40 flex flex-col justify-between space-y-3 shadow-md">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Kompletter Re-Scan</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Liest alle Logs frisch mit neuen Parser-Regeln ein. Re-indexiert alle Session-Archive und Backups.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRescanAll}
+                  disabled={isRescanning || isCheckingDb}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/20 border border-cyan-400 transition disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRescanning ? 'animate-spin' : ''}`} />
+                  <span>{isRescanning ? 'Lese Logs ein...' : '🔄 Alle Logs neu einlesen'}</span>
+                </button>
+              </div>
+
+              {/* Karte 2: Cleanup & VACUUM */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-3 shadow-md">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🧹 Datenbank-Bereinigung</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Entfernt verwaiste Datensätze, bereinigt doppelte Einträge und führt SQLite VACUUM aus.
+                  </p>
+                </div>
+                <button
+                  onClick={handleVacuum}
+                  disabled={isRescanning || isCheckingDb}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 transition disabled:opacity-50 cursor-pointer"
+                >
+                  <span>🧹 DB bereinigen &amp; VACUUM</span>
+                </button>
+              </div>
+
+              {/* Karte 3: Reset */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-rose-900/30 flex flex-col justify-between space-y-3 shadow-md">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>✕ Datenbank leeren</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Setzt alle indexierten Sessions, Finanzdaten und Lagerbestände komplett zurück.
+                  </p>
+                </div>
+                <button
+                  onClick={handleResetDb}
+                  disabled={isRescanning || isCheckingDb}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-800/80 transition disabled:opacity-50 cursor-pointer"
+                >
+                  <span>✕ Datenbank zurücksetzen</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Diagnose- & Ordner-Aktionen */}
+            <div className="flex flex-wrap gap-2.5 pt-3 border-t border-slate-800/80">
               <button
                 onClick={loadDbDiag}
-                disabled={isCheckingDb}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+                disabled={isCheckingDb || isRescanning}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
               >
-                🔍 Tiefe Integritätsprüfung
+                <span>🔍 Tiefe Integritätsprüfung</span>
               </button>
               <button
                 onClick={handleRepairDb}
-                disabled={isCheckingDb}
-                className="px-4 py-2 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-medium border border-cyan-800 transition"
+                disabled={isCheckingDb || isRescanning}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-medium border border-cyan-800 transition cursor-pointer"
               >
-                ⚡ Struktur &amp; Indizes reparieren
+                <span>⚡ Struktur &amp; Indizes reparieren</span>
+              </button>
+              <button
+                onClick={() => handleOpenFolder('db')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
+              >
+                <Folder className="w-3.5 h-3.5 text-amber-400" />
+                <span>📂 sessions.db im Explorer</span>
+              </button>
+              <button
+                onClick={() => handleOpenFolder('debug_log')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-slate-400" />
+                <span>📄 Debug-Log öffnen</span>
               </button>
             </div>
           </div>

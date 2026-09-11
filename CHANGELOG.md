@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Full Batch Log Re-Reading & Comprehensive Database Maintenance ("Alle Logs neu einlesen") (`SettingsView.tsx`, `SessionsView.tsx`, `MasterHeader.tsx`, `PhotinoBridge.cs`)**:
+  - Brought back the prominent 3-card maintenance center from RC2 in **Settings -> SQLite & Datenbank**:
+    - **Kompletter Re-Scan Card**: Action button **`🔄 Alle Logs neu einlesen`** with live animated gradient progress bar (`SCAN_PROGRESS` with indexed file count, filename, and percent) and completion summary banner (`✓ Re-Scan abgeschlossen: X Sessions, Y Ereignisse neu indexiert`).
+    - **Datenbank-Bereinigung Card**: Action button **`🧹 DB bereinigen & VACUUM`** to purge orphaned records and shrink the database file.
+    - **Datenbank leeren Card**: Action button **`✕ Datenbank zurücksetzen`** with safety confirmation prompt to reset all tables and indexes.
+    - Quick-launch tools: Deep integrity check, structure & index repair, open `sessions.db` in Windows Explorer, and open `SCLogMate.debug.log`.
+  - **Exhaustive Multi-Drive & Channel Log Discovery (`PhotinoBridge.cs`)**:
+    - Enhanced `ReparseAllLogs()` to scan all drives (`DriveInfo.GetDrives()`), known Star Citizen roots (`Program Files`, `Roberts Space Industries`, `Games`, `StarCitizen`), all channels (`LIVE`, `PTU`, `EPTU`, `HOTFIX`, `TECH-PREVIEW`), every `logbackups` directory (even if `Game.log` is missing or game is inactive), cloud storage paths, and local `LogArchive`, ensuring all historical logs (540+ files) are ingested.
+  - **Prominent Re-Scan Access Across the Entire App**:
+    - Renamed and highlighted the main action in `SessionsView.tsx` to **`🔄 Alle Logs neu einlesen`**.
+    - Integrated **`🔄 Alle Logs neu einlesen (Kompletter Re-Scan)`** directly into the in-view DB maintenance modal.
+    - Added a quick Re-Scan button next to Quick-Scan in `MasterHeader.tsx` accessible from any page.
 - **Complete Log Parsing & Session Management System (`SessionsView.tsx`, `Core/Photino/PhotinoBridge.cs`, `NativeDialogs.cs`)**:
   - Implemented the complete log parsing and session management suite in `SCLogMate-Photino` matching and enhancing the RC2 functionality:
     - **Log Source & Channel Command Bar**: Real-time display of the active `Game.log` path, Star Citizen channel badge (`LIVE`, `PTU`, `EPTU`, `TECH-PREVIEW`, `CUSTOM`), live file size, last modified timestamp, and streaming watcher indicator.

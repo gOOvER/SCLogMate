@@ -2489,50 +2489,108 @@ public class PhotinoBridge
     private (int indexedSessions, int totalEvents) ReparseAllLogs()
     {
         var filesByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        void AddLogFile(string p)
+
+        void AddLogFile(string? p)
         {
-            if (File.Exists(p))
+            if (string.IsNullOrEmpty(p)) return;
+            try
             {
-                var fn = Path.GetFileName(p);
-                filesByFileName.TryAdd(fn, p);
+                if (File.Exists(p))
+                {
+                    var fn = Path.GetFileName(p);
+                    filesByFileName.TryAdd(fn, p);
+                }
             }
+            catch { }
         }
 
-        // 0. SCLogMate eigenes Archiv
+        void ScanDir(string? dir)
+        {
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+            try
+            {
+                foreach (var f in Directory.GetFiles(dir, "*.log"))
+                    AddLogFile(f);
+                var subBackups = Path.Combine(dir, "logbackups");
+                if (Directory.Exists(subBackups))
+                {
+                    foreach (var f in Directory.GetFiles(subBackups, "*.log"))
+                        AddLogFile(f);
+                }
+            }
+            catch { }
+        }
+
+        // 0. SCLogMate eigenes Archiv (%APPDATA%\SCLogMate\archive)
         if (Directory.Exists(LogArchive.Dir))
         {
-            foreach (var f in Directory.GetFiles(LogArchive.Dir, "*.log"))
-                AddLogFile(f);
+            ScanDir(LogArchive.Dir);
         }
 
-        // 1. Aktuelle Game.log und logbackups
-        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+        // 1. Aktuelle Game.log und zugehörige Verzeichnisse
+        if (!string.IsNullOrEmpty(_currentLogPath))
         {
             AddLogFile(_currentLogPath);
             var dir = Path.GetDirectoryName(_currentLogPath);
+            ScanDir(dir);
             if (!string.IsNullOrEmpty(dir))
             {
-                var backups = Path.Combine(dir, "logbackups");
-                if (Directory.Exists(backups))
+                var parent = Directory.GetParent(dir)?.FullName;
+                if (!string.IsNullOrEmpty(parent))
                 {
-                    foreach (var f in Directory.GetFiles(backups, "*.log"))
-                        AddLogFile(f);
+                    ScanDir(parent);
+                    ScanDir(Path.Combine(parent, "logbackups"));
                 }
             }
         }
 
-        // 2. Alle erreichbaren SC-Pfade
-        foreach (var log in PathFinder.FindAll())
+        // 2. Gespeicherter Settings Pfad und CloudStoragePath
+        try
         {
-            AddLogFile(log);
-            var dir = Path.GetDirectoryName(log);
-            if (!string.IsNullOrEmpty(dir))
+            var savedSettings = Settings.Load();
+            if (!string.IsNullOrEmpty(savedSettings.LogPath) && savedSettings.LogPath != _currentLogPath)
             {
-                var backups = Path.Combine(dir, "logbackups");
-                if (Directory.Exists(backups))
+                AddLogFile(savedSettings.LogPath);
+                ScanDir(Path.GetDirectoryName(savedSettings.LogPath));
+            }
+            if (!string.IsNullOrEmpty(savedSettings.CloudStoragePath))
+            {
+                ScanDir(savedSettings.CloudStoragePath);
+                ScanDir(Path.Combine(savedSettings.CloudStoragePath, "logbackups"));
+            }
+        }
+        catch { }
+
+        // 3. Alle Laufwerke nach Star Citizen Installationen und Kanälen durchsuchen
+        var driveRoots = new List<string>();
+        try
+        {
+            foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady &&
+                         d.DriveType is DriveType.Fixed or DriveType.Removable or DriveType.Network))
+            {
+                var r = drive.RootDirectory.FullName;
+                driveRoots.Add(Path.Combine(r, "Program Files", "Roberts Space Industries", "StarCitizen"));
+                driveRoots.Add(Path.Combine(r, "Roberts Space Industries", "StarCitizen"));
+                driveRoots.Add(Path.Combine(r, "Games", "Roberts Space Industries", "StarCitizen"));
+                driveRoots.Add(Path.Combine(r, "StarCitizen"));
+            }
+        }
+        catch { }
+
+        string[] channels = { "LIVE", "PTU", "EPTU", "HOTFIX", "TECH-PREVIEW" };
+        foreach (var scRoot in driveRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(scRoot)) continue;
+            ScanDir(Path.Combine(scRoot, "logbackups"));
+
+            foreach (var ch in channels)
+            {
+                var chDir = Path.Combine(scRoot, ch);
+                if (Directory.Exists(chDir))
                 {
-                    foreach (var f in Directory.GetFiles(backups, "*.log"))
-                        AddLogFile(f);
+                    AddLogFile(Path.Combine(chDir, "Game.log"));
+                    ScanDir(chDir);
+                    ScanDir(Path.Combine(chDir, "logbackups"));
                 }
             }
         }
@@ -2570,6 +2628,11 @@ public class PhotinoBridge
             IndexedSessions = result.indexedSessions,
             TotalEvents = result.totalEvents
         });
+
+        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+        {
+            StartLogTailer(_currentLogPath);
+        }
 
         Broadcast("STATUS_UPDATE", GetAppStatus());
         Broadcast("sessions_response", GetSessions());

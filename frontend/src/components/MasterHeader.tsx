@@ -17,6 +17,7 @@ interface MasterHeaderProps {
   loading: boolean;
   onRefresh: () => void;
   onTriggerScan: () => void;
+  onReparseAll?: () => void;
 }
 
 export const MasterHeader: React.FC<MasterHeaderProps> = ({
@@ -26,6 +27,7 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
   loading,
   onRefresh,
   onTriggerScan,
+  onReparseAll,
 }) => {
   const { locale, setLocale, t } = useI18n();
   const [overlayFeedback, setOverlayFeedback] = useState<string | null>(null);
@@ -164,16 +166,30 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
           </button>
         </div>
 
-        {/* Scan Button */}
-        <button
-          onClick={onTriggerScan}
-          disabled={isScanning}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded border border-cyan-500/50 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/40 transition-all cursor-pointer disabled:opacity-50"
-          title={t('header.scanTooltip')}
-        >
-          <FolderSync className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">{isScanning ? t('common.scanning') : t('common.scan')}</span>
-        </button>
+        {/* Scan Button Group */}
+        <div className="flex items-center">
+          <button
+            onClick={onTriggerScan}
+            disabled={isScanning}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold border border-cyan-500/50 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/40 transition-all cursor-pointer disabled:opacity-50 ${
+              onReparseAll ? 'rounded-l' : 'rounded'
+            }`}
+            title="Schnell-Scan (auf neue Events prüfen)"
+          >
+            <FolderSync className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isScanning ? t('common.scanning') : t('common.scan')}</span>
+          </button>
+          {onReparseAll && (
+            <button
+              onClick={onReparseAll}
+              disabled={isScanning}
+              className="px-2 py-1.5 text-xs font-mono font-semibold rounded-r border-t border-r border-b border-cyan-500/50 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-800/50 transition-all cursor-pointer disabled:opacity-50"
+              title="Kompletter Re-Scan: Alle Logs neu einlesen"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-cyan-400' : ''}`} />
+            </button>
+          )}
+        </div>
 
         {/* Refresh Button */}
         <button
