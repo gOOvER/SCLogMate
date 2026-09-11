@@ -168,6 +168,47 @@ export interface FleetStatDto {
   lastUsed: string;
 }
 
+export interface FleetShipDto {
+  name: string;
+  rawCode: string;
+  manufacturer: string;
+  manufacturerBadge: string;
+  manufacturerColor: string;
+  role: string;
+  estimatedValueAuec: number;
+  flightCount: number;
+  quantumJumps: number;
+  lossCount: number;
+  lastFlown: string;
+  isCurrent: boolean;
+  isInHangar: boolean;
+  isPledgeBought: boolean;
+  pledgeValueUsd: number;
+  insuranceType: string;
+  acquisitionType: string;
+  customNotes: string;
+}
+
+export interface CatalogShipDto {
+  name: string;
+  manufacturer: string;
+  role: string;
+  valueAuec: number;
+  pledgeUsd: number;
+  defaultInsurance: string;
+}
+
+export interface FleetResponseDto {
+  ships: FleetShipDto[];
+  catalog: CatalogShipDto[];
+  totalFleetValueAuec: number;
+  totalFleetPledgeUsd: number;
+  totalFlights: number;
+  totalQuantumJumps: number;
+  hangarCount: number;
+  flownCount: number;
+}
+
 export interface MissionItemDto {
   id: string;
   title: string;
@@ -822,22 +863,122 @@ class PhotinoBridge {
         return this.handleMockRequest('get_warehouse', payload);
 
       case 'get_fleet':
-        return [
-          {
-            shipName: 'Drake Vulture',
-            flights: 14,
-            quantumJumps: 38,
-            losses: 0,
-            lastUsed: '10.09.2026 18:45',
-          },
-          {
-            shipName: 'Aegis Vanguard Warden',
-            flights: 22,
-            quantumJumps: 64,
-            losses: 2,
-            lastUsed: '08.09.2026 23:10',
-          },
-        ] as FleetStatDto[];
+      case 'toggle_ship_hangar':
+      case 'add_catalog_ship_to_hangar':
+      case 'remove_ship_from_hangar':
+      case 'cycle_ship_acquisition':
+      case 'cycle_ship_insurance':
+      case 'update_ship_pledge':
+      case 'update_ship_notes':
+        return {
+          ships: [
+            {
+              name: 'Drake Vulture',
+              rawCode: 'DRAK_Vulture',
+              manufacturer: 'Drake Interplanetary',
+              manufacturerBadge: 'DRAKE',
+              manufacturerColor: '#4ADE80',
+              role: 'Bergung & Salvage',
+              estimatedValueAuec: 2450000,
+              flightCount: 18,
+              quantumJumps: 42,
+              lossCount: 0,
+              lastFlown: '11.09.2026 16:30',
+              isCurrent: true,
+              isInHangar: true,
+              isPledgeBought: true,
+              pledgeValueUsd: 175,
+              insuranceType: 'LTI (Lifetime)',
+              acquisitionType: 'Pledge Store',
+              customNotes: 'Main Solo Salvage Ship mit Dual-Scraper',
+            },
+            {
+              name: 'Aegis Vanguard Warden',
+              rawCode: 'AEGS_Vanguard',
+              manufacturer: 'Aegis Dynamics',
+              manufacturerBadge: 'AEGIS',
+              manufacturerColor: '#38BDF8',
+              role: 'Schwerer Langstrecken-Jäger',
+              estimatedValueAuec: 3800000,
+              flightCount: 26,
+              quantumJumps: 68,
+              lossCount: 2,
+              lastFlown: '10.09.2026 21:15',
+              isCurrent: false,
+              isInHangar: true,
+              isPledgeBought: true,
+              pledgeValueUsd: 260,
+              insuranceType: '120 Monate (IAE)',
+              acquisitionType: 'Pledge Store',
+              customNotes: 'Bounty Hunter Setup (ERT/VHRT)',
+            },
+            {
+              name: 'Crusader C1 Spirit',
+              rawCode: 'CRUS_Spirit_C1',
+              manufacturer: 'Crusader Industries',
+              manufacturerBadge: 'CRUSADER',
+              manufacturerColor: '#F59E0B',
+              role: 'Mittlerer Frachter / Allrounder',
+              estimatedValueAuec: 3100000,
+              flightCount: 9,
+              quantumJumps: 22,
+              lossCount: 1,
+              lastFlown: '08.09.2026 14:05',
+              isCurrent: false,
+              isInHangar: true,
+              isPledgeBought: false,
+              pledgeValueUsd: 0,
+              insuranceType: 'Standard In-Game',
+              acquisitionType: 'In-Game (aUEC)',
+              customNotes: 'Gekauft in New Babbage Astro Armada',
+            },
+            {
+              name: 'Anvil Arrow',
+              rawCode: 'ANVL_Arrow',
+              manufacturer: 'Anvil Aerospace',
+              manufacturerBadge: 'ANVIL',
+              manufacturerColor: '#EF4444',
+              role: 'Leichter Abfangjäger',
+              estimatedValueAuec: 975000,
+              flightCount: 12,
+              quantumJumps: 18,
+              lossCount: 3,
+              lastFlown: '05.09.2026 19:40',
+              isCurrent: false,
+              isInHangar: false,
+              isPledgeBought: false,
+              pledgeValueUsd: 0,
+              insuranceType: 'Miet-Versicherung',
+              acquisitionType: 'Miete (Rental)',
+              customNotes: 'Gemietet für PvP Training',
+            },
+          ],
+          catalog: [
+            { name: 'Aegis Avenger Titan', manufacturer: 'Aegis Dynamics', role: 'Leichter Frachter / Starter', valueAuec: 785600, pledgeUsd: 60, defaultInsurance: '6 Monate' },
+            { name: 'Aegis Gladius', manufacturer: 'Aegis Dynamics', role: 'Leichter Jäger', valueAuec: 1169900, pledgeUsd: 90, defaultInsurance: '6 Monate' },
+            { name: 'Aegis Reclaimer', manufacturer: 'Aegis Dynamics', role: 'Schweres Bergungsschiff', valueAuec: 15120000, pledgeUsd: 400, defaultInsurance: 'LTI (Lifetime)' },
+            { name: 'Aegis Sabre', manufacturer: 'Aegis Dynamics', role: 'Tarnkappenjäger', valueAuec: 2194000, pledgeUsd: 170, defaultInsurance: '6 Monate' },
+            { name: 'Aegis Vanguard Warden', manufacturer: 'Aegis Dynamics', role: 'Schwerer Jäger', valueAuec: 3800000, pledgeUsd: 260, defaultInsurance: 'LTI (Lifetime)' },
+            { name: 'Anvil Arrow', manufacturer: 'Anvil Aerospace', role: 'Leichter Jäger', valueAuec: 975000, pledgeUsd: 75, defaultInsurance: '6 Monate' },
+            { name: 'Anvil Carrack', manufacturer: 'Anvil Aerospace', role: 'Schwere Erkundung', valueAuec: 26700000, pledgeUsd: 600, defaultInsurance: 'LTI (Lifetime)' },
+            { name: 'Anvil F7C Hornet Mk II', manufacturer: 'Anvil Aerospace', role: 'Mittlerer Raumüberlegenheitsjäger', valueAuec: 2450000, pledgeUsd: 175, defaultInsurance: '120 Monate (IAE)' },
+            { name: 'Crusader C1 Spirit', manufacturer: 'Crusader Industries', role: 'Mittlerer Frachter', valueAuec: 3100000, pledgeUsd: 125, defaultInsurance: '120 Monate (IAE)' },
+            { name: 'Crusader Mercury Star Runner', manufacturer: 'Crusader Industries', role: 'Daten- & Frachttransport', valueAuec: 5600000, pledgeUsd: 260, defaultInsurance: 'LTI (Lifetime)' },
+            { name: 'Drake Corsair', manufacturer: 'Drake Interplanetary', role: 'Schwere Erkundung & Gunship', valueAuec: 6500000, pledgeUsd: 250, defaultInsurance: '120 Monate (IAE)' },
+            { name: 'Drake Cutlass Black', manufacturer: 'Drake Interplanetary', role: 'Mittlerer Multirole-Frachter', valueAuec: 2100000, pledgeUsd: 110, defaultInsurance: '6 Monate' },
+            { name: 'Drake Vulture', manufacturer: 'Drake Interplanetary', role: 'Bergung & Salvage', valueAuec: 2450000, pledgeUsd: 175, defaultInsurance: 'LTI (Lifetime)' },
+            { name: 'MISC Prospector', manufacturer: 'Musashi Industrial & Starflight Concern', role: 'Solo-Erzabbau (Mining)', valueAuec: 2850000, pledgeUsd: 155, defaultInsurance: '6 Monate' },
+            { name: 'Origin 400i', manufacturer: 'Origin Jumpworks', role: 'Luxus-Erkundung', valueAuec: 6800000, pledgeUsd: 250, defaultInsurance: '120 Monate (IAE)' },
+            { name: 'RSI Constellation Andromeda', manufacturer: 'Roberts Space Industries', role: 'Kanonenboot / Frachter', valueAuec: 7200000, pledgeUsd: 240, defaultInsurance: '6 Monate' },
+            { name: 'RSI Zeus Mk II CL', manufacturer: 'Roberts Space Industries', role: 'Mittlerer Frachter', valueAuec: 3600000, pledgeUsd: 150, defaultInsurance: '120 Monate (IAE)' },
+          ],
+          totalFleetValueAuec: 9350000,
+          totalFleetPledgeUsd: 435,
+          totalFlights: 65,
+          totalQuantumJumps: 150,
+          hangarCount: 3,
+          flownCount: 4,
+        } as FleetResponseDto;
 
       case 'clear_contracts':
         return { success: true };

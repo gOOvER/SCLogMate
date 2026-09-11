@@ -320,6 +320,50 @@ public class FleetStatDto
     public string LastUsed { get; set; } = "";
 }
 
+public class FleetShipDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("rawCode")] public string RawCode { get; set; } = "";
+    [JsonPropertyName("manufacturer")] public string Manufacturer { get; set; } = "";
+    [JsonPropertyName("manufacturerBadge")] public string ManufacturerBadge { get; set; } = "";
+    [JsonPropertyName("manufacturerColor")] public string ManufacturerColor { get; set; } = "";
+    [JsonPropertyName("role")] public string Role { get; set; } = "";
+    [JsonPropertyName("estimatedValueAuec")] public long EstimatedValueAuec { get; set; }
+    [JsonPropertyName("flightCount")] public int FlightCount { get; set; }
+    [JsonPropertyName("quantumJumps")] public int QuantumJumps { get; set; }
+    [JsonPropertyName("lossCount")] public int LossCount { get; set; }
+    [JsonPropertyName("lastFlown")] public string LastFlown { get; set; } = "—";
+    [JsonPropertyName("isCurrent")] public bool IsCurrent { get; set; }
+    [JsonPropertyName("isInHangar")] public bool IsInHangar { get; set; }
+    [JsonPropertyName("isPledgeBought")] public bool IsPledgeBought { get; set; }
+    [JsonPropertyName("pledgeValueUsd")] public int PledgeValueUsd { get; set; }
+    [JsonPropertyName("insuranceType")] public string InsuranceType { get; set; } = "";
+    [JsonPropertyName("acquisitionType")] public string AcquisitionType { get; set; } = "";
+    [JsonPropertyName("customNotes")] public string CustomNotes { get; set; } = "";
+}
+
+public class CatalogShipDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("manufacturer")] public string Manufacturer { get; set; } = "";
+    [JsonPropertyName("role")] public string Role { get; set; } = "";
+    [JsonPropertyName("valueAuec")] public long ValueAuec { get; set; }
+    [JsonPropertyName("pledgeUsd")] public int PledgeUsd { get; set; }
+    [JsonPropertyName("defaultInsurance")] public string DefaultInsurance { get; set; } = "";
+}
+
+public class FleetResponseDto
+{
+    [JsonPropertyName("ships")] public List<FleetShipDto> Ships { get; set; } = new();
+    [JsonPropertyName("catalog")] public List<CatalogShipDto> Catalog { get; set; } = new();
+    [JsonPropertyName("totalFleetValueAuec")] public long TotalFleetValueAuec { get; set; }
+    [JsonPropertyName("totalFleetPledgeUsd")] public int TotalFleetPledgeUsd { get; set; }
+    [JsonPropertyName("totalFlights")] public int TotalFlights { get; set; }
+    [JsonPropertyName("totalQuantumJumps")] public int TotalQuantumJumps { get; set; }
+    [JsonPropertyName("hangarCount")] public int HangarCount { get; set; }
+    [JsonPropertyName("flownCount")] public int FlownCount { get; set; }
+}
+
 public class MissionItemDto
 {
     [JsonPropertyName("id")]
@@ -757,6 +801,7 @@ public class PhotinoBridge
     private string? _currentLogPath;
     private string? _activeSessionName;
     private string _selectedSession = "__live__";
+    private string? _currentShip;
     private DateTime? _lastEventTime;
     private readonly List<LogEventDto> _liveEvents = new();
     private readonly object _liveEventsLock = new();
@@ -1007,7 +1052,142 @@ public class PhotinoBridge
                     break;
 
                 case "get_fleet":
-                    SendResponse(req.Id, "fleet_response", GetFleetData());
+                    SendResponse(req.Id, "fleet_response", GetFleetResponse());
+                    break;
+
+                case "toggle_ship_hangar":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var tshProp))
+                    {
+                        var sName = tshProp.GetString() ?? "";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        bool newHangar = !(exCd?.InHangar ?? false);
+                        string newAcq = newHangar ? "Pledge Store" : "Geliehen / Free Fly";
+                        bool newPledge = newHangar;
+                        int newUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
+                        string newIns = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
+                        string newNotes = exCd?.Notes ?? "";
+                        Database.SaveFleetShipCustomData(sName, newHangar, newPledge, newUsd, newIns, newAcq, newNotes);
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "toggle_ship_hangar_response", fleetRes);
+                    }
+                    break;
+
+                case "add_catalog_ship_to_hangar":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var ashProp))
+                    {
+                        var sName = ashProp.GetString() ?? "";
+                        var cat = FleetCatalog.Lookup(sName);
+                        Database.SaveFleetShipCustomData(sName, true, true, cat.PledgeValueUsd, cat.DefaultInsurance, "Pledge Store", "");
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "add_catalog_ship_to_hangar_response", fleetRes);
+                    }
+                    break;
+
+                case "remove_ship_from_hangar":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var rshProp))
+                    {
+                        var sName = rshProp.GetString() ?? "";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        Database.SaveFleetShipCustomData(sName, false, false, exCd?.PledgeUsd ?? 0, exCd?.Insurance ?? "", "Geliehen / Free Fly", exCd?.Notes ?? "");
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "remove_ship_from_hangar_response", fleetRes);
+                    }
+                    break;
+
+                case "cycle_ship_acquisition":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var csaProp))
+                    {
+                        var sName = csaProp.GetString() ?? "";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        var curAcq = exCd?.Acquisition ?? "Geliehen / Free Fly";
+                        var nextAcq = curAcq switch
+                        {
+                            "Pledge Store" => "In-Game (aUEC)",
+                            "In-Game (aUEC)" => "Miete (Rental)",
+                            "Miete (Rental)" => "Geliehen / Free Fly",
+                            _ => "Pledge Store"
+                        };
+                        bool inHangar = nextAcq is "Pledge Store" or "In-Game (aUEC)";
+                        bool isPledge = nextAcq == "Pledge Store";
+                        int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
+                        string ins = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
+                        string notes = exCd?.Notes ?? "";
+                        Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, ins, nextAcq, notes);
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "cycle_ship_acquisition_response", fleetRes);
+                    }
+                    break;
+
+                case "cycle_ship_insurance":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var csiProp))
+                    {
+                        var sName = csiProp.GetString() ?? "";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        var curIns = exCd?.Insurance ?? "LTI (Lifetime)";
+                        var nextIns = curIns switch
+                        {
+                            "LTI (Lifetime)" or "LTI" => "120 Monate (IAE)",
+                            "120 Monate (IAE)" or "120M" => "24 Monate",
+                            "24 Monate" or "24M" => "12 Monate",
+                            "12 Monate" or "12M" => "6 Monate",
+                            _ => "LTI (Lifetime)"
+                        };
+                        bool inHangar = exCd?.InHangar ?? true;
+                        bool isPledge = exCd?.IsPledge ?? true;
+                        int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
+                        string acq = exCd?.Acquisition ?? "Pledge Store";
+                        string notes = exCd?.Notes ?? "";
+                        Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, nextIns, acq, notes);
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "cycle_ship_insurance_response", fleetRes);
+                    }
+                    break;
+
+                case "update_ship_pledge":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var uspProp) && req.Payload.Value.TryGetProperty("pledgeUsd", out var pUsdProp))
+                    {
+                        var sName = uspProp.GetString() ?? "";
+                        int pUsd = pUsdProp.GetInt32();
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        Database.SaveFleetShipCustomData(sName, exCd?.InHangar ?? true, exCd?.IsPledge ?? true, pUsd, exCd?.Insurance ?? "LTI (Lifetime)", exCd?.Acquisition ?? "Pledge Store", exCd?.Notes ?? "");
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "update_ship_pledge_response", fleetRes);
+                    }
+                    break;
+
+                case "update_ship_notes":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var usnProp) && req.Payload.Value.TryGetProperty("notes", out var notesProp))
+                    {
+                        var sName = usnProp.GetString() ?? "";
+                        string notes = notesProp.GetString() ?? "";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+                        Database.SaveFleetShipCustomData(sName, exCd?.InHangar ?? false, exCd?.IsPledge ?? false, exCd?.PledgeUsd ?? 0, exCd?.Insurance ?? "", exCd?.Acquisition ?? "Geliehen / Free Fly", notes);
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "update_ship_notes_response", fleetRes);
+                    }
+                    break;
+
+                case "set_current_ship":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var scsProp))
+                    {
+                        _currentShip = scsProp.GetString();
+                        Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                        Broadcast("FLEET_UPDATED", GetFleetResponse());
+                        SendResponse(req.Id, "set_current_ship_response", new { success = true, currentShip = _currentShip });
+                    }
                     break;
 
                 case "get_missions":
@@ -2335,6 +2515,143 @@ public class PhotinoBridge
         {
             locations,
             items,
+        };
+    }
+
+    private FleetResponseDto GetFleetResponse()
+    {
+        Database.EnsureInitialized();
+        var stats = Database.GetFleetStats();
+        var customData = Database.GetAllFleetCustomData();
+
+        // 1. Grouping by canonical ship name from catalog
+        var groupedStats = stats
+            .GroupBy(s =>
+            {
+                var cat = FleetCatalog.Lookup(s.Ship);
+                return cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : s.Ship;
+            })
+            .Select(g => new Database.DbShipStat(
+                Ship: g.Key,
+                FlightCount: g.Sum(x => x.FlightCount),
+                QtCount: g.Sum(x => x.QtCount),
+                LossCount: g.Sum(x => x.LossCount),
+                LastTime: g.Max(x => x.LastTime)
+            )).ToList();
+
+        var ships = new List<FleetShipDto>();
+
+        foreach (var stat in groupedStats)
+        {
+            var cat = FleetCatalog.Lookup(stat.Ship);
+            var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : stat.Ship;
+
+            bool isCurrent = !string.IsNullOrEmpty(_currentShip) &&
+                (_currentShip.Equals(canonicalName, StringComparison.OrdinalIgnoreCase) ||
+                 _currentShip.Equals(stat.Ship, StringComparison.OrdinalIgnoreCase) ||
+                 _currentShip.Contains(canonicalName, StringComparison.OrdinalIgnoreCase) ||
+                 canonicalName.Contains(_currentShip, StringComparison.OrdinalIgnoreCase));
+
+            var shipDto = new FleetShipDto
+            {
+                Name = canonicalName,
+                RawCode = stat.Ship,
+                Manufacturer = cat.Manufacturer,
+                ManufacturerBadge = cat.ManufacturerBadge,
+                ManufacturerColor = cat.ManufacturerColor,
+                Role = cat.Role,
+                EstimatedValueAuec = cat.EstimatedValueAuec,
+                FlightCount = stat.FlightCount,
+                QuantumJumps = stat.QtCount,
+                LossCount = stat.LossCount,
+                LastFlown = stat.LastTime.HasValue ? stat.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
+                IsCurrent = isCurrent,
+            };
+
+            if (customData.TryGetValue(shipDto.Name, out var cd) || customData.TryGetValue(stat.Ship, out cd))
+            {
+                shipDto.IsInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
+                shipDto.IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store";
+                shipDto.PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd;
+                shipDto.InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance;
+                shipDto.AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : (shipDto.IsInHangar ? "Pledge Store" : "Geliehen / Free Fly");
+                shipDto.CustomNotes = cd.Notes ?? "";
+            }
+            else
+            {
+                shipDto.IsInHangar = false;
+                shipDto.IsPledgeBought = false;
+                shipDto.PledgeValueUsd = cat.PledgeValueUsd;
+                shipDto.InsuranceType = cat.DefaultInsurance;
+                shipDto.AcquisitionType = "Geliehen / Free Fly";
+                shipDto.CustomNotes = "";
+            }
+
+            ships.Add(shipDto);
+        }
+
+        // Add manually added ships in customData that haven't been flown yet
+        foreach (var (shipName, cd) in customData)
+        {
+            var cat = FleetCatalog.Lookup(shipName);
+            var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : shipName;
+
+            bool shouldBeInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
+            if (shouldBeInHangar && !ships.Any(f => f.Name.Equals(canonicalName, StringComparison.OrdinalIgnoreCase)))
+            {
+                bool isCurrent = !string.IsNullOrEmpty(_currentShip) &&
+                    (_currentShip.Equals(canonicalName, StringComparison.OrdinalIgnoreCase) ||
+                     _currentShip.Equals(shipName, StringComparison.OrdinalIgnoreCase));
+
+                ships.Add(new FleetShipDto
+                {
+                    Name = canonicalName,
+                    RawCode = canonicalName,
+                    Manufacturer = cat.Manufacturer,
+                    ManufacturerBadge = cat.ManufacturerBadge,
+                    ManufacturerColor = cat.ManufacturerColor,
+                    Role = cat.Role,
+                    EstimatedValueAuec = cat.EstimatedValueAuec,
+                    FlightCount = 0,
+                    QuantumJumps = 0,
+                    LossCount = 0,
+                    LastFlown = "—",
+                    IsCurrent = isCurrent,
+                    IsInHangar = true,
+                    IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store",
+                    PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd,
+                    InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance,
+                    AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : "Pledge Store",
+                    CustomNotes = cd.Notes ?? ""
+                });
+            }
+        }
+
+        // Full catalog for "+ Schiff hinzufügen"
+        var catalog = FleetCatalog.AllShips
+            .OrderBy(s => s.NormalizedName)
+            .Select(s => new CatalogShipDto
+            {
+                Name = s.NormalizedName,
+                Manufacturer = s.Manufacturer,
+                Role = s.Role,
+                ValueAuec = s.EstimatedValueAuec,
+                PledgeUsd = s.PledgeValueUsd,
+                DefaultInsurance = s.DefaultInsurance,
+            }).ToList();
+
+        var hangarShips = ships.Where(s => s.IsInHangar).ToList();
+
+        return new FleetResponseDto
+        {
+            Ships = ships.OrderByDescending(s => s.IsCurrent).ThenByDescending(s => s.IsInHangar).ThenByDescending(s => s.FlightCount).ToList(),
+            Catalog = catalog,
+            TotalFleetValueAuec = hangarShips.Sum(s => s.EstimatedValueAuec),
+            TotalFleetPledgeUsd = hangarShips.Where(s => s.IsPledgeBought).Sum(s => s.PledgeValueUsd),
+            TotalFlights = ships.Sum(s => s.FlightCount),
+            TotalQuantumJumps = ships.Sum(s => s.QuantumJumps),
+            HangarCount = hangarShips.Count,
+            FlownCount = ships.Count,
         };
     }
 

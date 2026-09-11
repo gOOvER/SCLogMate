@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Aligned Missions subtabs to `Missionsverlauf`, `Aktive OCR-Verträge`, and `Auftragskatalog`.
     - Aligned Finances subtabs to `Übersicht`, `Buchhaltung`, `Ausgaben`, and `Fracht` with interactive financial timeline chart.
     - Aligned Events filter chips to the exact 9 RC2 categories: `Alle`, `Geld`, `Aufträge`, `Baupläne`, `Schiffe`, `Orte`, `Crew`, `Loot`, `Sonst`.
+  - **Full Parity for Fleet & Personal Hangar Management (`FleetView.tsx`, `PhotinoBridge.cs`)**:
+    - Restored the exact Avalonia RC2 **Flotten- & Hangar-Verzeichnis** structure with segmented switcher: `🏠 Mein Hangar` (owned ships filter with live counter) vs `✈ Flug-Historie` (all ships documented in game logs).
+    - Added catalog-backed **+ Schiff hinzufügen** modal with search across all `FleetCatalog` entries, enabling users to add ships into "Mein Hangar" even if not yet flown in logs.
+    - Added 1-click star toggle (`★` / `☆`) to dynamically add/remove ships from the personal Hangar.
+    - Added acquisition cycler chip (`💵 Pledge Store` ➔ `🪙 In-Game (aUEC)` ➔ `🎟 Miete (Rental)` ➔ `👥 Geliehen / Free Fly`).
+    - Added inline Pledge USD amount editor with direct persistence to SQLite `fleet_user_ships`.
+    - Added insurance cycler chip (`LTI (Lifetime)` ➔ `120 Monate (IAE)` ➔ `24 Monate` ➔ `12 Monate` ➔ `6 Monate`).
+    - Added "Als aktiv" quick button to set any fleet ship as active for top HUD telemetry and log parsing.
+    - Added complete Telemetry KPI Cluster: `WERT` (estimated aUEC market value), `PLEDGE` (total pledge USD), `FLÜGE` (total flight count), and `QUANTUM` (total quantum jumps).
+    - Added manufacturer brand chips and acquisition filter chips, with Star Citizen Wiki and UEX price lookup action links.
   - **Aurora Voice Service Integration (`PhotinoBridge.cs`)**:
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
