@@ -18,6 +18,10 @@ import {
   Scale,
   Send,
   HeartPulse,
+  Activity,
+  BarChart3,
+  LineChart,
+  Info,
 } from 'lucide-react';
 
 export const FinancesView: React.FC = () => {
@@ -28,7 +32,8 @@ export const FinancesView: React.FC = () => {
   const [copiedDiscord, setCopiedDiscord] = useState<boolean>(false);
 
   // Chart Controls
-  const [chartMode, setChartMode] = useState<'cumulative' | 'delta'>('cumulative');
+  const [chartMode, setChartMode] = useState<'cumulative' | 'income_spend' | 'cashflow'>('cumulative');
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const fetchFinance = async () => {
     try {
@@ -142,38 +147,167 @@ export const FinancesView: React.FC = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [data?.ledger]);
 
-  // Render SVG Quantum Timeline from real timelinePoints
+  const formatCompact = (num: number) => {
+    const abs = Math.abs(num);
+    const sign = num < 0 ? '-' : num > 0 ? '+' : '';
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}K`;
+    return `${sign}${abs}`;
+  };
+
+  // Timeline-Punkte und Koordinaten-Berechnung
   const timelinePoints = data?.timelinePoints || [];
-  const svgWidth = 800;
-  const svgHeight = 160;
-  const padding = 30;
+  const svgWidth = 920;
+  const svgHeight = 220;
+  const padLeft = 85;
+  const padRight = 30;
+  const padTop = 24;
+  const padBottom = 34;
+  const plotWidth = svgWidth - padLeft - padRight;
+  const plotHeight = svgHeight - padTop - padBottom;
 
-  const chartCoords = useMemo(() => {
-    if (timelinePoints.length === 0) return [];
-    const values = timelinePoints.map((p) => (chartMode === 'cumulative' ? p.balance : p.delta));
-    const minVal = Math.min(0, ...values);
-    const maxVal = Math.max(1, ...values);
-    const range = maxVal - minVal || 1;
+  const chartData = useMemo(() => {
+    if (timelinePoints.length === 0) return null;
 
-    return timelinePoints.map((p, idx) => {
-      const val = chartMode === 'cumulative' ? p.balance : p.delta;
-      const x = padding + (idx / Math.max(1, timelinePoints.length - 1)) * (svgWidth - padding * 2);
-      const y = svgHeight - padding - ((val - minVal) / range) * (svgHeight - padding * 2);
-      return { x, y, val, label: p.label, time: p.time };
-    });
+    let minVal = 0;
+    let maxVal = 1000;
+
+    if (chartMode === 'cumulative') {
+      const balances = timelinePoints.map((p) => p.balance);
+      minVal = Math.min(0, ...balances);
+      maxVal = Math.max(1000, ...balances);
+      if (minVal === maxVal) {
+        minVal -= 1000;
+        maxVal += 1000;
+      }
+    } else if (chartMode === 'income_spend') {
+      const incs = timelinePoints.map((p) => p.income);
+      const spds = timelinePoints.map((p) => p.spend);
+      minVal = 0;
+      maxVal = Math.max(1000, ...incs, ...spds);
+    } else {
+      // cashflow (delta)
+      const deltas = timelinePoints.map((p) => p.delta);
+      minVal = Math.min(0, ...deltas);
+      maxVal = Math.max(0, ...deltas);
+      if (minVal === 0 && maxVal === 0) {
+        minVal = -1000;
+        maxVal = 1000;
+      }
+      if (minVal === maxVal) {
+        minVal -= 1000;
+        maxVal += 1000;
+      }
+    }
+
+    const valRange = maxVal - minVal || 1;
+
+    const getY = (val: number) => {
+      const normalized = (val - minVal) / valRange;
+      return padTop + plotHeight - normalized * plotHeight;
+    };
+
+    const getX = (idx: number) => {
+      if (timelinePoints.length <= 1) return padLeft + plotWidth / 2;
+      return padLeft + (idx / (timelinePoints.length - 1)) * plotWidth;
+    };
+
+    const zeroY = getY(0);
+
+    const points = timelinePoints.map((p, idx) => ({
+      ...p,
+      idx,
+      x: getX(idx),
+      yBalance: getY(p.balance),
+      yIncome: getY(p.income),
+      ySpend: getY(p.spend),
+      yDelta: getY(p.delta),
+    }));
+
+    // Pfade für kumulierten Netto-Saldo
+    let balancePath = '';
+    let balanceArea = '';
+    if (chartMode === 'cumulative') {
+      balancePath = points.reduce((acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.yBalance}` : `${acc} L ${pt.x} ${pt.yBalance}`), '');
+      const lastPt = points[points.length - 1];
+      const firstPt = points[0];
+      const baseAreaY = Math.min(padTop + plotHeight, Math.max(padTop, zeroY));
+      balanceArea = `${balancePath} L ${lastPt.x} ${baseAreaY} L ${firstPt.x} ${baseAreaY} Z`;
+    }
+
+    // Pfade für Einnahmen vs. Ausgaben
+    let incomePath = '';
+    let incomeArea = '';
+    let spendPath = '';
+    let spendArea = '';
+    if (chartMode === 'income_spend') {
+      incomePath = points.reduce((acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.yIncome}` : `${acc} L ${pt.x} ${pt.yIncome}`), '');
+      spendPath = points.reduce((acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.ySpend}` : `${acc} L ${pt.x} ${pt.ySpend}`), '');
+      const lastPt = points[points.length - 1];
+      const firstPt = points[0];
+      const baseY = padTop + plotHeight;
+      incomeArea = `${incomePath} L ${lastPt.x} ${baseY} L ${firstPt.x} ${baseY} Z`;
+      spendArea = `${spendPath} L ${lastPt.x} ${baseY} L ${firstPt.x} ${baseY} Z`;
+    }
+
+    // 4 horizontale Raster-Linien & Beschriftungen
+    const gridTicks = [
+      { val: maxVal, y: getY(maxVal) },
+      { val: Math.round(maxVal * 0.66 + minVal * 0.34), y: getY(Math.round(maxVal * 0.66 + minVal * 0.34)) },
+      { val: Math.round(maxVal * 0.34 + minVal * 0.66), y: getY(Math.round(maxVal * 0.34 + minVal * 0.66)) },
+      { val: minVal, y: getY(minVal) },
+    ];
+
+    // Zeit-Ticks auf X-Achse (4 bis 6 Marken)
+    const timeTicks: { time: string; x: number }[] = [];
+    if (points.length > 0) {
+      const count = Math.min(6, points.length);
+      const step = Math.max(1, Math.floor((points.length - 1) / (count - 1)));
+      for (let i = 0; i < points.length; i += step) {
+        timeTicks.push({ time: points[i].time, x: points[i].x });
+      }
+      if (timeTicks[timeTicks.length - 1].x !== points[points.length - 1].x) {
+        timeTicks.push({ time: points[points.length - 1].time, x: points[points.length - 1].x });
+      }
+    }
+
+    return {
+      minVal,
+      maxVal,
+      zeroY,
+      points,
+      balancePath,
+      balanceArea,
+      incomePath,
+      incomeArea,
+      spendPath,
+      spendArea,
+      gridTicks,
+      timeTicks,
+    };
   }, [timelinePoints, chartMode]);
 
-  const svgPathD = useMemo(() => {
-    if (chartCoords.length === 0) return '';
-    return chartCoords.reduce((acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
-  }, [chartCoords]);
+  const handleChartMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!chartData || chartData.points.length === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = ((e.clientX - rect.left) / rect.width) * svgWidth;
+    if (mouseX < padLeft - 15 || mouseX > svgWidth - padRight + 15) {
+      setHoveredIdx(null);
+      return;
+    }
+    let closestIdx = 0;
+    let closestDist = Infinity;
+    for (let i = 0; i < chartData.points.length; i++) {
+      const dist = Math.abs(chartData.points[i].x - mouseX);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIdx = i;
+      }
+    }
+    setHoveredIdx(closestIdx);
+  };
 
-  const svgAreaD = useMemo(() => {
-    if (chartCoords.length === 0) return '';
-    const last = chartCoords[chartCoords.length - 1];
-    const first = chartCoords[0];
-    return `${svgPathD} L ${last.x} ${svgHeight - padding} L ${first.x} ${svgHeight - padding} Z`;
-  }, [chartCoords, svgPathD]);
+  const hoveredPoint = hoveredIdx !== null && chartData?.points ? chartData.points[hoveredIdx] : null;
 
   return (
     <div className="flex flex-col min-h-full space-y-3 font-sans select-none">
@@ -305,76 +439,363 @@ export const FinancesView: React.FC = () => {
 
       {/* ══ 3. SUBTAB INHALTE ══ */}
       <div className="flex-1 bg-[#040914]/90 rounded-b-lg border border-cyan-950/80 overflow-hidden flex flex-col p-3 shadow-sm min-h-[400px]">
-        {/* SUBTAB 1: ÜBERSICHT & REAL QUANTUM TIMELINE */}
+        {/* SUBTAB 1: ÜBERSICHT & MODERN SALDENVERLAUF */}
         {activeSubTab === 'overview' && (
           <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
-            {/* Echte Quantum Timeline SVG Grafik */}
-            <div className="bg-[#030a16] rounded-lg border border-cyan-950 p-3 relative overflow-hidden">
-              <div className="flex justify-between items-center mb-2">
+            {/* ══ INTERAKTIVER SALDEN- & TRANSAKTIONSVERLAUF ══ */}
+            <div className="bg-[#030a16] rounded-lg border border-cyan-950 p-3 relative overflow-hidden shadow-inner">
+              {/* Chart Header Bar */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    ❖ QUANTUM TIMELINE
-                  </span>
+                  <div className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 flex items-center gap-1.5 shadow-sm">
+                    <Activity className="w-3 h-3 text-cyan-400" />
+                    <span>SALDEN- & TRANSAKTIONSVERLAUF</span>
+                  </div>
                   <span className="text-xs font-mono font-bold text-slate-200">
-                    Finanzverlauf & Kontostand-Historie
+                    Finanzhistorie & Buchungsentwicklung
                   </span>
                 </div>
 
                 {/* Mode Selector */}
                 <div className="flex items-center gap-1 bg-[#051122] p-0.5 rounded border border-cyan-950 text-[10px] font-mono">
                   <button
-                    onClick={() => setChartMode('cumulative')}
-                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
-                      chartMode === 'cumulative' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-slate-400 hover:text-white'
+                    onClick={() => {
+                      setChartMode('cumulative');
+                      setHoveredIdx(null);
+                    }}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition flex items-center gap-1 ${
+                      chartMode === 'cumulative'
+                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 shadow-sm'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Kumulativ
+                    <LineChart className="w-3 h-3 text-cyan-400" />
+                    <span>Kumulativ (Saldo)</span>
                   </button>
+
                   <button
-                    onClick={() => setChartMode('delta')}
-                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
-                      chartMode === 'delta' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-slate-400 hover:text-white'
+                    onClick={() => {
+                      setChartMode('income_spend');
+                      setHoveredIdx(null);
+                    }}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition flex items-center gap-1 ${
+                      chartMode === 'income_spend'
+                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 shadow-sm'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Einzelposten
+                    <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    <span>Einnahmen vs. Ausgaben</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setChartMode('cashflow');
+                      setHoveredIdx(null);
+                    }}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition flex items-center gap-1 ${
+                      chartMode === 'cashflow'
+                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <BarChart3 className="w-3 h-3 text-amber-400" />
+                    <span>Cashflow (Einzelposten)</span>
                   </button>
                 </div>
               </div>
 
-              {chartCoords.length > 0 ? (
-                <div className="relative w-full overflow-x-auto">
-                  <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-40 overflow-visible">
+              {/* Live Hover Telemetry Strip */}
+              <div className="min-h-[28px] flex items-center justify-between mb-1.5 px-2.5 py-1 bg-[#020712]/90 border border-cyan-950/80 rounded text-xs font-mono">
+                {hoveredPoint ? (
+                  <div className="flex items-center gap-3 w-full overflow-hidden">
+                    <span className="text-cyan-400 font-bold shrink-0">🕒 {hoveredPoint.time}</span>
+                    <span className="text-slate-200 truncate max-w-[340px]" title={hoveredPoint.label}>
+                      {hoveredPoint.label}
+                    </span>
+                    <span className={`font-bold shrink-0 ${hoveredPoint.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {hoveredPoint.delta >= 0 ? '+' : ''}{formatNumber(hoveredPoint.delta)} aUEC
+                    </span>
+                    <span className="text-slate-400 ml-auto shrink-0">
+                      Saldo nach Buchung: <strong className="text-cyan-300">{formatNumber(hoveredPoint.balance)} aUEC</strong>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between w-full text-slate-500 text-[11px]">
+                    <span className="flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-cyan-600" />
+                      Bewege die Maus über das Diagramm für exakte Buchungsdetails
+                    </span>
+                    <span className="text-[10px] text-slate-600">
+                      {timelinePoints.length} Buchungszeitpunkte erfasst
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* SVG Chart */}
+              {chartData && chartData.points.length > 0 ? (
+                <div className="relative w-full">
+                  <svg
+                    viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                    className="w-full h-48 overflow-visible cursor-crosshair select-none"
+                    onMouseMove={handleChartMouseMove}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                  >
                     <defs>
-                      <linearGradient id="quantGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                      <linearGradient id="finNetGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
+                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.01" />
+                      </linearGradient>
+                      <linearGradient id="finIncGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.22" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
+                      </linearGradient>
+                      <linearGradient id="finSpdGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.22" />
+                        <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.01" />
                       </linearGradient>
                     </defs>
 
-                    {/* Raster-Linien */}
-                    <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="#1e293b" strokeDasharray="3,3" />
-                    <line x1={padding} y1={svgHeight / 2} x2={svgWidth - padding} y2={svgHeight / 2} stroke="#0f172a" strokeDasharray="2,2" />
-
-                    {/* Gradient Area Fill */}
-                    {svgAreaD && <path d={svgAreaD} fill="url(#quantGrad)" />}
-
-                    {/* Main Line */}
-                    {svgPathD && <path d={svgPathD} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />}
-
-                    {/* Data Points */}
-                    {chartCoords.map((p, i) => (
-                      <g key={i} className="group cursor-pointer">
-                        <circle cx={p.x} cy={p.y} r="3.5" fill="#082f49" stroke="#38bdf8" strokeWidth="2" className="group-hover:r-5 group-hover:fill-cyan-400 transition-all" />
-                        <title>{`${p.time}\n${p.label}\n${formatNumber(p.val)} aUEC`}</title>
+                    {/* Horizontal Grid Lines & Y-Axis Labels */}
+                    {chartData.gridTicks.map((tick, i) => (
+                      <g key={i}>
+                        <line
+                          x1={padLeft}
+                          y1={tick.y}
+                          x2={svgWidth - padRight}
+                          y2={tick.y}
+                          stroke="#1e293b"
+                          strokeDasharray="3,3"
+                          strokeOpacity="0.6"
+                        />
+                        <text
+                          x={padLeft - 10}
+                          y={tick.y + 3.5}
+                          textAnchor="end"
+                          className="text-[10px] font-mono fill-slate-400 font-semibold"
+                        >
+                          {formatCompact(tick.val)} aUEC
+                        </text>
                       </g>
                     ))}
+
+                    {/* Nulllinie hervorheben wenn vorhanden */}
+                    {chartData.minVal < 0 && chartData.maxVal > 0 && (
+                      <line
+                        x1={padLeft}
+                        y1={chartData.zeroY}
+                        x2={svgWidth - padRight}
+                        y2={chartData.zeroY}
+                        stroke="#475569"
+                        strokeWidth="1.2"
+                        strokeDasharray="4,2"
+                      />
+                    )}
+
+                    {/* X-Axis Baseline */}
+                    <line
+                      x1={padLeft}
+                      y1={svgHeight - padBottom}
+                      x2={svgWidth - padRight}
+                      y2={svgHeight - padBottom}
+                      stroke="#1e293b"
+                      strokeWidth="1"
+                    />
+
+                    {/* Time Axis Labels */}
+                    {chartData.timeTicks.map((tick, i) => (
+                      <text
+                        key={i}
+                        x={tick.x}
+                        y={svgHeight - 14}
+                        textAnchor="middle"
+                        className="text-[10px] font-mono fill-slate-500"
+                      >
+                        {tick.time}
+                      </text>
+                    ))}
+
+                    {/* ── Mode 1: Cumulative Net Balance ── */}
+                    {chartMode === 'cumulative' && (
+                      <>
+                        {chartData.balanceArea && <path d={chartData.balanceArea} fill="url(#finNetGrad)" />}
+                        {chartData.balancePath && (
+                          <path
+                            d={chartData.balancePath}
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {/* ── Mode 2: Income vs Spend ── */}
+                    {chartMode === 'income_spend' && (
+                      <>
+                        {chartData.incomeArea && <path d={chartData.incomeArea} fill="url(#finIncGrad)" />}
+                        {chartData.incomePath && (
+                          <path
+                            d={chartData.incomePath}
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+                        {chartData.spendArea && <path d={chartData.spendArea} fill="url(#finSpdGrad)" />}
+                        {chartData.spendPath && (
+                          <path
+                            d={chartData.spendPath}
+                            fill="none"
+                            stroke="#f43f5e"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {/* ── Mode 3: Cashflow Discrete Bars ── */}
+                    {chartMode === 'cashflow' && (
+                      <>
+                        {chartData.points.map((p) => {
+                          const barWidth = Math.max(2, Math.min(8, (plotWidth / chartData.points.length) * 0.7));
+                          const bx = p.x - barWidth / 2;
+                          const by = p.yDelta;
+                          const barH = Math.max(2, Math.abs(by - chartData.zeroY));
+                          const topY = Math.min(by, chartData.zeroY);
+                          const isPositive = p.delta >= 0;
+                          const isHovered = hoveredIdx === p.idx;
+
+                          return (
+                            <rect
+                              key={p.idx}
+                              x={bx}
+                              y={topY}
+                              width={barWidth}
+                              height={barH}
+                              fill={isPositive ? (isHovered ? '#34d399' : '#10b981') : (isHovered ? '#fb7185' : '#f43f5e')}
+                              opacity={hoveredIdx !== null && !isHovered ? 0.4 : 0.85}
+                              rx="1"
+                            />
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* ── Hover Guideline & Reticle ── */}
+                    {hoveredPoint && (
+                      <g className="pointer-events-none">
+                        {/* Vertikale Leitlinie */}
+                        <line
+                          x1={hoveredPoint.x}
+                          y1={padTop}
+                          x2={hoveredPoint.x}
+                          y2={svgHeight - padBottom}
+                          stroke="#38bdf8"
+                          strokeWidth="1.2"
+                          strokeDasharray="3,3"
+                          strokeOpacity="0.8"
+                        />
+
+                        {/* Target Reticle */}
+                        {chartMode === 'cumulative' && (
+                          <>
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.yBalance}
+                              r="7"
+                              fill="none"
+                              stroke="#38bdf8"
+                              strokeWidth="1.5"
+                              opacity="0.6"
+                            />
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.yBalance}
+                              r="3.5"
+                              fill="#38bdf8"
+                              stroke="#030a16"
+                              strokeWidth="1.5"
+                            />
+                          </>
+                        )}
+
+                        {chartMode === 'income_spend' && (
+                          <>
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.yIncome}
+                              r="4"
+                              fill="#10b981"
+                              stroke="#030a16"
+                              strokeWidth="1.5"
+                            />
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.ySpend}
+                              r="4"
+                              fill="#f43f5e"
+                              stroke="#030a16"
+                              strokeWidth="1.5"
+                            />
+                          </>
+                        )}
+                      </g>
+                    )}
                   </svg>
                 </div>
               ) : (
-                <div className="h-32 flex items-center justify-center text-xs font-mono text-slate-500">
-                  Keine historischen Transaktionen in dieser Auswahl vorhanden.
+                <div className="h-44 flex flex-col items-center justify-center text-xs font-mono text-slate-500 space-y-1">
+                  <Activity className="w-6 h-6 text-slate-600 mb-1" />
+                  <div>Keine historischen Finanztransaktionen vorhanden.</div>
                 </div>
               )}
+
+              {/* Chart Legend */}
+              <div className="mt-2 pt-1.5 border-t border-cyan-950/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <div className="flex items-center gap-4">
+                  {chartMode === 'cumulative' && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] inline-block shadow-[0_0_6px_#38bdf8]" />
+                      <span>Netto-Saldo (Kumuliert)</span>
+                    </div>
+                  )}
+                  {chartMode === 'income_spend' && (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_#34d399]" />
+                        <span>Einnahmen (Gesamt)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block shadow-[0_0_6px_#fb7185]" />
+                        <span>Ausgaben (Gesamt)</span>
+                      </div>
+                    </>
+                  )}
+                  {chartMode === 'cashflow' && (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block" />
+                        <span>Gutschrift / Einnahme</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" />
+                        <span>Zahlung / Ausgabe</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Transaktionsdaten via SQLite Ledger
+                </div>
+              </div>
             </div>
 
             {/* Top Einnahmen & Top Ausgaben 2-Spalten */}

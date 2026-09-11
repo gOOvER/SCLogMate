@@ -16,12 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added subtab switching matching RC2: `System & Wartung` (Shader cache, crash dumps, system diagnostics, user.cfg live editor & tuning generator) and `Backups` (ActionMaps keybind archive, backup creation with notes, restore directory info).
   - **Missions & Finances Parity**:
     - Aligned Missions subtabs to `Missionsverlauf`, `Aktive OCR-Verträge`, and `Auftragskatalog`.
-    - Aligned Finances subtabs to `Übersicht`, `Buchhaltung`, `Ausgaben`, and `Fracht` with SVG Quantum timeline.
+    - Aligned Finances subtabs to `Übersicht`, `Buchhaltung`, `Ausgaben`, and `Fracht` with interactive financial timeline chart.
     - Aligned Events filter chips to the exact 9 RC2 categories: `Alle`, `Geld`, `Aufträge`, `Baupläne`, `Schiffe`, `Orte`, `Crew`, `Loot`, `Sonst`.
   - **Aurora Voice Service Integration (`PhotinoBridge.cs`)**:
     - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
 
 ### Changed
+- **Finances Chart Overhaul & Modernization (`FinancesView.tsx`)**:
+  - Removed misleading legacy "Quantum Timeline" badge and terminology, replacing it with an informative `SALDEN- & TRANSAKTIONSVERLAUF` header.
+  - Eliminated dense static point circles that caused lumpy caterpillar-like stroke artifacts across dense ledger datasets.
+  - Implemented 3 dedicated, clean chart modes: `Kumulativ (Saldo)`, `Einnahmen vs. Ausgaben`, and `Cashflow (Einzelposten)`.
+  - Added formatted aUEC Y-axis grid lines (`+1.5M`, `+750K`, `0`, `-200K`) and X-axis timestamp ticks.
+  - Added interactive cursor tracking with vertical crosshair, target reticles, and real-time live telemetry inspector strip showing timestamp, booking detail, transaction delta, and resulting balance.
 - **Events View Modernization & Session Sync (`EventsView.tsx`, `App.tsx`)**:
   - Removed duplicate session selector dropdown from the `EventsView` filter bar, binding it directly to the global master HUD `SessionBar` (`telemetry.selectedSession`).
   - Streamlined the filter bar with a sleek active session status pill, giving full horizontal prominence to glowing category chips, search, and live tail controls.
