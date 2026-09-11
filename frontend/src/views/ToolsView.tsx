@@ -903,9 +903,6 @@ export const ToolsView: React.FC = () => {
                   <h1 className="text-base font-bold text-white tracking-wide">
                     STAR CITIZEN TRESOR &amp; BACKUP-ZENTRALE
                   </h1>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-purple-950 text-purple-300 border border-purple-800">
-                    RC2 Standard
-                  </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1 font-mono">
                   Zentrale Verwaltung aller Steuerungsbelegungen, user.cfg-Snapshots und Cloud-Replikation.

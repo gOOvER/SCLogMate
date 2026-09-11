@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Removed
+- **Obsolete Versioning Badge in Tools View (`ToolsView.tsx`)**:
+  - Removed the unnecessary internal `"RC2 Standard"` badge from the Star Citizen Tresor & Backup-Zentrale header.
+
 ### Added
 - **Full CitizenID & RSI Citizen Dossier Integration (`CitizenService.cs`, `PilotProfile.cs`, `Database.cs`, `HudBar.tsx`, `PilotDossierModal.tsx`, `PhotinoBridge.cs`)**:
   - Integrated public RSI Citizen Dossier lookup (`https://robertsspaceindustries.com/citizens/{handle}`) and CitizenID Space fallback API to automatically retrieve official Star Citizen pilot profiles:
