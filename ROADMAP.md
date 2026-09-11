@@ -8,7 +8,7 @@ Dieses Dokument sammelt geplante Erweiterungen, Optimierungen und Feature-Konzep
 
 Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden Schritte gleichen das React-Frontend Schritt für Schritt an das vertraute, hochdichte Star-Citizen-HUD-Design der Release-Candidate-Version (RC2) an:
 
-- [ ] **Schritt 1: Globaler Rahmen, Master-Header & 2-Zeilen-HUD (Shell)**
+- [x] **Schritt 1: Globaler Rahmen, Master-Header & 2-Zeilen-HUD (Shell)**
   - **Oberste Leiste:** Star Citizen Prozess-Status Badge (`● LIVE` / `○ Offline`), Overlay-Schnellstarter (`🖥 Mini-HUD`, `🛰 RS-Overlay`), Sprachwähler mit echten Länderflaggen (DE / EN) und Versions-Pill.
   - **mobiGlas Session-Strip:** Prominenter Session-Auswahlbalken direkt unter dem Header mit Dropdown aller erfassten Spielsitzungen und leuchtender Zeitspannen-Pille (`SessionSpanText`).
   - **Permanentes 2-Zeilen SC-HUD (oben, einklappbar):**

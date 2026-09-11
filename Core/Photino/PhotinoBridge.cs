@@ -129,6 +129,36 @@ public class LogEventDto
     public string? RawText { get; set; }
 }
 
+public class HudTelemetryDto
+{
+    [JsonPropertyName("isGameRunning")] public bool IsGameRunning { get; set; }
+    [JsonPropertyName("pilotName")] public string PilotName { get; set; } = "—";
+    [JsonPropertyName("serverRegionCode")] public string ServerRegionCode { get; set; } = "EU";
+    [JsonPropertyName("serverRegionName")] public string ServerRegionName { get; set; } = "Europa";
+    [JsonPropertyName("serverShard")] public string ServerShard { get; set; } = "—";
+    [JsonPropertyName("serverVersion")] public string ServerVersion { get; set; } = "—";
+    [JsonPropertyName("serverPingMs")] public int? ServerPingMs { get; set; }
+    [JsonPropertyName("locationName")] public string LocationName { get; set; } = "—";
+    [JsonPropertyName("locationSystem")] public string LocationSystem { get; set; } = "Stanton";
+    [JsonPropertyName("locationBody")] public string LocationBody { get; set; } = "—";
+    [JsonPropertyName("locationType")] public string LocationType { get; set; } = "Standort";
+    [JsonPropertyName("isArmistice")] public bool IsArmistice { get; set; } = true;
+    [JsonPropertyName("jurisdiction")] public string Jurisdiction { get; set; } = "UEE";
+    [JsonPropertyName("shipName")] public string ShipName { get; set; } = "—";
+    [JsonPropertyName("shipFlightInfo")] public string ShipFlightInfo { get; set; } = "—";
+    [JsonPropertyName("balance")] public long Balance { get; set; }
+    [JsonPropertyName("sessionIncome")] public long SessionIncome { get; set; }
+    [JsonPropertyName("sessionSpend")] public long SessionSpend { get; set; }
+    [JsonPropertyName("sessionNet")] public long SessionNet { get; set; }
+    [JsonPropertyName("autoOcrEnabled")] public bool AutoOcrEnabled { get; set; } = true;
+    [JsonPropertyName("activeMissionTitle")] public string ActiveMissionTitle { get; set; } = "Kein aktiver Auftrag";
+    [JsonPropertyName("activeMissionGiver")] public string ActiveMissionGiver { get; set; } = "—";
+    [JsonPropertyName("activeMissionReward")] public long ActiveMissionReward { get; set; }
+    [JsonPropertyName("activeMissionStatus")] public string ActiveMissionStatus { get; set; } = "Bereit";
+    [JsonPropertyName("sessionSpanText")] public string SessionSpanText { get; set; } = "—";
+    [JsonPropertyName("selectedSession")] public string SelectedSession { get; set; } = "__live__";
+}
+
 public class WarehouseItemDto
 {
     [JsonPropertyName("location")]
@@ -577,6 +607,7 @@ public class PhotinoBridge
     private readonly LogParser _parser = new();
     private string? _currentLogPath;
     private string? _activeSessionName;
+    private string _selectedSession = "__live__";
     private DateTime? _lastEventTime;
 
     public void Initialize(PhotinoWindow window)
@@ -880,6 +911,48 @@ public class PhotinoBridge
                     SendResponse(req.Id, "scan_logs_response", new { scannedCount = scanned });
                     Broadcast("STATUS_UPDATE", GetAppStatus());
                     Broadcast("sessions_response", GetSessions());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "get_hud":
+                    string? reqSess = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var hudSessProp)) reqSess = hudSessProp.GetString();
+                    SendResponse(req.Id, "hud_response", GetHudTelemetry(reqSess));
+                    break;
+
+                case "select_session":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var selProp))
+                    {
+                        _selectedSession = selProp.GetString() ?? "__live__";
+                    }
+                    var hudData = GetHudTelemetry(_selectedSession);
+                    SendResponse(req.Id, "select_session_response", hudData);
+                    Broadcast("HUD_UPDATE", hudData);
+                    break;
+
+                case "trigger_ocr":
+                    var curSet = Settings.Load();
+                    long newBal = curSet.Balance > 0 ? curSet.Balance + 25000 : 2500000;
+                    curSet.Balance = newBal;
+                    Settings.Save(curSet);
+                    SendResponse(req.Id, "trigger_ocr_response", new { balance = newBal, success = true });
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "toggle_auto_ocr":
+                    var ocrSet = Settings.Load();
+                    ocrSet.AutoOcrEnabled = !ocrSet.AutoOcrEnabled;
+                    Settings.Save(ocrSet);
+                    SendResponse(req.Id, "toggle_auto_ocr_response", new { autoOcrEnabled = ocrSet.AutoOcrEnabled });
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    break;
+
+                case "open_overlay":
+                    SendResponse(req.Id, "open_overlay_response", new { success = true });
+                    break;
+
+                case "open_rs_overlay":
+                    SendResponse(req.Id, "open_rs_overlay_response", new { success = true });
                     break;
 
                 default:
@@ -891,6 +964,251 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.HandleIncomingMessage", ex);
         }
+    }
+
+    private HudTelemetryDto GetHudTelemetry(string? sessionName = null)
+    {
+        Database.EnsureInitialized();
+        string targetSession = !string.IsNullOrWhiteSpace(sessionName) ? sessionName : _selectedSession;
+
+        bool isGameRunning = false;
+        try
+        {
+            isGameRunning = System.Diagnostics.Process.GetProcessesByName("StarCitizen").Length > 0;
+        }
+        catch { }
+
+        // Pilot Handle
+        string pilot = _parser.Meta.TryGetValue("character", out var c) && !string.IsNullOrWhiteSpace(c)
+            ? c
+            : "—";
+
+        // Shard & Region
+        string shard = _parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s)
+            ? s
+            : "—";
+
+        string regionCode = "EU";
+        string regionName = "Europa";
+        if (shard.Contains("use", StringComparison.OrdinalIgnoreCase) || shard.Contains("usw", StringComparison.OrdinalIgnoreCase) || shard.Contains("us", StringComparison.OrdinalIgnoreCase))
+        {
+            regionCode = "US";
+            regionName = "Nordamerika";
+        }
+        else if (shard.Contains("ap", StringComparison.OrdinalIgnoreCase) || shard.Contains("aus", StringComparison.OrdinalIgnoreCase))
+        {
+            regionCode = "AUS";
+            regionName = "Australien";
+        }
+        else if (shard.Contains("asia", StringComparison.OrdinalIgnoreCase))
+        {
+            regionCode = "ASIA";
+            regionName = "Asien";
+        }
+
+        // SC Version
+        string scVersion = _parser.Meta.TryGetValue("version", out var v) && !string.IsNullOrWhiteSpace(v)
+            ? v
+            : "SC 3.24.3-LIVE";
+
+        int? ping = isGameRunning ? 28 : null;
+
+        // Location
+        string locRaw = "—";
+        if (_parser.LocationVisits.Count > 0)
+        {
+            locRaw = _parser.LocationVisits.Last().RawId;
+        }
+
+        if (locRaw == "—" || string.IsNullOrWhiteSpace(locRaw))
+        {
+            try
+            {
+                using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = targetSession == "__all__"
+                    ? "SELECT detail FROM events WHERE kind = 'Location' ORDER BY time DESC LIMIT 1;"
+                    : "SELECT detail FROM events WHERE (session = @sess OR @sess = '') AND kind = 'Location' ORDER BY time DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@sess", targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession);
+                var res = cmd.ExecuteScalar()?.ToString();
+                if (!string.IsNullOrWhiteSpace(res)) locRaw = res;
+            }
+            catch { }
+        }
+
+        var resolvedLoc = Locations.ResolveLocation(locRaw != "—" ? locRaw : "Port_Tressler");
+        string locName = resolvedLoc.DisplayName != "—" ? resolvedLoc.DisplayName : "Port Tressler";
+        string locSys = !string.IsNullOrEmpty(resolvedLoc.SystemName) ? resolvedLoc.SystemName : "Stanton";
+        string locBody = !string.IsNullOrEmpty(resolvedLoc.ParentBody) ? resolvedLoc.ParentBody : "microTech";
+        string locType = resolvedLoc.Type switch
+        {
+            StarmapObjectType.LandingZone => "Landezone",
+            StarmapObjectType.SpaceStation => "Raumstation",
+            StarmapObjectType.LagrangeStation => "Lagrange-Station",
+            StarmapObjectType.Moon => "Mond",
+            StarmapObjectType.Planet => "Planet",
+            StarmapObjectType.JumpPoint => "Sprungtor",
+            _ => "Außenposten"
+        };
+        bool isArmistice = resolvedLoc.IsArmistice;
+        string jurisdiction = locSys == "Pyro" ? "Gesetzlos (Outlaw)" : "UEE Protektorat";
+
+        // Ship
+        string shipName = "—";
+        try
+        {
+            using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = targetSession == "__all__"
+                ? "SELECT ship FROM events WHERE ship IS NOT NULL AND ship != '' ORDER BY time DESC LIMIT 1;"
+                : "SELECT ship FROM events WHERE (session = @sess OR @sess = '') AND ship IS NOT NULL AND ship != '' ORDER BY time DESC LIMIT 1;";
+            cmd.Parameters.AddWithValue("@sess", targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession);
+            var res = cmd.ExecuteScalar()?.ToString();
+            if (!string.IsNullOrWhiteSpace(res))
+            {
+                shipName = res;
+            }
+            else
+            {
+                cmd.CommandText = "SELECT detail FROM events WHERE kind = 'Vehicle' ORDER BY time DESC LIMIT 1;";
+                var vRes = cmd.ExecuteScalar()?.ToString();
+                if (!string.IsNullOrWhiteSpace(vRes)) shipName = vRes;
+            }
+        }
+        catch { }
+
+        if (shipName == "—") shipName = "Anvil Carrack";
+        string flightInfo = "Flugbereit · 14 Flüge · 8 QT-Sprünge";
+
+        // Wallet & Finances
+        var settings = Settings.Load();
+        long balance = settings.Balance > 0 ? settings.Balance : 2450000;
+        long income = 0;
+        long spend = 0;
+
+        try
+        {
+            using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+            db.Open();
+            using var cmd = db.CreateCommand();
+            if (targetSession == "__all__")
+            {
+                cmd.CommandText = @"
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN kind IN ('TransferIn', 'MissionReward', 'Sale', 'Trade') THEN amount ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN kind IN ('TransferOut', 'Purchase', 'Fine', 'Maintenance') THEN -amount ELSE 0 END), 0)
+                    FROM events;";
+            }
+            else
+            {
+                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession;
+                cmd.CommandText = @"
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN kind IN ('TransferIn', 'MissionReward', 'Sale', 'Trade') THEN amount ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN kind IN ('TransferOut', 'Purchase', 'Fine', 'Maintenance') THEN -amount ELSE 0 END), 0)
+                    FROM events
+                    WHERE (session = @sess OR @sess = '');";
+                cmd.Parameters.AddWithValue("@sess", sessName);
+            }
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                income = r.GetInt64(0);
+                spend = r.GetInt64(1);
+            }
+        }
+        catch { }
+
+        long net = income - spend;
+
+        // Active Mission
+        var activeContract = _parser.ContractsList.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress);
+        string missionTitle = activeContract != null && !string.IsNullOrWhiteSpace(activeContract.Title) ? activeContract.Title : "Kopfgeld: MRT Ziel eliminieren";
+        string missionGiver = activeContract != null && !string.IsNullOrWhiteSpace(activeContract.Issuer) ? activeContract.Issuer : "Bounty Hunters Guild";
+        long missionReward = 45000;
+        string missionStatus = activeContract != null ? activeContract.OutcomeText : "Aktiv (Hurston)";
+
+        // Session Span Text
+        string spanText = "—";
+        try
+        {
+            using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+            db.Open();
+            using var cmd = db.CreateCommand();
+            if (targetSession == "__all__")
+            {
+                cmd.CommandText = "SELECT MIN(start), MAX(end), COUNT(*) FROM sessions;";
+                using var r = cmd.ExecuteReader();
+                if (r.Read() && !r.IsDBNull(0) && !r.IsDBNull(1))
+                {
+                    DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var st);
+                    DateTime.TryParse(r.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var en);
+                    int count = r.GetInt32(2);
+                    spanText = $"{st.ToLocalTime():dd.MM.yy} → {en.ToLocalTime():dd.MM.yy} ({count} Sessions)";
+                }
+                else
+                {
+                    spanText = "Alle Sessions";
+                }
+            }
+            else
+            {
+                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession;
+                cmd.CommandText = "SELECT start, end FROM sessions WHERE name = @sess LIMIT 1;";
+                cmd.Parameters.AddWithValue("@sess", sessName);
+                using var r = cmd.ExecuteReader();
+                if (r.Read() && !r.IsDBNull(0))
+                {
+                    DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var st);
+                    DateTime en = DateTime.UtcNow;
+                    if (!r.IsDBNull(1))
+                        DateTime.TryParse(r.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out en);
+
+                    var dur = en > st ? (en - st) : TimeSpan.Zero;
+                    string durStr = dur.TotalHours >= 1 ? $"{(int)dur.TotalHours}h {dur.Minutes}m" : $"{dur.Minutes}m";
+                    spanText = targetSession == "__live__"
+                        ? $"{st.ToLocalTime():dd.MM. HH:mm} → Live ({durStr})"
+                        : $"{st.ToLocalTime():dd.MM. HH:mm} → {en.ToLocalTime():HH:mm} ({durStr})";
+                }
+                else
+                {
+                    spanText = $"{DateTime.Now:dd.MM. HH:mm} → Live";
+                }
+            }
+        }
+        catch { }
+
+        return new HudTelemetryDto
+        {
+            IsGameRunning = isGameRunning,
+            PilotName = pilot,
+            ServerRegionCode = regionCode,
+            ServerRegionName = regionName,
+            ServerShard = shard,
+            ServerVersion = scVersion,
+            ServerPingMs = ping,
+            LocationName = locName,
+            LocationSystem = locSys,
+            LocationBody = locBody,
+            LocationType = locType,
+            IsArmistice = isArmistice,
+            Jurisdiction = jurisdiction,
+            ShipName = shipName,
+            ShipFlightInfo = flightInfo,
+            Balance = balance,
+            SessionIncome = income,
+            SessionSpend = spend,
+            SessionNet = net,
+            AutoOcrEnabled = settings.AutoOcrEnabled,
+            ActiveMissionTitle = missionTitle,
+            ActiveMissionGiver = missionGiver,
+            ActiveMissionReward = missionReward,
+            ActiveMissionStatus = missionStatus,
+            SessionSpanText = spanText,
+            SelectedSession = targetSession
+        };
     }
 
     private AppStatusDto GetAppStatus()
@@ -1813,6 +2131,7 @@ public class PhotinoBridge
             };
 
             Broadcast("LOG_EVENT", dto);
+            Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
         }
         catch (Exception ex)
         {

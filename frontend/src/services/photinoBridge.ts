@@ -25,6 +25,35 @@ export interface AppStatus {
   lastEventTime: string | null;
 }
 
+export interface HudTelemetry {
+  isGameRunning: boolean;
+  pilotName: string;
+  serverRegionCode: 'EU' | 'US' | 'AUS' | 'ASIA' | 'OTHER' | string;
+  serverRegionName: string;
+  serverShard: string;
+  serverVersion: string;
+  serverPingMs?: number | null;
+  locationName: string;
+  locationSystem: string;
+  locationBody: string;
+  locationType: string;
+  isArmistice: boolean;
+  jurisdiction: string;
+  shipName: string;
+  shipFlightInfo: string;
+  balance: number;
+  sessionIncome: number;
+  sessionSpend: number;
+  sessionNet: number;
+  autoOcrEnabled: boolean;
+  activeMissionTitle: string;
+  activeMissionGiver: string;
+  activeMissionReward: number;
+  activeMissionStatus: string;
+  sessionSpanText: string;
+  selectedSession: string;
+}
+
 export interface SessionSummary {
   id: number;
   name: string;
@@ -431,6 +460,39 @@ class PhotinoBridge {
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'get_hud':
+      case 'select_session':
+      case 'trigger_ocr':
+      case 'toggle_auto_ocr':
+        return {
+          isGameRunning: true,
+          pilotName: 'Commander Torsten',
+          serverRegionCode: 'EU',
+          serverRegionName: 'Europa',
+          serverShard: '#1042-EU',
+          serverVersion: 'SC 3.24.3-LIVE',
+          serverPingMs: 28,
+          locationName: 'Port Tressler · microTech',
+          locationSystem: 'Stanton',
+          locationBody: 'microTech',
+          locationType: 'Raumstation',
+          isArmistice: true,
+          jurisdiction: 'UEE Protektorat',
+          shipName: 'Anvil Carrack',
+          shipFlightInfo: 'Flugbereit · 14 Flüge · 8 QT-Sprünge',
+          balance: type === 'trigger_ocr' ? 2525000 : 2500000,
+          sessionIncome: 145000,
+          sessionSpend: 32500,
+          sessionNet: 112500,
+          autoOcrEnabled: type === 'toggle_auto_ocr' ? false : true,
+          activeMissionTitle: 'Kopfgeld: MRT Ziel eliminieren',
+          activeMissionGiver: 'Bounty Hunters Guild',
+          activeMissionReward: 45000,
+          activeMissionStatus: 'In Durchführung',
+          sessionSpanText: '11.09. 14:20 → 16:45 (2h 25m)',
+          selectedSession: payload?.session || '__live__',
+        } as HudTelemetry;
+
       case 'get_status':
         return {
           version: '1.0.0-photino-preview',

@@ -4,8 +4,12 @@ import {
   AppStatus,
   SessionSummary,
   LogEventItem,
+  HudTelemetry,
 } from './services/photinoBridge';
 import { Sidebar, NavTabId } from './components/Sidebar';
+import { MasterHeader } from './components/MasterHeader';
+import { SessionBar } from './components/SessionBar';
+import { HudBar } from './components/HudBar';
 import { DashboardView } from './views/DashboardView';
 import { EventsView } from './views/EventsView';
 import { SessionsView } from './views/SessionsView';
@@ -24,17 +28,12 @@ import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
-import {
-  FolderSync,
-  HardDrive,
-  Play,
-  RefreshCw,
-  Square,
-} from 'lucide-react';
+import { HardDrive } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [events, setEvents] = useState<LogEventItem[]>([]);
@@ -42,16 +41,47 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
+  const [telemetry, setTelemetry] = useState<HudTelemetry>({
+    isGameRunning: false,
+    pilotName: '—',
+    serverRegionCode: 'EU',
+    serverRegionName: 'Europa',
+    serverShard: '—',
+    serverVersion: '—',
+    serverPingMs: null,
+    locationName: '—',
+    locationSystem: 'Stanton',
+    locationBody: '—',
+    locationType: 'Standort',
+    isArmistice: true,
+    jurisdiction: 'UEE Protektorat',
+    shipName: '—',
+    shipFlightInfo: '—',
+    balance: 0,
+    sessionIncome: 0,
+    sessionSpend: 0,
+    sessionNet: 0,
+    autoOcrEnabled: true,
+    activeMissionTitle: 'Kein aktiver Auftrag',
+    activeMissionGiver: '—',
+    activeMissionReward: 0,
+    activeMissionStatus: 'Bereit',
+    sessionSpanText: '—',
+    selectedSession: '__live__',
+  });
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusRes, sessionsRes, whRes] = await Promise.all([
+      const [statusRes, sessionsRes, whRes, hudRes] = await Promise.all([
         bridge.sendRequest<AppStatus>('get_status'),
         bridge.sendRequest<SessionSummary[]>('get_sessions'),
         bridge.sendRequest<{ locations: any[] }>('get_warehouse'),
+        bridge.sendRequest<HudTelemetry>('get_hud'),
       ]);
       setStatus(statusRes);
       setSessions(sessionsRes);
+      if (hudRes) setTelemetry(hudRes);
       if (whRes?.locations) {
         const total = whRes.locations.reduce((acc: number, l: any) => acc + (l.totalItems || 0), 0);
         setWarehouseTotal(total);
@@ -75,6 +105,10 @@ export const App: React.FC = () => {
       setStatus(newStatus);
     });
 
+    const unbindHud = bridge.on<HudTelemetry>('HUD_UPDATE', (newTelemetry) => {
+      setTelemetry(newTelemetry);
+    });
+
     const unbindWh = bridge.on<{ locations: any[] }>('WAREHOUSE_UPDATED', (data) => {
       if (data?.locations) {
         const total = data.locations.reduce((acc: number, l: any) => acc + (l.totalItems || 0), 0);
@@ -82,10 +116,21 @@ export const App: React.FC = () => {
       }
     });
 
+    // Keyboard shortcut Alt + H to toggle HUD collapse
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setIsHudCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       unbindLog();
       unbindStatus();
+      unbindHud();
       unbindWh();
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -113,6 +158,31 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSelectSession = async (sessionName: string) => {
+    try {
+      const res = await bridge.sendRequest<HudTelemetry>('select_session', { session: sessionName });
+      if (res) setTelemetry(res);
+    } catch (err) {
+      console.error('Failed to select session:', err);
+    }
+  };
+
+  const handleTriggerOcr = async () => {
+    try {
+      await bridge.sendRequest('trigger_ocr');
+    } catch (err) {
+      console.error('Failed to trigger OCR:', err);
+    }
+  };
+
+  const handleToggleAutoOcr = async () => {
+    try {
+      await bridge.sendRequest('toggle_auto_ocr');
+    } catch (err) {
+      console.error('Failed to toggle auto OCR:', err);
+    }
+  };
+
   return (
     <div className="flex h-screen w-screen sc-grid bg-[#030712] text-slate-100 font-sans overflow-hidden">
       {/* 16-Tab Navigation Sidebar */}
@@ -127,72 +197,39 @@ export const App: React.FC = () => {
 
       {/* Main App Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top HUD Header */}
-        <header className="flex items-center justify-between px-6 py-2.5 border-b border-slate-800/80 bg-[#030712]/90 backdrop-blur-md z-10 shrink-0 h-14">
-          <div className="flex items-center gap-3 truncate">
-            <span className="font-mono text-xs text-slate-400 flex items-center gap-2 truncate">
-              <HardDrive className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span className="truncate max-w-md" title={status?.logPath || 'Standardpfad'}>
-                {status?.logPath || 'Star Citizen Live Log'}
-              </span>
-            </span>
-          </div>
+        {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher */}
+        <MasterHeader
+          status={status}
+          isGameRunning={telemetry.isGameRunning}
+          isScanning={isScanning}
+          loading={loading}
+          onRefresh={loadData}
+          onTriggerScan={handleTriggerScan}
+          onToggleWatcher={handleToggleWatcher}
+        />
 
-          {/* Action & Watcher Controls */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-900/80 border border-slate-800">
-              <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  status?.isLiveWatching
-                    ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]'
-                    : 'bg-amber-400/80'
-                }`}
-              />
-              <span className="text-xs font-mono font-medium text-slate-300">
-                {status?.isLiveWatching ? 'LIVE WATCHING' : 'STANDBY'}
-              </span>
-            </div>
+        {/* mobiGlas Session-Strip: Dropdown, Zeitspanne & HUD-Toggle */}
+        <SessionBar
+          sessions={sessions}
+          selectedSession={telemetry.selectedSession}
+          sessionSpanText={telemetry.sessionSpanText}
+          isHudCollapsed={isHudCollapsed}
+          onSelectSession={handleSelectSession}
+          onToggleHudCollapsed={() => setIsHudCollapsed(!isHudCollapsed)}
+        />
 
-            <button
-              onClick={handleToggleWatcher}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded border transition-all cursor-pointer ${
-                status?.isLiveWatching
-                  ? 'border-amber-500/40 bg-amber-950/30 text-amber-300 hover:bg-amber-900/40'
-                  : 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40'
-              }`}
-            >
-              {status?.isLiveWatching ? (
-                <>
-                  <Square className="w-3.5 h-3.5 fill-current" /> Stopp
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current" /> Start Watcher
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={handleTriggerScan}
-              disabled={isScanning}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/40 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <FolderSync className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-              {isScanning ? 'Scanne...' : 'Logs scannen'}
-            </button>
-
-            <button
-              onClick={loadData}
-              title="Neu laden"
-              className="p-1.5 rounded border border-slate-800 hover:border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </header>
+        {/* Permanentes 2-Zeilen SC-HUD (Collapsible für mehr Arbeitsfläche) */}
+        {!isHudCollapsed && (
+          <HudBar
+            telemetry={telemetry}
+            onNavigate={setActiveTab}
+            onTriggerOcr={handleTriggerOcr}
+            onToggleAutoOcr={handleToggleAutoOcr}
+          />
+        )}
 
         {/* View Body */}
-        <main className="flex-1 overflow-hidden p-5">
+        <main className="flex-1 overflow-hidden p-4">
           {activeTab === 'dashboard' && (
             <DashboardView
               status={status}
@@ -239,7 +276,7 @@ export const App: React.FC = () => {
         </main>
 
         {/* Bottom Statusbar */}
-        <footer className="flex items-center justify-between px-6 py-2 border-t border-slate-800 bg-[#030712]/95 text-[11px] font-mono text-slate-500 shrink-0">
+        <footer className="flex items-center justify-between px-5 py-1.5 border-t border-cyan-950/60 bg-[#020610]/95 text-[11px] font-mono text-slate-500 shrink-0">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <HardDrive className="w-3 h-3 text-cyan-400" /> SQLite: sessions.db
