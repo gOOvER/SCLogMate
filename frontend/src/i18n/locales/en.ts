@@ -38,7 +38,7 @@ export const en: Translations = {
     noActiveSession: 'No active session',
   },
   hud: {
-    server: 'SERVER & PILOT',
+    server: 'SERVER & INSTANCE',
     version: 'Version',
     shard: 'Shard',
     ping: 'Ping',

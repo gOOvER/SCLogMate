@@ -12,6 +12,9 @@ import {
   Sparkles,
   Zap,
   User,
+  Globe,
+  Radio,
+  Server,
 } from 'lucide-react';
 import { HudTelemetry } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
@@ -33,22 +36,15 @@ export const HudBar: React.FC<HudBarProps> = ({
   onOpenPilotDossier,
 }) => {
   const { t } = useI18n();
-  // Region Flag Helper
-  const renderRegionFlag = (code?: string, flagOverride?: string) => {
-    if (flagOverride && flagOverride !== '🌐') {
-      return <span className="text-sm leading-none select-none">{flagOverride}</span>;
-    }
+
+  const getRegionDisplayName = (code?: string, name?: string) => {
+    if (name && name !== 'Unbekannt') return name;
     switch (code?.toUpperCase()) {
-      case 'EU':
-        return <span className="text-sm leading-none select-none" title="Europa (EU Shard)">🇪🇺</span>;
-      case 'US':
-        return <span className="text-sm leading-none select-none" title="USA / Amerika (US Shard)">🇺🇸</span>;
-      case 'AUS':
-        return <span className="text-sm leading-none select-none" title="Australien (AUS Shard)">🇦🇺</span>;
-      case 'ASIA':
-        return <span className="text-sm leading-none select-none" title="Asien (ASIA Shard)">🌏</span>;
-      default:
-        return <span className="text-sm leading-none select-none" title="Global / Persistent Universe">🌐</span>;
+      case 'EU': return 'Europa';
+      case 'US': return 'Nordamerika';
+      case 'AUS': return 'Australien';
+      case 'ASIA': return 'Asien';
+      default: return 'Persistent Universe';
     }
   };
 
@@ -58,21 +54,21 @@ export const HudBar: React.FC<HudBarProps> = ({
 
   return (
     <div className="px-5 pt-2.5 pb-1 flex flex-col gap-2.5 shrink-0 bg-gradient-to-b from-[#030814]/90 to-[#020610]/95 border-b border-cyan-950/60 transition-all select-none">
-      {/* ══ ZEILE 1: 3 KARTEN (Pilot/Server, Standort, Schiff) ══ */}
+      {/* ══ ZEILE 1: 3 KARTEN (Server & Instanz, Standort, Schiff) ══ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-        {/* KARTE 1: PILOT & SERVER */}
+        {/* KARTE 1: SERVER & INSTANZ */}
         <div className="bg-[#051122]/80 border border-cyan-950/80 hover:border-cyan-800/60 rounded-lg p-2.5 flex flex-col justify-between backdrop-blur-sm transition-all shadow-sm">
           {/* Header */}
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <Server className="w-3 h-3 text-cyan-400" />
               {t('hud.server')}
             </span>
 
             {/* Region & Ping Badge */}
             <div className="flex items-center gap-1.5 bg-[#030814] px-2 py-0.5 rounded border border-cyan-950 text-[10px] font-mono">
-              {renderRegionFlag(telemetry.serverRegionCode, telemetry.serverRegionFlag)}
-              <span className="font-bold text-amber-300">
+              <Globe className="w-2.5 h-2.5 text-cyan-400" />
+              <span className="font-bold text-amber-300" title={`Server-Region: ${getRegionDisplayName(telemetry.serverRegionCode, telemetry.serverRegionName)}`}>
                 {telemetry.serverRegionCode && telemetry.serverRegionCode !== '—' ? telemetry.serverRegionCode : 'PU'}
               </span>
               <span className="text-slate-600">·</span>
@@ -85,40 +81,54 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
           </div>
 
-          {/* Main Pilot Name with Avatar & Dossier Trigger */}
-          <div
-            onClick={onOpenPilotDossier}
-            className="flex items-center gap-2 cursor-pointer group hover:bg-cyan-950/40 p-1 -ml-1 rounded transition"
-            title="Klicken für Piloten-Dossier (RSI Profil)"
-          >
-            <div className="w-6 h-6 rounded-full overflow-hidden border border-cyan-400/80 bg-slate-900 shrink-0 flex items-center justify-center shadow-[0_0_8px_rgba(6,182,212,0.3)]">
-              {telemetry.pilotAvatarUrl ? (
-                <img src={telemetry.pilotAvatarUrl} alt={telemetry.pilotName} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-3.5 h-3.5 text-cyan-400" />
+          {/* Main Shard Display & Pilot Quick Dossier */}
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div
+                className="text-sm font-bold font-mono text-slate-100 truncate flex items-center gap-1.5"
+                title={telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : 'Persistent Universe'}
+              >
+                <Radio className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="text-white tracking-wide">
+                  {telemetry.serverShardNumber && telemetry.serverShardNumber !== '—'
+                    ? telemetry.serverShardNumber
+                    : (telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : 'Persistent Universe')}
+                </span>
+              </div>
+              <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 shrink-0">
+                {getRegionDisplayName(telemetry.serverRegionCode, telemetry.serverRegionName)}
+              </span>
+            </div>
+
+            {/* Quick Pilot Dossier Shortcut */}
+            <button
+              onClick={onOpenPilotDossier}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-amber-300 hover:text-amber-200 bg-amber-950/30 hover:bg-amber-900/50 border border-amber-800/50 transition cursor-pointer shrink-0 shadow-sm"
+              title={`Piloten-Dossier öffnen: ${telemetry.pilotName || 'Pilot'}`}
+            >
+              <User className="w-2.5 h-2.5 text-amber-400" />
+              <span className="truncate max-w-[85px]">{telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Dossier'}</span>
+            </button>
+          </div>
+
+          {/* Subline: Version & Full Shard Identifier */}
+          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center justify-between mt-0.5">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="text-cyan-400 font-semibold">{telemetry.serverVersion && telemetry.serverVersion !== '—' ? telemetry.serverVersion : 'SC LIVE'}</span>
+              {telemetry.serverShard && telemetry.serverShard !== '—' && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-slate-500 text-[10px] truncate font-mono" title={telemetry.serverShard}>
+                    {telemetry.serverShard}
+                  </span>
+                </>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold font-mono text-slate-100 group-hover:text-cyan-300 transition truncate">
-                {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Kein Pilot erkannt'}
-              </div>
-            </div>
             {telemetry.pilotTitle && (
-              <span className="text-[10px] font-mono font-semibold text-amber-400 shrink-0 hidden sm:inline">
+              <span className="text-[10px] font-mono font-semibold text-amber-400 shrink-0 ml-2">
                 {telemetry.pilotTitle}
               </span>
             )}
-          </div>
-
-          {/* Subline: Version & Shard */}
-          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
-            <span className="text-cyan-400">{telemetry.serverVersion && telemetry.serverVersion !== '—' ? telemetry.serverVersion : 'SC LIVE'}</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-slate-400" title={telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : undefined}>
-              {telemetry.serverShardNumber && telemetry.serverShardNumber !== '—'
-                ? telemetry.serverShardNumber
-                : (telemetry.serverShard && telemetry.serverShard !== '—' ? telemetry.serverShard : 'Kein Server')}
-            </span>
           </div>
         </div>
 

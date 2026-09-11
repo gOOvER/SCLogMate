@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Server & Instance HUD Card Redesign (`HudBar.tsx`, `de.ts`, `en.ts`)**:
+  - Eliminated duplicate Pilot Profile display between `MasterHeader` and HUD Card 1:
+    - Card 1 retitled to **`SERVER & INSTANZ`** (`SERVER & INSTANCE`), aligning its visual hierarchy with the Location and Active Ship cards.
+    - Server Shard Identifier (e.g. `Shard #060`) and Region chip promoted to primary hero status with radio icon.
+    - Replaced redundant large pilot avatar block with a sleek, compact RSI Dossier trigger button (`[ 👤 gOOvER ]`).
+  - Fixed duplicate region text (`EU EU · 28ms`):
+    - Replaced Windows-incompatible flag emoji (which rendered as raw letters `EU`) with a sleek Globe icon and single region code, completely eliminating duplicate `EU EU` output.
+    - Enhanced bottom subline with game version, complete shard ID, and pilot rank title.
+
 ### Added
 - **Database & Log Synchronization Modal (`DbUpdateModal.tsx`, `App.tsx`, `PhotinoBridge.cs`)**:
   - Created a dedicated Glassmorphism `DbUpdateModal` dialog displaying whenever database schema migrations or parser upgrades require a full re-scan, or when indexing newly detected log files.
