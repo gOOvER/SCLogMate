@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Automatic Proceed after Database Synchronization (`DbUpdateModal.tsx`, `ROADMAP.md`)**:
+  - Implemented an automatic 3-second transition timer upon database synchronization completion (`isCompleted`), displaying a dynamic `"Weiter (3s)"` button that smoothly enters the application without requiring a manual click.
+
 ### Removed
 - **Obsolete Versioning Badge in Tools View (`ToolsView.tsx`)**:
   - Removed the unnecessary internal `"RC2 Standard"` badge from the Star Citizen Tresor & Backup-Zentrale header.

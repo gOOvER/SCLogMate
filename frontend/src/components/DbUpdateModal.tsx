@@ -9,22 +9,30 @@ interface DbUpdateModalProps {
 
 export const DbUpdateModal: React.FC<DbUpdateModalProps> = ({ progress, onDismiss }) => {
   const [dismissed, setDismissed] = useState(false);
+  const [countdown, setCountdown] = useState<number>(3);
 
   useEffect(() => {
     if (progress && !progress.isCompleted) {
       setDismissed(false);
-    } else if (progress?.isCompleted && !progress.isDbUpdate) {
-      // Bei normaler Hintergrund-Indexierung nach kurzer Bestätigung automatisch schließen
-      const timer = setTimeout(() => {
-        setDismissed(true);
-        if (onDismiss) onDismiss();
-      }, 1500);
-      return () => clearTimeout(timer);
+      setCountdown(3);
+    } else if (progress?.isCompleted) {
+      setCountdown(3);
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setDismissed(true);
+            if (onDismiss) onDismiss();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
     }
-  }, [progress?.isCompleted, progress?.isDbUpdate]);
+  }, [progress?.isCompleted]);
 
   if (!progress || dismissed) return null;
-  if (!progress.isDbUpdate && progress.isCompleted) return null;
 
   const handleClose = () => {
     setDismissed(true);
@@ -121,9 +129,10 @@ export const DbUpdateModal: React.FC<DbUpdateModalProps> = ({ progress, onDismis
             </div>
             <button
               onClick={handleClose}
-              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 transition cursor-pointer"
+              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 transition cursor-pointer flex items-center space-x-1.5"
             >
-              Schließen
+              <span>Weiter</span>
+              <span className="text-cyan-200 text-[10px]">({countdown}s)</span>
             </button>
           </div>
         ) : (

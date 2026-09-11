@@ -26,6 +26,7 @@ Entscheidung getroffen: **Wir bleiben bei React + Photino.NET**. Die folgenden S
   - Direkte In-Grid Schnellanpassungen (`+` / `-`) und Frachtaufzug-Aktionen (`📦 Per Frachtaufzug entnehmen`, `🔧 Zerlegt`, `Standort leeren`).
 - [x] **Schritt 5: Flotte, Aufträge, Ansehen & weitere Detail-Views**
   - Schrittweise Angleichung von Typografie, Tabellenstilen und Informationsdichte an die Avalonia-Vorlage.
+  - Automatischer Wechsel nach Datenbank-Synchronisation (`DbUpdateModal.tsx`): 3s-Countdown mit "Weiter (3s)"-Button, der nach Abschluss des Syncs selbsttätig in die App übergeht.
 
 ---
 
