@@ -1,0 +1,110 @@
+export type Locale = 'de' | 'en';
+
+export const DEFAULT_LOCALE: Locale = 'de';
+export const SUPPORTED_LOCALES: Locale[] = ['de', 'en'];
+
+export interface Translations {
+  common: {
+    refresh: string;
+    loading: string;
+    scan: string;
+    scanning: string;
+    close: string;
+    copy: string;
+    copied: string;
+    filter: string;
+    search: string;
+    actions: string;
+    all: string;
+    status: string;
+    details: string;
+    showAll: string;
+    unknown: string;
+    none: string;
+  };
+  header: {
+    liveGame: string;
+    offline: string;
+    noLogPath: string;
+    miniHud: string;
+    rsOverlay: string;
+    scanTooltip: string;
+    refreshTooltip: string;
+    german: string;
+    english: string;
+  };
+  sessionBar: {
+    activeSession: string;
+    allSessions: string;
+    liveStream: string;
+    hudToggle: string;
+    noActiveSession: string;
+  };
+  hud: {
+    server: string;
+    version: string;
+    shard: string;
+    ping: string;
+    location: string;
+    jurisdiction: string;
+    armistice: string;
+    activeShip: string;
+    flights: string;
+    qtJumps: string;
+    wallet: string;
+    autoSync: string;
+    testOcr: string;
+    income: string;
+    expense: string;
+    profit: string;
+    mission: string;
+    reward: string;
+    activeMission: string;
+    noMission: string;
+    openInStarmap: string;
+    openInFleet: string;
+    openInWiki: string;
+  };
+  nav: {
+    categoryCore: string;
+    categoryUniverse: string;
+    categoryEngineering: string;
+    categorySystem: string;
+    dashboard: string;
+    events: string;
+    sessions: string;
+    finances: string;
+    warehouse: string;
+    fleet: string;
+    missions: string;
+    reputation: string;
+    blueprints: string;
+    loadout: string;
+    starmap: string;
+    places: string;
+    blackbox: string;
+    orescanner: string;
+    market: string;
+    tools: string;
+    settings: string;
+    about: string;
+  };
+  dashboard: {
+    financialNet: string;
+    flightSessions: string;
+    warehouse: string;
+    fleet: string;
+    itemsStored: string;
+    shipsInService: string;
+    flightDeck: string;
+    flightDeckSub: string;
+    liveEvents: string;
+    liveEventsSub: string;
+    currentShip: string;
+    currentLocation: string;
+    currentJurisdiction: string;
+    safeZone: string;
+    activeContract: string;
+    noEventsYet: string;
+  };
+}

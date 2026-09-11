@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import {
   FolderSync,
   HardDrive,
-  Play,
   RefreshCw,
-  Square,
   Monitor,
   Radio,
   Sparkles,
 } from 'lucide-react';
 import { bridge, AppStatus } from '../services/photinoBridge';
+import { useI18n } from '../i18n';
 
 interface MasterHeaderProps {
   status: AppStatus | null;
@@ -18,7 +17,6 @@ interface MasterHeaderProps {
   loading: boolean;
   onRefresh: () => void;
   onTriggerScan: () => void;
-  onToggleWatcher: () => void;
 }
 
 export const MasterHeader: React.FC<MasterHeaderProps> = ({
@@ -28,9 +26,8 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
   loading,
   onRefresh,
   onTriggerScan,
-  onToggleWatcher,
 }) => {
-  const [currentLang, setCurrentLang] = useState<'de' | 'en'>('de');
+  const { locale, setLocale, t } = useI18n();
   const [overlayFeedback, setOverlayFeedback] = useState<string | null>(null);
 
   const handleOpenOverlay = async (type: 'mini' | 'rs') => {
@@ -82,16 +79,16 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
                 : 'bg-slate-500'
             }`}
           />
-          <span>{isGameRunning ? '● LIVE GAME' : '○ OFFLINE'}</span>
+          <span>{isGameRunning ? t('header.liveGame') : t('header.offline')}</span>
         </div>
 
         {/* Trenner */}
         <span className="text-slate-700 hidden sm:inline">|</span>
 
         {/* Aktiver Logpfad */}
-        <div className="hidden md:flex items-center gap-1.5 font-mono text-[11px] text-slate-400 truncate max-w-sm" title={status?.logPath || 'Standardpfad'}>
+        <div className="hidden md:flex items-center gap-1.5 font-mono text-[11px] text-slate-400 truncate max-w-sm" title={status?.logPath || t('header.noLogPath')}>
           <HardDrive className="w-3.5 h-3.5 text-cyan-400/80 shrink-0" />
-          <span className="truncate">{status?.logPath || 'Kein Logpfad gewählt'}</span>
+          <span className="truncate">{status?.logPath || t('header.noLogPath')}</span>
         </div>
       </div>
 
@@ -103,7 +100,7 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
         </div>
       )}
 
-      {/* Rechte Seite: Overlays, Sprache, Watcher & Aktionen */}
+      {/* Rechte Seite: Overlays, Sprache & Aktionen */}
       <div className="flex items-center gap-2.5 shrink-0">
         {/* Overlay Schnellstarter */}
         <div className="flex items-center gap-1 bg-[#06101e] p-1 rounded-md border border-cyan-950/80">
@@ -113,7 +110,7 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
             title="In-Game Mini-HUD Overlay ein-/ausblenden"
           >
             <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden xl:inline text-[11px]">Mini-HUD</span>
+            <span className="hidden xl:inline text-[11px]">{t('header.miniHud')}</span>
           </button>
           <button
             onClick={() => handleOpenOverlay('rs')}
@@ -121,16 +118,16 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
             title="RS Signal Decoder HUD Overlay ein-/ausblenden"
           >
             <Radio className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden xl:inline text-[11px]">RS-Overlay</span>
+            <span className="hidden xl:inline text-[11px]">{t('header.rsOverlay')}</span>
           </button>
         </div>
 
         {/* Globaler Sprachwähler mit Vektorflaggen */}
         <div className="flex items-center bg-[#06101e] border border-cyan-950/80 rounded-md p-0.5">
           <button
-            onClick={() => setCurrentLang('de')}
+            onClick={() => setLocale('de')}
             className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition cursor-pointer ${
-              currentLang === 'de'
+              locale === 'de'
                 ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/50 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -146,9 +143,9 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setCurrentLang('en')}
+            onClick={() => setLocale('en')}
             className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition cursor-pointer ${
-              currentLang === 'en'
+              locale === 'en'
                 ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/50 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -167,44 +164,21 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
           </button>
         </div>
 
-        {/* Watcher Status & Toggle */}
-        <button
-          onClick={onToggleWatcher}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded border transition-all cursor-pointer ${
-            status?.isLiveWatching
-              ? 'border-amber-500/50 bg-amber-950/30 text-amber-300 hover:bg-amber-900/40 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-              : 'border-emerald-500/50 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
-          }`}
-          title={status?.isLiveWatching ? 'Echtzeit-Log-Überwachung pausieren' : 'Echtzeit-Log-Überwachung starten'}
-        >
-          {status?.isLiveWatching ? (
-            <>
-              <Square className="w-3 h-3 fill-current" />
-              <span>Stopp</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-3 h-3 fill-current" />
-              <span>Watcher</span>
-            </>
-          )}
-        </button>
-
         {/* Scan Button */}
         <button
           onClick={onTriggerScan}
           disabled={isScanning}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded border border-cyan-500/50 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/40 transition-all cursor-pointer disabled:opacity-50"
-          title="Verzeichnis nach neuen Game.log Dateien scannen"
+          title={t('header.scanTooltip')}
         >
           <FolderSync className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">{isScanning ? 'Scanne...' : 'Scan'}</span>
+          <span className="hidden sm:inline">{isScanning ? t('common.scanning') : t('common.scan')}</span>
         </button>
 
         {/* Refresh Button */}
         <button
           onClick={onRefresh}
-          title="Daten neu laden"
+          title={t('header.refreshTooltip')}
           className="p-1.5 rounded border border-slate-800 hover:border-cyan-800 bg-[#06101e] text-slate-400 hover:text-cyan-300 transition cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />

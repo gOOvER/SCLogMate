@@ -63,6 +63,8 @@ interface SidebarProps {
   liveEventCount?: number;
 }
 
+import { useI18n } from '../i18n';
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
@@ -71,48 +73,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
   warehouseCount,
   liveEventCount,
 }) => {
+  const { t } = useI18n();
+
   const navGroups: NavGroup[] = [
     {
-      title: 'Zentrale & Echtzeit',
+      title: t('nav.categoryCore'),
       items: [
-        { id: 'dashboard', label: 'Übersicht', icon: Activity },
-        { id: 'events', label: 'Chronik / Events', icon: Scroll, badge: liveEventCount },
-        { id: 'sessions', label: 'Flugsitzungen', icon: Layers },
+        { id: 'dashboard', label: t('nav.dashboard'), icon: Activity },
+        { id: 'events', label: t('nav.events'), icon: Scroll, badge: liveEventCount },
+        { id: 'sessions', label: t('nav.sessions'), icon: Layers },
       ],
     },
     {
-      title: 'Wirtschaft & Besitz',
+      title: t('nav.categoryEngineering'),
       items: [
-        { id: 'finances', label: 'Finanzen & Saldo', icon: Coins },
-        { id: 'warehouse', label: 'Lager & Standorte', icon: Box, badge: warehouseCount },
-        { id: 'fleet', label: 'Flotte & Schiffe', icon: Rocket },
-        { id: 'market', label: 'Handelsmarkt (UEX)', icon: ShoppingBag },
+        { id: 'finances', label: t('nav.finances'), icon: Coins },
+        { id: 'warehouse', label: t('nav.warehouse'), icon: Box, badge: warehouseCount },
+        { id: 'fleet', label: t('nav.fleet'), icon: Rocket },
+        { id: 'market', label: t('nav.market'), icon: ShoppingBag },
+        { id: 'blueprints', label: t('nav.blueprints'), icon: FileCode2 },
+        { id: 'loadout', label: t('nav.loadout'), icon: Shield },
       ],
     },
     {
-      title: 'Aktivitäten & Ränge',
+      title: t('nav.categoryUniverse'),
       items: [
-        { id: 'missions', label: 'Aufträge / Verträge', icon: Target },
-        { id: 'reputation', label: 'Ansehen & Fraktionen', icon: Award },
-        { id: 'blueprints', label: 'Baupläne (Crafting)', icon: FileCode2 },
-        { id: 'loadout', label: 'Ausrüstung & Loadout', icon: Shield },
+        { id: 'missions', label: t('nav.missions'), icon: Target },
+        { id: 'reputation', label: t('nav.reputation'), icon: Award },
+        { id: 'starmap', label: t('nav.starmap'), icon: Radar },
+        { id: 'places', label: t('nav.places'), icon: Compass },
+        { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
+        { id: 'orescanner', label: t('nav.orescanner'), icon: Pickaxe },
       ],
     },
     {
-      title: 'Erkundung & Analyse',
+      title: t('nav.categorySystem'),
       items: [
-        { id: 'starmap', label: 'Sternenkarte', icon: Radar },
-        { id: 'places', label: 'Orte & Stationen', icon: Compass },
-        { id: 'blackbox', label: 'Flugschreiber', icon: MapPin },
-        { id: 'orescanner', label: 'RS Signal Scanner', icon: Pickaxe },
-      ],
-    },
-    {
-      title: 'System & Wartung',
-      items: [
-        { id: 'tools', label: 'Werkzeuge & Cache', icon: Wrench },
-        { id: 'settings', label: 'Einstellungen', icon: Settings },
-        { id: 'about', label: 'Über SCLogMate', icon: Info },
+        { id: 'tools', label: t('nav.tools'), icon: Wrench },
+        { id: 'settings', label: t('nav.settings'), icon: Settings },
+        { id: 'about', label: t('nav.about'), icon: Info },
       ],
     },
   ];

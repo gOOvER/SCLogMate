@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Full Reactive i18n System & Multi-Language Support (`frontend/src/i18n/`)**:
+  - Implemented a complete frontend internationalization engine supporting German (`de`) and English (`en`) with `localStorage` language persistence.
+  - Connected the Master Header vector flags (DE 🇩🇪 / EN 🇬🇧) to dynamically translate all top navigation tabs, group headers, 2-line HUD telemetry cards, session selector, and dashboard widgets instantly.
+- **Flight Deck Dashboard Modernization (`DashboardView.tsx`)**:
+  - Redesigned the start page to eliminate redundant session listings:
+    - Replaced the previous "Recent Sessions" list with a dedicated **Flight Deck & Live Telemetry** control card (active ship status, current location & armistice safety zone indicator, active mission preview with direct navigation links to Hangar, Starmap, and Missions).
+    - Expanded the **Live Event Feed** with categorized event entries, signed amounts, and direct navigation to the Chronik view.
+
+### Changed
+- **Master Header Cleanup (`MasterHeader.tsx`, `App.tsx`)**:
+  - Removed manual Stop/Watcher toggle button from the top master bar to align with SCLogMate RC2 architecture, which relies on fully automated `StarCitizen.exe` process tracking and `Game.log` streaming.
 - **RC2 UI/UX Alignment — Step 5: Fleet Registry & High-Density Ship Statistics (`FleetView.tsx`)**:
   - Refactored Fleet view (`FleetView.tsx`) with a high-density, multi-column Star Citizen hangar dashboard:
     - **Fleet KPI Summary Cards**: 4 top cards displaying total registered ship types, total flight sorties, successful Quantum Jumps, and estimated fleet net worth in aUEC.

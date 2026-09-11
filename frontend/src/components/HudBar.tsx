@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { HudTelemetry } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
+import { useI18n } from '../i18n';
 
 interface HudBarProps {
   telemetry: HudTelemetry;
@@ -28,6 +29,7 @@ export const HudBar: React.FC<HudBarProps> = ({
   onTriggerOcr,
   onToggleAutoOcr,
 }) => {
+  const { t } = useI18n();
   // Region Flag Helper
   const renderRegionFlag = (code: string) => {
     switch (code) {
@@ -71,7 +73,7 @@ export const HudBar: React.FC<HudBarProps> = ({
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              Pilot & Server
+              {t('hud.server')}
             </span>
 
             {/* Region & Ping Badge */}
@@ -108,7 +110,7 @@ export const HudBar: React.FC<HudBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-cyan-400" />
-                Standort
+                {t('hud.location')}
               </span>
 
               {/* System Pill */}
@@ -133,7 +135,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                 {telemetry.isArmistice ? (
                   <>
                     <Shield className="w-2.5 h-2.5 text-emerald-400" />
-                    <span>Schutzzone</span>
+                    <span>{t('hud.armistice')}</span>
                   </>
                 ) : (
                   <>
@@ -151,7 +153,7 @@ export const HudBar: React.FC<HudBarProps> = ({
               title="Auf der Sternenkarte anzeigen"
             >
               <Compass className="w-3 h-3" />
-              <span>Karte</span>
+              <span>{t('nav.starmap')}</span>
             </button>
           </div>
 
@@ -179,7 +181,7 @@ export const HudBar: React.FC<HudBarProps> = ({
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Rocket className="w-3 h-3 text-cyan-400" />
-              Schiff & Flotte
+              {t('hud.activeShip')}
             </span>
 
             {/* Quick Links Fleet & Wiki */}
@@ -189,7 +191,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-sky-300 hover:text-sky-200 bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 transition cursor-pointer"
                 title="Flottenübersicht & Hangar öffnen"
               >
-                <span>Flotte</span>
+                <span>{t('nav.fleet')}</span>
               </button>
               <a
                 href={`https://star-citizen.wiki/${encodeURIComponent(telemetry.shipName)}`}
@@ -224,7 +226,7 @@ export const HudBar: React.FC<HudBarProps> = ({
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <CreditCard className="w-3 h-3 text-cyan-400" />
-              Kontostand & Saldo
+              {t('hud.wallet')}
             </span>
 
             {/* Action Buttons: Auto-Sync & Scan */}
@@ -239,7 +241,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                 title="Automatischer mobiGlas Kontostand-Scan"
               >
                 <Zap className="w-2.5 h-2.5" />
-                <span>{telemetry.autoOcrEnabled ? 'Auto-Sync' : 'Manuell'}</span>
+                <span>{telemetry.autoOcrEnabled ? t('hud.autoSync') : 'Manuell'}</span>
               </button>
 
               <button
@@ -248,7 +250,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                 title="Kontostand per Test-Scan ablesen"
               >
                 <Sparkles className="w-2.5 h-2.5" />
-                <span>Scan</span>
+                <span>{t('common.scan')}</span>
               </button>
             </div>
           </div>
@@ -283,7 +285,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                 }`}
                 title="Netto-Saldo der Sitzung"
               >
-                <span>Netto:</span>
+                <span>{t('hud.profit')}:</span>
                 <span>{telemetry.sessionNet >= 0 ? '+' : ''}{formatAuec(telemetry.sessionNet)}</span>
               </div>
             </div>
@@ -296,7 +298,7 @@ export const HudBar: React.FC<HudBarProps> = ({
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Scroll className="w-3 h-3 text-cyan-400" />
-              Auftragsmanager
+              {t('hud.mission')}
             </span>
 
             <button
@@ -304,7 +306,7 @@ export const HudBar: React.FC<HudBarProps> = ({
               className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/60 transition cursor-pointer"
               title="Alle Aufträge & Verträge anzeigen"
             >
-              <span>Aufträge</span>
+              <span>{t('nav.missions')}</span>
             </button>
           </div>
 

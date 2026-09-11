@@ -134,18 +134,6 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const handleToggleWatcher = async () => {
-    if (!status) return;
-    try {
-      const res = await bridge.sendRequest<{ isLiveWatching: boolean }>('toggle_watcher', {
-        enable: !status.isLiveWatching,
-      });
-      setStatus((prev) => (prev ? { ...prev, isLiveWatching: res.isLiveWatching } : null));
-    } catch (err) {
-      console.error('Failed to toggle watcher:', err);
-    }
-  };
-
   const handleTriggerScan = async () => {
     try {
       setIsScanning(true);
@@ -205,7 +193,6 @@ export const App: React.FC = () => {
           loading={loading}
           onRefresh={loadData}
           onTriggerScan={handleTriggerScan}
-          onToggleWatcher={handleToggleWatcher}
         />
 
         {/* mobiGlas Session-Strip: Dropdown, Zeitspanne & HUD-Toggle */}
