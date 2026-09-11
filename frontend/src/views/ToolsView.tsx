@@ -16,10 +16,12 @@ import {
   Check,
   FolderOpen,
   Sparkles,
+  Wrench,
 } from 'lucide-react';
 import { bridge, ToolsStatusDto } from '../services/photinoBridge';
 
 export const ToolsView: React.FC = () => {
+  const [activeSubTab, setActiveSubTab] = useState<'maintenance' | 'backups'>('maintenance');
   const [status, setStatus] = useState<ToolsStatusDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -254,24 +256,55 @@ export const ToolsView: React.FC = () => {
           <button
             onClick={loadStatus}
             disabled={actionLoading !== null}
-            className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+            className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} />
             <span>Neu laden</span>
           </button>
-          <button
-            onClick={handleSaveUserCfg}
-            disabled={actionLoading !== null}
-            className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition"
-          >
-            <Save className="w-4 h-4" />
-            <span>user.cfg Speichern</span>
-          </button>
+          {activeSubTab === 'maintenance' && (
+            <button
+              onClick={handleSaveUserCfg}
+              disabled={actionLoading !== null}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>user.cfg Speichern</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Top Diagnostics & Cache Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Sub-Tab Navigation Bar */}
+      <div className="flex gap-2 border-b border-slate-800 pb-3">
+        <button
+          onClick={() => setActiveSubTab('maintenance')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            activeSubTab === 'maintenance'
+              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+              : 'bg-slate-900/40 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Wrench className="w-4 h-4" />
+          <span>System & Wartung</span>
+        </button>
+        <button
+          onClick={() => setActiveSubTab('backups')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            activeSubTab === 'backups'
+              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+              : 'bg-slate-900/40 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Key className="w-4 h-4" />
+          <span>Backups (ActionMaps)</span>
+        </button>
+      </div>
+
+      {/* SubTab 1: System & Wartung */}
+      {activeSubTab === 'maintenance' && (
+        <div className="space-y-6">
+          {/* Top Diagnostics & Cache Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Shader Cache Card */}
         <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
@@ -708,6 +741,102 @@ export const ToolsView: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
+  )}
+
+      {/* SubTab 2: Backups (ActionMaps & Keybinds) */}
+      {activeSubTab === 'backups' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <Key className="w-4 h-4" />
+                  <span>STAR CITIZEN ACTIONMAPS & KEYBIND-ARCHIV</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Sichert deine Steuerungsprofile (Tastatur, Maus, HOTAS, HOSAS, Rudder) vor großen Patches oder versehentlichem Überschreiben.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <span className="text-xs px-3 py-1 rounded-full bg-sky-950 text-sky-400 border border-sky-800 font-mono">
+                  {status?.keybindBackups?.length || 0} Gesicherte Profile
+                </span>
+              </div>
+            </div>
+
+            {/* Neues Backup anlegen */}
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-semibold text-slate-200">
+                Neues Keybind-Backup erstellen
+              </div>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="text"
+                  placeholder="Optionale Notiz (z. B. HOSAS Dual-Stick Alpha 4.8)..."
+                  value={backupNote}
+                  onChange={(e) => setBackupNote(e.target.value)}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                />
+                <button
+                  onClick={handleCreateBackup}
+                  disabled={actionLoading === 'backup'}
+                  className="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  {actionLoading === 'backup' ? 'Sichere...' : '+ Backup jetzt anlegen'}
+                </button>
+              </div>
+            </div>
+
+            {/* Backups List */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-slate-300">
+                Vorhandene Sicherungen
+              </div>
+              {status?.keybindBackups && status.keybindBackups.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {status.keybindBackups.map((b, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between transition group"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-9 h-9 rounded-lg bg-sky-950/80 border border-sky-800/60 flex items-center justify-center text-sky-400 shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-200 group-hover:text-sky-300 font-mono">
+                            {b}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            actionmaps.xml Sicherung
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">
+                        Aktiv gesichert
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic">
+                  Noch keine manuellen Keybind-Backups vorhanden. Klicke auf "+ Backup jetzt anlegen", um deine Belegungen vor Patches zu sichern.
+                </div>
+              )}
+            </div>
+
+            {/* Info Banner */}
+            <div className="p-4 rounded-xl bg-sky-950/20 border border-sky-900/30 flex items-start space-x-3 text-xs text-slate-400">
+              <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                Backups werden im Unterordner <code className="text-sky-300">USER\Client\0\Controls\Mappings\Backups</code> deiner Star Citizen Installation gespeichert und können jederzeit im Spiel unter "Options → Keybindings → Import Action Maps" wieder geladen werden.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

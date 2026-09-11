@@ -12,9 +12,7 @@ import { Sidebar, NavTabId } from './components/Sidebar';
 import { MasterHeader } from './components/MasterHeader';
 import { SessionBar } from './components/SessionBar';
 import { HudBar } from './components/HudBar';
-import { DashboardView } from './views/DashboardView';
 import { EventsView } from './views/EventsView';
-import { SessionsView } from './views/SessionsView';
 import { FinancesView } from './views/FinancesView';
 import { WarehouseView } from './views/WarehouseView';
 import { FleetView } from './views/FleetView';
@@ -30,15 +28,13 @@ import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
-import { PilotDossierModal } from './components/PilotDossierModal';
 import { DbUpdateModal } from './components/DbUpdateModal';
 import { HardDrive } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTabId>('events');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
-  const [isPilotDossierOpen, setIsPilotDossierOpen] = useState<boolean>(false);
   const [eventsSession, setEventsSession] = useState<string>('__live__');
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
@@ -163,9 +159,6 @@ export const App: React.FC = () => {
 
   const handleSelectTab = (tab: NavTabId) => {
     setActiveTab(tab);
-    if (tab === 'dashboard') {
-      handleSelectSession('__live__');
-    }
   };
 
   const handleTriggerScan = async () => {
@@ -232,15 +225,12 @@ export const App: React.FC = () => {
       {/* Main App Container */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher, Pilot Dossier */}
+        {/* Master Header: SC Prozess Status, Overlays, Sprache, Watcher */}
         <MasterHeader
           status={status}
           isGameRunning={telemetry.isGameRunning}
           isScanning={isScanning}
           loading={loading}
-          pilotName={telemetry.pilotName}
-          pilotAvatarUrl={telemetry.pilotAvatarUrl}
-          pilotTitle={telemetry.pilotTitle}
-          onOpenPilotDossier={() => setIsPilotDossierOpen(true)}
           onRefresh={loadData}
           onTriggerScan={handleTriggerScan}
           onReparseAll={handleReparseAll}
@@ -284,7 +274,7 @@ export const App: React.FC = () => {
           selectedSession={telemetry.selectedSession}
           sessionSpanText={telemetry.sessionSpanText}
           isHudCollapsed={isHudCollapsed}
-          isDashboard={activeTab === 'dashboard'}
+          isDashboard={false}
           activeSessionName={status?.activeSessionName || undefined}
           onSelectSession={handleSelectSession}
           onToggleHudCollapsed={() => setIsHudCollapsed(!isHudCollapsed)}
@@ -297,22 +287,11 @@ export const App: React.FC = () => {
             onNavigate={handleSelectTab}
             onTriggerOcr={handleTriggerOcr}
             onToggleAutoOcr={handleToggleAutoOcr}
-            onOpenPilotDossier={() => setIsPilotDossierOpen(true)}
           />
         )}
 
-        {/* View Body */}
+        {/* View Body: 16 Tabs exact matching Avalonia RC2 */}
         <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4">
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              status={status}
-              sessions={sessions}
-              events={events}
-              onNavigate={handleSelectTab}
-              warehouseTotal={warehouseTotal}
-            />
-          )}
-
           {activeTab === 'events' && (
             <EventsView
               initialSession={eventsSession}
@@ -320,32 +299,11 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'sessions' && (
-            <SessionsView
-              sessions={sessions}
-              selectedSession={telemetry.selectedSession}
-              onSelectSession={handleSelectSession}
-              onRefreshData={loadData}
-              onViewChronicle={(sessionName) => {
-                setEventsSession(sessionName);
-                handleSelectTab('events');
-              }}
-            />
-          )}
-
           {activeTab === 'finances' && <FinancesView />}
-
-          {activeTab === 'warehouse' && <WarehouseView />}
-
-          {activeTab === 'fleet' && <FleetView />}
 
           {activeTab === 'missions' && <MissionsView />}
 
           {activeTab === 'reputation' && <ReputationView />}
-
-          {activeTab === 'blueprints' && <BlueprintsView />}
-
-          {activeTab === 'loadout' && <LoadoutView />}
 
           {activeTab === 'starmap' && <StarmapView />}
 
@@ -357,19 +315,20 @@ export const App: React.FC = () => {
 
           {activeTab === 'market' && <MarketView />}
 
+          {activeTab === 'fleet' && <FleetView />}
+
+          {activeTab === 'warehouse' && <WarehouseView />}
+
+          {activeTab === 'blueprints' && <BlueprintsView />}
+
+          {activeTab === 'loadout' && <LoadoutView />}
+
           {activeTab === 'tools' && <ToolsView />}
 
           {activeTab === 'settings' && <SettingsView />}
 
           {activeTab === 'about' && <AboutView />}
         </main>
-
-        {/* Pilot Dossier Modal Popup */}
-        <PilotDossierModal
-          isOpen={isPilotDossierOpen}
-          pilotName={telemetry.pilotName}
-          onClose={() => setIsPilotDossierOpen(false)}
-        />
 
         {/* Database Migration & Scan Progress Modal */}
         <DbUpdateModal

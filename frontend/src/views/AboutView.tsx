@@ -26,7 +26,7 @@ export const AboutView: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-black text-white tracking-wider">SCLogMate</h1>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-sky-950 text-sky-400 border border-sky-800">
-                  v1.3.1 Photino Edition
+                  v1.0.0-rc2
                 </span>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
                   LIVE COMPANION

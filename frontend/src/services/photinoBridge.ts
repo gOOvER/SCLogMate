@@ -95,12 +95,24 @@ export interface SessionSummary {
 export interface LogEventItem {
   id: string;
   timestamp: string;
-  category: 'wallet' | 'combat' | 'mission' | 'ship' | 'location' | 'system';
+  category: string;
+  kind?: string;
+  kindText?: string;
+  icon?: string;
   title: string;
   description: string;
   amount?: number;
   ship?: string;
   rawText?: string;
+}
+
+export interface FinanceChartPointDto {
+  time: string;
+  balance: number;
+  income: number;
+  spend: number;
+  delta: number;
+  label: string;
 }
 
 export interface WarehouseItemDto {
@@ -131,6 +143,10 @@ export interface FinanceOverviewDto {
   totalIncome: number;
   totalSpend: number;
   totalNet: number;
+  liveBalance?: number;
+  totalCargoAuec?: number;
+  totalCargoScu?: number;
+  profitMargin?: number;
   sales: number;
   trade: number;
   missionsReward: number;
@@ -140,6 +156,8 @@ export interface FinanceOverviewDto {
   ledger: LogEventItem[];
   cargo: LogEventItem[];
   topExpenses: LogEventItem[];
+  topIncome?: LogEventItem[];
+  timelinePoints?: FinanceChartPointDto[];
 }
 
 export interface FleetStatDto {
@@ -380,7 +398,6 @@ export interface OcrTestResult {
 
 export interface SettingsDto {
   logPath?: string;
-  balance: number;
   autoOcrEnabled: boolean;
   uexApiKey?: string;
   overlayEnabled: boolean;
@@ -399,6 +416,21 @@ export interface SettingsDto {
   walletRegion?: ScanRegionDto | null;
   contractRegion?: ScanRegionDto | null;
   rsScanRegion?: ScanRegionDto | null;
+
+  // Wipe-Filter Settings
+  wipeFilterEnabled?: boolean;
+  wipeDateString?: string;
+  wipeFilterMoney?: boolean;
+  wipeFilterContracts?: boolean;
+  wipeFilterFleet?: boolean;
+  wipeFilterBlueprints?: boolean;
+
+  // General & System
+  selectedFontFamily?: string;
+  appLanguage?: string;
+  minimizeToTrayOnClose?: boolean;
+  autostartEnabled?: boolean;
+  debugMode?: boolean;
 }
 
 export interface DetectedPath {

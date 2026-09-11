@@ -129,6 +129,15 @@ public class LogEventDto
 
     [JsonPropertyName("rawText")]
     public string? RawText { get; set; }
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "System";
+
+    [JsonPropertyName("kindText")]
+    public string KindText { get; set; } = "";
+
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "❖";
 }
 
 public class HudTelemetryDto
@@ -226,6 +235,16 @@ public class WarehouseLocationDto
     public string Icon { get; set; } = "🪐";
 }
 
+public class FinanceChartPointDto
+{
+    [JsonPropertyName("time")] public string Time { get; set; } = "";
+    [JsonPropertyName("balance")] public long Balance { get; set; }
+    [JsonPropertyName("income")] public long Income { get; set; }
+    [JsonPropertyName("spend")] public long Spend { get; set; }
+    [JsonPropertyName("delta")] public long Delta { get; set; }
+    [JsonPropertyName("label")] public string Label { get; set; } = "";
+}
+
 public class FinanceOverviewDto
 {
     [JsonPropertyName("totalIncome")]
@@ -236,6 +255,18 @@ public class FinanceOverviewDto
 
     [JsonPropertyName("totalNet")]
     public long TotalNet { get; set; }
+
+    [JsonPropertyName("liveBalance")]
+    public long LiveBalance { get; set; }
+
+    [JsonPropertyName("totalCargoAuec")]
+    public long TotalCargoAuec { get; set; }
+
+    [JsonPropertyName("totalCargoScu")]
+    public long TotalCargoScu { get; set; }
+
+    [JsonPropertyName("profitMargin")]
+    public double ProfitMargin { get; set; }
 
     [JsonPropertyName("sales")]
     public long Sales { get; set; }
@@ -263,6 +294,12 @@ public class FinanceOverviewDto
 
     [JsonPropertyName("topExpenses")]
     public List<LogEventDto> TopExpenses { get; set; } = new();
+
+    [JsonPropertyName("topIncome")]
+    public List<LogEventDto> TopIncome { get; set; } = new();
+
+    [JsonPropertyName("timelinePoints")]
+    public List<FinanceChartPointDto> TimelinePoints { get; set; } = new();
 }
 
 public class FleetStatDto
@@ -583,7 +620,6 @@ public class ToolsStatusDto
 public class SettingsDto
 {
     [JsonPropertyName("logPath")] public string? LogPath { get; set; }
-    [JsonPropertyName("balance")] public long Balance { get; set; }
     [JsonPropertyName("autoOcrEnabled")] public bool AutoOcrEnabled { get; set; } = true;
     [JsonPropertyName("uexApiKey")] public string? UexApiKey { get; set; }
     [JsonPropertyName("overlayEnabled")] public bool OverlayEnabled { get; set; } = false;
@@ -602,6 +638,21 @@ public class SettingsDto
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
+
+    // RC2 Wipe Filter Settings
+    [JsonPropertyName("wipeFilterEnabled")] public bool WipeFilterEnabled { get; set; }
+    [JsonPropertyName("wipeDateString")] public string WipeDateString { get; set; } = "2026-05-15";
+    [JsonPropertyName("wipeFilterMoney")] public bool WipeFilterMoney { get; set; } = true;
+    [JsonPropertyName("wipeFilterContracts")] public bool WipeFilterContracts { get; set; } = true;
+    [JsonPropertyName("wipeFilterFleet")] public bool WipeFilterFleet { get; set; }
+    [JsonPropertyName("wipeFilterBlueprints")] public bool WipeFilterBlueprints { get; set; }
+
+    // General & System Settings
+    [JsonPropertyName("selectedFontFamily")] public string SelectedFontFamily { get; set; } = "Inter";
+    [JsonPropertyName("appLanguage")] public string AppLanguage { get; set; } = "Auto";
+    [JsonPropertyName("minimizeToTrayOnClose")] public bool MinimizeToTrayOnClose { get; set; } = true;
+    [JsonPropertyName("autostartEnabled")] public bool AutostartEnabled { get; set; }
+    [JsonPropertyName("debugMode")] public bool DebugMode { get; set; }
 }
 
 public class OcrRegionsConfigDto
@@ -728,11 +779,16 @@ public class PhotinoBridge
 
     private readonly OcrEngineService _ocrEngine = new();
     private readonly WalletCapture _walletCapture;
+    private readonly AuroraVoiceService _auroraService = new();
     private readonly NativeScanIndicator _walletScanIndicator = new("mobiGlas aUEC Scan", 0x22D3EE);
     private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
 
     public PhotinoBridge()
     {
+        var s = Settings.Load();
+        _auroraService.IsEnabled = s.AuroraIntegrationEnabled;
+        _auroraService.Volume = s.AuroraVolume;
+
         _walletCapture = new WalletCapture(
             _ocrEngine,
             () => Settings.Load().WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(),
@@ -873,23 +929,6 @@ public class PhotinoBridge
             {
                 case "get_status":
                     SendResponse(req.Id, "status_response", GetAppStatus());
-                    break;
-
-                case "get_pilot_dossier":
-                    string? dHandle = null;
-                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("handle", out var hProp))
-                    {
-                        dHandle = hProp.GetString();
-                    }
-                    if (string.IsNullOrWhiteSpace(dHandle) || dHandle == "—")
-                    {
-                        if (_parser.Meta.TryGetValue("character", out var cName) && !string.IsNullOrWhiteSpace(cName))
-                            dHandle = cName;
-                        else
-                            dHandle = Database.GetLatestPilotName() ?? "gOOvER";
-                    }
-                    var profile = await CitizenProfileService.GetProfileAsync(dHandle);
-                    SendResponse(req.Id, "pilot_dossier_response", profile);
                     break;
 
                 case "get_sessions":
@@ -1079,7 +1118,12 @@ public class PhotinoBridge
                 case "save_settings":
                     if (req.Payload.HasValue)
                     {
-                        var settingsDto = JsonSerializer.Deserialize<SettingsDto>(req.Payload.Value.GetRawText(), JsonOpts);
+                        var targetEl = req.Payload.Value;
+                        if (targetEl.ValueKind == JsonValueKind.Object && targetEl.TryGetProperty("settings", out var sProp))
+                        {
+                            targetEl = sProp;
+                        }
+                        var settingsDto = JsonSerializer.Deserialize<SettingsDto>(targetEl.GetRawText(), JsonOpts);
                         if (settingsDto != null)
                         {
                             SaveSettingsData(settingsDto);
@@ -1087,6 +1131,78 @@ public class PhotinoBridge
                     }
                     SendResponse(req.Id, "save_settings_response", GetSettingsData());
                     Broadcast("STATUS_UPDATE", GetAppStatus());
+                    break;
+
+                case "simulate_event":
+                    if (req.Payload.HasValue)
+                    {
+                        string evtType = "";
+                        string simParam = "";
+                        if (req.Payload.Value.TryGetProperty("eventType", out var etProp)) evtType = etProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("param", out var pProp)) simParam = pProp.GetString() ?? "";
+
+                        switch (evtType.ToLowerInvariant())
+                        {
+                            case "armistice_enter":
+                                _auroraService.ProcessLiveLine(@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Schutzzone - Kampfhandlung untersagt!: "" [9001]");
+                                break;
+                            case "armistice_leave":
+                                _auroraService.ProcessLiveLine(@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Schutzzone verlassen: "" [9002]");
+                                break;
+                            case "ship_join":
+                                string sName = string.IsNullOrWhiteSpace(simParam) ? "Drake Cutlass Black" : simParam;
+                                _auroraService.ProcessLiveLine($@"<2026-09-02T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification ""Du bist Kanal [ {sName} ] beigetreten""");
+                                break;
+                            case "blueprint_found":
+                                _auroraService.OnBlueprintLearned("Pyro RYT Multi-Tool");
+                                break;
+                            case "quantum_arrival":
+                                _auroraService.OnQuantumArrival();
+                                break;
+                            case "server_error":
+                                _auroraService.OnServerError();
+                                break;
+                            case "player_death":
+                                _auroraService.OnPlayerDeath();
+                                break;
+                        }
+                    }
+                    SendResponse(req.Id, "simulate_event_response", new { success = true });
+                    break;
+
+                case "dump_debug_state":
+                    {
+                        var curS = Settings.Load();
+                        Logger.Log("══════════════════════════════════════════════════════════");
+                        Logger.Log($"[DEBUG DUMP] Zeitstempel: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        Logger.Log($"[DEBUG DUMP] Debug-Modus: {curS.DebugMode}");
+                        Logger.Log($"[DEBUG DUMP] Sprache: {curS.AppLanguage}");
+                        Logger.Log($"[DEBUG DUMP] LogPath: {_currentLogPath} (Existiert: {File.Exists(_currentLogPath)})");
+                        Logger.Log($"[DEBUG DUMP] Aurora Voice: Installiert={_auroraService.IsInstalled}, Aktiv={_auroraService.IsEnabled}, Vol={_auroraService.Volume}%");
+                        Logger.Log($"[DEBUG DUMP] Windows OCR: AutoSync={curS.AutoOcrEnabled}");
+                        Logger.Log($"[DEBUG DUMP] Wipe-Filter: Aktiv={curS.WipeFilterEnabled}, Datum={curS.WipeDateString}");
+                        Logger.Log("══════════════════════════════════════════════════════════");
+                        string dbgPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate", "SCLogMate.debug.log");
+                        SendResponse(req.Id, "dump_debug_state_response", new { success = true, logPath = dbgPath });
+                    }
+                    break;
+
+                case "clear_debug_log":
+                    {
+                        try
+                        {
+                            var dpath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate", "SCLogMate.debug.log");
+                            if (File.Exists(dpath))
+                            {
+                                File.WriteAllText(dpath, $"[{DateTime.Now:HH:mm:ss}] [DEBUG] Logdatei zurückgesetzt.\n");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("ClearDebugLog", ex);
+                        }
+                        SendResponse(req.Id, "clear_debug_log_response", new { success = true });
+                    }
                     break;
 
                 case "get_ocr_regions":
@@ -1794,27 +1910,10 @@ public class PhotinoBridge
             }
         }
 
-        string? pilotAvatarUrl = null;
-        string? pilotTitle = null;
-        string? pilotOrgName = null;
-        if (!string.IsNullOrWhiteSpace(pilot) && pilot != "—" && pilot != "Kein Pilot erkannt")
-        {
-            var cachedProfile = CitizenProfileService.GetCached(pilot);
-            if (cachedProfile != null)
-            {
-                pilotAvatarUrl = cachedProfile.AvatarUrl;
-                pilotTitle = cachedProfile.Title;
-                pilotOrgName = cachedProfile.OrgName;
-            }
-        }
-
         return new HudTelemetryDto
         {
             IsGameRunning = isGameRunning,
             PilotName = !string.IsNullOrWhiteSpace(pilot) ? pilot : "Kein Pilot erkannt",
-            PilotAvatarUrl = pilotAvatarUrl,
-            PilotTitle = pilotTitle,
-            PilotOrgName = pilotOrgName,
             ServerRegionCode = regionCode,
             ServerRegionName = regionName,
             ServerRegionFlag = regionFlag,
@@ -1975,16 +2074,38 @@ public class PhotinoBridge
         return list;
     }
 
+    private static readonly Dictionary<string, HashSet<EventKind>?> Rc2FilterMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Alle"] = null,
+        ["Geld"] = new() { EventKind.TransferIn, EventKind.TransferOut, EventKind.MissionReward,
+                           EventKind.Purchase, EventKind.Sale, EventKind.Trade, EventKind.Offer, EventKind.Fine, EventKind.Maintenance },
+        ["Aufträge"] = new() { EventKind.Mission, EventKind.MissionDone, EventKind.MissionTaken },
+        ["Baupläne"] = new() { EventKind.Blueprint },
+        ["Schiffe"] = new() { EventKind.Vehicle, EventKind.Quantum, EventKind.ShipLoss },
+        ["Orte"] = new() { EventKind.Location, EventKind.Jurisdiction, EventKind.Hangar },
+        ["Crew"] = new() { EventKind.Party, EventKind.Friend },
+        ["Loot"] = new() { EventKind.Loot },
+        ["Sonst"] = new() { EventKind.MedBed, EventKind.Death, EventKind.Impound,
+                            EventKind.Loadout, EventKind.Entitlement, EventKind.Inventory, EventKind.Gear, EventKind.Kill,
+                            EventKind.Crime, EventKind.Refinery, EventKind.Injury, EventKind.Crash, EventKind.SessionChange },
+    };
+
     private List<LogEventDto> GetEvents(string? sessionFilter, string? categoryFilter, string? searchQuery, int limit, int offset)
     {
+        HashSet<EventKind>? allowedKinds = null;
+        if (!string.IsNullOrWhiteSpace(categoryFilter) && !categoryFilter.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            if (Rc2FilterMap.TryGetValue(categoryFilter, out var k)) allowedKinds = k;
+        }
+
         if (sessionFilter == "__live__" || (string.IsNullOrEmpty(sessionFilter) && _selectedSession == "__live__"))
         {
             lock (_liveEventsLock)
             {
                 var liveQuery = _liveEvents.AsEnumerable();
-                if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "all")
+                if (allowedKinds != null)
                 {
-                    liveQuery = liveQuery.Where(e => e.Category.Equals(categoryFilter, StringComparison.OrdinalIgnoreCase));
+                    liveQuery = liveQuery.Where(e => Enum.TryParse<EventKind>(e.Kind, out var ek) && allowedKinds.Contains(ek));
                 }
                 if (!string.IsNullOrWhiteSpace(searchQuery))
                 {
@@ -2001,9 +2122,9 @@ public class PhotinoBridge
         var rawEvents = Database.LoadRecentEvents(2500, sessionFilter == "__all__" ? null : sessionFilter);
         var query = rawEvents.AsEnumerable();
 
-        if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "all")
+        if (allowedKinds != null)
         {
-            query = query.Where(e => MapCategory(e.Kind).Equals(categoryFilter, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(e => allowedKinds.Contains(e.Kind));
         }
 
         if (!string.IsNullOrWhiteSpace(searchQuery))
@@ -2023,6 +2144,9 @@ public class PhotinoBridge
                 Id = Guid.NewGuid().ToString("N"),
                 Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm:ss"),
                 Category = MapCategory(e.Kind),
+                Kind = e.Kind.ToString(),
+                KindText = e.KindText,
+                Icon = e.Icon,
                 Title = e.KindText,
                 Description = e.Detail ?? e.KindText,
                 Amount = e.Amount != 0 ? e.Amount : null,
@@ -2037,11 +2161,58 @@ public class PhotinoBridge
         Database.EnsureInitialized();
         var agg = Database.Aggregate(since: null, filterMoney: true, filterContracts: true, filterFleet: false);
 
-        var financeEvents = Database.AllFinanceEvents().Take(100).Select(e => new LogEventDto
+        var allFinance = Database.AllFinanceEvents();
+        var sorted = allFinance.OrderBy(x => x.Time).ToList();
+
+        long runningInc = 0;
+        long runningSpd = 0;
+        long runningNet = 0;
+        long totalTradeAuec = 0;
+        var timelinePts = new List<FinanceChartPointDto>();
+
+        if (sorted.Count > 0)
+        {
+            timelinePts.Add(new FinanceChartPointDto
+            {
+                Time = sorted[0].Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+                Balance = 0,
+                Income = 0,
+                Spend = 0,
+                Delta = 0,
+                Label = "Start"
+            });
+        }
+
+        foreach (var e in sorted)
+        {
+            if (e.Amount >= 0) runningInc += e.Amount;
+            else runningSpd += Math.Abs(e.Amount);
+            runningNet = runningInc - runningSpd;
+
+            if (e.Kind == EventKind.Trade)
+            {
+                totalTradeAuec += Math.Abs(e.Amount);
+            }
+
+            timelinePts.Add(new FinanceChartPointDto
+            {
+                Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+                Balance = runningNet,
+                Income = runningInc,
+                Spend = runningSpd,
+                Delta = e.Amount,
+                Label = $"{e.KindText}: {e.Detail}"
+            });
+        }
+
+        var financeEvents = sorted.Take(150).Select(e => new LogEventDto
         {
             Id = Guid.NewGuid().ToString("N"),
             Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
             Category = MapCategory(e.Kind),
+            Kind = e.Kind.ToString(),
+            KindText = e.KindText,
+            Icon = e.Icon,
             Title = e.KindText,
             Description = e.Detail ?? e.KindText,
             Amount = e.Amount,
@@ -2053,28 +2224,57 @@ public class PhotinoBridge
             Id = Guid.NewGuid().ToString("N"),
             Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
             Category = "wallet",
+            Kind = e.Kind.ToString(),
+            KindText = e.KindText,
+            Icon = e.Icon,
             Title = e.KindText,
             Description = e.Detail ?? e.KindText,
             Amount = e.Amount,
             Ship = e.Ship,
         }).ToList();
 
-        var topMoney = Database.TopMoney(15).Select(e => new LogEventDto
+        var topMoney = sorted.Where(e => e.Amount < 0).OrderBy(e => e.Amount).Take(15).Select(e => new LogEventDto
         {
             Id = Guid.NewGuid().ToString("N"),
             Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
             Category = "wallet",
+            Kind = e.Kind.ToString(),
+            KindText = e.KindText,
+            Icon = e.Icon,
             Title = e.KindText,
             Description = e.Detail ?? e.KindText,
             Amount = e.Amount,
             Ship = e.Ship,
         }).ToList();
 
+        var topIncome = sorted.Where(e => e.Amount > 0).OrderByDescending(e => e.Amount).Take(15).Select(e => new LogEventDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Timestamp = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            Category = "wallet",
+            Kind = e.Kind.ToString(),
+            KindText = e.KindText,
+            Icon = e.Icon,
+            Title = e.KindText,
+            Description = e.Detail ?? e.KindText,
+            Amount = e.Amount,
+            Ship = e.Ship,
+        }).ToList();
+
+        long totInc = agg.In + agg.Reward + agg.Sales + agg.Trade;
+        long totSpd = agg.Out + agg.Purchases;
+        long totNet = totInc - totSpd;
+        double profitMargin = totInc > 0 ? (double)totNet / totInc * 100.0 : 0.0;
+
         return new FinanceOverviewDto
         {
-            TotalIncome = agg.In + agg.Reward + agg.Sales + agg.Trade,
-            TotalSpend = agg.Out + agg.Purchases,
-            TotalNet = (agg.In + agg.Reward + agg.Sales + agg.Trade) - (agg.Out + agg.Purchases),
+            TotalIncome = totInc,
+            TotalSpend = totSpd,
+            TotalNet = totNet,
+            LiveBalance = Settings.Load().Balance > 0 ? Settings.Load().Balance : totNet,
+            TotalCargoAuec = totalTradeAuec,
+            TotalCargoScu = 0,
+            ProfitMargin = Math.Round(profitMargin, 1),
             Sales = agg.Sales,
             Trade = agg.Trade,
             MissionsReward = agg.Reward,
@@ -2084,6 +2284,8 @@ public class PhotinoBridge
             Ledger = financeEvents,
             Cargo = cargoEvents,
             TopExpenses = topMoney,
+            TopIncome = topIncome,
+            TimelinePoints = timelinePts,
         };
     }
 
@@ -2481,25 +2683,6 @@ public class PhotinoBridge
                         }
                         Broadcast("LIVE_EVENTS_LOADED", snapshot);
                         Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
-
-                        if (_parser.Meta.TryGetValue("character", out var charName) && !string.IsNullOrWhiteSpace(charName))
-                        {
-                            Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    await CitizenProfileService.GetProfileAsync(charName);
-                                    if (_isWebviewReady)
-                                    {
-                                        Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Error("PhotinoBridge.GetProfileAsync", ex);
-                                }
-                            });
-                        }
                     }
                 }
                 catch (Exception ex)
@@ -2879,7 +3062,6 @@ public class PhotinoBridge
         return new SettingsDto
         {
             LogPath = s.LogPath ?? _currentLogPath,
-            Balance = s.Balance,
             AutoOcrEnabled = s.AutoOcrEnabled,
             UexApiKey = s.UexApiKey,
             OverlayEnabled = s.OverlayEnabled,
@@ -2897,7 +3079,20 @@ public class PhotinoBridge
             RsTargetSoundEnabled = s.RsTargetSoundEnabled,
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
-            RsScanRegion = s.RsScanRegion
+            RsScanRegion = s.RsScanRegion,
+
+            WipeFilterEnabled = s.WipeFilterEnabled,
+            WipeDateString = s.WipeDateString,
+            WipeFilterMoney = s.WipeFilterMoney,
+            WipeFilterContracts = s.WipeFilterContracts,
+            WipeFilterFleet = s.WipeFilterFleet,
+            WipeFilterBlueprints = s.WipeFilterBlueprints,
+
+            SelectedFontFamily = s.SelectedFontFamily,
+            AppLanguage = s.AppLanguage,
+            MinimizeToTrayOnClose = s.MinimizeToTrayOnClose,
+            AutostartEnabled = s.AutostartEnabled,
+            DebugMode = s.DebugMode,
         };
     }
 
@@ -2907,7 +3102,6 @@ public class PhotinoBridge
         bool pathChanged = !string.Equals(s.LogPath, dto.LogPath, StringComparison.OrdinalIgnoreCase);
 
         s.LogPath = dto.LogPath;
-        s.Balance = dto.Balance;
         s.AutoOcrEnabled = dto.AutoOcrEnabled;
         s.UexApiKey = dto.UexApiKey;
         s.OverlayEnabled = dto.OverlayEnabled;
@@ -2921,11 +3115,26 @@ public class PhotinoBridge
         s.ToastShipDestructionEnabled = dto.ToastShipDestructionEnabled;
         s.AuroraIntegrationEnabled = dto.AuroraIntegrationEnabled;
         s.AuroraVolume = dto.AuroraVolume;
+        _auroraService.IsEnabled = dto.AuroraIntegrationEnabled;
+        _auroraService.Volume = dto.AuroraVolume;
         s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
         s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
         s.WalletRegion = dto.WalletRegion;
         s.ContractRegion = dto.ContractRegion;
         s.RsScanRegion = dto.RsScanRegion;
+
+        s.WipeFilterEnabled = dto.WipeFilterEnabled;
+        s.WipeDateString = dto.WipeDateString;
+        s.WipeFilterMoney = dto.WipeFilterMoney;
+        s.WipeFilterContracts = dto.WipeFilterContracts;
+        s.WipeFilterFleet = dto.WipeFilterFleet;
+        s.WipeFilterBlueprints = dto.WipeFilterBlueprints;
+
+        s.SelectedFontFamily = dto.SelectedFontFamily;
+        s.AppLanguage = dto.AppLanguage;
+        s.MinimizeToTrayOnClose = dto.MinimizeToTrayOnClose;
+        s.AutostartEnabled = dto.AutostartEnabled;
+        s.DebugMode = dto.DebugMode;
 
         Settings.Save(s);
 
@@ -3027,6 +3236,7 @@ public class PhotinoBridge
             if (isLive)
             {
                 _walletCapture.ProcessLine(rawLine);
+                _auroraService.ProcessLiveLine(rawLine);
             }
             var entry = _parser.Feed(rawLine);
             if (entry == null) return;

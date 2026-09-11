@@ -1,36 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { bridge, FinanceOverviewDto } from '../services/photinoBridge';
 import {
   Coins,
   CreditCard,
   Package,
-  PlusCircle,
   RefreshCw,
   TrendingDown,
   TrendingUp,
-  Wrench,
-  Fuel,
-  Crosshair,
-  Timer,
-  Box,
-  HeartPulse,
-  ShoppingCart,
   Search,
-  CheckCircle2,
+  Copy,
+  Check,
+  Fuel,
+  Wrench,
+  Rocket,
+  Shield,
+  ShoppingCart,
+  Scale,
+  Send,
+  HeartPulse,
 } from 'lucide-react';
 
 export const FinancesView: React.FC = () => {
   const [data, setData] = useState<FinanceOverviewDto | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'cargo' | 'topExpenses' | 'newExpense'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>('overview');
   const [loading, setLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
+  const [copiedDiscord, setCopiedDiscord] = useState<boolean>(false);
 
-  // Formular-State für manuelle Ausgaben
-  const [manualCategory, setManualCategory] = useState<string>('🔧 Reparatur & Wartung');
-  const [manualAmount, setManualAmount] = useState<string>('');
-  const [manualNote, setManualNote] = useState<string>('');
-  const [manualLocation, setManualLocation] = useState<string>('Port Tressler');
-  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+  // Chart Controls
+  const [chartMode, setChartMode] = useState<'cumulative' | 'delta'>('cumulative');
 
   const fetchFinance = async () => {
     try {
@@ -46,7 +44,6 @@ export const FinancesView: React.FC = () => {
 
   useEffect(() => {
     fetchFinance();
-
     const unbind = bridge.on<FinanceOverviewDto>('finance_response', (newData) => {
       setData(newData);
     });
@@ -58,93 +55,156 @@ export const FinancesView: React.FC = () => {
     return new Intl.NumberFormat('de-DE').format(num);
   };
 
-  const handleBookExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const rawNum = manualAmount.replace(/\./g, '').replace(/,/g, '').trim();
-    const parsed = parseInt(rawNum, 10);
-    if (isNaN(parsed) || parsed <= 0) return;
+  const handleCopyDiscord = () => {
+    if (!data) return;
+    const income = formatNumber(data.totalIncome);
+    const spend = formatNumber(data.totalSpend);
+    const net = formatNumber(data.totalNet);
+    const sign = data.totalNet >= 0 ? '+' : '';
+    const text = `**📊 SCLogMate Finanzbericht**
+> ↗ Einnahmen: \`${income} aUEC\`
+> ↘ Ausgaben: \`${spend} aUEC\`
+> 💰 Bilanz: \`${sign}${net} aUEC\` (${data.profitMargin}% Marge)
+> 📦 Handelsvolumen: \`${formatNumber(data.totalCargoAuec)} aUEC\``;
 
-    try {
-      await bridge.sendRequest('record_expense', {
-        category: manualCategory,
-        note: manualNote || manualCategory,
-        amount: parsed,
-        location: manualLocation || '—',
-      });
-      setBookingSuccess(`✓ ${formatNumber(parsed)} aUEC erfolgreich als "${manualCategory}" verbucht!`);
-      setManualAmount('');
-      setManualNote('');
-      fetchFinance();
-      setTimeout(() => setBookingSuccess(null), 3500);
-    } catch (err) {
-      console.error('Failed to book expense:', err);
-    }
+    navigator.clipboard.writeText(text);
+    setCopiedDiscord(true);
+    setTimeout(() => setCopiedDiscord(false), 2500);
   };
 
-  // Gewinnmarge berechnen
-  const marginPercent = data && data.totalIncome > 0
-    ? Math.round((data.totalNet / data.totalIncome) * 100)
-    : 0;
+  // Filtered ledger
+  const filteredLedger = useMemo(() => {
+    return (data?.ledger || []).filter((item) => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        (item.title && item.title.toLowerCase().includes(s)) ||
+        (item.description && item.description.toLowerCase().includes(s)) ||
+        (item.ship && item.ship.toLowerCase().includes(s))
+      );
+    });
+  }, [data?.ledger, search]);
 
-  // Dummy / generierte Kurvenpunkte für das SVG Sci-Fi Verlaufs-Chart
-  const chartPoints = [
-    { x: 20, y: 110, val: '2.100.000' },
-    { x: 90, y: 95, val: '2.250.000' },
-    { x: 160, y: 115, val: '2.050.000' },
-    { x: 230, y: 75, val: '2.400.000' },
-    { x: 300, y: 85, val: '2.320.000' },
-    { x: 370, y: 45, val: '2.680.000' },
-    { x: 440, y: 60, val: '2.550.000' },
-    { x: 510, y: 30, val: '2.850.000' },
-    { x: 580, y: 20, val: '2.970.000' },
-  ];
+  // Spending categories aggregation
+  const spendingCategories = useMemo(() => {
+    if (!data?.ledger) return [];
+    const catMap: Record<string, { label: string; icon: any; amount: number; count: number; color: string }> = {
+      fuel: { label: 'Treibstoff (Hydrogen/QT)', icon: Fuel, amount: 0, count: 0, color: 'text-amber-400 bg-amber-500' },
+      repair: { label: 'Reparatur & Service', icon: Wrench, amount: 0, count: 0, color: 'text-orange-400 bg-orange-500' },
+      ship: { label: 'Schiffe (Kauf/Miete/Claim)', icon: Rocket, amount: 0, count: 0, color: 'text-sky-400 bg-sky-500' },
+      gear: { label: 'Waffen & Ausrüstung', icon: Shield, amount: 0, count: 0, color: 'text-purple-400 bg-purple-500' },
+      cargo: { label: 'Fracht- & Rohstoffeinkauf', icon: ShoppingCart, amount: 0, count: 0, color: 'text-emerald-400 bg-emerald-500' },
+      fine: { label: 'Strafen & Bußgelder', icon: Scale, amount: 0, count: 0, color: 'text-rose-400 bg-rose-500' },
+      transfer: { label: 'Überweisungen', icon: Send, amount: 0, count: 0, color: 'text-cyan-400 bg-cyan-500' },
+      med: { label: 'MedBed & Behandlung', icon: HeartPulse, amount: 0, count: 0, color: 'text-red-400 bg-red-500' },
+    };
 
-  const svgPathD = chartPoints.reduce(
-    (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
-    ''
-  );
-  const svgAreaD = `${svgPathD} L 580 140 L 20 140 Z`;
+    let totalNegative = 0;
+    for (const item of data.ledger) {
+      if (item.amount && item.amount < 0) {
+        const amt = Math.abs(item.amount);
+        totalNegative += amt;
+        const text = (item.title + ' ' + item.description).toLowerCase();
+        if (text.includes('fuel') || text.includes('tanken') || text.includes('treibstoff')) {
+          catMap.fuel.amount += amt;
+          catMap.fuel.count++;
+        } else if (text.includes('repair') || text.includes('reparatur') || text.includes('restock') || text.includes('service')) {
+          catMap.repair.amount += amt;
+          catMap.repair.count++;
+        } else if (text.includes('claim') || text.includes('insurance') || text.includes('versicherung') || text.includes('ship')) {
+          catMap.ship.amount += amt;
+          catMap.ship.count++;
+        } else if (text.includes('armor') || text.includes('weapon') || text.includes('waffe') || text.includes('rüst')) {
+          catMap.gear.amount += amt;
+          catMap.gear.count++;
+        } else if (text.includes('trade') || text.includes('kauf') || text.includes('waren')) {
+          catMap.cargo.amount += amt;
+          catMap.cargo.count++;
+        } else if (text.includes('fine') || text.includes('strafe')) {
+          catMap.fine.amount += amt;
+          catMap.fine.count++;
+        } else if (text.includes('transfer') || text.includes('überweisung')) {
+          catMap.transfer.amount += amt;
+          catMap.transfer.count++;
+        } else {
+          catMap.cargo.amount += amt;
+          catMap.cargo.count++;
+        }
+      }
+    }
 
-  const filteredLedger = (data?.ledger || []).filter((item) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      (item.title && item.title.toLowerCase().includes(s)) ||
-      (item.description && item.description.toLowerCase().includes(s)) ||
-      (item.ship && item.ship.toLowerCase().includes(s))
-    );
-  });
+    return Object.values(catMap)
+      .filter((c) => c.amount > 0)
+      .map((c) => ({
+        ...c,
+        percent: totalNegative > 0 ? Math.round((c.amount / totalNegative) * 100) : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [data?.ledger]);
+
+  // Render SVG Quantum Timeline from real timelinePoints
+  const timelinePoints = data?.timelinePoints || [];
+  const svgWidth = 800;
+  const svgHeight = 160;
+  const padding = 30;
+
+  const chartCoords = useMemo(() => {
+    if (timelinePoints.length === 0) return [];
+    const values = timelinePoints.map((p) => (chartMode === 'cumulative' ? p.balance : p.delta));
+    const minVal = Math.min(0, ...values);
+    const maxVal = Math.max(1, ...values);
+    const range = maxVal - minVal || 1;
+
+    return timelinePoints.map((p, idx) => {
+      const val = chartMode === 'cumulative' ? p.balance : p.delta;
+      const x = padding + (idx / Math.max(1, timelinePoints.length - 1)) * (svgWidth - padding * 2);
+      const y = svgHeight - padding - ((val - minVal) / range) * (svgHeight - padding * 2);
+      return { x, y, val, label: p.label, time: p.time };
+    });
+  }, [timelinePoints, chartMode]);
+
+  const svgPathD = useMemo(() => {
+    if (chartCoords.length === 0) return '';
+    return chartCoords.reduce((acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
+  }, [chartCoords]);
+
+  const svgAreaD = useMemo(() => {
+    if (chartCoords.length === 0) return '';
+    const last = chartCoords[chartCoords.length - 1];
+    const first = chartCoords[0];
+    return `${svgPathD} L ${last.x} ${svgHeight - padding} L ${first.x} ${svgHeight - padding} Z`;
+  }, [chartCoords, svgPathD]);
 
   return (
     <div className="flex flex-col min-h-full space-y-3 font-sans select-none">
       {/* ══ 1. TOP 5 KPI SUMMARY CARDS (Exakt nach RC2) ══ */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 shrink-0">
-        {/* Karte 1: Einnahmen Total */}
+        {/* Karte 1: Einnahmen */}
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Einnahmen Total
+              Einnahmen
             </span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
           </div>
-          <div className="mt-1 text-lg font-bold font-mono text-emerald-400">
-            +{formatNumber(data?.totalIncome)} <span className="text-[10px] font-normal text-emerald-600">aUEC</span>
+          <div className="mt-1 text-lg font-bold font-mono text-emerald-300">
+            +{formatNumber(data?.totalIncome)} <span className="text-[10px] font-normal text-emerald-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-            ↗ Aufträge, Handel & Verkäufe
+            ↗ Missionen, Handel & Erlöse
           </div>
         </div>
 
-        {/* Karte 2: Ausgaben Total */}
+        {/* Karte 2: Ausgaben */}
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Ausgaben Total
+              Ausgaben
             </span>
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
           </div>
-          <div className="mt-1 text-lg font-bold font-mono text-rose-400">
-            -{formatNumber(data?.totalSpend)} <span className="text-[10px] font-normal text-rose-600">aUEC</span>
+          <div className="mt-1 text-lg font-bold font-mono text-rose-300">
+            -{formatNumber(data?.totalSpend)} <span className="text-[10px] font-normal text-rose-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
             ↘ Wartung, Treibstoff & Käufe
@@ -163,7 +223,7 @@ export const FinancesView: React.FC = () => {
             {((data?.totalNet || 0) >= 0 ? '+' : '')}{formatNumber(data?.totalNet)} <span className="text-[10px] font-normal text-cyan-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-cyan-400 font-bold mt-0.5">
-            Marge: {marginPercent}% Netto
+            Marge: {data?.profitMargin || 0}% Netto
           </div>
         </div>
 
@@ -176,7 +236,7 @@ export const FinancesView: React.FC = () => {
             <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
           </div>
           <div className="mt-1 text-lg font-bold font-mono text-slate-100 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]">
-            {formatNumber((data?.totalNet || 0) + 1500000)} <span className="text-[10px] font-normal text-slate-400">aUEC</span>
+            {formatNumber(data?.liveBalance || data?.totalNet)} <span className="text-[10px] font-normal text-slate-400">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
             mobiGlas Konto-Erfassung
@@ -192,7 +252,7 @@ export const FinancesView: React.FC = () => {
             <Package className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="mt-1 text-lg font-bold font-mono text-amber-300">
-            {formatNumber((data?.sales || 0) + (data?.trade || 0))} <span className="text-[10px] font-normal text-amber-500">aUEC</span>
+            {formatNumber(data?.totalCargoAuec || (data?.sales || 0) + (data?.trade || 0))} <span className="text-[10px] font-normal text-amber-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-amber-400/80 mt-0.5">
             Waren & Beute-Verkäufe
@@ -200,22 +260,21 @@ export const FinancesView: React.FC = () => {
         </div>
       </div>
 
-      {/* ══ 2. SUBTABS NAVIGATION ══ */}
+      {/* ══ 2. SUBTABS NAVIGATION (Exakt 4 RC2 Subtabs) ══ */}
       <div className="flex items-center justify-between border-b border-cyan-950/80 bg-[#040914] px-3 py-1.5 shrink-0 rounded-t-lg">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
             { id: 'overview', label: '📊 Übersicht & Verlauf' },
-            { id: 'ledger', label: `📑 Hauptbuch (${data?.ledger.length || 0})` },
-            { id: 'cargo', label: `📦 Fracht & Rohstoffe (${data?.cargo.length || 0})` },
-            { id: 'topExpenses', label: '📉 Größte Ausgaben' },
-            { id: 'newExpense', label: '➕ Ausgabe buchen' },
+            { id: 'ledger', label: `📑 Buchhaltung (${data?.ledger.length || 0})` },
+            { id: 'spending', label: `📉 Ausgaben-Analyse` },
+            { id: 'cargo', label: `📦 Fracht & Handel (${data?.cargo.length || 0})` },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`px-3 py-1 text-xs font-mono font-semibold rounded transition cursor-pointer shrink-0 ${
                 activeSubTab === tab.id
-                  ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-600/60 shadow-[0_0_8px_rgba(6,182,212,0.2)]'
+                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
               }`}
             >
@@ -224,159 +283,201 @@ export const FinancesView: React.FC = () => {
           ))}
         </div>
 
-        <button
-          onClick={fetchFinance}
-          title="Finanzdaten aktualisieren"
-          className="p-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyDiscord}
+            title="Finanzbericht für Discord kopieren"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-700 text-xs font-mono text-cyan-300 transition cursor-pointer"
+          >
+            {copiedDiscord ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
+            <span>{copiedDiscord ? 'Kopiert!' : 'Discord Copy'}</span>
+          </button>
+
+          <button
+            onClick={fetchFinance}
+            title="Finanzdaten aktualisieren"
+            className="p-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-800 text-slate-400 hover:text-cyan-300 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* ══ 3. SUBTAB INHALTE ══ */}
       <div className="flex-1 bg-[#040914]/90 rounded-b-lg border border-cyan-950/80 overflow-hidden flex flex-col p-3 shadow-sm min-h-[400px]">
-        {/* SUBTAB 1: ÜBERSICHT & SCI-FI CHART */}
+        {/* SUBTAB 1: ÜBERSICHT & REAL QUANTUM TIMELINE */}
         {activeSubTab === 'overview' && (
           <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
-            {/* Sci-Fi SVG Saldo-Verlaufsgraph */}
+            {/* Echte Quantum Timeline SVG Grafik */}
             <div className="bg-[#030a16] rounded-lg border border-cyan-950 p-3 relative overflow-hidden">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                  aUEC Saldo-Verlauf & Finanztrend
-                </span>
-                <span className="text-[10px] font-mono text-slate-500">Live-Interpolation · Letzte 9 Events</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    ❖ QUANTUM TIMELINE
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-200">
+                    Finanzverlauf & Kontostand-Historie
+                  </span>
+                </div>
+
+                {/* Mode Selector */}
+                <div className="flex items-center gap-1 bg-[#051122] p-0.5 rounded border border-cyan-950 text-[10px] font-mono">
+                  <button
+                    onClick={() => setChartMode('cumulative')}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
+                      chartMode === 'cumulative' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Kumulativ
+                  </button>
+                  <button
+                    onClick={() => setChartMode('delta')}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
+                      chartMode === 'delta' ? 'bg-cyan-950 text-cyan-300 border border-cyan-700' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Einzelposten
+                  </button>
+                </div>
               </div>
 
-              {/* SVG Curve */}
-              <div className="w-full h-36 relative">
-                <svg viewBox="0 0 600 150" className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="cyanGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.35" />
-                      <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+              {chartCoords.length > 0 ? (
+                <div className="relative w-full overflow-x-auto">
+                  <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-40 overflow-visible">
+                    <defs>
+                      <linearGradient id="quantGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
+                        <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
 
-                  {/* Rasterlinien */}
-                  <line x1="20" y1="30" x2="580" y2="30" stroke="#0a2540" strokeDasharray="3 3" strokeWidth="1" />
-                  <line x1="20" y1="70" x2="580" y2="70" stroke="#0a2540" strokeDasharray="3 3" strokeWidth="1" />
-                  <line x1="20" y1="110" x2="580" y2="110" stroke="#0a2540" strokeDasharray="3 3" strokeWidth="1" />
+                    {/* Raster-Linien */}
+                    <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="#1e293b" strokeDasharray="3,3" />
+                    <line x1={padding} y1={svgHeight / 2} x2={svgWidth - padding} y2={svgHeight / 2} stroke="#0f172a" strokeDasharray="2,2" />
 
-                  {/* Gradient Area */}
-                  <path d={svgAreaD} fill="url(#cyanGlow)" />
+                    {/* Gradient Area Fill */}
+                    {svgAreaD && <path d={svgAreaD} fill="url(#quantGrad)" />}
 
-                  {/* Line */}
-                  <path d={svgPathD} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+                    {/* Main Line */}
+                    {svgPathD && <path d={svgPathD} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />}
 
-                  {/* Points */}
-                  {chartPoints.map((p, idx) => (
-                    <g key={idx} className="group">
-                      <circle cx={p.x} cy={p.y} r="3.5" fill="#030a16" stroke="#38bdf8" strokeWidth="2" />
-                      <circle cx={p.x} cy={p.y} r="6" fill="#38bdf8" opacity="0" className="group-hover:opacity-40 transition" />
-                    </g>
-                  ))}
-                </svg>
-              </div>
-
-              <div className="flex justify-between text-[10px] font-mono text-slate-500 mt-1 px-2 border-t border-cyan-950/60 pt-1">
-                <span>Start der erfassten Historie</span>
-                <span>Aktueller Netto-Stand</span>
-              </div>
+                    {/* Data Points */}
+                    {chartCoords.map((p, i) => (
+                      <g key={i} className="group cursor-pointer">
+                        <circle cx={p.x} cy={p.y} r="3.5" fill="#082f49" stroke="#38bdf8" strokeWidth="2" className="group-hover:r-5 group-hover:fill-cyan-400 transition-all" />
+                        <title>{`${p.time}\n${p.label}\n${formatNumber(p.val)} aUEC`}</title>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-xs font-mono text-slate-500">
+                  Keine historischen Transaktionen in dieser Auswahl vorhanden.
+                </div>
+              )}
             </div>
 
-            {/* Ausgaben-Kategorien Aufschlüsselung */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-              {[
-                { title: 'Wartung & Reparatur', icon: Wrench, amount: 48500, color: 'text-amber-400', bg: 'border-amber-950/60' },
-                { title: 'Tanken & Treibstoff', icon: Fuel, amount: 24200, color: 'text-orange-400', bg: 'border-orange-950/60' },
-                { title: 'Munition & Rearm', icon: Crosshair, amount: 15400, color: 'text-rose-400', bg: 'border-rose-950/60' },
-                { title: 'Schiffsrückholung', icon: Timer, amount: 35000, color: 'text-purple-400', bg: 'border-purple-950/60' },
-                { title: 'Frachtaufzug-Gebühr', icon: Box, amount: 12000, color: 'text-sky-400', bg: 'border-sky-950/60' },
-                { title: 'Klinik & Med-Beds', icon: HeartPulse, amount: 5000, color: 'text-emerald-400', bg: 'border-emerald-950/60' },
-                { title: 'Ausrüstung & Gear', icon: ShoppingCart, amount: 65000, color: 'text-cyan-400', bg: 'border-cyan-950/60' },
-                { title: 'Sonstige Dienste', icon: CreditCard, amount: 18000, color: 'text-slate-400', bg: 'border-slate-800' },
-              ].map((cat, idx) => {
-                const IconComponent = cat.icon;
-                return (
-                  <div key={idx} className={`p-2.5 rounded bg-[#030914] border ${cat.bg} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                      <IconComponent className={`w-4 h-4 ${cat.color} shrink-0`} />
-                      <div>
-                        <div className="text-[10.5px] font-bold text-slate-300">{cat.title}</div>
-                        <div className="text-[9.5px] text-slate-500 font-mono">Buchungsposten</div>
+            {/* Top Einnahmen & Top Ausgaben 2-Spalten */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Größte Einnahmen */}
+              <div className="bg-[#030a16] rounded-lg border border-cyan-950 p-3">
+                <div className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Größte Einnahmen-Posten
+                </div>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {(data?.topIncome || []).map((e, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-xs font-mono bg-[#051122]/60 p-1.5 rounded border border-cyan-950/60">
+                      <div className="truncate max-w-[240px]">
+                        <span className="text-slate-200 font-semibold">{e.title}</span>
+                        <div className="text-[10px] text-slate-500 truncate">{e.description}</div>
                       </div>
+                      <span className="text-emerald-400 font-bold shrink-0">+{formatNumber(e.amount)} aUEC</span>
                     </div>
-                    <div className={`font-mono text-xs font-bold ${cat.color}`}>
-                      -{formatNumber(cat.amount)}
+                  ))}
+                  {(!data?.topIncome || data.topIncome.length === 0) && (
+                    <div className="text-xs text-slate-500 py-2">Keine Einnahmen erfasst.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Größte Ausgaben */}
+              <div className="bg-[#030a16] rounded-lg border border-cyan-950 p-3">
+                <div className="text-xs font-mono font-bold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <TrendingDown className="w-3.5 h-3.5" />
+                  Größte Ausgaben-Posten
+                </div>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {(data?.topExpenses || []).map((e, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-xs font-mono bg-[#051122]/60 p-1.5 rounded border border-cyan-950/60">
+                      <div className="truncate max-w-[240px]">
+                        <span className="text-slate-200 font-semibold">{e.title}</span>
+                        <div className="text-[10px] text-slate-500 truncate">{e.description}</div>
+                      </div>
+                      <span className="text-rose-400 font-bold shrink-0">{formatNumber(e.amount)} aUEC</span>
                     </div>
-                  </div>
-                );
-              })}
+                  ))}
+                  {(!data?.topExpenses || data.topExpenses.length === 0) && (
+                    <div className="text-xs text-slate-500 py-2">Keine Ausgaben erfasst.</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* SUBTAB 2: HAUPTBUCH (LEDGER) */}
+        {/* SUBTAB 2: BUCHHALTUNG (LEDGER DATAGRID) */}
         {activeSubTab === 'ledger' && (
-          <div className="flex-1 flex flex-col overflow-hidden space-y-2">
-            {/* Filter & Suche */}
+          <div className="flex-1 flex flex-col space-y-2 overflow-hidden">
             <div className="flex items-center justify-between gap-2 shrink-0">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative w-72">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buchungssätze filtern..."
-                  className="w-full bg-[#071322] border border-cyan-900/60 rounded pl-8 pr-3 py-1 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none"
+                  placeholder="Buchungsjournal durchsuchen..."
+                  className="w-full bg-[#071322] border border-cyan-900/60 rounded pl-8 pr-3 py-1 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
-              <span className="text-[11px] font-mono text-slate-500">
-                {filteredLedger.length} Transaktionen erfasst
-              </span>
+              <span className="text-xs font-mono text-slate-400">{filteredLedger.length} Buchungen erfasst</span>
             </div>
 
-            {/* Dichte DataGrid Tabelle */}
-            <div className="flex-1 overflow-y-auto border border-cyan-950 rounded-lg">
-              <table className="w-full text-left text-xs border-collapse font-mono">
-                <thead>
-                  <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 z-10">
-                    <th className="py-2 px-3">Zeitpunkt</th>
-                    <th className="py-2 px-3">Art</th>
-                    <th className="py-2 px-3">Beschreibung</th>
+            <div className="flex-1 overflow-auto border border-cyan-950 rounded-lg">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead className="bg-[#030914] text-slate-400 text-[11px] uppercase tracking-wider sticky top-0 border-b border-cyan-950 z-10">
+                  <tr>
+                    <th className="py-2 px-3">Zeit</th>
+                    <th className="py-2 px-3">Typ</th>
+                    <th className="py-2 px-3">Betrag</th>
                     <th className="py-2 px-3">Schiff</th>
-                    <th className="py-2 px-3 text-right">Betrag (aUEC)</th>
+                    <th className="py-2 px-3">Buchungsdetail</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cyan-950/40">
-                  {filteredLedger.length === 0 ? (
+                  {filteredLedger.map((item) => (
+                    <tr key={item.id} className="hover:bg-[#071322]/80 transition">
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap">{item.timestamp}</td>
+                      <td className="py-2 px-3">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 border border-cyan-900/50 text-cyan-300">
+                          {item.kindText || item.title}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 whitespace-nowrap font-bold">
+                        <span className={(item.amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                          {((item.amount || 0) >= 0 ? '+' : '')}{formatNumber(item.amount)} aUEC
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-cyan-300 font-semibold truncate max-w-[140px]">{item.ship || '—'}</td>
+                      <td className="py-2 px-3 text-slate-300 truncate max-w-md" title={item.description}>{item.description}</td>
+                    </tr>
+                  ))}
+                  {filteredLedger.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-500">
-                        Keine Buchungssätze gefunden.
+                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                        Keine Buchungen gefunden.
                       </td>
                     </tr>
-                  ) : (
-                    filteredLedger.map((item) => (
-                      <tr key={item.id} className="hover:bg-[#071628]/60 transition-colors">
-                        <td className="py-2 px-3 text-slate-400 text-[11px]">{item.timestamp}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-200">
-                          <span className="px-1.5 py-0.5 rounded bg-[#030914] border border-cyan-950 text-[10px]">
-                            {item.title}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-slate-300 font-sans text-xs truncate max-w-md">{item.description}</td>
-                        <td className="py-2 px-3 text-sky-400 text-[11px]">{item.ship || '—'}</td>
-                        <td
-                          className={`py-2 px-3 text-right font-bold text-xs ${
-                            (item.amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
-                        >
-                          {(item.amount || 0) >= 0 ? '+' : ''}
-                          {formatNumber(item.amount)}
-                        </td>
-                      </tr>
-                    ))
                   )}
                 </tbody>
               </table>
@@ -384,185 +485,86 @@ export const FinancesView: React.FC = () => {
           </div>
         )}
 
-        {/* SUBTAB 3: FRACHT & ROHSTOFFHANDEL */}
-        {activeSubTab === 'cargo' && (
-          <div className="flex-1 overflow-y-auto border border-cyan-950 rounded-lg">
-            <table className="w-full text-left text-xs border-collapse font-mono">
-              <thead>
-                <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 z-10">
-                  <th className="py-2 px-3">Zeitpunkt</th>
-                  <th className="py-2 px-3">Transaktion</th>
-                  <th className="py-2 px-3">Handelsgut / Rohstoff</th>
-                  <th className="py-2 px-3">Frachter</th>
-                  <th className="py-2 px-3 text-right">Umsatz (aUEC)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cyan-950/40">
-                {(!data?.cargo || data.cargo.length === 0) ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500">
-                      Keine Fracht- oder Rohstofftransaktionen im gewählten Log gefunden.
-                    </td>
-                  </tr>
-                ) : (
-                  data.cargo.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#071628]/60 transition-colors">
-                      <td className="py-2 px-3 text-slate-400 text-[11px]">{item.timestamp}</td>
-                      <td className="py-2 px-3 text-amber-300 font-bold">{item.title}</td>
-                      <td className="py-2 px-3 text-slate-200 font-sans">{item.description}</td>
-                      <td className="py-2 px-3 text-sky-400">{item.ship || '—'}</td>
-                      <td className="py-2 px-3 text-right font-bold text-amber-300">
-                        {formatNumber(item.amount)} aUEC
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* SUBTAB 3: AUSGABEN-ANALYSE */}
+        {activeSubTab === 'spending' && (
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="text-xs font-mono text-slate-400">
+              Kategorisierte Aufschlüsselung aller erfassten Ausgabenposten:
+            </div>
 
-        {/* SUBTAB 4: GRÖSSTE AUSGABEN */}
-        {activeSubTab === 'topExpenses' && (
-          <div className="flex-1 overflow-y-auto border border-cyan-950 rounded-lg">
-            <table className="w-full text-left text-xs border-collapse font-mono">
-              <thead>
-                <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[10.5px] font-bold uppercase tracking-wider sticky top-0 z-10">
-                  <th className="py-2 px-3">Rang</th>
-                  <th className="py-2 px-3">Zeitpunkt</th>
-                  <th className="py-2 px-3">Verwendungszweck</th>
-                  <th className="py-2 px-3">Schiff</th>
-                  <th className="py-2 px-3 text-right">Kosten (aUEC)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cyan-950/40">
-                {(!data?.topExpenses || data.topExpenses.length === 0) ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500">
-                      Keine Ausgabenposten erfasst.
-                    </td>
-                  </tr>
-                ) : (
-                  data.topExpenses.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-[#071628]/60 transition-colors">
-                      <td className="py-2 px-3 font-bold text-slate-400">#{idx + 1}</td>
-                      <td className="py-2 px-3 text-slate-400 text-[11px]">{item.timestamp}</td>
-                      <td className="py-2 px-3 text-slate-200 font-sans font-semibold">{item.description}</td>
-                      <td className="py-2 px-3 text-sky-400">{item.ship || '—'}</td>
-                      <td className="py-2 px-3 text-right font-bold text-rose-400">
-                        -{formatNumber(Math.abs(item.amount || 0))} aUEC
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* SUBTAB 5: MANUELLE BUCHUNG */}
-        {activeSubTab === 'newExpense' && (
-          <div className="flex-1 max-w-xl mx-auto flex flex-col justify-center py-4">
-            <form onSubmit={handleBookExpense} className="bg-[#030914] p-5 rounded-lg border border-cyan-950 space-y-4 shadow-lg">
-              <div className="flex items-center gap-2 border-b border-cyan-950 pb-2">
-                <PlusCircle className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm font-bold font-mono text-slate-100 uppercase tracking-wider">
-                  Manuelle Ausgabe erfassen
-                </span>
-              </div>
-
-              {bookingSuccess && (
-                <div className="flex items-center gap-2 p-2.5 rounded bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 text-xs font-mono">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>{bookingSuccess}</span>
-                </div>
+            <div className="space-y-3">
+              {spendingCategories.map((c, i) => {
+                const IconComponent = c.icon;
+                return (
+                  <div key={i} className="bg-[#030a16] p-3 rounded-lg border border-cyan-950 space-y-2">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <div className="flex items-center gap-2">
+                        <IconComponent className="w-4 h-4 text-cyan-400" />
+                        <span className="font-bold text-slate-200">{c.label}</span>
+                        <span className="text-slate-500">({c.count}× gebucht)</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-rose-400">-{formatNumber(c.amount)} aUEC</span>
+                        <span className="text-cyan-300 font-semibold">{c.percent}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-cyan-950">
+                      <div className={`h-full ${c.color}`} style={{ width: `${c.percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {spendingCategories.length === 0 && (
+                <div className="text-xs text-slate-500 py-8 text-center">Keine Ausgaben zur Kategorisierung vorhanden.</div>
               )}
+            </div>
+          </div>
+        )}
 
-              {/* Kategorie Schnellwahl Buttons */}
-              <div>
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold block mb-1.5">
-                  Ausgaben-Kategorie wählen:
-                </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    '🔧 Reparatur & Wartung',
-                    '⛽ Tanken & Treibstoff',
-                    '🚀 Munition & Rearm',
-                    '⏱️ Schiffsrückholung (Expedite)',
-                    '📦 Ladegebühr (Auto-Load)',
-                    '🏥 Medizinisch / Klinik',
-                  ].map((cat) => (
-                    <button
-                      type="button"
-                      key={cat}
-                      onClick={() => setManualCategory(cat)}
-                      className={`p-2 rounded text-left text-xs font-mono transition cursor-pointer border ${
-                        manualCategory === cat
-                          ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300'
-                          : 'bg-[#061224] border-cyan-950 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {cat}
-                    </button>
+        {/* SUBTAB 4: FRACHT & HANDEL */}
+        {activeSubTab === 'cargo' && (
+          <div className="flex-1 flex flex-col space-y-2 overflow-hidden">
+            <div className="text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>Fracht- & Rohstoffhandel (Trade Logs)</span>
+              <span>{data?.cargo.length || 0} Handelsposten erfasst</span>
+            </div>
+
+            <div className="flex-1 overflow-auto border border-cyan-950 rounded-lg">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead className="bg-[#030914] text-slate-400 text-[11px] uppercase tracking-wider sticky top-0 border-b border-cyan-950 z-10">
+                  <tr>
+                    <th className="py-2 px-3">Zeit</th>
+                    <th className="py-2 px-3">Handelsaktion</th>
+                    <th className="py-2 px-3">Umsatz / Wert</th>
+                    <th className="py-2 px-3">Schiff</th>
+                    <th className="py-2 px-3">Detail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyan-950/40">
+                  {(data?.cargo || []).map((c) => (
+                    <tr key={c.id} className="hover:bg-[#071322]/80 transition">
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap">{c.timestamp}</td>
+                      <td className="py-2 px-3 text-amber-300 font-semibold">{c.title}</td>
+                      <td className="py-2 px-3 font-bold text-emerald-400 whitespace-nowrap">
+                        {formatNumber(c.amount)} aUEC
+                      </td>
+                      <td className="py-2 px-3 text-cyan-300 truncate max-w-[130px]">{c.ship || '—'}</td>
+                      <td className="py-2 px-3 text-slate-300 truncate max-w-md">{c.description}</td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-
-              {/* Betrag in aUEC */}
-              <div>
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold block mb-1">
-                  Betrag in aUEC:
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={manualAmount}
-                  onChange={(e) => setManualAmount(e.target.value)}
-                  placeholder="z. B. 25000"
-                  className="w-full bg-[#071322] border border-cyan-900/60 rounded px-3 py-2 text-sm font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              {/* Notiz / Zweck */}
-              <div>
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold block mb-1">
-                  Notiz / Zweck (optional):
-                </label>
-                <input
-                  type="text"
-                  value={manualNote}
-                  onChange={(e) => setManualNote(e.target.value)}
-                  placeholder="z. B. Landepad 02 Reparatur nach Pyro-Einsatz"
-                  className="w-full bg-[#071322] border border-cyan-900/60 rounded px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              {/* Standort */}
-              <div>
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold block mb-1">
-                  Standort:
-                </label>
-                <input
-                  type="text"
-                  value={manualLocation}
-                  onChange={(e) => setManualLocation(e.target.value)}
-                  placeholder="z. B. Port Tressler"
-                  className="w-full bg-[#071322] border border-cyan-900/60 rounded px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded bg-cyan-950/70 hover:bg-cyan-900/80 border border-cyan-600/60 text-cyan-300 font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-              >
-                Ausgabe verbuchen & Saldo anpassen
-              </button>
-            </form>
+                  {(!data?.cargo || data.cargo.length === 0) && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                        Keine Fracht- oder Handelsbewegungen verzeichnet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 };
-
-export default FinancesView;

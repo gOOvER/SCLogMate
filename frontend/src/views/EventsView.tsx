@@ -33,7 +33,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>(initialSession);
   const [events, setEvents] = useState<LogEventItem[]>([]);
-  const [category, setCategory] = useState<string>('all');
+  const [category, setCategory] = useState<string>('Alle');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedEvent, setSelectedEvent] = useState<LogEventItem | null>(null);
@@ -248,24 +248,26 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
         <div className="h-4 w-px bg-cyan-950/80 hidden sm:block shrink-0" />
 
-        {/* Kategorien Chips */}
+        {/* RC2 Filter-Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {[
-            { id: 'all', label: 'Alle' },
-            { id: 'wallet', label: '💰 Finanzen' },
-            { id: 'combat', label: '⚔️ Kampf' },
-            { id: 'mission', label: '🎯 Aufträge' },
-            { id: 'ship', label: '🚀 Schiffe & QT' },
-            { id: 'location', label: '📍 Standorte' },
-            { id: 'system', label: '⚙️ System' },
+            { id: 'Alle', label: 'Alle' },
+            { id: 'Geld', label: '💰 Geld' },
+            { id: 'Aufträge', label: '❖ Aufträge' },
+            { id: 'Baupläne', label: '⬡ Baupläne' },
+            { id: 'Schiffe', label: '🚀 Schiffe' },
+            { id: 'Orte', label: '📍 Orte' },
+            { id: 'Crew', label: '👥 Crew' },
+            { id: 'Loot', label: '📦 Loot' },
+            { id: 'Sonst', label: '⚙️ Sonst' },
           ].map((c) => (
             <button
               key={c.id}
               onClick={() => setCategory(c.id)}
               className={`px-2.5 py-1 text-xs font-mono font-semibold rounded transition cursor-pointer shrink-0 ${
                 category === c.id
-                  ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80 border border-transparent'
+                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80 border border-slate-800/80'
               }`}
             >
               {c.label}

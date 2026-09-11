@@ -21,6 +21,7 @@ import {
   Check,
   AlertTriangle,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 import {
   bridge,
@@ -32,14 +33,13 @@ import {
 
 export const SettingsView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<
-    'general' | 'hud' | 'ocr' | 'audio' | 'uex' | 'database'
+    'general' | 'wipe' | 'hud' | 'ocr' | 'uex' | 'audio' | 'database' | 'developer'
   >('general');
   const [settings, setSettings] = useState<SettingsDto>({
     logPath: 'J:\\StarCitizen\\LIVE\\logbackups\\game.log',
-    balance: 15420800,
     autoOcrEnabled: true,
     uexApiKey: '',
-    overlayEnabled: true,
+    overlayEnabled: false,
     overlayOpacity: 0.92,
     toastEnabled: true,
     toastBlueprintEnabled: true,
@@ -52,6 +52,17 @@ export const SettingsView: React.FC = () => {
     auroraVolume: 40,
     rsTargetAlertEnabled: true,
     rsTargetSoundEnabled: true,
+    wipeFilterEnabled: false,
+    wipeDateString: '2026-05-15',
+    wipeFilterMoney: true,
+    wipeFilterContracts: true,
+    wipeFilterFleet: false,
+    wipeFilterBlueprints: false,
+    selectedFontFamily: 'Inter',
+    appLanguage: 'Auto',
+    minimizeToTrayOnClose: true,
+    autostartEnabled: false,
+    debugMode: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -327,6 +338,61 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const handleSetWipe48 = () => {
+    setSettings((prev) => ({
+      ...prev,
+      wipeFilterEnabled: true,
+      wipeDateString: '2026-05-15',
+    }));
+    showToast('Wipe-Filter auf Alpha 4.8 (15.05.2026) gesetzt');
+  };
+
+  const handleSetWipeToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setSettings((prev) => ({
+      ...prev,
+      wipeFilterEnabled: true,
+      wipeDateString: today,
+    }));
+    showToast(`Wipe-Filter auf heutigen Tag (${today}) gesetzt`);
+  };
+
+  const handleClearWipe = () => {
+    setSettings((prev) => ({
+      ...prev,
+      wipeFilterEnabled: false,
+    }));
+    showToast('Wipe-Filter deaktiviert');
+  };
+
+  const handleSimulate = async (eventType: string, param?: string) => {
+    try {
+      await bridge.sendRequest('simulate_event', { eventType, param });
+      showToast(`🧪 [DEBUG] Simuliert: ${eventType}`);
+    } catch (err) {
+      console.error('Simulation failed:', err);
+      showToast('Fehler bei der Simulation');
+    }
+  };
+
+  const handleDumpDebugState = async () => {
+    try {
+      await bridge.sendRequest('dump_debug_state');
+      showToast('✓ [DEBUG] Detaillierter Status in SCLogMate.debug.log geschrieben.');
+    } catch (err) {
+      showToast('Fehler beim Dump');
+    }
+  };
+
+  const handleClearDebugLog = async () => {
+    try {
+      await bridge.sendRequest('clear_debug_log');
+      showToast('✓ [DEBUG] Debug-Logdatei geleert.');
+    } catch (err) {
+      showToast('Fehler beim Leeren des Logs');
+    }
+  };
+
   const handleVacuum = async () => {
     try {
       setIsCheckingDb(true);
@@ -479,12 +545,14 @@ export const SettingsView: React.FC = () => {
       {/* Sub-Tab Navigation Bar */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
         {[
-          { id: 'general', label: '📁 Allgemein & Pfade', icon: Folder },
+          { id: 'general', label: '📁 Allgemein', icon: Folder },
+          { id: 'wipe', label: '⏳ Wipe & Filter', icon: Clock },
           { id: 'hud', label: '🖥 Overlays & HUD', icon: Eye },
           { id: 'ocr', label: '👁 mobiGlas & OCR', icon: Radio },
-          { id: 'audio', label: '🎙 Aurora & Audio', icon: Volume2 },
           { id: 'uex', label: '🌐 UEX Integration', icon: Globe },
-          { id: 'database', label: '💾 SQLite & Wartung', icon: Database },
+          { id: 'audio', label: '🎙 VoiceAttack & Aurora', icon: Volume2 },
+          { id: 'database', label: '💾 Datenbank & Wartung', icon: Database },
+          ...(settings.debugMode ? [{ id: 'developer', label: '🧪 Entwickler', icon: Sparkles }] : []),
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -492,7 +560,7 @@ export const SettingsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
                 isActive
                   ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
                   : 'bg-slate-900/40 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-transparent'
@@ -508,11 +576,12 @@ export const SettingsView: React.FC = () => {
       {/* Tab 1: Allgemein */}
       {activeSubTab === 'general' && (
         <div className="space-y-6">
+          {/* 1. Star Citizen Logdatei */}
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
             <div>
               <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
                 <Folder className="w-4 h-4" />
-                <span>STAR CITIZEN GAME.LOG DATEIPFAD</span>
+                <span>STAR CITIZEN & LOGDATEI</span>
               </h2>
               <p className="text-xs text-slate-400 mt-1">
                 Wähle deine Game.log Datei aus dem LIVE- oder PTU-Installationsverzeichnis von Star Citizen.
@@ -530,14 +599,14 @@ export const SettingsView: React.FC = () => {
                 />
                 <button
                   onClick={handleBrowse}
-                  className="px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition shrink-0"
+                  className="px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition shrink-0 cursor-pointer"
                   title="Game.log manuell auswählen"
                 >
                   📁 Durchsuchen
                 </button>
                 <button
                   onClick={handleAutoDetect}
-                  className="px-3 py-2.5 rounded-lg bg-sky-900/60 hover:bg-sky-800/80 text-sky-300 text-xs font-medium border border-sky-700/60 transition shrink-0"
+                  className="px-3 py-2.5 rounded-lg bg-sky-900/60 hover:bg-sky-800/80 text-sky-300 text-xs font-medium border border-sky-700/60 transition shrink-0 cursor-pointer"
                   title="Automatisch auf allen Laufwerken nach Game.log suchen"
                 >
                   ⚡ Auto-Erkennung
@@ -545,6 +614,249 @@ export const SettingsView: React.FC = () => {
               </div>
               <div className="text-[11px] text-slate-500">
                 Hinweis: SCLogMate liest die Datei im Non-Locking Shared Stream und tailt Live-Events verzögerungsfrei.
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Erscheinungsbild & Schriftart (Font Chooser) */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                <FileText className="w-4 h-4" />
+                <span>ERSCHEINUNGSBILD & SCHRIFTART (FONT CHOOSER)</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Passe die primäre Schriftart der Benutzeroberfläche an deine Vorlieben an.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+              <select
+                value={settings.selectedFontFamily || 'Inter'}
+                onChange={(e) => setSettings({ ...settings, selectedFontFamily: e.target.value })}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+              >
+                <option value="Inter">Inter (Standard Modern)</option>
+                <option value="Orbitron">Orbitron (Sci-Fi Cockpit)</option>
+                <option value="Rajdhani">Rajdhani (Cyber Tech)</option>
+                <option value="Segoe UI">Segoe UI (Windows Native)</option>
+                <option value="Roboto">Roboto (Clean Sans)</option>
+                <option value="Consolas">Consolas (Monospace)</option>
+              </select>
+              <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-300 truncate" style={{ fontFamily: settings.selectedFontFamily || 'Inter' }}>
+                Vorschau: Star Citizen Live Log Companion 0123456789 (aUEC · Saldo · ⬡ Baupläne)
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Sprache & Regional-Einstellungen */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <Globe className="w-4 h-4" />
+                  <span>SPRACHE & REGIONAL-EINSTELLUNGEN / LANGUAGE</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Wähle die Sprache der Anwendung und für sprachabhängige Zusatzmodule wie VoiceAttack & Aurora.
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 px-3 py-1 rounded bg-sky-950 border border-sky-800 text-xs text-sky-300 font-bold">
+                <span>{settings.appLanguage === 'en-US' ? '🇬🇧 English' : '🇩🇪 Deutsch'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+              <select
+                value={settings.appLanguage || 'Auto'}
+                onChange={(e) => setSettings({ ...settings, appLanguage: e.target.value })}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+              >
+                <option value="Auto">🌐 Auto (Systemstandard)</option>
+                <option value="de-DE">🇩🇪 Deutsch (Standard)</option>
+                <option value="en-US">🇬🇧 English (US / UK)</option>
+              </select>
+              <div className="text-xs text-slate-400">
+                {settings.appLanguage === 'en-US'
+                  ? 'Application strings in English. Voice prompts English.'
+                  : 'Benutzeroberfläche auf Deutsch. Deutsche Sprachdateien aktiv.'}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Fenster-, Tray- & System-Verhalten */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+              <Monitor className="w-4 h-4" />
+              <span>FENSTER-, TRAY- & SYSTEM-VERHALTEN</span>
+            </h2>
+
+            <div className="space-y-3">
+              <label className="flex items-start space-x-3 cursor-pointer p-2 rounded hover:bg-slate-800/40">
+                <input
+                  type="checkbox"
+                  checked={settings.minimizeToTrayOnClose ?? true}
+                  onChange={(e) => setSettings({ ...settings, minimizeToTrayOnClose: e.target.checked })}
+                  className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-slate-200">
+                    Beim Klick auf das Schließen-Kreuz (X) ins System-Tray minimieren
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Die App läuft im Hintergrund im Infobereich weiter (Tracking, OCR & Overlays bleiben aktiv).
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-start space-x-3 cursor-pointer p-2 rounded hover:bg-slate-800/40">
+                <input
+                  type="checkbox"
+                  checked={settings.autostartEnabled ?? false}
+                  onChange={(e) => setSettings({ ...settings, autostartEnabled: e.target.checked })}
+                  className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-slate-200">
+                    Mit Windows automatisch im Hintergrund starten (System-Tray)
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Startet SCLogMate bei der Windows-Anmeldung minimiert in den Infobereich. Erkennt Star Citizen bei Spielstart sofort vollautomatisch.
+                  </div>
+                </div>
+              </label>
+
+              <div className="pt-2 border-t border-slate-800">
+                <label className="flex items-start space-x-3 cursor-pointer p-2 rounded hover:bg-slate-800/40">
+                  <input
+                    type="checkbox"
+                    checked={settings.debugMode ?? false}
+                    onChange={(e) => setSettings({ ...settings, debugMode: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-800 mt-0.5"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-amber-300 flex items-center space-x-2">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Entwickler- & Debug-Modus aktivieren</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Schaltet den Sub-Tab "🧪 Entwickler" mit Test-Eventsimulatoren (Schutzzone, Schiff, Bauplan, 30k) und Diagnose-Dumps frei.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Wipe & Filter */}
+      {activeSubTab === 'wipe' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
+                  <Clock className="w-4 h-4" />
+                  <span>WIPE- & PERSISTENZ-FILTER</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Kappt historische Log-Daten vor einem bestimmten Patch-Stichtag (z.B. Alpha 4.8 Wipe), damit Kontosalden, Missionen und Statistiken nur für den aktuellen Zyklus berechnet werden.
+                </p>
+              </div>
+              <label className="flex items-center space-x-2 cursor-pointer px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-800/60 text-amber-300 text-xs font-bold">
+                <input
+                  type="checkbox"
+                  checked={settings.wipeFilterEnabled ?? false}
+                  onChange={(e) => setSettings({ ...settings, wipeFilterEnabled: e.target.checked })}
+                  className="rounded border-amber-700 text-amber-500 focus:ring-amber-400 bg-slate-900"
+                />
+                <span>Wipe-Filter aktiv</span>
+              </label>
+            </div>
+
+            {/* Stichtag festlegen */}
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-semibold text-slate-200">
+                Stichtag festlegen (Wipe-Datum)
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={settings.wipeDateString || '2026-05-15'}
+                  onChange={(e) => setSettings({ ...settings, wipeDateString: e.target.value })}
+                  placeholder="JJJJ-MM-TT (z. B. 2026-05-15)"
+                  className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  onClick={handleSetWipe48}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                  title="Auf Alpha 4.8 (15.05.2026) setzen"
+                >
+                  ★ 4.8 Wipe
+                </button>
+                <button
+                  onClick={handleSetWipeToday}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                  title="Auf heutigen Tag setzen"
+                >
+                  📅 Heute
+                </button>
+                <button
+                  onClick={handleClearWipe}
+                  className="px-3 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/60 transition cursor-pointer"
+                  title="Filter deaktivieren"
+                >
+                  ✕ Filter aus
+                </button>
+              </div>
+            </div>
+
+            {/* Modular filterbar */}
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-semibold text-slate-200">
+                Betroffene Datenbereiche (Modular filterbar)
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.wipeFilterMoney ?? true}
+                    onChange={(e) => setSettings({ ...settings, wipeFilterMoney: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-800"
+                  />
+                  <span className="text-xs text-slate-200">💰 Geld & Saldo</span>
+                </label>
+
+                <label className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.wipeFilterContracts ?? true}
+                    onChange={(e) => setSettings({ ...settings, wipeFilterContracts: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-800"
+                  />
+                  <span className="text-xs text-slate-200">❖ Missionen</span>
+                </label>
+
+                <label className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.wipeFilterFleet ?? false}
+                    onChange={(e) => setSettings({ ...settings, wipeFilterFleet: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-800"
+                  />
+                  <span className="text-xs text-slate-200">✈ Flotte</span>
+                </label>
+
+                <label className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.wipeFilterBlueprints ?? false}
+                    onChange={(e) => setSettings({ ...settings, wipeFilterBlueprints: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-800"
+                  />
+                  <span className="text-xs text-slate-200">🛠 Baupläne</span>
+                </label>
               </div>
             </div>
           </div>
@@ -1532,6 +1844,114 @@ export const SettingsView: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
                 <span>📄 Debug-Log öffnen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 8: Entwickler & Debug Tools (Nur sichtbar, wenn debugMode aktiv) */}
+      {activeSubTab === 'developer' && settings.debugMode && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-amber-900/40 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span>STAR CITIZEN LIVE-EVENTS SIMULIEREN</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Injiziert simulierte Star Citizen Game.log-Events zur Prüfung von Audioausgaben, Muting, Cooldowns und Benachrichtigungen.
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-amber-950 text-amber-400 border border-amber-800 text-[10px] font-bold">
+                DEBUG ONLY
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <button
+                onClick={() => handleSimulate('armistice_enter')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">🛡️</span>
+                <span>Schutzzone betreten</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('armistice_leave')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">⚔️</span>
+                <span>Schutzzone verlassen</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('ship_join', 'Drake Cutlass Black')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">🚀</span>
+                <span>Schiffseinstieg (Cutlass)</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('blueprint_found')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">📜</span>
+                <span>Bauplan erlernt (Toast)</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('quantum_arrival')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">🌌</span>
+                <span>Quantensprung Ankunft</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('server_error')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-rose-300 hover:text-rose-200 cursor-pointer"
+              >
+                <span className="text-base">⚠️</span>
+                <span>30k Serverfehler</span>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('player_death')}
+                className="p-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center space-x-2.5 text-xs text-rose-300 hover:text-rose-200 cursor-pointer"
+              >
+                <span className="text-base">💀</span>
+                <span>Notfall / Spielertod</span>
+              </button>
+            </div>
+          </div>
+
+          {/* System-Diagnose & Logging */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+              <FileText className="w-4 h-4" />
+              <span>SYSTEM-DIAGNOSE & PROTOKOLLE</span>
+            </h2>
+            <p className="text-xs text-slate-400">
+              Schreibe den vollständigen internen Telemetrie- und Modul-Status in <code>%APPDATA%\SCLogMate\SCLogMate.debug.log</code> oder setze die Datei zurück.
+            </p>
+
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                onClick={handleDumpDebugState}
+                className="px-4 py-2.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 text-xs font-semibold border border-sky-500/40 transition flex items-center space-x-2 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Debug-Status in Log schreiben</span>
+              </button>
+              <button
+                onClick={handleClearDebugLog}
+                className="px-4 py-2.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-800/60 transition flex items-center space-x-2 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Debug-Logdatei leeren</span>
               </button>
             </div>
           </div>

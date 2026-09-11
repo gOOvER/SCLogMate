@@ -6,19 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Full Parity with SCLogMate 1.0.0-rc2 Structure & Subtabs**:
+  - **Settings Subtabs (`SettingsView.tsx`, `PhotinoBridge.cs`)**:
+    - Restored exact 8 subtabs in RC2 order: `📁 Allgemein`, `⏳ Wipe & Filter`, `🖥 Overlays & HUD`, `👁 mobiGlas & OCR`, `🌐 UEX Integration`, `🎙 VoiceAttack & Aurora`, `💾 Datenbank & Wartung`, and `🧪 Entwickler` (conditional on `debugMode`).
+    - Added dedicated **Wipe & Persistence Filter** subtab with live toggle, target date input, quick presets ("★ 4.8 Wipe", "📅 Heute", "✕ Filter aus"), and modular category filters (Money, Contracts, Fleet, Blueprints).
+    - Added **Developer & Debug Tools** subtab (`debugMode`) with live simulation triggers for armistice entry/exit, ship channel entry, blueprint discovered, quantum arrival, 30k server error, and emergency/death, plus state dump and log cleanup.
+  - **Tools Subtabs (`ToolsView.tsx`)**:
+    - Added subtab switching matching RC2: `System & Wartung` (Shader cache, crash dumps, system diagnostics, user.cfg live editor & tuning generator) and `Backups` (ActionMaps keybind archive, backup creation with notes, restore directory info).
+  - **Missions & Finances Parity**:
+    - Aligned Missions subtabs to `Missionsverlauf`, `Aktive OCR-Verträge`, and `Auftragskatalog`.
+    - Aligned Finances subtabs to `Übersicht`, `Buchhaltung`, `Ausgaben`, and `Fracht` with SVG Quantum timeline.
+    - Aligned Events filter chips to the exact 9 RC2 categories: `Alle`, `Geld`, `Aufträge`, `Baupläne`, `Schiffe`, `Orte`, `Crew`, `Loot`, `Sonst`.
+  - **Aurora Voice Service Integration (`PhotinoBridge.cs`)**:
+    - Wired `AuroraVoiceService` into live log tailing and simulation commands, honoring user volume and activation settings.
+
 ### Changed
-- **Server & Instance HUD Card Redesign (`HudBar.tsx`, `de.ts`, `en.ts`)**:
-  - Eliminated duplicate Pilot Profile display between `MasterHeader` and HUD Card 1:
-    - Card 1 retitled to **`SERVER & INSTANZ`** (`SERVER & INSTANCE`), aligning its visual hierarchy with the Location and Active Ship cards.
-    - Server Shard Identifier (e.g. `Shard #060`) and Region chip promoted to primary hero status with radio icon.
-    - Replaced redundant large pilot avatar block with a sleek, compact RSI Dossier trigger button (`[ 👤 gOOvER ]`).
-  - Fixed duplicate region text (`EU EU · 28ms`):
-    - Replaced Windows-incompatible flag emoji (which rendered as raw letters `EU`) with a sleek Globe icon and single region code, completely eliminating duplicate `EU EU` output.
-    - Enhanced bottom subline with game version, complete shard ID, and pilot rank title.
+- **Navigation & Sidebar (`Sidebar.tsx`, `App.tsx`, `AboutView.tsx`)**:
+  - Restored exact 16 tabs in RC2 order (`events`, `finances`, `missions`, `reputation`, `starmap`, `places`, `blackbox`, `orescanner`, `market`, `fleet`, `warehouse`, `blueprints`, `loadout`, `tools`, `settings`, `about`).
+  - Default tab set to `events` (`Ereignisse`), matching Avalonia RC2 startup behavior.
+  - Version aligned to `v1.0.0-rc2` matching `SCLogMate.csproj`.
 
 ### Removed
-- **Manual Start Balance Setting Card (`SettingsView.tsx`)**:
-  - Removed unnecessary "Start-Kontostand (aUEC)" input box from General Settings since the player's wallet is automatically tracked through game log events and live OCR.
+- **Unauthorized Scraping & Long-Removed Features**:
+  - Removed unauthorized RSI citizen web scraper (`CitizenProfileService.cs`) and `PilotDossierModal.tsx`.
+  - Removed obsolete standalone `DashboardView` and `SessionsView` tabs (dashboard is docked in HUD rows 1-2, and sessions are switched globally in the header).
+  - Removed obsolete manual balance input card from settings.
 
 ### Added
 - **Interactive OCR Region Selection & Calibration Subsystem (`NativeRegionSelector.cs`, `NativeScanIndicator.cs`, `SettingsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:

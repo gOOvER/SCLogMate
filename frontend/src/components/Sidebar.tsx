@@ -1,13 +1,11 @@
 import React from 'react';
 import {
-  Activity,
   Award,
   Box,
   Coins,
   Compass,
   FileCode2,
   Info,
-  Layers,
   MapPin,
   Maximize2,
   Minimize2,
@@ -23,12 +21,8 @@ import {
 } from 'lucide-react';
 
 export type NavTabId =
-  | 'dashboard'
   | 'events'
-  | 'sessions'
   | 'finances'
-  | 'warehouse'
-  | 'fleet'
   | 'missions'
   | 'reputation'
   | 'starmap'
@@ -36,6 +30,8 @@ export type NavTabId =
   | 'blackbox'
   | 'orescanner'
   | 'market'
+  | 'fleet'
+  | 'warehouse'
   | 'blueprints'
   | 'loadout'
   | 'tools'
@@ -63,8 +59,6 @@ interface SidebarProps {
   liveEventCount?: number;
 }
 
-import { useI18n } from '../i18n';
-
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
@@ -73,45 +67,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
   warehouseCount,
   liveEventCount,
 }) => {
-  const { t } = useI18n();
-
   const navGroups: NavGroup[] = [
     {
-      title: t('nav.categoryCore'),
+      title: 'Hauptfunktionen',
       items: [
-        { id: 'dashboard', label: t('nav.dashboard'), icon: Activity },
-        { id: 'events', label: t('nav.events'), icon: Scroll, badge: liveEventCount },
-        { id: 'sessions', label: t('nav.sessions'), icon: Layers },
+        { id: 'events', label: 'Ereignisse', icon: Scroll, badge: liveEventCount },
+        { id: 'finances', label: 'Finanzen', icon: Coins },
+        { id: 'missions', label: 'Missionen', icon: Target },
+        { id: 'reputation', label: 'Ruf & Fraktionen', icon: Award },
       ],
     },
     {
-      title: t('nav.categoryEngineering'),
+      title: 'Universum & Raum',
       items: [
-        { id: 'finances', label: t('nav.finances'), icon: Coins },
-        { id: 'warehouse', label: t('nav.warehouse'), icon: Box, badge: warehouseCount },
-        { id: 'fleet', label: t('nav.fleet'), icon: Rocket },
-        { id: 'market', label: t('nav.market'), icon: ShoppingBag },
-        { id: 'blueprints', label: t('nav.blueprints'), icon: FileCode2 },
-        { id: 'loadout', label: t('nav.loadout'), icon: Shield },
+        { id: 'starmap', label: 'Sternenkarte', icon: Radar },
+        { id: 'places', label: 'Orte & POIs', icon: Compass },
+        { id: 'blackbox', label: 'Flugschreiber', icon: MapPin },
+        { id: 'orescanner', label: 'Erz-Scanner', icon: Pickaxe },
       ],
     },
     {
-      title: t('nav.categoryUniverse'),
+      title: 'Flotte & Inventar',
       items: [
-        { id: 'missions', label: t('nav.missions'), icon: Target },
-        { id: 'reputation', label: t('nav.reputation'), icon: Award },
-        { id: 'starmap', label: t('nav.starmap'), icon: Radar },
-        { id: 'places', label: t('nav.places'), icon: Compass },
-        { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
-        { id: 'orescanner', label: t('nav.orescanner'), icon: Pickaxe },
+        { id: 'market', label: 'Markt', icon: ShoppingBag },
+        { id: 'fleet', label: 'Flotte', icon: Rocket },
+        { id: 'warehouse', label: 'Warenlager', icon: Box, badge: warehouseCount },
+        { id: 'blueprints', label: 'Baupläne', icon: FileCode2 },
+        { id: 'loadout', label: 'Ausrüstung', icon: Shield },
       ],
     },
     {
-      title: t('nav.categorySystem'),
+      title: 'System & Optionen',
       items: [
-        { id: 'tools', label: t('nav.tools'), icon: Wrench },
-        { id: 'settings', label: t('nav.settings'), icon: Settings },
-        { id: 'about', label: t('nav.about'), icon: Info },
+        { id: 'tools', label: 'Werkzeuge', icon: Wrench },
+        { id: 'settings', label: 'Einstellungen', icon: Settings },
+        { id: 'about', label: 'Über', icon: Info },
       ],
     },
   ];
