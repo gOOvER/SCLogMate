@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   PanelLeft,
   PanelLeftClose,
+  BookOpen,
 } from 'lucide-react';
 
 export const WarehouseView: React.FC = () => {
@@ -349,7 +350,11 @@ export const WarehouseView: React.FC = () => {
                     <tr key={menuKey} className="hover:bg-[#071628]/60 transition-colors group">
                       <td className="py-2.5 px-3 text-center text-sm shrink-0">{it.icon}</td>
                       <td className="py-2.5 px-4 min-w-[200px]">
-                        <div className="font-semibold text-slate-200 group-hover:text-cyan-300 transition font-sans text-xs">
+                        <div
+                          onClick={() => window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: it.itemClass || it.itemName }))}
+                          className="font-semibold text-slate-200 hover:text-cyan-300 transition font-sans text-xs cursor-pointer"
+                          title="Im Star Citizen Wiki nachschlagen"
+                        >
                           {it.itemName}
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono truncate max-w-sm" title={it.itemClass}>
@@ -424,6 +429,17 @@ export const WarehouseView: React.FC = () => {
                             >
                               <Wrench className="w-3.5 h-3.5 text-amber-400" />
                               <span>🔧 Zerlegt / Modifiziert (-1)</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: it.itemClass || it.itemName }));
+                                setActionMenuOpenId(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-cyan-950/60 text-cyan-300 hover:text-cyan-200 flex items-center gap-2 transition cursor-pointer"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>Im SCWiki anzeigen</span>
                             </button>
 
                             <div className="h-px bg-cyan-950 my-1" />

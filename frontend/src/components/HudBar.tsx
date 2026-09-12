@@ -25,6 +25,7 @@ interface HudBarProps {
   onNavigate: (tab: NavTabId) => void;
   onTriggerOcr?: () => void;
   onToggleAutoOcr?: () => void;
+  onOpenWiki?: (query: string) => void;
 }
 
 const RegionFlag: React.FC<{ regionCode?: string }> = ({ regionCode }) => {
@@ -122,6 +123,7 @@ export const HudBar: React.FC<HudBarProps> = ({
   onNavigate,
   onTriggerOcr,
   onToggleAutoOcr,
+  onOpenWiki,
 }) => {
   const { t } = useI18n();
 
@@ -401,16 +403,20 @@ export const HudBar: React.FC<HudBarProps> = ({
               >
                 <span>{t('nav.fleet')}</span>
               </button>
-              <a
-                href={`https://star-citizen.wiki/${encodeURIComponent(telemetry.shipName)}`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => {
+                  if (onOpenWiki && telemetry.shipName && telemetry.shipName !== '—') {
+                    onOpenWiki(telemetry.shipName);
+                  } else if (telemetry.shipName && telemetry.shipName !== '—') {
+                    window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: telemetry.shipName }));
+                  }
+                }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/60 transition cursor-pointer"
                 title="Star Citizen Wiki Datenblatt öffnen"
               >
                 <span>Wiki</span>
                 <ExternalLink className="w-2.5 h-2.5" />
-              </a>
+              </button>
             </div>
           </div>
 

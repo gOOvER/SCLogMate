@@ -1984,6 +1984,49 @@ public class PhotinoBridge
                         break;
                     }
 
+                case "lookup_wiki":
+                    {
+                        string q = "";
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("query", out var wqProp)) q = wqProp.GetString() ?? "";
+                            else if (req.Payload.Value.TryGetProperty("className", out var wcnProp)) q = wcnProp.GetString() ?? "";
+                            else if (req.Payload.Value.TryGetProperty("name", out var wnProp)) q = wnProp.GetString() ?? "";
+                        }
+                        var wInfo = await WikiApiClient.LookupAsync(q, enrichBase64Image: true);
+                        SendResponse(req.Id, "lookup_wiki_response", wInfo);
+                        break;
+                    }
+
+                case "search_wiki":
+                    {
+                        string sq = "";
+                        string? scat = null;
+                        int slim = 25;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("query", out var sqProp)) sq = sqProp.GetString() ?? "";
+                            if (req.Payload.Value.TryGetProperty("category", out var scProp)) scat = scProp.GetString();
+                            if (req.Payload.Value.TryGetProperty("limit", out var slProp)) slim = slProp.GetInt32();
+                        }
+                        var searchHits = await WikiApiClient.SearchWikiAsync(sq, scat, slim);
+                        SendResponse(req.Id, "search_wiki_response", searchHits);
+                        break;
+                    }
+
+                case "get_wiki_specs":
+                    {
+                        string target = "";
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("name", out var snProp)) target = snProp.GetString() ?? "";
+                            else if (req.Payload.Value.TryGetProperty("query", out var sqProp2)) target = sqProp2.GetString() ?? "";
+                        }
+                        var specs = await WikiApiClient.LookupAsync(target, enrichBase64Image: true);
+                        SendResponse(req.Id, "get_wiki_specs_response", specs);
+                        break;
+                    }
+
                 default:
                     SendResponse(req.Id, $"{req.Type}_ack", new { success = true });
                     break;

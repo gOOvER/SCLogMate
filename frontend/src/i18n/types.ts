@@ -82,6 +82,7 @@ export interface Translations {
     loadout: string;
     starmap: string;
     places: string;
+    wiki: string;
     blackbox: string;
     orescanner: string;
     market: string;

@@ -623,15 +623,15 @@ export const FleetView: React.FC = () => {
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Wiki */}
-                          <a
-                            href={`https://star-citizen.wiki/${encodeURIComponent(ship.name)}`}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            onClick={() => {
+                              window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: ship.name }));
+                            }}
                             className="p-1.5 rounded bg-[#071322] hover:bg-cyan-950/60 border border-[#14263B] hover:border-cyan-700 text-cyan-400 transition cursor-pointer"
-                            title="Star Citizen Wiki öffnen"
+                            title="Star Citizen Wiki Dossier öffnen"
                           >
                             <ExternalLink className="w-3 h-3" />
-                          </a>
+                          </button>
 
                           {/* UEX */}
                           <a

@@ -79,6 +79,7 @@ export const de: Translations = {
     loadout: 'Piloten-Ausrüstung',
     starmap: 'Sternenkarte (Starmap)',
     places: 'Orte & Stationen',
+    wiki: 'Wiki Explorer',
     blackbox: 'Flugschreiber (Blackbox)',
     orescanner: 'RS Signal-Scanner',
     market: 'Handelsmarkt & UEX',

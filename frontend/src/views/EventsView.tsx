@@ -582,16 +582,16 @@ export const EventsView: React.FC<EventsViewProps> = ({
               </button>
 
               {selectedEvent.ship && (
-                <a
-                  href={`https://star-citizen.wiki/${encodeURIComponent(selectedEvent.ship)}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: selectedEvent.ship }));
+                  }}
                   className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded bg-[#061224] hover:bg-cyan-950/60 border border-cyan-950 hover:border-cyan-800 text-xs text-cyan-400 hover:text-cyan-200 transition cursor-pointer"
-                  title="Im Star Citizen Wiki nachschlagen"
+                  title="Star Citizen Wiki Dossier öffnen"
                 >
                   <ExternalLink className="w-3 h-3" />
                   <span>Wiki</span>
-                </a>
+                </button>
               )}
             </div>
           </div>

@@ -576,6 +576,44 @@ export interface UnknownEventsData {
   lines: string[];
 }
 
+export interface WikiStoreLocation {
+  storeName: string;
+  location: string;
+  priceAuec: number;
+  rentPrice1dAuec?: number | null;
+}
+
+export interface WikiInfo {
+  name: string;
+  category: string;
+  manufacturer: string;
+  role: string;
+  type: string;
+  focus: string;
+  size: string;
+  crewMin?: number | null;
+  crewMax?: number | null;
+  cargoScu?: number | null;
+  quantumFuel?: number | null;
+  length?: number | null;
+  beam?: number | null;
+  height?: number | null;
+  mass?: number | null;
+  descriptionDe: string;
+  descriptionEn: string;
+  bestDescription: string;
+  descriptionHeader: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  localImageBase64?: string;
+  webUrl: string;
+  pledgeUrl: string;
+  msrp?: number | null;
+  productionStatus: string;
+  specs: Record<string, string>;
+  storeLocations: WikiStoreLocation[];
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -707,6 +745,18 @@ class PhotinoBridge {
 
   public getPilotDossier(handle?: string): Promise<PilotProfile> {
     return this.sendRequest<PilotProfile>('get_pilot_dossier', { handle });
+  }
+
+  public lookupWiki(query: string): Promise<WikiInfo | null> {
+    return this.sendRequest<WikiInfo | null>('lookup_wiki', { query });
+  }
+
+  public searchWiki(query: string, category?: string, limit = 25): Promise<WikiInfo[]> {
+    return this.sendRequest<WikiInfo[]>('search_wiki', { query, category, limit });
+  }
+
+  public getWikiSpecs(name: string): Promise<WikiInfo | null> {
+    return this.sendRequest<WikiInfo | null>('get_wiki_specs', { name });
   }
 
   // Mock implementation for browser-only development
@@ -1626,6 +1676,101 @@ class PhotinoBridge {
           rsTargetAlertEnabled: payload?.settings?.rsTargetAlertEnabled ?? true,
           rsTargetSoundEnabled: payload?.settings?.rsTargetSoundEnabled ?? true,
         } as SettingsDto;
+
+      case 'lookup_wiki':
+      case 'get_wiki_specs':
+        return {
+          name: payload?.query || payload?.name || 'Cutlass Black',
+          category: 'Schiff & Fahrzeug',
+          manufacturer: 'Drake Interplanetary',
+          role: 'Mittlerer Frachter / Gunship',
+          type: 'Medium Freight / Combat',
+          focus: 'Allrounder, Fracht & Kampf',
+          size: '3',
+          crewMin: 1,
+          crewMax: 2,
+          cargoScu: 46,
+          quantumFuel: 2500,
+          length: 29.0,
+          beam: 26.5,
+          height: 10.0,
+          mass: 226000,
+          descriptionDe: 'Die Drake Cutlass Black ist das bekannteste und vielseitigste Schiff im Verse. Mit großem Frachtraum, Side-Doors, Traktorstrahl-Aufhängung und starker Bewaffnung ist sie die erste Wahl für Händler, Söldner und Entdecker.',
+          descriptionEn: 'The Drake Cutlass Black is a low-cost, easy-to-maintain medium fighter and freighter. Boasting a larger-than-average cargo hold and tractor beam mount.',
+          bestDescription: 'Die Drake Cutlass Black ist das bekannteste und vielseitigste Schiff im Verse. Mit großem Frachtraum, Side-Doors, Traktorstrahl-Aufhängung und starker Bewaffnung ist sie die erste Wahl für Händler, Söldner und Entdecker.',
+          descriptionHeader: '📖  BESCHREIBUNG (DEUTSCH)',
+          imageUrl: 'https://media.starcitizen.tools/images/thumb/7/7b/Cutlass_Black_in_flight.png/1200px-Cutlass_Black_in_flight.png',
+          thumbnailUrl: 'https://media.starcitizen.tools/images/thumb/7/7b/Cutlass_Black_in_flight.png/320px-Cutlass_Black_in_flight.png',
+          webUrl: 'https://star-citizen.wiki/Cutlass_Black',
+          pledgeUrl: 'https://robertsspaceindustries.com/pledge/ships/drake-cutlass/Cutlass-Black',
+          msrp: 110,
+          productionStatus: 'Flight-Ready',
+          specs: {
+            'Frachtkapazität': '46 SCU',
+            'Besatzung': '1 - 2 Personen',
+            'Quantum Treibstoff': '2.500 l',
+            'Abmessungen (L×B×H)': '29.0 m × 26.5 m × 10.0 m',
+            'Masse': '226.000 kg',
+            'Fahrzeuggröße': 'Größe 3 (Medium)',
+            'Waffen': '4× Size 3 Hardpoints (Gimbal S2/Fixed S3)',
+            'Türme': '1× Bemanntes Dach-Geschütz (2× S3)',
+            'Schilde': '1× S2 Schildgenerator',
+          },
+          storeLocations: [
+            {
+              storeName: 'New Deal',
+              location: 'Teasa Spaceport, Lorville (Hurston)',
+              priceAuec: 2100000,
+              rentPrice1dAuec: 42000,
+            }
+          ]
+        } as WikiInfo;
+
+      case 'search_wiki':
+        return [
+          {
+            name: 'Cutlass Black',
+            category: 'Schiff & Fahrzeug',
+            manufacturer: 'Drake Interplanetary',
+            role: 'Mittlerer Frachter',
+            type: 'Medium Freight',
+            cargoScu: 46,
+            crewMin: 1,
+            crewMax: 2,
+            productionStatus: 'Flight-Ready',
+            thumbnailUrl: 'https://media.starcitizen.tools/images/thumb/7/7b/Cutlass_Black_in_flight.png/320px-Cutlass_Black_in_flight.png',
+            webUrl: 'https://star-citizen.wiki/Cutlass_Black',
+            msrp: 110,
+          },
+          {
+            name: 'Gladius',
+            category: 'Schiff & Fahrzeug',
+            manufacturer: 'Aegis Dynamics',
+            role: 'Leichter Jäger',
+            type: 'Light Fighter',
+            cargoScu: 0,
+            crewMin: 1,
+            crewMax: 1,
+            productionStatus: 'Flight-Ready',
+            thumbnailUrl: 'https://media.starcitizen.tools/images/thumb/8/87/Gladius_flying_in_space.jpg/320px-Gladius_flying_in_space.jpg',
+            webUrl: 'https://star-citizen.wiki/Gladius',
+            msrp: 90,
+          },
+          {
+            name: 'Carrack',
+            category: 'Schiff & Fahrzeug',
+            manufacturer: 'Anvil Aerospace',
+            role: 'Expedition / Deep Space',
+            type: 'Large Explorer',
+            cargoScu: 456,
+            crewMin: 4,
+            crewMax: 6,
+            productionStatus: 'Flight-Ready',
+            thumbnailUrl: 'https://media.starcitizen.tools/images/thumb/e/e6/Carrack_in_space.jpg/320px-Carrack_in_space.jpg',
+            webUrl: 'https://star-citizen.wiki/Carrack',
+            msrp: 600,
+          }
+        ] as WikiInfo[];
     }
   }
 }

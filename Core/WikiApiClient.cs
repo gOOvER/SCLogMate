@@ -10,25 +10,44 @@ using System.Threading.Tasks;
 
 namespace SCLogMate.Core;
 
+public sealed class WikiStoreLocationDto
+{
+    [JsonPropertyName("storeName")] public string StoreName { get; set; } = "";
+    [JsonPropertyName("location")] public string Location { get; set; } = "";
+    [JsonPropertyName("priceAuec")] public long PriceAuec { get; set; }
+    [JsonPropertyName("rentPrice1dAuec")] public long? RentPrice1dAuec { get; set; }
+}
+
 public sealed class WikiInfo
 {
-    public string Name { get; set; } = "";
-    public string Category { get; set; } = "Fahrzeug"; // Schiff, Waffe, Rüstung, Komponente, Item
-    public string Manufacturer { get; set; } = "";
-    public string Role { get; set; } = "";
-    public string Type { get; set; } = "";
-    public string Size { get; set; } = "";
-    public string DescriptionDe { get; set; } = "";
-    public string DescriptionEn { get; set; } = "";
-    public string BestDescription => !string.IsNullOrWhiteSpace(DescriptionDe) ? DescriptionDe : DescriptionEn;
-    public string DescriptionHeader => !string.IsNullOrWhiteSpace(DescriptionDe) ? "📖  BESCHREIBUNG (DEUTSCH)" : "📖  BESCHREIBUNG (ENGLISCH)";
-    public string ImageUrl { get; set; } = "";
-    public string ThumbnailUrl { get; set; } = "";
-    public string WebUrl { get; set; } = "";
-    public string PledgeUrl { get; set; } = "";
-    public double? Msrp { get; set; }
-    public string ProductionStatus { get; set; } = "";
-    public Dictionary<string, string> Specs { get; set; } = new();
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("category")] public string Category { get; set; } = "Fahrzeug"; // Schiff & Fahrzeug, Waffe, Rüstung, Komponente, Item
+    [JsonPropertyName("manufacturer")] public string Manufacturer { get; set; } = "";
+    [JsonPropertyName("role")] public string Role { get; set; } = "";
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("focus")] public string Focus { get; set; } = "";
+    [JsonPropertyName("size")] public string Size { get; set; } = "";
+    [JsonPropertyName("crewMin")] public int? CrewMin { get; set; }
+    [JsonPropertyName("crewMax")] public int? CrewMax { get; set; }
+    [JsonPropertyName("cargoScu")] public double? CargoScu { get; set; }
+    [JsonPropertyName("quantumFuel")] public double? QuantumFuel { get; set; }
+    [JsonPropertyName("length")] public double? Length { get; set; }
+    [JsonPropertyName("beam")] public double? Beam { get; set; }
+    [JsonPropertyName("height")] public double? Height { get; set; }
+    [JsonPropertyName("mass")] public double? Mass { get; set; }
+    [JsonPropertyName("descriptionDe")] public string DescriptionDe { get; set; } = "";
+    [JsonPropertyName("descriptionEn")] public string DescriptionEn { get; set; } = "";
+    [JsonPropertyName("bestDescription")] public string BestDescription => !string.IsNullOrWhiteSpace(DescriptionDe) ? DescriptionDe : DescriptionEn;
+    [JsonPropertyName("descriptionHeader")] public string DescriptionHeader => !string.IsNullOrWhiteSpace(DescriptionDe) ? "📖  BESCHREIBUNG (DEUTSCH)" : "📖  BESCHREIBUNG (ENGLISCH)";
+    [JsonPropertyName("imageUrl")] public string ImageUrl { get; set; } = "";
+    [JsonPropertyName("thumbnailUrl")] public string ThumbnailUrl { get; set; } = "";
+    [JsonPropertyName("localImageBase64")] public string LocalImageBase64 { get; set; } = "";
+    [JsonPropertyName("webUrl")] public string WebUrl { get; set; } = "";
+    [JsonPropertyName("pledgeUrl")] public string PledgeUrl { get; set; } = "";
+    [JsonPropertyName("msrp")] public double? Msrp { get; set; }
+    [JsonPropertyName("productionStatus")] public string ProductionStatus { get; set; } = "";
+    [JsonPropertyName("specs")] public Dictionary<string, string> Specs { get; set; } = new();
+    [JsonPropertyName("storeLocations")] public List<WikiStoreLocationDto> StoreLocations { get; set; } = new();
 }
 
 public static class WikiApiClient
@@ -53,12 +72,19 @@ public static class WikiApiClient
         Http.DefaultRequestHeaders.Add("User-Agent", "SCLogMate/1.0.0 (+https://github.com/gOOvER/SCLogMate)");
     }
 
-    public static async Task<WikiInfo?> LookupAsync(string query)
+    public static async Task<WikiInfo?> LookupAsync(string query, bool enrichBase64Image = true)
     {
         if (string.IsNullOrWhiteSpace(query) || query == "—") return null;
 
         var clean = CleanSearchTerm(query);
-        if (Cache.TryGetValue(clean, out var cached) && cached != null) return cached;
+        if (Cache.TryGetValue(clean, out var cached) && cached != null)
+        {
+            if (enrichBase64Image && string.IsNullOrEmpty(cached.LocalImageBase64))
+            {
+                await EnrichLocalImageAsync(cached);
+            }
+            return cached;
+        }
 
         try
         {
@@ -69,15 +95,17 @@ public static class WikiApiClient
                 var byClass = await LookupByClassNameAsync(clean);
                 if (byClass != null)
                 {
+                    if (enrichBase64Image) await EnrichLocalImageAsync(byClass);
                     Cache[clean] = byClass;
                     return byClass;
                 }
             }
 
-            // 1. Bei Fahrzeugen / Schiffen suchen
+            // 1. Bei Fahrzeugen / Schiffen suchen (prüft auch lokalen SQLite-Cache)
             var vehicle = await SearchVehicleAsync(clean);
             if (vehicle != null)
             {
+                if (enrichBase64Image) await EnrichLocalImageAsync(vehicle);
                 Cache[clean] = vehicle;
                 return vehicle;
             }
@@ -86,6 +114,7 @@ public static class WikiApiClient
             var item = await SearchItemAsync(clean);
             if (item != null)
             {
+                if (enrichBase64Image) await EnrichLocalImageAsync(item);
                 Cache[clean] = item;
                 return item;
             }
@@ -112,6 +141,7 @@ public static class WikiApiClient
         var dbCached = Database.GetCachedWikiItem(clean);
         if (dbCached != null)
         {
+            WikiImageCache.PrefetchImage(dbCached.ImageUrl ?? dbCached.ThumbnailUrl);
             Cache[clean] = dbCached;
             return dbCached;
         }
@@ -164,6 +194,7 @@ public static class WikiApiClient
                     }
 
                     Database.SaveCachedWikiItem(clean, info);
+                    WikiImageCache.PrefetchImage(info.ImageUrl ?? info.ThumbnailUrl);
                     Cache[clean] = info;
                     ItemResolved?.Invoke(clean, info);
                     return info;
@@ -175,9 +206,108 @@ public static class WikiApiClient
             Logger.Log($"WikiApi Lookup Fehler ({clean}): {ex.Message}");
         }
 
-        // Weder im Wiki noch lokal vorhanden -> Unbekanntes Item für spätere Pflege loggen!
         UnknownEventsLogger.LogUnknown("ItemClass", clean);
         return null;
+    }
+
+    public static async Task<List<WikiInfo>> SearchWikiAsync(string query, string? category = null, int limit = 25)
+    {
+        var results = new List<WikiInfo>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // 1. Lokale gecachte Schiffe prüfen
+        var cachedVehicles = Database.GetAllCachedWikiVehicles();
+        var q = query.Trim().ToLowerInvariant();
+
+        foreach (var v in cachedVehicles)
+        {
+            if (string.IsNullOrWhiteSpace(q) || v.Name.ToLowerInvariant().Contains(q) || v.Manufacturer.ToLowerInvariant().Contains(q) || v.Role.ToLowerInvariant().Contains(q))
+            {
+                if (category == null || category == "all" || category == "ships")
+                {
+                    results.Add(v);
+                    seenNames.Add(v.Name);
+                    if (results.Count >= limit) return results;
+                }
+            }
+        }
+
+        // 2. Remote API Abfrage für Fahrzeuge
+        if (category == null || category == "all" || category == "ships")
+        {
+            try
+            {
+                var url = $"vehicles?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit}";
+                var response = await Http.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using var doc = await JsonDocument.ParseAsync(stream);
+                    if (doc.RootElement.TryGetProperty("data", out var vData) && vData.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in vData.EnumerateArray())
+                        {
+                            var vName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                            if (!string.IsNullOrWhiteSpace(vName) && seenNames.Add(vName))
+                            {
+                                var parsed = ParseVehicleFromJson(item, vName);
+                                Database.SaveCachedWikiVehicle(parsed);
+                                results.Add(parsed);
+                                if (results.Count >= limit) break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"WikiApi Search Vehicles Fehler: {ex.Message}");
+            }
+        }
+
+        // 3. Remote API Abfrage für Items / Ausrüstung
+        if (results.Count < limit && (category == null || category == "all" || category != "ships"))
+        {
+            try
+            {
+                var url = $"items?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit - results.Count}";
+                var response = await Http.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using var doc = await JsonDocument.ParseAsync(stream);
+                    if (doc.RootElement.TryGetProperty("data", out var iData) && iData.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in iData.EnumerateArray())
+                        {
+                            var iName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                            if (!string.IsNullOrWhiteSpace(iName) && seenNames.Add(iName))
+                            {
+                                var parsed = ParseItemFromJson(item, iName);
+                                results.Add(parsed);
+                                if (results.Count >= limit) break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"WikiApi Search Items Fehler: {ex.Message}");
+            }
+        }
+
+        return results;
+    }
+
+    public static async Task EnrichLocalImageAsync(WikiInfo info)
+    {
+        if (info == null) return;
+        var targetUrl = !string.IsNullOrEmpty(info.ImageUrl) ? info.ImageUrl : info.ThumbnailUrl;
+        if (!string.IsNullOrEmpty(targetUrl))
+        {
+            info.LocalImageBase64 = await WikiImageCache.GetImageAsDataUriAsync(targetUrl);
+        }
     }
 
     public static void EnqueueClassPrefetch(string className)
@@ -206,7 +336,7 @@ public static class WikiApiClient
                 try
                 {
                     await LookupByClassNameAsync(itemClass);
-                    await Task.Delay(250); // Sanfte Rate-Limiting-Pause
+                    await Task.Delay(250);
                 }
                 catch { }
             }
@@ -260,7 +390,6 @@ public static class WikiApiClient
     private static string CleanSearchTerm(string term)
     {
         var s = term.Trim();
-        // Entfernt Hersteller-Suffixe wie " · Drake" oder "(Kauf)"
         if (s.Contains(" · ")) s = s.Split(" · ")[0].Trim();
         if (s.Contains(" - ")) s = s.Split(" - ")[0].Trim();
         if (s.Contains('(')) s = s.Split('(')[0].Trim();
@@ -269,6 +398,14 @@ public static class WikiApiClient
 
     private static async Task<WikiInfo?> SearchVehicleAsync(string name)
     {
+        // 1. Lokalen SQLite-Cache zuerst prüfen!
+        var localCached = Database.GetCachedWikiVehicle(name);
+        if (localCached != null)
+        {
+            WikiImageCache.PrefetchImage(localCached.ImageUrl ?? localCached.ThumbnailUrl);
+            return localCached;
+        }
+
         var url = $"vehicles?filter[name]={Uri.EscapeDataString(name)}";
         var response = await Http.GetAsync(url);
         if (!response.IsSuccessStatusCode) return null;
@@ -279,15 +416,27 @@ public static class WikiApiClient
 
         if (!root.TryGetProperty("data", out var data) || data.GetArrayLength() == 0) return null;
 
-        var first = data[0];
+        var parsed = ParseVehicleFromJson(data[0], name);
+
+        // In SQLite persistieren und Bild im Hintergrund vorhalten
+        Database.SaveCachedWikiVehicle(parsed);
+        WikiImageCache.PrefetchImage(parsed.ImageUrl ?? parsed.ThumbnailUrl);
+
+        return parsed;
+    }
+
+    private static WikiInfo ParseVehicleFromJson(JsonElement first, string fallbackName)
+    {
+        var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? fallbackName : fallbackName;
         var info = new WikiInfo
         {
-            Name = first.TryGetProperty("name", out var n) ? n.GetString() ?? name : name,
+            Name = name,
             Category = "Schiff & Fahrzeug",
             WebUrl = first.TryGetProperty("web_url", out var wu) ? wu.GetString() ?? "" : "",
             PledgeUrl = first.TryGetProperty("pledge_url", out var pu) ? pu.GetString() ?? "" : "",
             Role = first.TryGetProperty("role", out var r) ? r.GetString() ?? "" : "",
-            Msrp = first.TryGetProperty("msrp", out var ms) && ms.ValueKind == JsonValueKind.Number ? ms.GetDouble() : null
+            Msrp = first.TryGetProperty("msrp", out var ms) && ms.ValueKind == JsonValueKind.Number ? ms.GetDouble() : null,
+            Size = first.TryGetProperty("size", out var sz) ? sz.ToString() : ""
         };
 
         // Hersteller
@@ -296,11 +445,23 @@ public static class WikiApiClient
             if (m.TryGetProperty("name", out var mn)) info.Manufacturer = mn.GetString() ?? "";
         }
 
-        // Typ / Fokus
+        // Typ
         if (first.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.Object)
         {
             if (t.TryGetProperty("de_DE", out var tde)) info.Type = tde.GetString() ?? "";
             else if (t.TryGetProperty("en_EN", out var ten)) info.Type = ten.GetString() ?? "";
+        }
+        else if (first.TryGetProperty("type", out var tStr))
+        {
+            info.Type = tStr.GetString() ?? "";
+        }
+
+        // Fokus
+        if (first.TryGetProperty("foci", out var fociEl) && fociEl.ValueKind == JsonValueKind.Array && fociEl.GetArrayLength() > 0)
+        {
+            var firstFocus = fociEl[0];
+            if (firstFocus.TryGetProperty("de_DE", out var fde)) info.Focus = fde.GetString() ?? "";
+            else if (firstFocus.TryGetProperty("en_EN", out var fen)) info.Focus = fen.GetString() ?? "";
         }
 
         // Status
@@ -309,8 +470,41 @@ public static class WikiApiClient
             if (ps.TryGetProperty("de_DE", out var psde)) info.ProductionStatus = psde.GetString() ?? "";
             else if (ps.TryGetProperty("en_EN", out var psen)) info.ProductionStatus = psen.GetString() ?? "";
         }
+        else if (first.TryGetProperty("production_status", out var psStr))
+        {
+            info.ProductionStatus = psStr.GetString() ?? "";
+        }
 
-        // Beschreibung (intelligente Auswahl der echten deutschen In-Game Übersetzung)
+        // Crew
+        if (first.TryGetProperty("crew", out var crewObj) && crewObj.ValueKind == JsonValueKind.Object)
+        {
+            if (crewObj.TryGetProperty("min", out var cmin) && cmin.ValueKind == JsonValueKind.Number) info.CrewMin = cmin.GetInt32();
+            if (crewObj.TryGetProperty("max", out var cmax) && cmax.ValueKind == JsonValueKind.Number) info.CrewMax = cmax.GetInt32();
+        }
+
+        // Cargo SCU
+        if (first.TryGetProperty("cargo_capacity", out var cc) && cc.ValueKind == JsonValueKind.Number)
+        {
+            info.CargoScu = cc.GetDouble();
+        }
+        else if (first.TryGetProperty("cargobay_size", out var cbs) && cbs.ValueKind == JsonValueKind.Number)
+        {
+            info.CargoScu = cbs.GetDouble();
+        }
+
+        // Quantum Fuel
+        if (first.TryGetProperty("quantum_fuel_tank_size", out var qft) && qft.ValueKind == JsonValueKind.Number)
+        {
+            info.QuantumFuel = qft.GetDouble();
+        }
+
+        // Abmessungen (Length, Beam, Height, Mass)
+        if (first.TryGetProperty("length", out var len) && len.ValueKind == JsonValueKind.Number) info.Length = len.GetDouble();
+        if (first.TryGetProperty("beam", out var bm) && bm.ValueKind == JsonValueKind.Number) info.Beam = bm.GetDouble();
+        if (first.TryGetProperty("height", out var hg) && hg.ValueKind == JsonValueKind.Number) info.Height = hg.GetDouble();
+        if (first.TryGetProperty("mass", out var mass) && mass.ValueKind == JsonValueKind.Number) info.Mass = mass.GetDouble();
+
+        // Beschreibung
         string dde = "", den = "", gdde = "", gden = "";
         if (first.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.Object)
         {
@@ -326,24 +520,15 @@ public static class WikiApiClient
 
         info.DescriptionEn = !string.IsNullOrWhiteSpace(gden) ? CleanGermanDescription(gden) : den;
 
-        // Echte deutsche Übersetzung bevorzugen:
         var cleanedGdde = CleanGermanDescription(gdde);
         if (!string.IsNullOrWhiteSpace(cleanedGdde) && !IsEnglishText(cleanedGdde))
-        {
             info.DescriptionDe = cleanedGdde;
-        }
         else if (!string.IsNullOrWhiteSpace(dde) && !IsEnglishText(dde))
-        {
             info.DescriptionDe = dde;
-        }
         else if (!string.IsNullOrWhiteSpace(cleanedGdde))
-        {
             info.DescriptionDe = cleanedGdde;
-        }
         else
-        {
             info.DescriptionDe = dde;
-        }
 
         // Bilder
         if (first.TryGetProperty("images", out var imgs) && imgs.ValueKind == JsonValueKind.Array && imgs.GetArrayLength() > 0)
@@ -353,7 +538,40 @@ public static class WikiApiClient
             if (img.TryGetProperty("original_url", out var ou)) info.ImageUrl = ou.GetString() ?? "";
         }
 
+        // Specs Dictionary zusammenstellen
+        if (info.CargoScu.HasValue) info.Specs["Frachtkapazität"] = $"{info.CargoScu.Value:N0} SCU";
+        if (info.CrewMin.HasValue || info.CrewMax.HasValue) info.Specs["Besatzung"] = $"{info.CrewMin ?? 1} - {info.CrewMax ?? info.CrewMin ?? 1} Personen";
+        if (info.QuantumFuel.HasValue) info.Specs["Quantum Treibstoff"] = $"{info.QuantumFuel.Value:N0} l";
+        if (info.Length.HasValue && info.Beam.HasValue && info.Height.HasValue)
+            info.Specs["Abmessungen (L×B×H)"] = $"{info.Length.Value:N1} m × {info.Beam.Value:N1} m × {info.Height.Value:N1} m";
+        if (info.Mass.HasValue) info.Specs["Masse"] = $"{info.Mass.Value:N0} kg";
+        if (!string.IsNullOrEmpty(info.Size)) info.Specs["Fahrzeuggröße"] = $"Größe {info.Size}";
+
+        // Händlerorte anreichern (FleetCatalog & Standard Verse Händler)
+        var catEntry = FleetCatalog.Lookup(info.Name);
+        if (catEntry.EstimatedValueAuec > 0)
+        {
+            var storeLoc = DetermineVerseStore(info.Manufacturer);
+            info.StoreLocations.Add(new WikiStoreLocationDto
+            {
+                StoreName = storeLoc.store,
+                Location = storeLoc.location,
+                PriceAuec = catEntry.EstimatedValueAuec,
+                RentPrice1dAuec = (long)(catEntry.EstimatedValueAuec * 0.02)
+            });
+        }
+
         return info;
+    }
+
+    private static (string store, string location) DetermineVerseStore(string manufacturer)
+    {
+        var m = manufacturer.ToLowerInvariant();
+        if (m.Contains("origin") || m.Contains("aegis") || m.Contains("misc") || m.Contains("esperia"))
+            return ("Astro Armada", "Area 18, ArcCorp");
+        if (m.Contains("crusader"))
+            return ("Crusader Showroom", "Cloudview Center, Orison");
+        return ("New Deal", "Teasa Spaceport, Lorville (Hurston)");
     }
 
     private static async Task<WikiInfo?> SearchItemAsync(string name)
@@ -368,10 +586,15 @@ public static class WikiApiClient
 
         if (!root.TryGetProperty("data", out var data) || data.GetArrayLength() == 0) return null;
 
-        var first = data[0];
+        return ParseItemFromJson(data[0], name);
+    }
+
+    private static WikiInfo ParseItemFromJson(JsonElement first, string fallbackName)
+    {
+        var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? fallbackName : fallbackName;
         var info = new WikiInfo
         {
-            Name = first.TryGetProperty("name", out var n) ? n.GetString() ?? name : name,
+            Name = name,
             Category = first.TryGetProperty("type_label", out var tl) ? tl.GetString() ?? "Item" : "Item",
             WebUrl = first.TryGetProperty("web_url", out var wu) ? wu.GetString() ?? "" : "",
             Type = first.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",

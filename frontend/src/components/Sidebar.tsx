@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Target,
   Wrench,
+  BookOpen,
 } from 'lucide-react';
 
 export type NavTabId =
@@ -31,6 +32,7 @@ export type NavTabId =
   | 'orescanner'
   | 'market'
   | 'fleet'
+  | 'wiki'
   | 'warehouse'
   | 'blueprints'
   | 'loadout'
@@ -91,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'market', label: 'Markt', icon: ShoppingBag },
         { id: 'fleet', label: 'Flotte', icon: Rocket },
+        { id: 'wiki', label: 'Wiki Explorer', icon: BookOpen },
         { id: 'warehouse', label: 'Warenlager', icon: Box, badge: warehouseCount },
         { id: 'blueprints', label: 'Baupläne', icon: FileCode2 },
         { id: 'loadout', label: 'Ausrüstung', icon: Shield },

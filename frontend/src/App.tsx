@@ -28,10 +28,12 @@ import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
 import { AboutView } from './views/AboutView';
+import { WikiExplorerView } from './views/WikiExplorerView';
 import { DbUpdateModal } from './components/DbUpdateModal';
 import { UpdateModal } from './components/UpdateModal';
+import { WikiDossierModal } from './components/WikiDossierModal';
 import { HardDrive } from 'lucide-react';
-import { UpdateInfoDto } from './services/photinoBridge';
+import { UpdateInfoDto, WikiInfo } from './services/photinoBridge';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
@@ -46,6 +48,22 @@ export const App: React.FC = () => {
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
+
+  // Wiki Dossier Modal State
+  const [wikiModalOpen, setWikiModalOpen] = useState<boolean>(false);
+  const [wikiModalItem, setWikiModalItem] = useState<WikiInfo | null>(null);
+  const [wikiModalQuery, setWikiModalQuery] = useState<string | null>(null);
+
+  const handleOpenWiki = (target: string | WikiInfo) => {
+    if (typeof target === 'string') {
+      setWikiModalQuery(target);
+      setWikiModalItem(null);
+    } else {
+      setWikiModalItem(target);
+      setWikiModalQuery(target.name);
+    }
+    setWikiModalOpen(true);
+  };
 
   const [telemetry, setTelemetry] = useState<HudTelemetry>({
     isGameRunning: false,
@@ -157,6 +175,11 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
 
+    const onOpenWikiEvent = (e: any) => {
+      if (e.detail) handleOpenWiki(e.detail);
+    };
+    window.addEventListener('open-wiki-dossier', onOpenWikiEvent);
+
     return () => {
       unbindLog();
       unbindLiveLoaded();
@@ -166,6 +189,7 @@ export const App: React.FC = () => {
       unbindScan();
       unbindUpdate();
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open-wiki-dossier', onOpenWikiEvent);
     };
   }, []);
 
@@ -289,6 +313,7 @@ export const App: React.FC = () => {
             onNavigate={handleSelectTab}
             onTriggerOcr={handleTriggerOcr}
             onToggleAutoOcr={handleToggleAutoOcr}
+            onOpenWiki={handleOpenWiki}
           />
         )}
 
@@ -318,6 +343,8 @@ export const App: React.FC = () => {
 
           {activeTab === 'fleet' && <FleetView />}
 
+          {activeTab === 'wiki' && <WikiExplorerView onOpenDossier={handleOpenWiki} />}
+
           {activeTab === 'warehouse' && <WarehouseView />}
 
           {activeTab === 'blueprints' && <BlueprintsView />}
@@ -342,6 +369,14 @@ export const App: React.FC = () => {
           isOpen={isUpdateModalOpen}
           updateInfo={updateInfo}
           onClose={() => setIsUpdateModalOpen(false)}
+        />
+
+        {/* Star Citizen Wiki Dossier Modal */}
+        <WikiDossierModal
+          isOpen={wikiModalOpen}
+          item={wikiModalItem}
+          query={wikiModalQuery}
+          onClose={() => setWikiModalOpen(false)}
         />
 
         {/* Bottom Statusbar */}

@@ -106,7 +106,6 @@ flowchart LR
     A[UI Klick: Schiff / Item / HUD] --> B[PhotinoBridge: lookup_wiki]
     B --> C{SQLite Cache?}
     C -- Ja --> D[Sofortige Rückgabe aus DB]
-    C -- Nein --> E[SCWiki API v2]
     E --> F[Lokaler HD-Bilder Cache auf Disk]
     E --> G[Speichern in SQLite]
     F --> H[WikiDossierModal in React]
@@ -115,33 +114,33 @@ flowchart LR
 ```
 
 ### 📝 Aufgaben für die SCWiki-Vollintegration:
-- [ ] **Lokaler HD-Bilder- & Asset-Cache (`Core/WikiImageCache.cs`):**
+- [x] **Lokaler HD-Bilder- & Asset-Cache (`Core/WikiImageCache.cs`):**
   - Download und dauerhaftes Speichern aller Render-Bilder und Thumbnails unter `%APPDATA%\SCLogMate\cache\wiki\images\{hash}.webp`.
   - Bereitstellung der lokalen Cachedateien für das React-Frontend (über Base64 Data-URIs oder lokales Dateiprotokoll).
   - Automatischer Fallback: Falls offline oder noch nicht gecacht, wird das Remote-CDN geladen und parallel im Hintergrund gecacht.
-- [ ] **Erweiterter SQLite-Speicher (`Core/Database.cs`, Schema v20):**
+- [x] **Erweiterter SQLite-Speicher (`Core/Database.cs`, Schema v20):**
   - **Neue Tabelle `wiki_vehicles_cache`:**
     - Speicherung vollständiger Schiffsspezifikationen: *Rolle, Typ, Fokus, Hersteller, Besatzung (Min/Max), Frachtkapazität (SCU), Quantum-Treibstoff-Kapazität, Triebwerke, Waffen-Hardpoints, Schilde, Kühler, Abmessungen (L×B×H, Masse), Pledge-Preis (MSRP) und deutscher Beschreibungstext*.
-  - **Bestehende Tabelle `wiki_items_cache` erweitern um:**
+  - **Bestehende Tabelle `wiki_items_cache` erweitert um:**
     - Schadenswerte, Feuerrate, Rüstungsklasse, Temperaturwiderstände, Item-Grade und Typ.
-- [ ] **Backend IPC-Bridge (`Core/Photino/PhotinoBridge.cs`):**
+- [x] **Backend IPC-Bridge (`Core/Photino/PhotinoBridge.cs`):**
   - Neuer Handler `lookup_wiki`: Sucht Schiffe oder Items anhand Name oder interner CIG-Klasse (`grin_utility_medium_helmet_01_01_04`).
   - Neuer Handler `search_wiki`: Volltextsuche über Schiffe, Fahrzeuge, Waffen, Rüstungen und Module.
   - Neuer Handler `get_wiki_specs`: Liefert strukturierte Datenblätter für Schiffe und Ausrüstung.
-- [ ] **Interaktives SCWiki-Dossier-Modal (`frontend/src/components/WikiDossierModal.tsx`):**
+- [x] **Interaktives SCWiki-Dossier-Modal (`frontend/src/components/WikiDossierModal.tsx`):**
   - Modernes Star-Citizen-Glassmorphism-Modal direkt in der App:
     - **HD-Header:** Vollbild-Render des Schiffs/Items mit Hersteller-Logo und Kategorie-Pill.
     - **Lore & Beschreibung:** Deutsche Übersetzung priorisiert, mit Umschalter auf Original-Englisch.
     - **Spezifikationen-Grid:** Kacheln für Besatzung, Fracht (SCU), Schild-Größen, Quantum Drive, Waffen/Türme.
     - **Kauf- & Mietorte:** Wo im Verse (z. B. *New Deal*, *Astro Armada*, *Cousin Crows*) ist das Schiff/Item für aUEC erhältlich?
     - **Externer Link:** Direkter Button zum Öffnen des Eintrags im echten Wiki (`starcitizen.tools` / `star-citizen.wiki`).
-- [ ] **Nahtlose Einbindung an allen Berührungspunkten in der UI:**
+- [x] **Nahtlose Einbindung an allen Berührungspunkten in der UI:**
   - **Startseite / HUD (Karte 3 - Aktives Schiff):** Klick auf „Wiki“ öffnet das Schiffsdossier-Modal.
   - **Flotten-Manager (`FleetView.tsx`):** Klick auf ein beliebiges Schiff öffnet das vollständige SCWiki-Datenblatt.
   - **Lagerbestand (`WarehouseView.tsx`):** Klick auf Gegenstand oder Aktionsmenü „Im Wiki anzeigen“ öffnet das Item-Dossier.
   - **Ereignis-Chronik (`EventsView.tsx`):** Kontextmenü / Button bei Log-Einträgen mit Schiffen oder Beute.
   - **Ausrüstung & Baupläne (`LoadoutView.tsx`, `BlueprintsView.tsx`):** Klick auf Waffen/Rüstungen/Komponenten öffnet das SCWiki-Dossier.
-- [ ] **Eigener SCWiki-Browser / Explorer (Neuer Reiter oder Untermenü):**
+- [x] **Eigener SCWiki-Browser / Explorer (Neuer Reiter oder Untermenü):**
   - Katalog aller Star-Citizen-Schiffe, -Fahrzeuge und -Waffen mit Live-Suche, Herstellerfiltern (Anvil, Drake, RSI, Aegis, Origin etc.) und Direktansicht.
 
 ---
@@ -172,8 +171,8 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 
 | Bereich | RC2 (Avalonia) | Photino (Aktueller Stand) | Status / ToDo |
 |---|---|---|---|
-| **SCWiki In-App Overlay** | Integriertes Modal mit Bild, Specs & deutscher Lore | Nur externer Browser-Link (`target="_blank"`) | 🔴 Fehlt in Photino (Abschnitt 6) |
-| **Lokaler SCWiki Bild-Cache** | Nur Remote-URLs (kein permanenter Disk-Cache) | Keiner | 🔴 Fehlt komplett (Abschnitt 6) |
+| **SCWiki In-App Overlay** | Integriertes Modal mit Bild, Specs & deutscher Lore | Integriertes Glassmorphism-Modal mit HD-Render, Specs & Lore | 🟢 Erledigt (Abschnitt 6) |
+| **Lokaler SCWiki Bild-Cache** | Nur Remote-URLs (kein permanenter Disk-Cache) | Vollständiger Disk-Cache unter %APPDATA%\cache\wiki\ | 🟢 Erledigt (Abschnitt 6) |
 | **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Nur Web-Dashboard im Hauptfenster | 🟡 Pop-out / Win32 Overlay fehlt noch |
 | **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Nur als View im Hauptfenster (`OreScannerView.tsx`) | 🟡 Transparenter In-Game-Modus fehlt |
 | **OCR Screen-Region-Selector** | Interaktiver Rahmen auf dem Desktop zum Zeichnen/Justieren der Scan-Region für Kontostand & Aufträge | Koordinaten-Eingabe in Settings | 🟡 Visueller Desktop-Drag-Selector fehlt |
@@ -186,15 +185,17 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 
 ## 🚀 Empfohlene nächste Umsetzungsschritte
 
-- [ ] **Schritt 1 (SCWiki Backend & Cache):**
+- [x] **Schritt 1 (SCWiki Backend & Cache):**
   - Implementierung von `Core/WikiImageCache.cs` (Disk-Cache für Render-Bilder unter `%APPDATA%\SCLogMate\cache\wiki\images\`).
   - Tabelle `wiki_vehicles_cache` in `Database.cs` (Schema v20) für strukturierte Fahrzeug-Spezifikationen.
   - Erweiterung von `WikiApiClient.cs` & `PhotinoBridge.cs` um `lookup_wiki`.
-- [ ] **Schritt 2 (SCWiki UI Modal & Trigger):**
+- [x] **Schritt 2 (SCWiki UI Modal & Trigger):**
   - Erstellung des React-Modals `WikiDossierModal.tsx` mit HD-Bildern, deutscher Übersetzung und Spezifikationen-Kacheln.
   - Anbindung an das HUD (Schiffskarte), die Flotte (`FleetView.tsx`) und das Lager (`WarehouseView.tsx`).
-- [ ] **Schritt 3 (SCWiki Explorer / Suche):**
-  - Eine Suchmaske zum Durchstöbern aller Schiffe, Fahrzeuge und Gegenstände des Star Citizen Wikis direkt in SCLogMate.
+- [x] **Schritt 3 (SCWiki Explorer / Suche):**
+  - Eine Suchmaske zum Durchstöbern aller Schiffe, Fahrzeuge und Gegenstände des Star Citizen Wikis direkt in SCLogMate (`WikiExplorerView.tsx`).
+- [ ] **Schritt 4 (In-Game Chat-Verlauf & Player Reports - Abschnitt 7):**
+  - OCR-basierte Chat-Erfassung, SQLite-Speicherung in `chat_messages` und 1-Klick CIG Support-Report Export.
 
 
 

@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 19; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 20; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -428,6 +428,55 @@ public static class Database
             Exec(db, "PRAGMA user_version = 19;");
             dbSchemaVersion = 19;
             Logger.Log("DB Schema: Migration auf v19 (pilot_profiles Tabelle & Indizes) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 20)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS wiki_vehicles_cache (
+                        name TEXT PRIMARY KEY,
+                        manufacturer TEXT,
+                        role TEXT,
+                        type TEXT,
+                        focus TEXT,
+                        size TEXT,
+                        crew_min INTEGER,
+                        crew_max INTEGER,
+                        cargo_scu REAL,
+                        quantum_fuel REAL,
+                        length REAL,
+                        beam REAL,
+                        height REAL,
+                        mass REAL,
+                        msrp REAL,
+                        production_status TEXT,
+                        description_de TEXT,
+                        description_en TEXT,
+                        thumbnail_url TEXT,
+                        image_url TEXT,
+                        web_url TEXT,
+                        pledge_url TEXT,
+                        specs_json TEXT,
+                        stores_json TEXT,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_wiki_vehicles_manufacturer ON wiki_vehicles_cache(manufacturer);
+                    CREATE INDEX IF NOT EXISTS ix_wiki_vehicles_role ON wiki_vehicles_cache(role);
+                ");
+
+                try { Exec(db, "ALTER TABLE wiki_items_cache ADD COLUMN specs_json TEXT;"); } catch { }
+                try { Exec(db, "ALTER TABLE wiki_items_cache ADD COLUMN item_grade TEXT;"); } catch { }
+                try { Exec(db, "ALTER TABLE wiki_items_cache ADD COLUMN item_type TEXT;"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v20 (wiki_vehicles_cache)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 20;");
+            dbSchemaVersion = 20;
+            Logger.Log("DB Schema: Migration auf v20 (wiki_vehicles_cache & erweiterte Item-Attribute) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2350,6 +2399,212 @@ public static class Database
         {
             Logger.Error("SaveCachedWikiItem", ex);
         }
+    }
+
+    public static WikiInfo? GetCachedWikiVehicle(string name)
+    {
+        EnsureInitialized();
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT name, manufacturer, role, type, focus, size, crew_min, crew_max, 
+                       cargo_scu, quantum_fuel, length, beam, height, mass, msrp, 
+                       production_status, description_de, description_en, thumbnail_url, 
+                       image_url, web_url, pledge_url, specs_json, stores_json 
+                FROM wiki_vehicles_cache 
+                WHERE name = $name 
+                LIMIT 1;
+            ";
+            cmd.Parameters.AddWithValue("$name", name.Trim());
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                var info = new WikiInfo
+                {
+                    Name = reader.GetString(0),
+                    Category = "Schiff & Fahrzeug",
+                    Manufacturer = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Role = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    Type = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    Focus = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    Size = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    CrewMin = reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                    CrewMax = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                    CargoScu = reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                    QuantumFuel = reader.IsDBNull(9) ? null : reader.GetDouble(9),
+                    Length = reader.IsDBNull(10) ? null : reader.GetDouble(10),
+                    Beam = reader.IsDBNull(11) ? null : reader.GetDouble(11),
+                    Height = reader.IsDBNull(12) ? null : reader.GetDouble(12),
+                    Mass = reader.IsDBNull(13) ? null : reader.GetDouble(13),
+                    Msrp = reader.IsDBNull(14) ? null : reader.GetDouble(14),
+                    ProductionStatus = reader.IsDBNull(15) ? "" : reader.GetString(15),
+                    DescriptionDe = reader.IsDBNull(16) ? "" : reader.GetString(16),
+                    DescriptionEn = reader.IsDBNull(17) ? "" : reader.GetString(17),
+                    ThumbnailUrl = reader.IsDBNull(18) ? "" : reader.GetString(18),
+                    ImageUrl = reader.IsDBNull(19) ? "" : reader.GetString(19),
+                    WebUrl = reader.IsDBNull(20) ? "" : reader.GetString(20),
+                    PledgeUrl = reader.IsDBNull(21) ? "" : reader.GetString(21),
+                };
+
+                if (!reader.IsDBNull(22))
+                {
+                    try
+                    {
+                        var json = reader.GetString(22);
+                        info.Specs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+                    }
+                    catch { }
+                }
+
+                if (!reader.IsDBNull(23))
+                {
+                    try
+                    {
+                        var json = reader.GetString(23);
+                        info.StoreLocations = System.Text.Json.JsonSerializer.Deserialize<List<WikiStoreLocationDto>>(json) ?? new();
+                    }
+                    catch { }
+                }
+
+                return info;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetCachedWikiVehicle", ex);
+        }
+        return null;
+    }
+
+    public static void SaveCachedWikiVehicle(WikiInfo info)
+    {
+        EnsureInitialized();
+        if (info == null || string.IsNullOrWhiteSpace(info.Name)) return;
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO wiki_vehicles_cache (
+                    name, manufacturer, role, type, focus, size, crew_min, crew_max, 
+                    cargo_scu, quantum_fuel, length, beam, height, mass, msrp, 
+                    production_status, description_de, description_en, thumbnail_url, 
+                    image_url, web_url, pledge_url, specs_json, stores_json, updated_at
+                ) VALUES (
+                    $name, $mfg, $role, $type, $focus, $size, $crewMin, $crewMax,
+                    $cargoScu, $qf, $len, $beam, $hgt, $mass, $msrp,
+                    $status, $dde, $den, $thumb, $img, $web, $pledge,
+                    $specs, $stores, $updated
+                )
+                ON CONFLICT(name) DO UPDATE SET
+                    manufacturer = excluded.manufacturer,
+                    role = excluded.role,
+                    type = excluded.type,
+                    focus = excluded.focus,
+                    size = excluded.size,
+                    crew_min = excluded.crew_min,
+                    crew_max = excluded.crew_max,
+                    cargo_scu = excluded.cargo_scu,
+                    quantum_fuel = excluded.quantum_fuel,
+                    length = excluded.length,
+                    beam = excluded.beam,
+                    height = excluded.height,
+                    mass = excluded.mass,
+                    msrp = excluded.msrp,
+                    production_status = excluded.production_status,
+                    description_de = excluded.description_de,
+                    description_en = excluded.description_en,
+                    thumbnail_url = excluded.thumbnail_url,
+                    image_url = excluded.image_url,
+                    web_url = excluded.web_url,
+                    pledge_url = excluded.pledge_url,
+                    specs_json = excluded.specs_json,
+                    stores_json = excluded.stores_json,
+                    updated_at = excluded.updated_at;
+            ";
+
+            cmd.Parameters.AddWithValue("$name", info.Name.Trim());
+            cmd.Parameters.AddWithValue("$mfg", info.Manufacturer ?? "");
+            cmd.Parameters.AddWithValue("$role", info.Role ?? "");
+            cmd.Parameters.AddWithValue("$type", info.Type ?? "");
+            cmd.Parameters.AddWithValue("$focus", info.Focus ?? "");
+            cmd.Parameters.AddWithValue("$size", info.Size ?? "");
+            cmd.Parameters.AddWithValue("$crewMin", (object?)info.CrewMin ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$crewMax", (object?)info.CrewMax ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$cargoScu", (object?)info.CargoScu ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$qf", (object?)info.QuantumFuel ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$len", (object?)info.Length ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$beam", (object?)info.Beam ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$hgt", (object?)info.Height ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$mass", (object?)info.Mass ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$msrp", (object?)info.Msrp ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$status", info.ProductionStatus ?? "");
+            cmd.Parameters.AddWithValue("$dde", info.DescriptionDe ?? "");
+            cmd.Parameters.AddWithValue("$den", info.DescriptionEn ?? "");
+            cmd.Parameters.AddWithValue("$thumb", info.ThumbnailUrl ?? "");
+            cmd.Parameters.AddWithValue("$img", info.ImageUrl ?? "");
+            cmd.Parameters.AddWithValue("$web", info.WebUrl ?? "");
+            cmd.Parameters.AddWithValue("$pledge", info.PledgeUrl ?? "");
+            cmd.Parameters.AddWithValue("$specs", info.Specs.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.Specs) : DBNull.Value);
+            cmd.Parameters.AddWithValue("$stores", info.StoreLocations.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.StoreLocations) : DBNull.Value);
+            cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("o"));
+
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("SaveCachedWikiVehicle", ex);
+        }
+    }
+
+    public static List<WikiInfo> GetAllCachedWikiVehicles()
+    {
+        EnsureInitialized();
+        var list = new List<WikiInfo>();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT name, manufacturer, role, type, focus, size, crew_min, crew_max, 
+                       cargo_scu, msrp, production_status, thumbnail_url, image_url, web_url 
+                FROM wiki_vehicles_cache 
+                ORDER BY name ASC;
+            ";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new WikiInfo
+                {
+                    Name = reader.GetString(0),
+                    Category = "Schiff & Fahrzeug",
+                    Manufacturer = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Role = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    Type = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    Focus = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    Size = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    CrewMin = reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                    CrewMax = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                    CargoScu = reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                    Msrp = reader.IsDBNull(9) ? null : reader.GetDouble(9),
+                    ProductionStatus = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                    ThumbnailUrl = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    ImageUrl = reader.IsDBNull(12) ? "" : reader.GetString(12),
+                    WebUrl = reader.IsDBNull(13) ? "" : reader.GetString(13)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetAllCachedWikiVehicles", ex);
+        }
+        return list;
     }
 
     public static (string? pilot, string? shard, string? version) GetSessionMeta(string sessionName)

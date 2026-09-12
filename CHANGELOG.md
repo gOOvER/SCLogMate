@@ -15,6 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed the unnecessary internal `"RC2 Standard"` badge from the Star Citizen Tresor & Backup-Zentrale header.
 
 ### Added
+- **Star Citizen Wiki (SCWiki) Full Integration & Local Offline Cache (`WikiImageCache.cs`, `WikiApiClient.cs`, `Database.cs`, `PhotinoBridge.cs`, `WikiDossierModal.tsx`, `WikiExplorerView.tsx`, `HudBar.tsx`, `FleetView.tsx`, `WarehouseView.tsx`, `EventsView.tsx`)**:
+  - Implemented local persistent disk-cache in `Core/WikiImageCache.cs` storing HD vehicle and item render images under `%APPDATA%\SCLogMate\cache\wiki\images\{hash}.webp`.
+  - Added Base64 Data-URI encoding (`data:image/webp;base64,...`) for instant, offline-capable image rendering inside WebView2 with graceful remote fallback.
+  - Upgraded SQLite database schema to `CurrentSchemaVersion = 20` in `Core/Database.cs`, creating `wiki_vehicles_cache` with comprehensive specifications (role, type, focus, size, min/max crew, cargo SCU, quantum fuel, dimensions, mass, MSRP, production status, localized lore, and Verse store pricing) and extending `wiki_items_cache`.
+  - Added new IPC bridge endpoints (`lookup_wiki`, `search_wiki`, `get_wiki_specs`) in `PhotinoBridge.cs` and client methods in `photinoBridge.ts`.
+  - Created interactive Glassmorphism **SCWiki Dossier Modal (`WikiDossierModal.tsx`)**:
+    - HD ship/item render with manufacturer logo badge and production status pill.
+    - German and English lore with instant language toggle (`DE / EN`).
+    - Core telemetry KPI bar (Cargo SCU, Crew, QT Fuel, Length/Beam, MSRP).
+    - Detailed vehicle specifications raster (Hardpoints, Weapons, Shields, Quantum Drive).
+    - Verse availability tab with in-game store locations (*New Deal*, *Astro Armada*, *Crusader Showroom*) and aUEC purchase/rental rates.
+    - Quick actions to open the full web entry on `star-citizen.wiki` and the official RSI Pledge Store.
+  - Implemented dedicated **Wiki Explorer View (`WikiExplorerView.tsx`)**:
+    - Full-text search and live filtering across ships, ground vehicles, weapons, and armor.
+    - Manufacturer quick-filter chips (Aegis, Anvil, Argo, Crusader, Drake, MISC, Origin, RSI, CNOU, Alien).
+    - Responsive card grid with 1-click dossier inspection.
+  - Integrated Wiki dossier triggers across the entire application:
+    - Active ship card in top HUD bar (`HudBar.tsx`).
+    - Fleet ship table and cards (`FleetView.tsx`).
+    - Warehouse items table and context actions (`WarehouseView.tsx`).
+    - Chronicle event drawer (`EventsView.tsx`).
+    - Sidebar navigation entry (`Sidebar.tsx`) and global event listener in `App.tsx`.
 - **Comprehensive Feature & Migration Roadmap (`ROADMAP.md`)**:
   - Expanded the central `ROADMAP.md` covering full Star Citizen Wiki (SCWiki) integration with local image caching and vehicle/item SQLite specifications, open Avalonia RC2 feature parity items, and an OCR-based in-game chat logging system with 1-click CIG player support reporting.
 - **Full CitizenID & RSI Citizen Dossier Integration (`CitizenService.cs`, `PilotProfile.cs`, `Database.cs`, `HudBar.tsx`, `PilotDossierModal.tsx`, `PhotinoBridge.cs`)**:
