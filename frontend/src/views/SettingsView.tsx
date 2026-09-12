@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings,
   Save,
@@ -69,6 +69,8 @@ export const SettingsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const isLoadedRef = useRef(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | null>(null);
 
   const [dbDiag, setDbDiag] = useState<any>(null);
   const [isCheckingDb, setIsCheckingDb] = useState(false);
@@ -279,6 +281,9 @@ export const SettingsView: React.FC = () => {
       const data = await bridge.send<SettingsDto>('get_settings');
       if (data) {
         setSettings(data);
+        setTimeout(() => {
+          isLoadedRef.current = true;
+        }, 150);
       }
       await loadOcrConfig();
     } catch (err) {
@@ -477,6 +482,7 @@ export const SettingsView: React.FC = () => {
     try {
       setSaving(true);
       await bridge.send('save_settings', { settings });
+      setAutoSaveStatus('saved');
       showToast('Einstellungen erfolgreich in settings.json gespeichert!');
     } catch (err) {
       console.error('Failed to save settings:', err);
@@ -485,6 +491,26 @@ export const SettingsView: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // Automatisches Speichern bei jeder Einstellungs-Änderung (debounced 400ms)
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+
+    setAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await bridge.send('save_settings', { settings });
+        setAutoSaveStatus('saved');
+        const resetTimer = setTimeout(() => setAutoSaveStatus(null), 2500);
+        return () => clearTimeout(resetTimer);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        setAutoSaveStatus(null);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [settings]);
 
   useEffect(() => {
     loadSettings();
@@ -556,14 +582,28 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Speichere...' : 'Einstellungen speichern'}</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {autoSaveStatus === 'saving' && (
+            <span className="flex items-center space-x-1.5 text-xs text-sky-400 font-mono animate-pulse bg-sky-950/40 px-2.5 py-1 rounded border border-sky-800/60">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Speichert...</span>
+            </span>
+          )}
+          {autoSaveStatus === 'saved' && (
+            <span className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-800/60">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Automatisch gespeichert</span>
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Speichere...' : 'Manuell speichern'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Sub-Tab Navigation Bar */}
@@ -1071,6 +1111,38 @@ export const SettingsView: React.FC = () => {
                   <span>Scan-Rahmen aktiv</span>
                 </span>
               )}
+            </div>
+
+            {/* Auto-OCR Wächter & Schutzmechanismus direkt im Geldscanner */}
+            <div className="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-3">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.autoOcrEnabled}
+                  onChange={(e) => setSettings({ ...settings, autoOcrEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-white flex items-center space-x-2">
+                    <Shield className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Auto-OCR Wächter für Geldscanner aktiv</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Scannt beim Öffnen des mobiGlas (F1) vollautomatisch den Kontostand per Screen-Burst und aktualisiert deinen Saldo
+                  </div>
+                </div>
+              </label>
+
+              <div className="pt-2 border-t border-slate-850 text-xs text-slate-400 space-y-1">
+                <div className="flex items-center space-x-2 text-emerald-400 text-[11px]">
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <span>Dual-Pass & Cross-Grab: Erkennt ¤ aUEC zuverlässig und verwirft Fehlscans durch mehrfache Burst-Bestätigung</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sky-400 text-[11px]">
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <span>Adaptive Skalierung & Kontrast-Filter für scharfe Textextraktion ohne Treppenartefakte</span>
+                </div>
+              </div>
             </div>
 
             {/* Haupt-Aktionsleiste */}
@@ -1612,90 +1684,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Sektion 4: Aktive Aufträge & Missions-Tracking (100% Game.log & SQLite) */}
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                  <FileText className="w-4 h-4" />
-                  <span>❖  AKTIVE AUFTRÄGE & MISSIONS-TRACKING</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Missionsdaten, Belohnungen und Baupläne werden 100% automatisch aus dem Game.log und der SQLite-Master-Datenbank abgeglichen (Auftrags-OCR wurde dauerhaft deaktiviert, da Star Citizen alle Vertragsstatus nativ im Log protokolliert).
-                </p>
-              </div>
-
-              <button
-                onClick={handleClearContracts}
-                className="px-3.5 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-800/80 transition cursor-pointer shrink-0"
-                title="Aktive Auftragsliste leeren"
-              >
-                ✕ Aufträge leeren
-              </button>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-200">
-                  Game.log Notification Parser & Master-DB
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Erkennt automatisch <code className="text-sky-300">Contract Accepted</code>, <code className="text-emerald-300">Contract Complete</code> und <code className="text-rose-300">Contract Failed</code> mit MissionId direkt aus Star Citizen.
-                </div>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-bold flex items-center space-x-1.5 shrink-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>⚡ Auto-Sync aktiv</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Sektion 3: Auto-OCR Wächter & Schutzmechanismen */}
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Shield className="w-4 h-4" />
-                <span>AUTO-OCR WÄCHTER & SCHUTZMECHANISMEN</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Hintergrund-Synchronisation und NexusApp-Sicherheitslayer gegen Fehlscans.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg bg-slate-950/60 border border-slate-800">
-                <input
-                  type="checkbox"
-                  checked={settings.autoOcrEnabled}
-                  onChange={(e) => setSettings({ ...settings, autoOcrEnabled: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
-                />
-                <div>
-                  <div className="text-xs font-semibold text-white">Auto-OCR Wächter aktiv</div>
-                  <div className="text-[11px] text-slate-400">
-                    Scannt beim Öffnen des mobiGlas (F1) vollautomatisch den Kontostand und aktualisiert deinen Saldo
-                  </div>
-                </div>
-              </label>
-
-              <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-3">
-                <div className="text-xs font-semibold text-slate-200">
-                  Dual-Read & Cross-Grab Schutzmechanismus
-                </div>
-                <div className="text-xs text-slate-400 leading-relaxed space-y-1.5">
-                  <div className="flex items-center space-x-2 text-emerald-400">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span>Cross-Grab Bestätigung: Derselbe Wert muss mindestens 2× in einer Burst-Sequenz übereinstimmen</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sky-400">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span>Adaptive Schwellenwert-Invertierung & Kontrast-Filter für kristallklare Textextraktion</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -2066,6 +2054,13 @@ export const SettingsView: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
                 <span>📄 Debug-Log öffnen</span>
+              </button>
+              <button
+                onClick={handleClearContracts}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/80 transition cursor-pointer"
+                title="Aktive Auftragsliste leeren"
+              >
+                <span>✕ Aufträge leeren</span>
               </button>
             </div>
           </div>

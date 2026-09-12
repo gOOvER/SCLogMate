@@ -26,11 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added robust localization extractors in `WikiApiClient.ExtractLocalizedOrString()` and `CleanLocalizedField()` across SQLite cache persistence and retrieval, alongside defensive client-side sanitizers in `WikiDossierModal.tsx` and `WikiExplorerView.tsx`.
 
 ### Added
+- **Auto-Save for Application Settings (`SettingsView.tsx`)**:
+  - Implemented debounced automatic saving for all user settings changes, providing an unobtrusive real-time saving status badge (`Speichert...` / `Automatisch gespeichert`) alongside the manual save button.
 - **Universal OCR Region Calibration & In-View Controls (`PhotinoBridge.cs`, `SettingsView.tsx`, `ChatLogView.tsx`, `OreScannerView.tsx`, `photinoBridge.ts`)**:
   - Added dedicated OCR scan region management, interactive screen selection, test-scans, and reset controls for RS Signal Radar (`rs`) and In-Game Chat (`chat`) in `Core/Photino/PhotinoBridge.cs` and `SettingsView.tsx`.
   - Added direct "Bereich markieren" (interactive snipping tool) and "Test-Scan" buttons with real-time feedback directly into `ChatLogView.tsx` and `OreScannerView.tsx` for seamless, one-click OCR configuration and verification.
 
 ### Changed
+- **OCR Settings Menu Cleanup & Reorganization (`SettingsView.tsx`)**:
+  - Consolidated the orphaned "Auto-OCR Wächter & Schutzmechanismus" (dual-read, cross-grab, contrast filters) section directly into Sektion 1 (mobiGlas Wallet / Geldscanner aUEC) where it functionally belongs.
+  - Completely removed the redundant OCR contracts section ("Aktive Aufträge & Missions-Tracking") from the OCR settings tab, as contract updates are parsed 100% natively from `Game.log`.
+  - Relocated the "Aufträge leeren" maintenance action button to the Database settings tab under diagnostic actions.
 - **Automatic Proceed after Database Synchronization (`DbUpdateModal.tsx`, `ROADMAP.md`)**:
   - Implemented an automatic 3-second transition timer upon database synchronization completion (`isCompleted`), displaying a dynamic `"Weiter (3s)"` button that smoothly enters the application without requiring a manual click.
 
