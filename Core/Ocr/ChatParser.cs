@@ -12,17 +12,22 @@ namespace SCLogMate.Core.Ocr;
 public static class ChatParser
 {
     // Erkennt Chat-Header wie:
-    // [GLOBAL] Minoofie:
-    // [GLOBAL) Vanduul40k:
-    // [GLOBALI gOOvER: not really
-    // BALI Dragon-heart: any SoO group going?
-    // [Party] Wingman: Ready
+    // [GLOBAL] Minoofie: text
+    // [SC KRAUTZ] AnthonyBenson: text
+    // [SékRAUTZj AnthonyBenson:
+    // tsc KRAUTZ] Ravaxx:
+    // 'IS&KRAUTZI goovERi
     // [Direct] Pilot to Target: whisper
     private static readonly Regex HeaderPattern = new(
-        @"^(?:[\[\(\{]?(?<channel>GLOBAL|PARTY|DIRECT|WHISPER|SYSTEM|TEAM|CREW|GROUP|BALI)[\]\)\|\}I1l\:]*|[\[\(\{](?<channel>[a-zA-Z]{3,10})[\]\)\|\}I1l\:]*)\s*(?:(?:From\s+)?\[?(?<sender>[a-zA-Z0-9_\-\.]{2,30})\]?(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,30})\]?)?)\s*(?:[:\-])?\s*(?<inlineMsg>.*)$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        @"^(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?(?:\s*[:\-\.;i]\s*|\s+)(?<inlineMsg>.*)$",
+        RegexOptions.Compiled);
 
-    // Fallback für einfache "Player: Text" Zeilen
+    // Standalone Header wie "[SC KRAUTZ] AnthonyBenson:" auf einer eigenen Zeile
+    private static readonly Regex StandaloneHeaderPattern = new(
+        @"^(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?\s*[:\-\.;i]?$",
+        RegexOptions.Compiled);
+
+    // Fallback für einfache "Player: Text" Zeilen (ohne Kanal-Tag davor)
     private static readonly Regex ColonSenderPattern = new(
         @"^\[?(?<sender>[a-zA-Z0-9_\-\.]{2,25})\]?\s*[:\-]\s*(?<inlineMsg>.*)$",
         RegexOptions.Compiled);
@@ -72,6 +77,9 @@ public static class ChatParser
 
             if (line.Length < 2) continue;
 
+            // Ignorieren einzelner Rauschzeichen (z. B. isolierte Zahlen oder Symbole)
+            if (line.Length <= 2 && !char.IsLetter(line[0])) continue;
+
             // Ignorieren offensichtlicher HUD- oder Menü-Fragmente
             bool shouldIgnore = false;
             foreach (var phrase in IgnoredPhrases)
@@ -84,9 +92,11 @@ public static class ChatParser
             }
             if (shouldIgnore) continue;
 
-            // 1. Muster mit Kanal-Header: [Global] Sender: Message oder [Global] Sender:
+            // 1. Muster mit Kanal-Header und Inline-Nachricht: [Global] Sender: Message
             var mHeader = HeaderPattern.Match(line);
-            if (mHeader.Success)
+            var mStandalone = StandaloneHeaderPattern.Match(line);
+
+            if (mHeader.Success && IsLikelyPlayerName(mHeader.Groups["sender"].Value))
             {
                 FinalizeCurrent();
                 var channelRaw = mHeader.Groups["channel"].Value.Trim();
@@ -102,6 +112,26 @@ public static class ChatParser
                     Sender = sender,
                     Recipient = recipient,
                     Message = inlineMsg,
+                    RawOcr = line,
+                    CreatedAt = now
+                };
+                continue;
+            }
+            else if (mStandalone.Success && IsLikelyPlayerName(mStandalone.Groups["sender"].Value))
+            {
+                FinalizeCurrent();
+                var channelRaw = mStandalone.Groups["channel"].Value.Trim();
+                var sender = mStandalone.Groups["sender"].Value.Trim();
+                var recipient = mStandalone.Groups["recipient"].Success ? mStandalone.Groups["recipient"].Value.Trim() : null;
+
+                current = new ChatMessageDto
+                {
+                    Timestamp = now,
+                    SessionId = sessionId,
+                    Channel = NormalizeChannel(channelRaw),
+                    Sender = sender,
+                    Recipient = recipient,
+                    Message = "",
                     RawOcr = line,
                     CreatedAt = now
                 };
@@ -153,26 +183,49 @@ public static class ChatParser
 
     private static string NormalizeChannel(string raw)
     {
-        var r = raw.ToLowerInvariant();
+        var r = raw.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(r)) return "Global";
         if (r.Contains("glo") || r.Contains("bal") || r.Contains("all") || r.Contains("server") || r.Contains("system")) return "Global";
         if (r.Contains("party") || r.Contains("gruppe") || r.Contains("crew") || r.Contains("team")) return "Party";
-        if (r.Contains("direct") || r.Contains("whisper") || r.Contains("flüster") || r.Contains("pm") || r.Contains("dm")) return "Direct";
-        return char.ToUpperInvariant(raw[0]) + (raw.Length > 1 ? raw.Substring(1).ToLowerInvariant() : "");
+        if (r.Contains("direct") || r.Contains("whisper") || r.Contains("flüster") || r.Contains("pm") || r.Contains("dm") || r.Contains("privat")) return "Direct";
+
+        // Bereinigung für Custom / Org Channels (z. B. "SC KRAUTZ", "SékRAUTZ", "IS&KRAUTZ")
+        var cleaned = raw.Trim(' ', '[', ']', '(', ')', '{', '}', '\'', '"', '~', '|', 'j', 't', 'I', 'l')
+                         .Replace('&', 'C')
+                         .Replace('é', 'c')
+                         .Replace('É', 'C');
+
+        if (cleaned.Length >= 2)
+        {
+            var title = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned.ToLowerInvariant());
+            if (title.StartsWith("Sc ", StringComparison.OrdinalIgnoreCase))
+            {
+                title = "SC " + title.Substring(3);
+            }
+            else if (title.StartsWith("Sck", StringComparison.OrdinalIgnoreCase) || title.StartsWith("Sék", StringComparison.OrdinalIgnoreCase))
+            {
+                title = "SC " + title.Substring(3).TrimStart();
+            }
+            return title;
+        }
+
+        return "Global";
     }
 
     private static string CleanHandle(string raw)
     {
-        // Entfernt führende/nachfolgende OCR-Artefakte wie Klammern, Doppelpunkte, Tilden
-        return raw.Trim(' ', '[', ']', '(', ')', ':', '<', '>', '~', '|', '-', '{', '}')
+        // Entfernt führende/nachfolgende OCR-Artefakte wie Klammern, Doppelpunkte, Tilden, Anführungszeichen
+        return raw.Trim(' ', '[', ']', '(', ')', ':', '<', '>', '~', '|', '-', '{', '}', '\'', '"', ';')
                   .Replace('Ø', '0')
                   .Replace('ø', '0');
     }
 
     private static bool IsLikelyPlayerName(string s)
     {
-        if (s.Length < 2 || s.Length > 30) return false;
-        if (int.TryParse(s, out _)) return false;
-        var lower = s.ToLowerInvariant();
+        var clean = CleanHandle(s);
+        if (clean.Length < 2 || clean.Length > 25) return false;
+        if (int.TryParse(clean, out _)) return false;
+        var lower = clean.ToLowerInvariant();
         if (lower is "http" or "https" or "error" or "warning" or "info" or "size" or "scu" or "time" or "date" or "name" or "press" or "f12" or "enter" or "online" or "members") return false;
         return true;
     }

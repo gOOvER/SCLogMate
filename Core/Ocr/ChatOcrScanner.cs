@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -153,10 +154,25 @@ public sealed class ChatOcrScanner : IDisposable
             ? ChatParser.ParseChatLines(plainText, currentSession)
             : new List<ChatMessageDto>();
 
-        // 2. Falls Plain-Pass keine Nachrichten liefert, Inverted-Pass als Fallback versuchen
-        if (parsed.Count == 0 && !string.IsNullOrWhiteSpace(invText))
+        // 2. Inverted-Pass ergänzen (erfasst ggf. dunklere oder invertiert besser lesbare Nachrichten)
+        if (!string.IsNullOrWhiteSpace(invText))
         {
-            parsed = ChatParser.ParseChatLines(invText, currentSession);
+            var invParsed = ChatParser.ParseChatLines(invText, currentSession);
+            if (parsed.Count == 0)
+            {
+                parsed = invParsed;
+            }
+            else if (invParsed.Count > 0)
+            {
+                var existingHashes = new HashSet<string>(parsed.Select(m => ComputeMessageHash(m.Channel, m.Sender, m.Message)));
+                foreach (var invMsg in invParsed)
+                {
+                    if (existingHashes.Add(ComputeMessageHash(invMsg.Channel, invMsg.Sender, invMsg.Message)))
+                    {
+                        parsed.Add(invMsg);
+                    }
+                }
+            }
         }
 
         if (parsed.Count == 0)

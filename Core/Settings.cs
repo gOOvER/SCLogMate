@@ -28,7 +28,7 @@ public class AppSettings
     public ScanRegion? ContractRegion { get; set; }
 
     /// <summary>Aktiviert die automatische OCR-Erfassung des Star Citizen In-Game Chatfensters.</summary>
-    public bool ChatOcrEnabled { get; set; } = false;
+    public bool ChatOcrEnabled { get; set; } = true;
 
     /// <summary>Polling-Intervall für Chat-OCR in Millisekunden.</summary>
     public int ChatOcrIntervalMs { get; set; } = 3500;

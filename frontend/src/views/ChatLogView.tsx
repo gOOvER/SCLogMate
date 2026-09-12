@@ -48,7 +48,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
   const [dossierModalOpen, setDossierModalOpen] = useState(false);
   const [selectedPilot, setSelectedPilot] = useState<PilotProfile | null>(null);
 
-  const listEndRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
   // Fetch messages from backend
@@ -105,8 +105,11 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
   }, [initialSession]);
 
   useEffect(() => {
-    if (autoScroll && listEndRef.current) {
-      listEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({
+        top: tableContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }, [messages, autoScroll]);
 
@@ -227,6 +230,18 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
     setReportModalOpen(true);
   };
 
+  // Dynamic custom/org channels detected in messages
+  const distinctOrgChannels = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of messages) {
+      const lower = m.channel.toLowerCase();
+      if (lower !== 'global' && lower !== 'party' && lower !== 'direct' && lower !== 'whisper') {
+        set.add(m.channel);
+      }
+    }
+    return Array.from(set);
+  }, [messages]);
+
   // Filter messages
   const filteredMessages = useMemo(() => {
     return messages.filter((m) => {
@@ -235,6 +250,9 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
         if (selectedChannel === 'Global' && m.channel.toLowerCase() !== 'global') return false;
         if (selectedChannel === 'Party' && !['party', 'gruppe'].includes(m.channel.toLowerCase())) return false;
         if (selectedChannel === 'Direct' && !['direct', 'whisper', 'dm', 'privat'].includes(m.channel.toLowerCase())) return false;
+        if (!['Global', 'Party', 'Direct'].includes(selectedChannel)) {
+          if (m.channel.toLowerCase() !== selectedChannel.toLowerCase()) return false;
+        }
       }
 
       // Flagged filter
@@ -379,7 +397,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
       {/* Filter and Action Toolbar */}
       <div className="sc-glass rounded-xl p-3 border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
         {/* Channel Pills */}
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
           <button
             onClick={() => setSelectedChannel('all')}
             className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
@@ -420,6 +438,19 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
           >
             [Direct / Whisper]
           </button>
+          {distinctOrgChannels.map((orgCh) => (
+            <button
+              key={orgCh}
+              onClick={() => setSelectedChannel(orgCh)}
+              className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
+                selectedChannel.toLowerCase() === orgCh.toLowerCase()
+                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                  : 'bg-slate-900/60 border-slate-800 text-amber-400/80 hover:text-amber-300'
+              }`}
+            >
+              [{orgCh}]
+            </button>
+          ))}
         </div>
 
         {/* Search & Flagged Filter */}
@@ -448,6 +479,41 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-2">
+          {/* Quick Scanner Controls right in toolbar */}
+          <div className="flex items-center space-x-1 border-r border-slate-800 pr-2">
+            <button
+              onClick={handleTriggerScan}
+              disabled={scanningNow}
+              className="px-2.5 py-1.5 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white font-bold text-[11px] border border-cyan-500/50 flex items-center space-x-1 transition-colors disabled:opacity-50"
+              title="In-Game Chatbereich jetzt sofort scannen"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${scanningNow ? 'animate-spin' : ''}`} />
+              <span>Scan</span>
+            </button>
+
+            <button
+              onClick={handleSelectRegion}
+              disabled={selectingRegion}
+              className="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] border border-slate-800 flex items-center space-x-1 transition-colors disabled:opacity-50"
+              title="Chatfenster-Scanbereich am Bildschirm markieren"
+            >
+              <Crop className={`w-3.5 h-3.5 text-cyan-400 ${selectingRegion ? 'animate-spin' : ''}`} />
+              <span>Bereich</span>
+            </button>
+
+            <button
+              onClick={handleToggleOcr}
+              className={`px-2 py-1.5 rounded-lg text-[11px] border font-bold transition-colors ${
+                ocrEnabled
+                  ? 'border-emerald-600/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+                  : 'border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800'
+              }`}
+              title="Automatischen OCR-Hintergrundscanner (3,5s) starten oder pausieren"
+            >
+              <span>{ocrEnabled ? 'Live: Ein' : 'Live: Aus'}</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setAutoScroll(!autoScroll)}
             className={`px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors flex items-center space-x-1.5 ${
@@ -491,14 +557,14 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
         </div>
 
         {/* Message Chronicle Rows */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800/40 p-2 space-y-1">
+        <div ref={tableContainerRef} className="flex-1 overflow-y-auto divide-y divide-slate-800/40 p-2 space-y-1">
           {loading && messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500 space-y-3">
               <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
               <p className="text-xs">Lade In-Game Chat-Protokoll...</p>
             </div>
           ) : filteredMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-500 space-y-3">
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-3">
               <MessageSquare className="w-8 h-8 text-slate-700" />
               <p className="text-xs font-semibold text-slate-400">
                 {messages.length === 0
@@ -507,9 +573,29 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
               </p>
               <p className="text-[11px] text-slate-600 max-w-md text-center">
                 {messages.length === 0
-                  ? 'Der optische Chat-Scanner überwacht den Star Citizen Chat-Bereich links oben im Spiel. Drücke "Scan" oder starte Star Citizen.'
+                  ? 'Der optische Chat-Scanner überwacht den Star Citizen Chat-Bereich links oben im Spiel. Drücke "Scan", wähle den Bereich oder starte den Scanner.'
                   : 'Passe die Suchkriterien oder Kanäle an.'}
               </p>
+              {messages.length === 0 && (
+                <div className="flex items-center space-x-2 pt-2">
+                  <button
+                    onClick={handleTriggerScan}
+                    disabled={scanningNow}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-cyan-950/50 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${scanningNow ? 'animate-spin' : ''}`} />
+                    <span>Jetzt Chat scannen</span>
+                  </button>
+                  <button
+                    onClick={handleSelectRegion}
+                    disabled={selectingRegion}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs border border-slate-700 flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Crop className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Chat-Bereich auswählen</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             filteredMessages.map((msg) => {
@@ -523,6 +609,8 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 channelUpper.includes('DM')
               ) {
                 channelBadgeClass = 'bg-purple-950/60 border-purple-500/40 text-purple-300';
+              } else if (!channelUpper.includes('GLOBAL')) {
+                channelBadgeClass = 'bg-amber-950/60 border-amber-500/40 text-amber-300';
               }
 
               const timeFormatted = msg.timestamp
@@ -608,7 +696,6 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
               );
             })
           )}
-          <div ref={listEndRef} />
         </div>
       </div>
 
