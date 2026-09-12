@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **In-Game Toast Notifications Test Trigger (`PhotinoBridge.cs`, `SettingsView.tsx`)**:
+  - Added dedicated "Test-Toast anzeigen" button in the In-Game Toast Settings card header and Developer simulation panel in `SettingsView.tsx` to immediately test and preview native Win32 Always-On-Top desktop toasts.
+  - Implemented `test_toast` IPC command in `PhotinoBridge.cs` supporting customizable icon, header, title, subtitle, and accent border color parameters, immediately firing sample notifications via `NativeToastOverlay`.
+  - Added native toast visual display to the `blueprint_found` developer simulation action.
+  - Added master `toastEnabled` checkbox toggle in the Toast Settings card.
 - **RC2 Feature Parity: In-Game Win32 Always-On-Top Overlays & Desktop Toasts (`NativeMiniHudOverlay.cs`, `NativeToastOverlay.cs`, `NativeRsOverlay.cs`, `GlobalHotkey.cs`, `PhotinoBridge.cs`, `ContextMenu.tsx`, `EventsView.tsx`, `MasterHeader.tsx`)**:
   - Implemented persistent, lightweight Win32 layered Always-on-Top Floating Mini-HUD (`Alt+H`) directly rendered over Star Citizen fullscreen/borderless gameplay without stealing focus (`WS_EX_NOACTIVATE`, `WS_EX_TOPMOST`, `WS_EX_TOOLWINDOW`).
   - Added real-time GDI double-buffered Mini-HUD metrics: live aUEC balance, session net earnings (+/- colored delta), server region, shard number, live ping color indicator, current location, armistice status, and active mission tracker.

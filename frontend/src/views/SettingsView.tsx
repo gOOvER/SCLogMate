@@ -394,6 +394,22 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const handleTestToast = async () => {
+    try {
+      await bridge.sendRequest('test_toast', {
+        icon: '🏆',
+        header: 'TEST-BENACHRICHTIGUNG',
+        title: 'Covalex Cargo Express',
+        subtitle: '+45.000 aUEC Belohnung erhalten',
+        color: 0x0080de4a,
+      });
+      showToast('✓ Test-Toast über dem Bildschirm ausgelöst!');
+    } catch (err) {
+      console.error('Test toast failed:', err);
+      showToast('Fehler beim Auslösen des Test-Toasts');
+    }
+  };
+
   const handleDumpDebugState = async () => {
     try {
       await bridge.sendRequest('dump_debug_state');
@@ -971,15 +987,41 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Bell className="w-4 h-4" />
-                <span>IN-GAME TOAST-BENACHRICHTIGUNGEN</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Wähle, welche Ereignisse als dezent animiertes Overlay-Banner eingeblendet werden sollen.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <Bell className="w-4 h-4" />
+                  <span>IN-GAME TOAST-BENACHRICHTIGUNGEN</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Wähle, welche Ereignisse als dezent animiertes Overlay-Banner eingeblendet werden sollen.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleTestToast}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-semibold cursor-pointer transition shadow-sm active:scale-95 whitespace-nowrap self-start sm:self-auto"
+                title="Sendet eine Test-Benachrichtigung an das native Desktop-Overlay"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                <span>Test-Toast anzeigen</span>
+              </button>
             </div>
+
+            <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg bg-slate-950/60 border border-slate-800">
+              <input
+                type="checkbox"
+                checked={settings.toastEnabled}
+                onChange={(e) => setSettings({ ...settings, toastEnabled: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
+              />
+              <div>
+                <div className="text-xs font-semibold text-white">In-Game Desktop-Toasts aktivieren</div>
+                <div className="text-[11px] text-slate-400">
+                  Zeigt Benachrichtigungen zentriert am oberen Bildschirmrand über dem Spielfenster an
+                </div>
+              </div>
+            </label>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               {[
@@ -2101,6 +2143,14 @@ export const SettingsView: React.FC = () => {
               >
                 <span className="text-base">📜</span>
                 <span>Bauplan erlernt (Toast)</span>
+              </button>
+
+              <button
+                onClick={handleTestToast}
+                className="p-3 rounded-lg bg-sky-950/40 hover:bg-sky-900/50 border border-sky-700/60 text-left transition flex items-center space-x-2.5 text-xs text-sky-200 hover:text-white cursor-pointer"
+              >
+                <span className="text-base">🏆</span>
+                <span>Test-Toast auslösen</span>
               </button>
 
               <button

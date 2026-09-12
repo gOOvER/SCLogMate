@@ -1784,6 +1784,7 @@ public class PhotinoBridge
                                 break;
                             case "blueprint_found":
                                 _auroraService.OnBlueprintLearned("Pyro RYT Multi-Tool");
+                                _toastOverlay.ShowToast("📜", "BAUPLAN ERLERNT", "Pyro RYT Multi-Tool", "Bauplan im mobiGlas verfügbar", 0x000BB5F5u);
                                 break;
                             case "quantum_arrival":
                                 _auroraService.OnQuantumArrival();
@@ -2216,6 +2217,33 @@ public class PhotinoBridge
                     _rsOverlay.Toggle();
                     SendResponse(req.Id, "open_rs_overlay_response", new { success = true, isRsOverlayActive = _rsOverlay.IsVisible });
                     Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = _rsOverlay.IsVisible });
+                    break;
+
+                case "test_toast":
+                    {
+                        string icon = "🏆";
+                        string header = "TEST-BENACHRICHTIGUNG";
+                        string title = "Covalex Cargo Express";
+                        string subtitle = "+45.000 aUEC Belohnung erhalten";
+                        uint color = 0x0080DE4Au;
+
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("icon", out var pIcon) && !string.IsNullOrEmpty(pIcon.GetString()))
+                                icon = pIcon.GetString()!;
+                            if (req.Payload.Value.TryGetProperty("header", out var pHeader) && !string.IsNullOrEmpty(pHeader.GetString()))
+                                header = pHeader.GetString()!;
+                            if (req.Payload.Value.TryGetProperty("title", out var pTitle) && !string.IsNullOrEmpty(pTitle.GetString()))
+                                title = pTitle.GetString()!;
+                            if (req.Payload.Value.TryGetProperty("subtitle", out var pSub) && !string.IsNullOrEmpty(pSub.GetString()))
+                                subtitle = pSub.GetString()!;
+                            if (req.Payload.Value.TryGetProperty("color", out var pColor) && pColor.TryGetUInt32(out var cVal))
+                                color = cVal;
+                        }
+
+                        _toastOverlay.ShowToast(icon, header, title, subtitle, color);
+                        SendResponse(req.Id, "test_toast_response", new { success = true });
+                    }
                     break;
 
                 case "record_expense":
