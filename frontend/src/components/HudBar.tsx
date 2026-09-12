@@ -14,6 +14,9 @@ import {
   Zap,
   User,
   Server,
+  Edit2,
+  Check,
+  X,
 } from 'lucide-react';
 import { HudTelemetry, PilotProfile, bridge } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
@@ -126,6 +129,20 @@ export const HudBar: React.FC<HudBarProps> = ({
   onOpenWiki,
 }) => {
   const { t } = useI18n();
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
+  const [manualBalanceValue, setManualBalanceValue] = useState('');
+
+  const handleSaveManualBalance = async () => {
+    const val = parseInt(manualBalanceValue.replace(/[^\d]/g, ''), 10);
+    if (!isNaN(val) && val > 0) {
+      try {
+        await bridge.sendRequest('set_manual_balance', { balance: val });
+      } catch (err) {
+        console.error('Failed to set manual balance:', err);
+      }
+    }
+    setIsEditingBalance(false);
+  };
 
   const formatAuec = (val: number) => {
     return new Intl.NumberFormat('de-DE').format(val);
@@ -471,10 +488,49 @@ export const HudBar: React.FC<HudBarProps> = ({
 
           {/* Kontostand Live & Pills */}
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="text-lg font-bold font-mono text-cyan-300 tracking-tight flex items-baseline gap-1.5">
-              <span>{formatAuec(telemetry.balance)}</span>
-              <span className="text-xs font-semibold text-cyan-500 font-sans">aUEC</span>
-            </div>
+            {isEditingBalance ? (
+              <div className="flex items-center gap-1.5 my-0.5">
+                <input
+                  type="text"
+                  value={manualBalanceValue}
+                  onChange={(e) => setManualBalanceValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveManualBalance();
+                    if (e.key === 'Escape') setIsEditingBalance(false);
+                  }}
+                  placeholder="z.B. 2059843"
+                  className="w-36 bg-slate-900 border border-cyan-500/80 rounded px-2 py-0.5 text-xs text-cyan-300 font-mono focus:outline-none shadow-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveManualBalance}
+                  className="px-2 py-0.5 rounded bg-emerald-800 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer transition"
+                  title="Kontostand manuell übernehmen"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setIsEditingBalance(false)}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[11px] cursor-pointer transition"
+                  title="Abbrechen"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => {
+                  setManualBalanceValue(telemetry.balance ? telemetry.balance.toString() : '');
+                  setIsEditingBalance(true);
+                }}
+                className="text-lg font-bold font-mono text-cyan-300 tracking-tight flex items-baseline gap-1.5 cursor-pointer hover:text-cyan-200 group transition-colors"
+                title="Klicken zum manuellen Anpassen des Kontostands"
+              >
+                <span>{formatAuec(telemetry.balance)}</span>
+                <span className="text-xs font-semibold text-cyan-500 font-sans">aUEC</span>
+                <Edit2 className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+              </div>
+            )}
 
             {/* Session Delta Pills */}
             <div className="flex items-center gap-1.5 font-mono text-[10px]">

@@ -916,13 +916,145 @@ public class PhotinoBridge
 
     private void OnBalanceCaptured(long newBalance)
     {
+        if (newBalance <= 0 || newBalance > 1_000_000_000_000L) return;
+
         var s = Settings.Load();
+        long oldBalance = s.Balance;
+        DateTime? oldSetAt = s.BalanceSetAt;
+
+        // Auto-Delta Erkennung:
+        long deltaKnown = 0;
+        if (oldBalance > 0 && oldSetAt.HasValue && oldSetAt.Value > DateTime.MinValue)
+        {
+            try
+            {
+                using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM events
+                    WHERE time > @since
+                      AND kind IN ('TransferIn', 'MissionReward', 'Sale', 'Trade', 'TransferOut', 'Purchase', 'Fine', 'Maintenance');";
+                cmd.Parameters.AddWithValue("@since", oldSetAt.Value.ToString("o", CultureInfo.InvariantCulture));
+                var res = cmd.ExecuteScalar();
+                if (res != null && long.TryParse(res.ToString(), out var dk))
+                {
+                    deltaKnown = dk;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnBalanceCaptured.CheckKnownDelta", ex);
+            }
+        }
+
+        long expectedBalance = oldBalance > 0 ? (oldBalance + deltaKnown) : newBalance;
+        long unloggedDiff = newBalance - expectedBalance;
+
+        string currentSession = _activeSessionName ?? (_selectedSession == "__all__" ? "Game.log" : _selectedSession);
+        string? ship = !string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—" ? _currentShip : null;
+        DateTime nowUtc = DateTime.UtcNow;
+
+        if (oldBalance > 0 && unloggedDiff != 0)
+        {
+            if (unloggedDiff > 0)
+            {
+                // Einnahme (mobiGlas Saldo-Zunahme, z.B. Missions-Belohnung, Verkauf, Transfer)
+                string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (+{unloggedDiff:N0} aUEC Gutschrift)";
+                Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, unloggedDiff, detail, ship);
+
+                var dto = new LogEventDto
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                    Category = "wallet",
+                    Kind = EventKind.TransferIn.ToString(),
+                    KindText = "Einnahme (mobiGlas)",
+                    Icon = "💰",
+                    Title = "Einnahme (mobiGlas)",
+                    Description = detail,
+                    Amount = unloggedDiff,
+                    Ship = ship,
+                    RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: +{unloggedDiff:N0} aUEC)"
+                };
+
+                lock (_liveEventsLock)
+                {
+                    _liveEvents.Insert(0, dto);
+                    if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                }
+
+                Broadcast("LOG_EVENT", dto);
+            }
+            else
+            {
+                // Ausgabe (mobiGlas Saldo-Abnahme, z.B. Tanken, Reparatur, Einkauf, Strafe)
+                long absDiff = Math.Abs(unloggedDiff);
+                string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (-{absDiff:N0} aUEC Ausgaben/Service)";
+                Database.InsertCustomEvent(currentSession, nowUtc, EventKind.Maintenance, unloggedDiff, detail, ship);
+
+                var dto = new LogEventDto
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                    Category = "wallet",
+                    Kind = EventKind.Maintenance.ToString(),
+                    KindText = "Ausgabe (mobiGlas)",
+                    Icon = "💳",
+                    Title = "Ausgabe (mobiGlas)",
+                    Description = detail,
+                    Amount = unloggedDiff,
+                    Ship = ship,
+                    RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: -{absDiff:N0} aUEC)"
+                };
+
+                lock (_liveEventsLock)
+                {
+                    _liveEvents.Insert(0, dto);
+                    if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                }
+
+                Broadcast("LOG_EVENT", dto);
+            }
+        }
+        else if (oldBalance == 0)
+        {
+            // Initialer Kontostand
+            string detail = $"mobiGlas Kontostand initial erfasst: {newBalance:N0} aUEC";
+            Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, 0, detail, ship);
+
+            var dto = new LogEventDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                Category = "wallet",
+                Kind = EventKind.TransferIn.ToString(),
+                KindText = "Kontostand initial erfasst",
+                Icon = "💳",
+                Title = "Kontostand erfasst",
+                Description = detail,
+                Amount = null,
+                Ship = ship,
+                RawText = $"mobiGlas OCR initial: {newBalance:N0} aUEC"
+            };
+
+            lock (_liveEventsLock)
+            {
+                _liveEvents.Insert(0, dto);
+                if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
+            }
+
+            Broadcast("LOG_EVENT", dto);
+        }
+
         s.Balance = newBalance;
         s.BalanceSetAt = DateTime.UtcNow;
         Settings.Save(s);
         _walletScanIndicator.FlashGreen();
         Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
         Broadcast("STATUS_UPDATE", GetAppStatus());
+        Broadcast("finance_response", GetFinanceOverview());
     }
 
     private void OnChatMessagesScanned(List<ChatMessageDto> messages)
@@ -1987,12 +2119,43 @@ public class PhotinoBridge
                     break;
 
                 case "trigger_ocr":
-                    var curSet = Settings.Load();
-                    long newBal = curSet.Balance > 0 ? curSet.Balance + 25000 : 2500000;
-                    curSet.Balance = newBal;
-                    Settings.Save(curSet);
-                    SendResponse(req.Id, "trigger_ocr_response", new { balance = newBal, success = true });
-                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    {
+                        try
+                        {
+                            var val = await _walletCapture.ScanDirectAsync();
+                            if (val.HasValue && val.Value > 0)
+                            {
+                                SendResponse(req.Id, "trigger_ocr_response", new { balance = val.Value, success = true });
+                            }
+                            else
+                            {
+                                _walletCapture.Trigger();
+                                var curBal = Settings.Load().Balance;
+                                SendResponse(req.Id, "trigger_ocr_response", new { balance = curBal, success = false, message = "mobiGlas Kontostand konnte nicht direkt gelesen werden. Burst-Scan gestartet." });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("trigger_ocr", ex);
+                            SendResponse(req.Id, "trigger_ocr_response", new { balance = Settings.Load().Balance, success = false, message = ex.Message });
+                        }
+                        break;
+                    }
+
+                case "set_manual_balance":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("balance", out var mbProp))
+                    {
+                        long manualBal = mbProp.GetInt64();
+                        if (manualBal > 0)
+                        {
+                            OnBalanceCaptured(manualBal);
+                            SendResponse(req.Id, "set_manual_balance_response", new { balance = manualBal, success = true });
+                        }
+                        else
+                        {
+                            SendResponse(req.Id, "set_manual_balance_response", new { balance = Settings.Load().Balance, success = false, message = "Ungültiger Betrag" });
+                        }
+                    }
                     break;
 
                 case "toggle_auto_ocr":
@@ -2461,7 +2624,7 @@ public class PhotinoBridge
 
         // Wallet & Finances
         var settings = Settings.Load();
-        long balance = settings.Balance > 0 ? settings.Balance : 2450000;
+        long balance = settings.Balance;
         long income = 0;
         long spend = 0;
 
@@ -2480,13 +2643,13 @@ public class PhotinoBridge
             }
             else
             {
-                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession;
+                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "Game.log") : targetSession;
                 cmd.CommandText = @"
                     SELECT 
                         COALESCE(SUM(CASE WHEN kind IN ('TransferIn', 'MissionReward', 'Sale', 'Trade') THEN amount ELSE 0 END), 0),
                         COALESCE(SUM(CASE WHEN kind IN ('TransferOut', 'Purchase', 'Fine', 'Maintenance') THEN -amount ELSE 0 END), 0)
                     FROM events
-                    WHERE (session = @sess OR @sess = '');";
+                    WHERE (session = @sess OR @sess = '' OR session = 'Game.log');";
                 cmd.Parameters.AddWithValue("@sess", sessName);
             }
             using var r = cmd.ExecuteReader();
@@ -4324,7 +4487,7 @@ public class PhotinoBridge
     private static string MapCategory(EventKind kind) => kind switch
     {
         EventKind.TransferIn or EventKind.TransferOut or EventKind.Purchase or
-        EventKind.Sale or EventKind.Trade or EventKind.MissionReward or EventKind.Fine => "wallet",
+        EventKind.Sale or EventKind.Trade or EventKind.MissionReward or EventKind.Fine or EventKind.Maintenance => "wallet",
         EventKind.Death or EventKind.ShipLoss or EventKind.Kill or EventKind.Injury => "combat",
         EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken => "mission",
         EventKind.Vehicle or EventKind.Quantum or EventKind.Hangar => "ship",

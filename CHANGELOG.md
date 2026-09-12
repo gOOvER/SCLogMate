@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Wallet Balance Delta Tracking & Live-Log Synchronization (`PhotinoBridge.cs`, `HudBar.tsx`)**:
+  - Fixed an issue where recognized or manual mobiGlas wallet balances did not update session deltas (`sessionIncome`, `sessionSpend`, `sessionNet`), causing the HUD to show `+0` and the Live-Log stream to omit income/expense entries.
+  - Implemented automatic delta calculation in `OnBalanceCaptured`: comparing new balances against prior balances minus logged game events, dynamically inserting `TransferIn` (for credits/payouts) or `Maintenance` (for debits/expenses) events into SQLite `events` and `_liveEvents`.
+  - Replaced dummy mock implementation in `trigger_ocr` (`balance + 25000`) with actual instant single-pass scan via `_walletCapture.ScanDirectAsync()`, falling back to background multi-frame burst scanning when mobiGlas is transitioning.
 - **Multi-Monitor OCR & mobiGlas aUEC Recognition Accuracy (`OcrEngineService.cs`, `WalletOcrTrigger.cs`, `WalletCapture.cs`, `PhotinoBridge.cs`)**:
   - Resolved character distortion and digit misreads (e.g. `8,0` recognized as `40` resulting in `2,034063` instead of `2,038,063`) by replacing hardcoded `scale: 6` with adaptive image-height scaling (`h * scale <= 240`), preventing extreme staircase interpolation artifacts on wider mobiGlas crops.
   - Added common OCR currency glyph misreads (`Ä`, `ä`, `Å`, `å`, `©`, `®`) into `CurrencyLabelRegex` so that recognized mobiGlas aUEC symbols are cleanly sanitized before numeric extraction.
@@ -26,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added robust localization extractors in `WikiApiClient.ExtractLocalizedOrString()` and `CleanLocalizedField()` across SQLite cache persistence and retrieval, alongside defensive client-side sanitizers in `WikiDossierModal.tsx` and `WikiExplorerView.tsx`.
 
 ### Added
+- **Inline Manual Balance Editing in HUD (`HudBar.tsx`, `PhotinoBridge.cs`)**:
+  - Added click-to-edit inline input directly on the HUD balance display (`Edit2` icon / Enter / Checkmark button), allowing instant manual adjustment of the current account balance with automated delta logging via IPC endpoint `set_manual_balance`.
 - **Auto-Save for Application Settings (`SettingsView.tsx`)**:
   - Implemented debounced automatic saving for all user settings changes, providing an unobtrusive real-time saving status badge (`Speichert...` / `Automatisch gespeichert`) alongside the manual save button.
 - **Universal OCR Region Calibration & In-View Controls (`PhotinoBridge.cs`, `SettingsView.tsx`, `ChatLogView.tsx`, `OreScannerView.tsx`, `photinoBridge.ts`)**:
