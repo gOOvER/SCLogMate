@@ -110,9 +110,10 @@ public sealed class OcrEngineService : IDisposable
             padding = 4;
         }
 
-        // Windows OCR Limit: MaxImageDimension = 2600 Pixel
+        // Adaptiver Skalierungsfaktor: Zeilenhöhe sollte für Windows.Media.Ocr optimal im Bereich ~35px bis ~90px liegen.
+        // Zu hohe Skalierung (z.B. scale=6 bei 144px Bildhöhe) erzeugt Treppeneffekte und deformiert kursive Ziffern (z.B. 8, wird zu 4).
         int maxDim = Math.Max(w, h);
-        while (scale > 1 && (maxDim * scale + padding * 2) > 2600)
+        while (scale > 1 && (h * scale > 240 || (maxDim * scale + padding * 2) > 2600))
         {
             scale--;
         }

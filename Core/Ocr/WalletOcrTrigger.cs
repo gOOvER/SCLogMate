@@ -20,7 +20,7 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"\b\d{1,2}:\d{2}(?::\d{2})?\b")]
     private static partial Regex ClockRegex();
 
-    [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥]")]
+    [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥ÄäÅå©®]")]
     private static partial Regex CurrencyLabelRegex();
 
     [GeneratedRegex(@"[+*~|/\\()\[\]{}]")]
@@ -66,7 +66,7 @@ public static partial class WalletOcrTrigger
         // 1. Uhrzeiten entfernen (z.B. "14:02 1,067,200 aUEC" -> "  1,067,200 aUEC")
         var normalized = ClockRegex().Replace(ocrText, " ");
 
-        // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289")
+        // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289" oder "Ä 2.038.063")
         normalized = CurrencyLabelRegex().Replace(normalized, " ");
 
         // 3. Führende Vorzeichen / OCR-Störzeichen entfernen
@@ -92,13 +92,13 @@ public static partial class WalletOcrTrigger
 
             if (parts.Length > 1)
             {
-                // Tausender-Gruppierung: erste Gruppe 1-3 Ziffern, alle folgenden MÜSSEN genau 3 Ziffern haben
+                // Tausender-Gruppierung: erste Gruppe 1-3 Ziffern, alle folgenden 3 Ziffern (oder Vielfache falls Trennzeichen verschmolzen)
                 if (parts[0].Length < 1 || parts[0].Length > 3) continue;
 
                 bool validGrouping = true;
                 for (int i = 1; i < parts.Length; i++)
                 {
-                    if (parts[i].Length != 3)
+                    if (parts[i].Length != 3 && parts[i].Length != 6 && parts[i].Length != 9)
                     {
                         validGrouping = false;
                         break;

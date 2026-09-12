@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **Multi-Monitor OCR & Secondary Display Support (`NativeRegionSelector.cs`, `NativeScanIndicator.cs`, `ScreenCapture.cs`, `WalletCapture.cs`)**:
+- **Multi-Monitor OCR & mobiGlas aUEC Recognition Accuracy (`OcrEngineService.cs`, `WalletOcrTrigger.cs`, `WalletCapture.cs`, `PhotinoBridge.cs`)**:
+  - Resolved character distortion and digit misreads (e.g. `8,0` recognized as `40` resulting in `2,034063` instead of `2,038,063`) by replacing hardcoded `scale: 6` with adaptive image-height scaling (`h * scale <= 240`), preventing extreme staircase interpolation artifacts on wider mobiGlas crops.
+  - Added common OCR currency glyph misreads (`Ä`, `ä`, `Å`, `å`, `©`, `®`) into `CurrencyLabelRegex` so that recognized mobiGlas aUEC symbols are cleanly sanitized before numeric extraction.
+  - Relaxed numeric thousand-group validation to tolerate 3-digit multiple runs (`Length == 6` or `9`), preventing premature balance rejection when OCR fails to detect a faint secondary thousand separator.
   - Fixed Win32 class registration and window creation failures (`ERROR_CLASS_ALREADY_EXISTS 1410` and `ERROR_CANNOT_FIND_WND_CLASS 1407`) by explicitly enforcing `CharSet = CharSet.Unicode` on `WNDCLASSEX`, `RegisterClassEx`, and `UnregisterClass` P/Invokes, preventing single-byte ANSI string truncation that prevented the snipping overlay and scan indicator from ever rendering.
   - Added graceful tolerance for `ERROR_CLASS_ALREADY_EXISTS` (1410) during overlay window class registration so window creation proceeds unhindered.
   - Added `SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)` to `NativeRegionSelector`, `NativeScanIndicator`, and `ScreenCapture.Capture` ensuring accurate 1:1 physical pixel coordinates across multi-monitor setups with mixed scaling factors (e.g. 100% and 125%/150%).

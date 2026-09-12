@@ -62,7 +62,8 @@ public sealed class WalletCapture : IDisposable
         var raw = ScreenCapture.Capture(capX, capY, capW, capH);
         if (raw == null) return null;
 
-        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 6, padding: 24, boostContrast: false).ConfigureAwait(false);
+        int optScale = capH >= 100 ? 1 : (capH >= 45 ? 2 : 3);
+        var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: optScale, padding: 24, boostContrast: false).ConfigureAwait(false);
         var bestText = WalletOcrTrigger.BestRead(invText, plainText);
         var balance = WalletOcrTrigger.ExtractBalance(bestText);
 
@@ -133,7 +134,8 @@ public sealed class WalletCapture : IDisposable
                     continue;
                 }
 
-                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: 6, padding: 24, boostContrast: false).ConfigureAwait(false);
+                int optScale = capH >= 100 ? 1 : (capH >= 45 ? 2 : 3);
+                var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: optScale, padding: 24, boostContrast: false).ConfigureAwait(false);
                 var bestText = WalletOcrTrigger.BestRead(invText, plainText);
                 var balance = WalletOcrTrigger.ExtractBalance(bestText);
 

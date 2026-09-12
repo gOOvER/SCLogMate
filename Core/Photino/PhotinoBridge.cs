@@ -4234,9 +4234,10 @@ public class PhotinoBridge
             {
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
-            var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 6, padding: 24, boostContrast: false);
+            int optScale = region.Height >= 100 ? 1 : (region.Height >= 45 ? 2 : 3);
+            var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: optScale, padding: 24, boostContrast: false);
             var bestText = WalletOcrTrigger.BestRead(invText, plainText);
-            var val = WalletOcrTrigger.ExtractBalance(bestText);
+            var val = WalletOcrTrigger.ExtractBalance(bestText ?? invText ?? plainText);
             sw.Stop();
 
             if (val.HasValue)
