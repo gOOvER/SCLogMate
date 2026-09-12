@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
+- **Real-Time Wallet Balance Dynamic Tracking via Game Log (`PhotinoBridge.cs`)**:
+  - Implemented automatic wallet balance updating on live financial log events (mission payouts, commodity sales, item purchases, refuel/repairs, fines, transfers) and manual expense recordings, eliminating the need to press F1 mobiGlas just to see current funds.
+  - Dynamically updates `Settings.Balance` and `BalanceSetAt` in real-time, instantly broadcasting `HUD_UPDATE` to synchronize the top HUD bar, the floating Always-on-Top Mini-HUD overlay, and the Finance overview.
+  - Seamlessly reconciles with F1 mobiGlas OCR scans so subsequent scans align with log-updated balances without generating duplicate delta events.
 - **Active Mission Telemetry Synchronization & False Fallback Cleanup (`PhotinoBridge.cs`, `HudBar.tsx`, `photinoBridge.ts`)**:
   - Fixed an issue where the HUD telemetry card always displayed a hardcoded dummy mission ("Kopfgeld: MRT Ziel eliminieren" with +45.000 aUEC) when no active contracts were in progress.
   - Linked active mission telemetry directly to `Database.GetActiveContracts()` and parser `ContractsList`, correctly reflecting live active contracts or defaulting cleanly to "Kein aktiver Auftrag" (with reward = 0, giver = "—", and status = "Bereit").

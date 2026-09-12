@@ -2256,7 +2256,17 @@ public class PhotinoBridge
                             string loc = req.Payload.Value.TryGetProperty("location", out var lProp) ? lProp.GetString() ?? "—" : "—";
                             string? ship = req.Payload.Value.TryGetProperty("ship", out var sProp) ? sProp.GetString() : null;
 
-                            Database.InsertCustomEvent(_activeSessionName ?? "Game.log", DateTime.UtcNow, Models.EventKind.Purchase, -Math.Abs(amount), $"{cat}: {expenseNote} @ {loc}", ship);
+                            long signedAmount = -Math.Abs(amount);
+                            Database.InsertCustomEvent(_activeSessionName ?? "Game.log", DateTime.UtcNow, Models.EventKind.Purchase, signedAmount, $"{cat}: {expenseNote} @ {loc}", ship);
+
+                            var curS = Settings.Load();
+                            if (curS.Balance > 0)
+                            {
+                                curS.Balance = Math.Max(0, curS.Balance + signedAmount);
+                                curS.BalanceSetAt = DateTime.UtcNow;
+                                Settings.Save(curS);
+                            }
+
                             SendResponse(req.Id, "record_expense_response", new { success = true });
                             Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
                             Broadcast("finance_response", GetFinanceOverview());
@@ -4584,6 +4594,18 @@ public class PhotinoBridge
                 CheckAndTriggerToast(entry, dto);
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
 
+                bool isFinancial = entry.Amount != 0 && MapCategory(entry.Kind) == "wallet";
+                if (isFinancial)
+                {
+                    var curS = Settings.Load();
+                    if (curS.Balance > 0 || entry.Amount > 0)
+                    {
+                        curS.Balance = Math.Max(0, curS.Balance + entry.Amount);
+                        curS.BalanceSetAt = entry.Time;
+                        Settings.Save(curS);
+                    }
+                }
+
                 if (entry.Kind is EventKind.MissionDone or EventKind.MissionReward)
                 {
                     var fac = ReputationCatalog.MatchFaction(entry.Detail) ?? ReputationCatalog.MatchFaction(entry.Ship);
@@ -4597,6 +4619,10 @@ public class PhotinoBridge
 
                 Broadcast("LOG_EVENT", dto);
                 Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                if (isFinancial)
+                {
+                    Broadcast("finance_response", GetFinanceOverview());
+                }
             }
         }
         catch (Exception ex)
