@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
+- **Live-Stream Events Display & Active Game.log Synchronization (`PhotinoBridge.cs`, `EventsView.tsx`, `App.tsx`)**:
+  - Fixed an issue where the Live-Stream tab in `EventsView.tsx` showed "Keine Ereignisse gefunden" even though `Game.log` was actively loaded with events.
+  - Added automatic fallback to SQLite database recent events for `Game.log` in `GetEvents("__live__")` so the active `Game.log` session is immediately populated and never rendered blank.
+  - Added `LIVE_EVENTS_LOADED` and `HUD_UPDATE` event listeners in `EventsView.tsx` to automatically synchronize events when background log tailing completes or new telemetry arrives.
+  - Wired `initialEvents` prop from `App.tsx` into `EventsView.tsx` and added immediate re-fetching when switching between Live-Stream and Sitzungsarchiv modes.
 - **Active Contracts Detection & Live Missions View Layout (`PhotinoBridge.cs`, `LogParser.cs`, `MissionsView.tsx`)**:
   - Fixed an issue where accepted and in-progress missions from `Game.log` were not populated in the "Aktive Aufträge" table or count, because `GetMissionsData()` only queried OCR database records.
   - Linked `GetMissionsData()` to `_parser.ContractsList` (`Outcome == InProgress`), merging real-time parsed missions with database contracts.

@@ -3253,6 +3253,46 @@ public class PhotinoBridge
         {
             lock (_liveEventsLock)
             {
+                if (_liveEvents.Count == 0)
+                {
+                    try
+                    {
+                        Database.EnsureInitialized();
+                        string target = _activeSessionName ?? "Game.log";
+                        var dbEvents = Database.LoadRecentEvents(1000, target);
+                        if (dbEvents.Count == 0 && target != "Game.log")
+                        {
+                            dbEvents = Database.LoadRecentEvents(1000, "Game.log");
+                        }
+                        if (dbEvents.Count == 0)
+                        {
+                            dbEvents = Database.LoadRecentEvents(1000);
+                        }
+
+                        foreach (var e in dbEvents.OrderBy(x => x.Time))
+                        {
+                            _liveEvents.Insert(0, new LogEventDto
+                            {
+                                Id = Guid.NewGuid().ToString("N"),
+                                Timestamp = e.Time.ToLocalTime().ToString("HH:mm:ss"),
+                                Category = MapCategory(e.Kind),
+                                Kind = e.Kind.ToString(),
+                                KindText = e.KindText,
+                                Icon = e.Icon,
+                                Title = e.KindText,
+                                Description = CleanEventDetail(e.Detail, e.Kind),
+                                Amount = e.Amount != 0 ? e.Amount : null,
+                                Ship = CleanEventShip(e.Ship, e.Kind),
+                                RawText = e.Detail ?? "",
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.GetEvents.LiveFallback", ex);
+                    }
+                }
+
                 var liveQuery = _liveEvents.AsEnumerable();
                 if (allowedKinds != null)
                 {

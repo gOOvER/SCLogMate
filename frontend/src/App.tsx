@@ -323,6 +323,7 @@ export const App: React.FC = () => {
           {activeTab === 'events' && (
             <EventsView
               sessions={sessions}
+              initialEvents={events}
             />
           )}
 

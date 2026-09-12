@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { bridge, LogEventItem, SessionSummary, CombatAnalyticsDto } from '../services/photinoBridge';
+import { bridge, LogEventItem, SessionSummary, CombatAnalyticsDto, HudTelemetry } from '../services/photinoBridge';
 import {
   Archive,
   BookOpen,
@@ -30,12 +30,14 @@ type SortDirection = 'asc' | 'desc';
 
 interface EventsViewProps {
   sessions?: SessionSummary[];
+  initialEvents?: LogEventItem[];
 }
 
 export const EventsView: React.FC<EventsViewProps> = ({
   sessions = [],
+  initialEvents = [],
 }) => {
-  const [events, setEvents] = useState<LogEventItem[]>([]);
+  const [events, setEvents] = useState<LogEventItem[]>(initialEvents);
   const [viewMode, setViewMode] = useState<'live' | 'archive' | 'combat'>('live');
   const [archiveSession, setArchiveSession] = useState<string>('__all__');
   const [combatData, setCombatData] = useState<CombatAnalyticsDto | null>(null);
@@ -49,6 +51,12 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; event: LogEventItem } | null>(null);
 
   const activeSession = viewMode === 'live' ? '__live__' : archiveSession;
+
+  useEffect(() => {
+    if (initialEvents && initialEvents.length > 0 && events.length === 0 && activeSession === '__live__') {
+      setEvents(initialEvents);
+    }
+  }, [initialEvents]);
 
   const fetchCombatAnalytics = async (sessionTarget = activeSession) => {
     try {
@@ -89,10 +97,33 @@ export const EventsView: React.FC<EventsViewProps> = ({
   // Live log subscription (active only in live stream mode)
   useEffect(() => {
     if (activeSession !== '__live__') return;
-    const unbind = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
+
+    const unbindLog = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
       setEvents((prev) => [newEvent, ...prev.slice(0, limit - 1)]);
     });
-    return () => unbind();
+
+    const unbindLiveLoaded = bridge.on<LogEventItem[]>('LIVE_EVENTS_LOADED', (loadedEvents) => {
+      if (Array.isArray(loadedEvents) && loadedEvents.length > 0) {
+        setEvents(loadedEvents);
+      } else {
+        fetchEvents(limit, '__live__');
+      }
+    });
+
+    const unbindHud = bridge.on<HudTelemetry>('HUD_UPDATE', () => {
+      setEvents((prev) => {
+        if (prev.length === 0) {
+          fetchEvents(limit, '__live__');
+        }
+        return prev;
+      });
+    });
+
+    return () => {
+      unbindLog();
+      unbindLiveLoaded();
+      unbindHud();
+    };
   }, [activeSession, limit]);
 
   // Keyboard navigation
@@ -245,7 +276,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
           <div className="flex items-center gap-1.5 shrink-0 bg-[#030814] p-0.5 rounded border border-cyan-950">
             <button
               type="button"
-              onClick={() => setViewMode('live')}
+              onClick={() => {
+                setViewMode('live');
+                fetchEvents(limit, '__live__');
+              }}
               className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
                 viewMode === 'live'
                   ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/70 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
@@ -262,7 +296,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <button
               type="button"
-              onClick={() => setViewMode('archive')}
+              onClick={() => {
+                setViewMode('archive');
+                fetchEvents(limit, archiveSession);
+              }}
               className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
                 viewMode === 'archive'
                   ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
