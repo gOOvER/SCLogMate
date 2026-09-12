@@ -1099,18 +1099,19 @@ export const ToolsView: React.FC = () => {
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Grafikkarte (GPU)</span>
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Grafikkarte &amp; Anzeige</span>
                     <Monitor className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
                     {status?.gpuModel || 'Wird ermittelt...'}
                   </div>
+                  <div className="text-[11px] text-slate-400 font-mono mt-1">
+                    {status?.gpuVramMb ? `${status.gpuVramMb}` : '12 GB'} VRAM {status?.gpuDriverVersion ? `· v${status.gpuDriverVersion}` : ''}
+                  </div>
                 </div>
                 <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>VRAM &amp; Treiber:</span>
-                  <span className="font-semibold text-emerald-300">
-                    {status?.gpuVramMb ? `${status.gpuVramMb}` : '12 GB'} {status?.gpuDriverVersion ? `· v${status.gpuDriverVersion}` : ''}
-                  </span>
+                  <span>Display-Auflösung:</span>
+                  <span className="font-semibold text-emerald-300">{status?.displayResolution || '2560x1440x32'}</span>
                 </div>
               </div>
 
@@ -1131,11 +1132,11 @@ export const ToolsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Drive & Resolution Box */}
+              {/* Drive Box */}
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Laufwerk &amp; Display</span>
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Installations-Laufwerk</span>
                     <HardDrive className="w-4 h-4 text-amber-400" />
                   </div>
                   <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
@@ -1143,8 +1144,8 @@ export const ToolsView: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Auflösung:</span>
-                  <span className="font-semibold text-amber-300">{status?.displayResolution || '2560x1440x32'}</span>
+                  <span>Laufwerkstyp:</span>
+                  <span className="font-semibold text-amber-300">{status?.driveType || 'Interne SSD / NVMe'}</span>
                 </div>
               </div>
             </div>

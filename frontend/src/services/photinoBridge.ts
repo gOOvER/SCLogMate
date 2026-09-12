@@ -574,6 +574,7 @@ export interface ToolsStatusDto {
   totalRamGb: number;
   ramStatus: string;
   driveName: string;
+  driveType?: string;
   freeDiskGb: number;
   pagefileStatus: string;
   keybindBackups: string[];

@@ -739,6 +739,7 @@ public class ToolsStatusDto
     [JsonPropertyName("totalRamGb")] public double TotalRamGb { get; set; }
     [JsonPropertyName("ramStatus")] public string RamStatus { get; set; } = "32 GB (Optimal)";
     [JsonPropertyName("driveName")] public string DriveName { get; set; } = "C:";
+    [JsonPropertyName("driveType")] public string DriveType { get; set; } = "Interne SSD / NVMe";
     [JsonPropertyName("freeDiskGb")] public double FreeDiskGb { get; set; }
     [JsonPropertyName("pagefileStatus")] public string PagefileStatus { get; set; } = "Aktiv";
     [JsonPropertyName("keybindBackups")] public List<string> KeybindBackups { get; set; } = new();
@@ -4782,6 +4783,7 @@ public class PhotinoBridge
             TotalRamGb = diag.TotalRamGb,
             RamStatus = diag.RamStatus,
             DriveName = diag.DriveName,
+            DriveType = diag.DriveType,
             FreeDiskGb = diag.FreeDiskGb,
             PagefileStatus = diag.PagefileStatus,
             CloudStoragePath = chosenCloud,

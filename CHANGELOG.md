@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- **Hardware Telemetry Grid Coherence (`PhotinoBridge.cs`, `photinoBridge.ts`, `ToolsView.tsx`)**:
+  - Relocated display resolution metric to the Graphics & Display card (`Grafikkarte & Anzeige`) alongside GPU model, VRAM, and driver version.
+  - Dedicated the Storage Drive card (`Installations-Laufwerk`) strictly to drive metrics: drive letter, available free space, and drive type (`Interne SSD / NVMe`).
 - **Streamlined Tools & Maintenance View Header (`ToolsView.tsx`)**:
   - Removed misplaced cloud synchronization status badge and redundant `user.cfg` action buttons from the global Tools header banner.
   - Replaced crowded header with a clean, uncluttered title and refresh control, moving the `user.cfg` file path directly into Tab 1's Live Editor header where it belongs contextually.
