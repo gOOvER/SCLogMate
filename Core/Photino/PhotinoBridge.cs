@@ -58,6 +58,9 @@ public class AppStatusDto
 
     [JsonPropertyName("lastEventTime")]
     public string? LastEventTime { get; set; }
+
+    [JsonPropertyName("chatOcrEnabled")]
+    public bool ChatOcrEnabled { get; set; }
 }
 
 public class SessionSummaryDto
@@ -716,6 +719,9 @@ public class SettingsDto
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
+    [JsonPropertyName("chatRegion")] public ScanRegion? ChatRegion { get; set; }
+    [JsonPropertyName("chatOcrEnabled")] public bool ChatOcrEnabled { get; set; } = true;
+    [JsonPropertyName("chatOcrIntervalMs")] public int ChatOcrIntervalMs { get; set; } = 3500;
 
     // RC2 Wipe Filter Settings
     [JsonPropertyName("wipeFilterEnabled")] public bool WipeFilterEnabled { get; set; }
@@ -738,9 +744,11 @@ public class OcrRegionsConfigDto
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
+    [JsonPropertyName("chatRegion")] public ScanRegion? ChatRegion { get; set; }
     [JsonPropertyName("defaultWalletRegion")] public ScanRegion DefaultWalletRegion { get; set; } = new();
     [JsonPropertyName("defaultContractRegion")] public ScanRegion DefaultContractRegion { get; set; } = new();
     [JsonPropertyName("defaultRsRegion")] public ScanRegion DefaultRsRegion { get; set; } = new();
+    [JsonPropertyName("defaultChatRegion")] public ScanRegion DefaultChatRegion { get; set; } = new();
     [JsonPropertyName("screenWidth")] public int ScreenWidth { get; set; } = 1920;
     [JsonPropertyName("screenHeight")] public int ScreenHeight { get; set; } = 1080;
     [JsonPropertyName("isWalletScanBoxVisible")] public bool IsWalletScanBoxVisible { get; set; }
@@ -858,6 +866,7 @@ public class PhotinoBridge
 
     private readonly OcrEngineService _ocrEngine = new();
     private readonly WalletCapture _walletCapture;
+    private readonly ChatOcrScanner _chatScanner;
     private readonly AuroraVoiceService _auroraService = new();
     private readonly NativeScanIndicator _walletScanIndicator = new("mobiGlas aUEC Scan", 0x22D3EE);
     private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
@@ -879,6 +888,18 @@ public class PhotinoBridge
             () => Settings.Load().WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(),
             () => Settings.Load().AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
+
+        _chatScanner = new ChatOcrScanner(
+            _ocrEngine,
+            () => Settings.Load().ChatRegion ?? ScreenCapture.GetDefaultChatRegion(),
+            () => Settings.Load().ChatOcrEnabled,
+            () => _activeSessionName ?? _selectedSession,
+            s.ChatOcrIntervalMs);
+        _chatScanner.MessagesScanned += OnChatMessagesScanned;
+        if (s.ChatOcrEnabled)
+        {
+            _chatScanner.Start();
+        }
 
         CitizenService.ProfileResolved += profile =>
         {
@@ -902,6 +923,21 @@ public class PhotinoBridge
         _walletScanIndicator.FlashGreen();
         Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
         Broadcast("STATUS_UPDATE", GetAppStatus());
+    }
+
+    private void OnChatMessagesScanned(List<ChatMessageDto> messages)
+    {
+        if (messages == null || messages.Count == 0) return;
+        var currentSession = _activeSessionName ?? _selectedSession;
+        foreach (var msg in messages)
+        {
+            if (string.IsNullOrEmpty(msg.SessionId))
+            {
+                msg.SessionId = currentSession;
+            }
+            Database.InsertChatMessage(msg);
+        }
+        Broadcast("CHAT_MESSAGES_RECEIVED", messages);
     }
 
     public void Initialize(PhotinoWindow window)
@@ -2027,6 +2063,136 @@ public class PhotinoBridge
                         break;
                     }
 
+                case "get_chat_messages":
+                    {
+                        string? csSession = null;
+                        string? csChannel = null;
+                        string? csSender = null;
+                        string? csSearch = null;
+                        bool csFlagged = false;
+                        int csLimit = 300;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("session", out var sp)) csSession = sp.GetString();
+                            if (req.Payload.Value.TryGetProperty("channel", out var cp)) csChannel = cp.GetString();
+                            if (req.Payload.Value.TryGetProperty("sender", out var sndp)) csSender = sndp.GetString();
+                            if (req.Payload.Value.TryGetProperty("search", out var srchp)) csSearch = srchp.GetString();
+                            if (req.Payload.Value.TryGetProperty("flaggedOnly", out var fp)) csFlagged = fp.GetBoolean();
+                            if (req.Payload.Value.TryGetProperty("limit", out var lp)) csLimit = lp.GetInt32();
+                        }
+                        var msgs = Database.GetChatMessages(csSession, csChannel, csSender, csSearch, csFlagged, csLimit);
+                        SendResponse(req.Id, "get_chat_messages_response", msgs);
+                        break;
+                    }
+
+                case "scan_chat_now":
+                    {
+                        var chatScanned = await _chatScanner.ScanNowAsync();
+                        SendResponse(req.Id, "scan_chat_now_response", new { success = true, count = chatScanned.Count, messages = chatScanned });
+                        break;
+                    }
+
+                case "toggle_chat_ocr":
+                    {
+                        var s = Settings.Load();
+                        bool chatEnable = req.Payload.HasValue && req.Payload.Value.TryGetProperty("enabled", out var enProp) 
+                            ? enProp.GetBoolean() 
+                            : !s.ChatOcrEnabled;
+                        s.ChatOcrEnabled = chatEnable;
+                        Settings.Save(s);
+                        if (chatEnable) _chatScanner.Start();
+                        else _chatScanner.Stop();
+                        SendResponse(req.Id, "toggle_chat_ocr_response", new { enabled = chatEnable });
+                        Broadcast("STATUS_UPDATE", GetAppStatus());
+                        break;
+                    }
+
+                case "flag_chat_message":
+                    {
+                        long id = 0;
+                        bool flagged = true;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("id", out var idProp)) id = idProp.GetInt64();
+                            if (req.Payload.Value.TryGetProperty("isFlagged", out var fProp)) flagged = fProp.GetBoolean();
+                        }
+                        Database.FlagChatMessage(id, flagged);
+                        SendResponse(req.Id, "flag_chat_message_response", new { success = true, id, isFlagged = flagged });
+                        break;
+                    }
+
+                case "clear_chat_messages":
+                    {
+                        string? sess = null;
+                        if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var sessProp)) sess = sessProp.GetString();
+                        Database.ClearChatMessages(sess);
+                        SendResponse(req.Id, "clear_chat_messages_response", new { success = true });
+                        break;
+                    }
+
+                case "export_player_report":
+                    {
+                        string reportSuspect = "";
+                        string reportCategory = "Griefing / Harassment";
+                        string reportDescription = "";
+                        List<long> messageIds = new();
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("suspect", out var susProp)) reportSuspect = susProp.GetString() ?? "";
+                            if (req.Payload.Value.TryGetProperty("category", out var catProp)) reportCategory = catProp.GetString() ?? reportCategory;
+                            if (req.Payload.Value.TryGetProperty("description", out var descProp)) reportDescription = descProp.GetString() ?? "";
+                            if (req.Payload.Value.TryGetProperty("messageIds", out var idsProp) && idsProp.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var elem in idsProp.EnumerateArray())
+                                {
+                                    if (elem.TryGetInt64(out var mid)) messageIds.Add(mid);
+                                }
+                            }
+                        }
+                        var hud = GetHudTelemetry(_selectedSession);
+                        var allFlagged = Database.GetChatMessages(null, null, null, null, flaggedOnly: false, limit: 1000);
+                        var targetMsgs = messageIds.Count > 0 
+                            ? allFlagged.Where(m => messageIds.Contains(m.Id)).ToList() 
+                            : allFlagged.Where(m => m.IsFlagged || (!string.IsNullOrEmpty(reportSuspect) && string.Equals(m.Sender, reportSuspect, StringComparison.OrdinalIgnoreCase))).ToList();
+
+                        var sb = new System.Text.StringBuilder();
+                        sb.AppendLine("# Cloud Imperium Games — Player Support Incident Report");
+                        sb.AppendLine();
+                        sb.AppendLine($"**Report Date (UTC):** {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+                        sb.AppendLine($"**Category:** {reportCategory}");
+                        sb.AppendLine($"**Reported Player / Suspect:** {(!string.IsNullOrWhiteSpace(reportSuspect) ? reportSuspect : "Multiple / Unspecified")}");
+                        sb.AppendLine($"**Reporting Pilot:** {hud.PilotName}");
+                        sb.AppendLine($"**Server Shard:** {hud.ServerShard}");
+                        sb.AppendLine($"**Server Region:** {hud.ServerRegionName} ({hud.ServerRegionCode})");
+                        sb.AppendLine($"**Game Version:** {hud.ServerVersion}");
+                        sb.AppendLine($"**Location at Incident:** {hud.LocationName} ({hud.LocationSystem})");
+                        sb.AppendLine();
+                        sb.AppendLine("---");
+                        sb.AppendLine("### Incident Description & Summary");
+                        sb.AppendLine(string.IsNullOrWhiteSpace(reportDescription) ? "*No additional comment provided.*" : reportDescription.Trim());
+                        sb.AppendLine();
+                        sb.AppendLine("---");
+                        sb.AppendLine("### In-Game Chat Evidence Transcript (OCR Verified)");
+                        if (targetMsgs.Count == 0)
+                        {
+                            sb.AppendLine("*No chat lines selected.*");
+                        }
+                        else
+                        {
+                            sb.AppendLine("| Time (UTC) | Channel | Sender | Message Content |");
+                            sb.AppendLine("|---|---|---|---|");
+                            foreach (var m in targetMsgs.OrderBy(m => m.Timestamp))
+                            {
+                                sb.AppendLine($"| {m.Timestamp:yyyy-MM-dd HH:mm:ss} | [{m.Channel}] | **{m.Sender}** | {m.Message.Replace("|", "\\|")} |");
+                            }
+                        }
+                        sb.AppendLine();
+                        sb.AppendLine("---");
+                        sb.AppendLine("*Generated automatically by SCLogMate Chronicle Suite.*");
+                        SendResponse(req.Id, "export_player_report_response", new { markdown = sb.ToString() });
+                        break;
+                    }
+
                 default:
                     SendResponse(req.Id, $"{req.Type}_ack", new { success = true });
                     break;
@@ -2493,6 +2659,7 @@ public class PhotinoBridge
             TotalSpend = spend,
             TotalNet = income - spend,
             LastEventTime = _lastEventTime?.ToString("HH:mm:ss"),
+            ChatOcrEnabled = Settings.Load().ChatOcrEnabled,
         };
     }
 
@@ -3865,6 +4032,9 @@ public class PhotinoBridge
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
             RsScanRegion = s.RsScanRegion,
+            ChatRegion = s.ChatRegion,
+            ChatOcrEnabled = s.ChatOcrEnabled,
+            ChatOcrIntervalMs = s.ChatOcrIntervalMs,
 
             WipeFilterEnabled = s.WipeFilterEnabled,
             WipeDateString = s.WipeDateString,
@@ -3907,6 +4077,11 @@ public class PhotinoBridge
         s.WalletRegion = dto.WalletRegion;
         s.ContractRegion = dto.ContractRegion;
         s.RsScanRegion = dto.RsScanRegion;
+        s.ChatRegion = dto.ChatRegion;
+        s.ChatOcrEnabled = dto.ChatOcrEnabled;
+        s.ChatOcrIntervalMs = dto.ChatOcrIntervalMs;
+        if (dto.ChatOcrEnabled) _chatScanner.Start();
+        else _chatScanner.Stop();
 
         s.WipeFilterEnabled = dto.WipeFilterEnabled;
         s.WipeDateString = dto.WipeDateString;
@@ -3948,9 +4123,11 @@ public class PhotinoBridge
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
             RsScanRegion = s.RsScanRegion,
+            ChatRegion = s.ChatRegion,
             DefaultWalletRegion = ScreenCapture.GetDefaultWalletRegion(),
             DefaultContractRegion = ScreenCapture.GetDefaultContractRegion(),
             DefaultRsRegion = ScreenCapture.GetDefaultRsRegion(),
+            DefaultChatRegion = ScreenCapture.GetDefaultChatRegion(),
             ScreenWidth = sw,
             ScreenHeight = sh,
             IsWalletScanBoxVisible = _walletScanIndicator.IsVisible,

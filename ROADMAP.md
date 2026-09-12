@@ -146,20 +146,20 @@ flowchart LR
 ---
 
 ## 💬 7. In-Game Chat-Verlauf & OCR-Protokollierung (Player Reports)
-- [ ] **OCR-basierte Chat-Erfassung (`Core/Ocr/ChatOcrScanner.cs`):**
+- [x] **OCR-basierte Chat-Erfassung (`Core/Ocr/ChatOcrScanner.cs`):**
   - Dedizierte, ressourcenschonende OCR-Erfassung des Star Citizen Chat-Fensters (Global, Party, Direct Message, Channel).
   - Robust gegen variierende Transparenzen, Chat-Schriftarten und Hintergründe.
-- [ ] **Strukturierte Chat-Chronik mit Zeitstempel & User-ID (`Core/Database.cs`):**
+- [x] **Strukturierte Chat-Chronik mit Zeitstempel & User-ID (`Core/Database.cs`):**
   - Automatisches Parsen von:
     - **Präziser Zeitstempel** (`[YYYY-MM-DD HH:mm:ss]`).
     - **Sender / Spielername** (`User / Handle`) inkl. Farb-/Kanal-Zuordnung (Global / Party / Flüstern).
     - **Kanal-Kennung** (`Global`, `Party`, `Direct`).
     - **Vollständiger Nachrichten-Text**.
   - Speicherung in dedizierter SQLite-Tabelle `chat_messages` mit Indizes auf Zeitstempel und Spielername.
-- [ ] **Chat-Chronik & Such-Explorer in der UI (`frontend/src/views/ChatLogView.tsx`):**
+- [x] **Chat-Chronik & Such-Explorer in der UI (`frontend/src/views/ChatLogView.tsx`):**
   - Durchsuchbarer Chat-Verlauf mit Live-Volltextsuche und Spieler-Filter (z. B. alle Nachrichten eines bestimmten Spielers isolieren).
   - Schnellauswahl nach Zeitraum / Spielsitzung.
-- [ ] **1-Klick CIG Support-Report Export:**
+- [x] **1-Klick CIG Support-Report Export:**
   - Einfaches Zusammenstellen und Exportieren von Vorfällen (Griefing, Beleidigungen, Belästigung, Erpressung, Piraterie) für den RSI / CIG Player Support.
   - Formatierte Zusammenfassung mit exakten Zeitstempeln, Shard-ID, Server-Region, Spielernamen, wörtlichem Chatprotokoll und optionalem Screenshot-Auszug als saubere Text-/Markdown-Vorlage für das Support-Ticket.
 
@@ -173,6 +173,7 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 |---|---|---|---|
 | **SCWiki In-App Overlay** | Integriertes Modal mit Bild, Specs & deutscher Lore | Integriertes Glassmorphism-Modal mit HD-Render, Specs & Lore | 🟢 Erledigt (Abschnitt 6) |
 | **Lokaler SCWiki Bild-Cache** | Nur Remote-URLs (kein permanenter Disk-Cache) | Vollständiger Disk-Cache unter %APPDATA%\cache\wiki\ | 🟢 Erledigt (Abschnitt 6) |
+| **In-Game Chat-Chronik & Reports** | Nicht vorhanden | OCR-Chatlogger, SQLite-Speicherung & 1-Klick CIG Report | 🟢 Erledigt (Abschnitt 7) |
 | **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Nur Web-Dashboard im Hauptfenster | 🟡 Pop-out / Win32 Overlay fehlt noch |
 | **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Nur als View im Hauptfenster (`OreScannerView.tsx`) | 🟡 Transparenter In-Game-Modus fehlt |
 | **OCR Screen-Region-Selector** | Interaktiver Rahmen auf dem Desktop zum Zeichnen/Justieren der Scan-Region für Kontostand & Aufträge | Koordinaten-Eingabe in Settings | 🟡 Visueller Desktop-Drag-Selector fehlt |
@@ -194,7 +195,7 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
   - Anbindung an das HUD (Schiffskarte), die Flotte (`FleetView.tsx`) und das Lager (`WarehouseView.tsx`).
 - [x] **Schritt 3 (SCWiki Explorer / Suche):**
   - Eine Suchmaske zum Durchstöbern aller Schiffe, Fahrzeuge und Gegenstände des Star Citizen Wikis direkt in SCLogMate (`WikiExplorerView.tsx`).
-- [ ] **Schritt 4 (In-Game Chat-Verlauf & Player Reports - Abschnitt 7):**
+- [x] **Schritt 4 (In-Game Chat-Verlauf & Player Reports - Abschnitt 7):**
   - OCR-basierte Chat-Erfassung, SQLite-Speicherung in `chat_messages` und 1-Klick CIG Support-Report Export.
 
 

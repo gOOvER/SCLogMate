@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed the unnecessary internal `"RC2 Standard"` badge from the Star Citizen Tresor & Backup-Zentrale header.
 
 ### Added
+- **In-Game Chat OCR Logging & Player Support Report Generator (`ChatOcrScanner.cs`, `ChatParser.cs`, `ChatMessageDto.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`, `PlayerReportModal.tsx`)**:
+  - Implemented real-time optical character recognition for Star Citizen's in-game chat (`F12`) in `Core/Ocr/ChatOcrScanner.cs` utilizing dual-pass contrast boosting, duplicate hash history queues, and non-blocking background OCR timers.
+  - Added regex parsing engine in `Core/Ocr/ChatParser.cs` extracting bracketed channels (`[Global]`, `[Party]`, `[Direct]`, `[Whisper]`), sender handles, recipients, and message text with HUD noise filtering.
+  - Bumped SQLite database schema to `CurrentSchemaVersion = 21` in `Core/Database.cs`, adding `chat_messages` table with indexed timestamps, channels, sender handles, and incident flags.
+  - Added backend IPC handlers in `Core/Photino/PhotinoBridge.cs` (`get_chat_messages`, `scan_chat_now`, `toggle_chat_ocr`, `flag_chat_message`, `clear_chat_messages`, `export_player_report`) and real-time broadcasts (`CHAT_MESSAGES_RECEIVED`).
+  - Created glassmorphic **Chat Chronicle View (`ChatLogView.tsx`)** with channel filter pills (`Global`, `Party`, `Direct`), search, flagged-only filter, auto-scroll toggle, 1-click pilot dossier lookup, and manual scan triggers.
+  - Created **Player Incident Report Modal (`PlayerReportModal.tsx`)** generating 1-click formatted Markdown tickets for Cloud Imperium Games (RSI) Player Support, capturing violation category (Griefing, Harassment, Exploits, Scamming), server shard/region, reporting pilot telemetry, and verified OCR chat transcripts.
+  - Added chat navigation tab to sidebar (`Sidebar.tsx`) and application router (`App.tsx`) with English and German localization.
 - **Star Citizen Wiki (SCWiki) Full Integration & Local Offline Cache (`WikiImageCache.cs`, `WikiApiClient.cs`, `Database.cs`, `PhotinoBridge.cs`, `WikiDossierModal.tsx`, `WikiExplorerView.tsx`, `HudBar.tsx`, `FleetView.tsx`, `WarehouseView.tsx`, `EventsView.tsx`)**:
   - Implemented local persistent disk-cache in `Core/WikiImageCache.cs` storing HD vehicle and item render images under `%APPDATA%\SCLogMate\cache\wiki\images\{hash}.webp`.
   - Added Base64 Data-URI encoding (`data:image/webp;base64,...`) for instant, offline-capable image rendering inside WebView2 with graceful remote fallback.

@@ -69,6 +69,7 @@ export const en: Translations = {
     categorySystem: 'SYSTEM & DIAGNOSTICS',
     dashboard: 'Dashboard (Home)',
     events: 'Events & Chronology',
+    chat: 'In-Game Chat Log (OCR)',
     sessions: 'Flight Sessions',
     finances: 'Finances & Ledger',
     warehouse: 'Warehouse & Storage',

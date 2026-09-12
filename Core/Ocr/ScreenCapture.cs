@@ -176,5 +176,17 @@ public static class ScreenCapture
         int y = (int)(sh * 0.43);
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }
+
+    /// <summary>Liefert die Standard-Region für das Star Citizen In-Game Chatfenster (F12 Chat).</summary>
+    public static ScanRegion GetDefaultChatRegion()
+    {
+        var (sw, sh) = GetPrimaryScreenSize();
+        // Chatfenster befindet sich standardmäßig im oberen linken Bereich (ca. 25-30% Breite, 40-50% Höhe)
+        int x = (int)Math.Round(sw * 0.015);
+        int y = (int)Math.Round(sh * 0.05);
+        int w = (int)Math.Round(sw * 0.28);
+        int h = (int)Math.Round(sh * 0.45);
+        return new ScanRegion { X = x, Y = y, Width = Math.Max(w, 350), Height = Math.Max(h, 250) };
+    }
 }
 

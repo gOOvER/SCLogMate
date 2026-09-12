@@ -69,6 +69,7 @@ export const de: Translations = {
     categorySystem: 'SYSTEM & DIAGNOSE',
     dashboard: 'Startseite (Dashboard)',
     events: 'Chronik & Ereignisse',
+    chat: 'Chat-Protokoll (OCR)',
     sessions: 'Spielsitzungen',
     finances: 'Finanzen & Saldo',
     warehouse: 'Lagerbestand (Warehouse)',

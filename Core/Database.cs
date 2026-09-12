@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 20; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 21; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -477,6 +477,38 @@ public static class Database
             Exec(db, "PRAGMA user_version = 20;");
             dbSchemaVersion = 20;
             Logger.Log("DB Schema: Migration auf v20 (wiki_vehicles_cache & erweiterte Item-Attribute) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 21)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS chat_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        session_id TEXT,
+                        channel TEXT NOT NULL,
+                        sender TEXT NOT NULL,
+                        recipient TEXT,
+                        message TEXT NOT NULL,
+                        raw_ocr TEXT,
+                        is_flagged INTEGER DEFAULT 0,
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_chat_timestamp ON chat_messages(timestamp);
+                    CREATE INDEX IF NOT EXISTS ix_chat_sender ON chat_messages(sender);
+                    CREATE INDEX IF NOT EXISTS ix_chat_channel ON chat_messages(channel);
+                    CREATE INDEX IF NOT EXISTS ix_chat_session ON chat_messages(session_id);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v21 (chat_messages)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 21;");
+            dbSchemaVersion = 21;
+            Logger.Log("DB Schema: Migration auf v21 (chat_messages Tabelle & Indizes) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2584,8 +2616,8 @@ public static class Database
             cmd.Parameters.AddWithValue("$img", info.ImageUrl ?? "");
             cmd.Parameters.AddWithValue("$web", info.WebUrl ?? "");
             cmd.Parameters.AddWithValue("$pledge", info.PledgeUrl ?? "");
-            cmd.Parameters.AddWithValue("$specs", info.Specs.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.Specs) : DBNull.Value);
-            cmd.Parameters.AddWithValue("$stores", info.StoreLocations.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.StoreLocations) : DBNull.Value);
+            cmd.Parameters.AddWithValue("$specs", info.Specs != null && info.Specs.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.Specs) : DBNull.Value);
+            cmd.Parameters.AddWithValue("$stores", info.StoreLocations != null && info.StoreLocations.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(info.StoreLocations) : DBNull.Value);
             cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("o"));
 
             cmd.ExecuteNonQuery();
@@ -2795,6 +2827,190 @@ public static class Database
         catch (Exception ex)
         {
             Logger.Error($"Database.SavePilotProfile({profile.Handle})", ex);
+        }
+    }
+
+    #endregion
+
+    #region Chat Messages (OCR & Chronik)
+
+    public static long InsertChatMessage(ChatMessageDto msg)
+    {
+        EnsureInitialized();
+        if (msg == null || string.IsNullOrWhiteSpace(msg.Message)) return 0;
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+
+            // Deduplizierung: Selbe Nachricht vom selben Sender innerhalb von 15 Sekunden überspringen
+            using var checkCmd = db.CreateCommand();
+            checkCmd.CommandText = @"
+                SELECT id FROM chat_messages 
+                WHERE sender = @s AND message = @m 
+                ORDER BY id DESC LIMIT 1;
+            ";
+            checkCmd.Parameters.AddWithValue("@s", msg.Sender.Trim());
+            checkCmd.Parameters.AddWithValue("@m", msg.Message.Trim());
+            var existing = checkCmd.ExecuteScalar();
+            if (existing != null && existing != DBNull.Value)
+            {
+                return Convert.ToInt64(existing);
+            }
+
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO chat_messages (
+                    timestamp, session_id, channel, sender, recipient, 
+                    message, raw_ocr, is_flagged, created_at
+                ) VALUES (
+                    @ts, @sid, @ch, @s, @r, @m, @raw, @flag, @cr
+                );
+                SELECT last_insert_rowid();
+            ";
+            cmd.Parameters.AddWithValue("@ts", string.IsNullOrEmpty(msg.Timestamp) ? DateTime.UtcNow.ToString("o") : msg.Timestamp);
+            cmd.Parameters.AddWithValue("@sid", (object?)msg.SessionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ch", string.IsNullOrEmpty(msg.Channel) ? "Global" : msg.Channel);
+            cmd.Parameters.AddWithValue("@s", msg.Sender.Trim());
+            cmd.Parameters.AddWithValue("@r", (object?)msg.Recipient ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@m", msg.Message.Trim());
+            cmd.Parameters.AddWithValue("@raw", (object?)msg.RawOcr ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@flag", msg.IsFlagged ? 1 : 0);
+            cmd.Parameters.AddWithValue("@cr", string.IsNullOrEmpty(msg.CreatedAt) ? DateTime.UtcNow.ToString("o") : msg.CreatedAt);
+
+            var idObj = cmd.ExecuteScalar();
+            return idObj != null ? Convert.ToInt64(idObj) : 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.InsertChatMessage", ex);
+            return 0;
+        }
+    }
+
+    public static List<ChatMessageDto> GetChatMessages(
+        string? sessionId = null,
+        string? channel = null,
+        string? sender = null,
+        string? query = null,
+        bool flaggedOnly = false,
+        int limit = 250,
+        int offset = 0)
+    {
+        EnsureInitialized();
+        var list = new List<ChatMessageDto>();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+
+            var whereClauses = new List<string>();
+            if (!string.IsNullOrWhiteSpace(sessionId) && sessionId != "ALL")
+            {
+                whereClauses.Add("session_id = @sid");
+                cmd.Parameters.AddWithValue("@sid", sessionId.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(channel) && channel != "ALL")
+            {
+                whereClauses.Add("LOWER(channel) = LOWER(@ch)");
+                cmd.Parameters.AddWithValue("@ch", channel.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(sender))
+            {
+                whereClauses.Add("LOWER(sender) LIKE @sender");
+                cmd.Parameters.AddWithValue("@sender", $"%{sender.Trim().ToLowerInvariant()}%");
+            }
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                whereClauses.Add("(LOWER(message) LIKE @q OR LOWER(sender) LIKE @q)");
+                cmd.Parameters.AddWithValue("@q", $"%{query.Trim().ToLowerInvariant()}%");
+            }
+            if (flaggedOnly)
+            {
+                whereClauses.Add("is_flagged = 1");
+            }
+
+            var where = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
+            cmd.CommandText = $@"
+                SELECT id, timestamp, session_id, channel, sender, recipient, 
+                       message, raw_ocr, is_flagged, created_at
+                FROM chat_messages
+                {where}
+                ORDER BY id DESC
+                LIMIT @lim OFFSET @off;
+            ";
+            cmd.Parameters.AddWithValue("@lim", Math.Clamp(limit, 1, 1000));
+            cmd.Parameters.AddWithValue("@off", Math.Max(0, offset));
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new ChatMessageDto
+                {
+                    Id = reader.GetInt64(0),
+                    Timestamp = reader.GetString(1),
+                    SessionId = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    Channel = reader.GetString(3),
+                    Sender = reader.GetString(4),
+                    Recipient = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    Message = reader.GetString(6),
+                    RawOcr = reader.IsDBNull(7) ? null : reader.GetString(7),
+                    IsFlagged = reader.GetInt32(8) == 1,
+                    CreatedAt = reader.GetString(9)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.GetChatMessages", ex);
+        }
+        return list;
+    }
+
+    public static bool FlagChatMessage(long id, bool isFlagged)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "UPDATE chat_messages SET is_flagged = @flag WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@flag", isFlagged ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", id);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.FlagChatMessage", ex);
+            return false;
+        }
+    }
+
+    public static bool ClearChatMessages(string? sessionId = null)
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            if (!string.IsNullOrWhiteSpace(sessionId) && sessionId != "ALL")
+            {
+                cmd.CommandText = "DELETE FROM chat_messages WHERE session_id = @sid;";
+                cmd.Parameters.AddWithValue("@sid", sessionId.Trim());
+            }
+            else
+            {
+                cmd.CommandText = "DELETE FROM chat_messages;";
+            }
+            return cmd.ExecuteNonQuery() >= 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.ClearChatMessages", ex);
+            return false;
         }
     }
 

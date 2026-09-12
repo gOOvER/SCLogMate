@@ -72,6 +72,7 @@ export interface Translations {
     categorySystem: string;
     dashboard: string;
     events: string;
+    chat: string;
     sessions: string;
     finances: string;
     warehouse: string;

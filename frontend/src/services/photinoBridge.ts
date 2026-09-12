@@ -23,6 +23,20 @@ export interface AppStatus {
   totalSpend: number;
   totalNet: number;
   lastEventTime: string | null;
+  chatOcrEnabled?: boolean;
+}
+
+export interface ChatMessageDto {
+  id: number;
+  timestamp: string;
+  sessionId?: string;
+  channel: string;
+  sender: string;
+  recipient?: string;
+  message: string;
+  rawOcr?: string;
+  isFlagged: boolean;
+  createdAt: string;
 }
 
 export interface HudTelemetry {
@@ -759,9 +773,121 @@ class PhotinoBridge {
     return this.sendRequest<WikiInfo | null>('get_wiki_specs', { name });
   }
 
+  public getChatMessages(filters?: {
+    session?: string;
+    channel?: string;
+    sender?: string;
+    search?: string;
+    flaggedOnly?: boolean;
+    limit?: number;
+  }): Promise<ChatMessageDto[]> {
+    return this.sendRequest<ChatMessageDto[]>('get_chat_messages', filters);
+  }
+
+  public scanChatNow(): Promise<{ success: boolean; count: number; messages: ChatMessageDto[] }> {
+    return this.sendRequest<{ success: boolean; count: number; messages: ChatMessageDto[] }>('scan_chat_now');
+  }
+
+  public toggleChatOcr(enabled?: boolean): Promise<{ enabled: boolean }> {
+    return this.sendRequest<{ enabled: boolean }>('toggle_chat_ocr', { enabled });
+  }
+
+  public flagChatMessage(id: number, isFlagged: boolean): Promise<{ success: boolean; id: number; isFlagged: boolean }> {
+    return this.sendRequest<{ success: boolean; id: number; isFlagged: boolean }>('flag_chat_message', { id, isFlagged });
+  }
+
+  public clearChatMessages(session?: string): Promise<{ success: boolean }> {
+    return this.sendRequest<{ success: boolean }>('clear_chat_messages', { session });
+  }
+
+  public exportPlayerReport(params: {
+    suspect?: string;
+    category?: string;
+    description?: string;
+    messageIds?: number[];
+  }): Promise<{ markdown: string }> {
+    return this.sendRequest<{ markdown: string }>('export_player_report', params);
+  }
+
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'get_chat_messages':
+        return [
+          {
+            id: 1,
+            timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+            sessionId: '__live__',
+            channel: 'Global',
+            sender: 'Cpt_Starhawk',
+            message: 'Need escort from Seraphim to GrimHEX, paying 50k aUEC.',
+            isFlagged: false,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 2,
+            timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+            sessionId: '__live__',
+            channel: 'Global',
+            sender: 'Shadow_Viper',
+            message: 'Incoming hostile mantis at OM-1! Snare active, beware traders!',
+            isFlagged: false,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 3,
+            timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+            sessionId: '__live__',
+            channel: 'Party',
+            sender: 'Wingman_Fox',
+            message: 'Forming up on your wing, quantum drive spooled.',
+            isFlagged: false,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 4,
+            timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+            sessionId: '__live__',
+            channel: 'Global',
+            sender: 'GriefMaster_99',
+            message: 'Pad ramming everyone at Port Tressler, try and stop me losers',
+            isFlagged: true,
+            createdAt: new Date().toISOString()
+          }
+        ] as ChatMessageDto[];
+
+      case 'scan_chat_now':
+        return {
+          success: true,
+          count: 1,
+          messages: [
+            {
+              id: Date.now(),
+              timestamp: new Date().toISOString(),
+              sessionId: '__live__',
+              channel: 'Global',
+              sender: 'Reclaimer_Chief',
+              message: 'Selling 120 SCU RMC at Area18 TDD.',
+              isFlagged: false,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        };
+
+      case 'toggle_chat_ocr':
+        return { enabled: payload?.enabled ?? true };
+
+      case 'flag_chat_message':
+        return { success: true, id: payload?.id, isFlagged: payload?.isFlagged };
+
+      case 'clear_chat_messages':
+        return { success: true };
+
+      case 'export_player_report':
+        return {
+          markdown: `# Cloud Imperium Games — Player Support Incident Report\n\n**Report Date (UTC):** ${new Date().toISOString()}\n**Category:** ${payload?.category || 'Griefing'}\n**Reported Player:** ${payload?.suspect || 'GriefMaster_99'}\n\n### Incident Description & Summary\n${payload?.description || 'Pad ramming at Port Tressler'}\n\n### In-Game Chat Evidence Transcript\n| Time | Channel | Sender | Message |\n|---|---|---|---|\n| ${new Date().toLocaleTimeString()} | [Global] | GriefMaster_99 | Pad ramming everyone at Port Tressler |`
+        };
+
       case 'check_update':
         return {
           updateAvailable: false,
