@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **In-Game Chat OCR Multi-Line Message Parsing & Chronicle Display (`ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
+- **In-Game Chat OCR Multi-Line Message Parsing, Chronicle Display & Compact Layout (`ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
   - Resolved an issue where in-game chat messages (such as custom organization channels like `[SC KRAUTZ]`) were not detected or displayed in `Chat-Protokoll`.
   - Upgraded `ChatParser.cs` regexes (`HeaderPattern`, `StandaloneHeaderPattern`) to flexibly recognize custom organization and group channel tags with OCR bracket anomalies (`[...j`, `'I...I`, `tsc ...`), spaces, and accented glyphs, normalizing them cleanly into proper org titles (`SC Krautz`).
   - Improved handle sanitization and sender delimiter handling (`:`, `-`, `.`, `;`, `i`) to reliably capture multi-line chat messages and avoid swallowing subsequent headers into message bodies.
   - Enabled `ChatOcrEnabled = true` by default in `Settings.cs` and combined plain and inverted OCR passes in `ChatOcrScanner.cs` for enhanced recognition of both bright and dimmed chat text.
+  - Fixed toolbar control overlap by organizing channel filters and scanner controls into a structured, responsive two-tier layout (channel pills + scanner pod on top; search bar, 'Nur Markierte' toggle, and table action buttons on bottom).
+  - Compacted the chat chronicle table row height by ~50% (`py-1`, tighter line-height, and fixed-width metadata columns `w-16`, `w-20`, `w-36`), eliminating excessive blank spacing and significantly improving text density and scanning efficiency.
   - Fixed `ChatLogView.tsx` scroll layout: isolated auto-scroll behavior to the internal message table container (`tableContainerRef`), preventing the top KPI cards and scanner action buttons from scrolling off screen.
   - Added quick scanner controls (`Scan`, `Bereich`, `Live: Ein/Aus`) directly into the chat filter toolbar, added interactive call-to-action buttons (`Jetzt Chat scannen`, `Chat-Bereich auswählen`) inside the empty-state screen, and dynamically generated filter pills for all recognized organization channels with authentic Star Citizen amber badges.
 - **Wallet Balance Delta Tracking & Live-Log Synchronization (`PhotinoBridge.cs`, `HudBar.tsx`)**:
