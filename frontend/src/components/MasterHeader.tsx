@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderSync,
   HardDrive,
@@ -34,15 +34,38 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
 }) => {
   const { locale, setLocale, t } = useI18n();
   const [overlayFeedback, setOverlayFeedback] = useState<string | null>(null);
+  const [isMiniHudActive, setIsMiniHudActive] = useState(false);
+  const [isRsOverlayActive, setIsRsOverlayActive] = useState(false);
+
+  useEffect(() => {
+    const unsub1 = bridge.on('OVERLAY_STATE', (data: any) => {
+      if (typeof data?.isOverlayActive === 'boolean') {
+        setIsMiniHudActive(data.isOverlayActive);
+      }
+    });
+    const unsub2 = bridge.on('RS_OVERLAY_STATE', (data: any) => {
+      if (typeof data?.isRsOverlayActive === 'boolean') {
+        setIsRsOverlayActive(data.isRsOverlayActive);
+      }
+    });
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, []);
 
   const handleOpenOverlay = async (type: 'mini' | 'rs') => {
     try {
       if (type === 'mini') {
-        await bridge.sendRequest('open_overlay');
-        showToast('Mini-HUD aktiviert');
+        const res = await bridge.sendRequest<{ success?: boolean; isOverlayActive?: boolean }>('open_overlay');
+        const active = res?.isOverlayActive ?? !isMiniHudActive;
+        setIsMiniHudActive(active);
+        showToast(active ? 'Mini-HUD aktiviert (Alt+H)' : 'Mini-HUD ausgeblendet');
       } else {
-        await bridge.sendRequest('open_rs_overlay');
-        showToast('RS-Decoder aktiviert');
+        const res = await bridge.sendRequest<{ success?: boolean; isRsOverlayActive?: boolean }>('open_rs_overlay');
+        const active = res?.isRsOverlayActive ?? !isRsOverlayActive;
+        setIsRsOverlayActive(active);
+        showToast(active ? 'RS-Radar aktiviert' : 'RS-Radar ausgeblendet');
       }
     } catch (e) {
       console.error('Failed to trigger overlay:', e);
@@ -126,19 +149,29 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
         <div className="flex items-center gap-1 bg-[#06101e] p-1 rounded-md border border-cyan-950/80">
           <button
             onClick={() => handleOpenOverlay('mini')}
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-950/40 transition cursor-pointer"
-            title="In-Game Mini-HUD Overlay ein-/ausblenden"
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
+              isMiniHudActive
+                ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
+                : 'text-slate-300 hover:text-cyan-300 hover:bg-cyan-950/40 border border-transparent'
+            }`}
+            title="In-Game Mini-HUD Overlay ein-/ausblenden (Globaler Hotkey: Alt+H)"
           >
-            <Monitor className="w-3.5 h-3.5 text-cyan-400" />
+            <Monitor className={`w-3.5 h-3.5 ${isMiniHudActive ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'}`} />
             <span className="hidden xl:inline text-[11px]">{t('header.miniHud')}</span>
+            {isMiniHudActive && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />}
           </button>
           <button
             onClick={() => handleOpenOverlay('rs')}
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold text-slate-300 hover:text-amber-300 hover:bg-amber-950/40 transition cursor-pointer"
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
+              isRsOverlayActive
+                ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                : 'text-slate-300 hover:text-amber-300 hover:bg-amber-950/40 border border-transparent'
+            }`}
             title="RS Signal Decoder HUD Overlay ein-/ausblenden"
           >
-            <Radio className="w-3.5 h-3.5 text-amber-400" />
+            <Radio className={`w-3.5 h-3.5 ${isRsOverlayActive ? 'text-amber-300 animate-pulse' : 'text-amber-400'}`} />
             <span className="hidden xl:inline text-[11px]">{t('header.rsOverlay')}</span>
+            {isRsOverlayActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />}
           </button>
         </div>
 

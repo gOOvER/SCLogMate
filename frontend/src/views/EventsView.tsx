@@ -2,12 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { bridge, LogEventItem, SessionSummary } from '../services/photinoBridge';
 import {
   Archive,
+  BookOpen,
   Check,
   ChevronDown,
   ChevronUp,
+  Code2,
   Coins,
   Copy,
   ExternalLink,
+  Filter,
   MapPin,
   Rocket,
   Search,
@@ -16,6 +19,7 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
+import { ContextMenu } from '../components/ContextMenu';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
@@ -37,6 +41,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [sortCol, setSortCol] = useState<SortColumn>('timestamp');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; event: LogEventItem } | null>(null);
 
   const activeSession = viewMode === 'live' ? '__live__' : archiveSession;
 
@@ -411,6 +416,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
                   <div
                     key={e.id}
                     onClick={() => setSelectedEvent(e)}
+                    onContextMenu={(ev) => {
+                      ev.preventDefault();
+                      setSelectedEvent(e);
+                      setContextMenu({ x: ev.clientX, y: ev.clientY, event: e });
+                    }}
                     className={`grid grid-cols-[105px_120px_125px_150px_1fr] items-center cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-cyan-950/50 text-slate-100 border-l-2 border-l-cyan-400'
@@ -597,6 +607,58 @@ export const EventsView: React.FC<EventsViewProps> = ({
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            ...(contextMenu.event.ship && contextMenu.event.ship !== '—'
+              ? [
+                  {
+                    label: `Im SCWiki öffnen: ${contextMenu.event.ship}`,
+                    icon: BookOpen,
+                    onClick: () => {
+                      window.dispatchEvent(
+                        new CustomEvent('open-wiki-dossier', { detail: contextMenu.event.ship })
+                      );
+                    },
+                  },
+                  {
+                    label: `Filter auf Schiff: ${contextMenu.event.ship}`,
+                    icon: Filter,
+                    onClick: () => setSearch(contextMenu.event.ship || ''),
+                  },
+                ]
+              : []),
+            {
+              label: `Kategorie filtern: ${contextMenu.event.category}`,
+              icon: Filter,
+              onClick: () => setCategory(contextMenu.event.category),
+            },
+            { divider: true, label: '', onClick: () => {} },
+            {
+              label: 'Zeilen-Inhalt kopieren',
+              icon: Copy,
+              onClick: () => {
+                const e = contextMenu.event;
+                const amt = e.amount ? ` (${e.amount > 0 ? '+' : ''}${e.amount} aUEC)` : '';
+                const shp = e.ship ? ` [${e.ship}]` : '';
+                const text = `[${e.timestamp}] [${e.kindText}] ${e.title} - ${e.description || ''}${amt}${shp}`.trim();
+                handleCopy(text, 'row');
+              },
+            },
+            {
+              label: 'JSON Rohdaten kopieren',
+              icon: Code2,
+              onClick: () => {
+                handleCopy(JSON.stringify(contextMenu.event, null, 2), 'json');
+              },
+            },
+          ]}
+        />
+      )}
     </div>
   );
 };

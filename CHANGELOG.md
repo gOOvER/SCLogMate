@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **RC2 Feature Parity: In-Game Win32 Always-On-Top Overlays & Desktop Toasts (`NativeMiniHudOverlay.cs`, `NativeToastOverlay.cs`, `NativeRsOverlay.cs`, `GlobalHotkey.cs`, `PhotinoBridge.cs`, `ContextMenu.tsx`, `EventsView.tsx`, `MasterHeader.tsx`)**:
+  - Implemented persistent, lightweight Win32 layered Always-on-Top Floating Mini-HUD (`Alt+H`) directly rendered over Star Citizen fullscreen/borderless gameplay without stealing focus (`WS_EX_NOACTIVATE`, `WS_EX_TOPMOST`, `WS_EX_TOOLWINDOW`).
+  - Added real-time GDI double-buffered Mini-HUD metrics: live aUEC balance, session net earnings (+/- colored delta), server region, shard number, live ping color indicator, current location, armistice status, and active mission tracker.
+  - Implemented native drag-to-move repositioning, position persistence (`overlayPositionX`, `overlayPositionY`), click-through mode toggle, and adjustable opacity.
+  - Added native Win32 Desktop Toast notification manager (`NativeToastOverlay.cs`) rendering stacked, non-intrusive notifications centered at the top of the primary game display with smooth slide-in and 4.5s auto-fadeout for elevator alerts, ship destruction, mission payouts, blueprint unlocks, and faction reputation increases.
+  - Implemented native Win32 RS Radar Signal Decoder popout HUD (`NativeRsOverlay.cs`) with live target signature predictions, resource tiers, node cluster valuations, and confidence ratings.
+  - Added reusable glassmorphism context menu component (`ContextMenu.tsx`) across table rows in `EventsView.tsx`, allowing right-click actions to open SCWiki dossiers, copy formatted event text, filter by pilot ship, or export JSON payload.
+  - Added live visual indicators in `MasterHeader.tsx` reflecting active state for Mini-HUD and RS-Decoder overlays with synchronized IPC broadcasts (`OVERLAY_STATE`, `RS_OVERLAY_STATE`).
+
 ### Changed
 - **In-Game Chat-Protokoll & Background OCR (`Sidebar.tsx`, `Settings.cs`, `PhotinoBridge.cs`, `ROADMAP.md`)**:
   - Temporarily deactivated the In-Game Chat-Protokoll navigation tab from the main sidebar and defaulted `ChatOcrEnabled = false` in application settings and Photino bridge state.

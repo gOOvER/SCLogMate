@@ -176,11 +176,11 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 | **In-Game Chat-Chronik & Reports** | Nicht vorhanden | OCR-Chatlogger, SQLite-Speicherung & 1-Klick CIG Report | 🟢 Erledigt (Abschnitt 7) |
 | **OCR Screen-Region-Selector** | Interaktiver Rahmen auf dem Desktop zum Zeichnen/Justieren der Scan-Region für Kontostand & Aufträge | Virtuelles Multi-Monitor Snipping-Tool über alle Displays mit Live-Pixelbadge & Tastaturkürzeln | 🟢 Erledigt (`NativeRegionSelector.cs`) |
 | **Scan Indicator Window** | Grüner/Gelber visueller Flash-Indikator am Monitorrand bei OCR-Erfassung | Nativer transparenter Color-Key Rahmen mit grünem Bestätigungs-Flash | 🟢 Erledigt (`NativeScanIndicator.cs`) |
-| **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Web-Dashboard & Overlay-Schalter vorhanden | 🟡 Pop-out / Win32 Overlay Fenster finalisieren |
-| **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Im Hauptfenster vorhanden (`OreScannerView.tsx`) | 🟡 Transparenter In-Game Always-on-Top Modus |
-| **In-Game Desktop Toasts** | Transparente native Toasts über dem Spielfenster für Aufzüge, Schiffszerstörung, Missionsabschluss | Interne Web-Toasts innerhalb der App aktiv | 🟡 Native Win32 Always-On-Top Desktop-Toasts |
-| **Rechtsklick-Kontextmenüs** | Kontextmenüs auf allen Tabellenzeilen (*Im Wiki nachschlagen, Zeile kopieren, Filter setzen*) | Meist nur Klick-Auswahl oder Detail-Drawer | 🟢 In React nachrüstbar |
-| **DB-Diagnose & Schnell-Reparatur** | Visuelle Tabelle mit Prüfung aller Spalten, Tabellen, Indizes und `PRAGMA quick_check;` | Basis-Tools vorhanden | 🟢 UI-Angleichung an RC2-Diagnose |
+| **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Nativer Win32 Always-On-Top Layered HUD mit Alt+H Hotkey, Live-Saldo & Drag-to-Move | 🟢 Erledigt (`NativeMiniHudOverlay.cs`) |
+| **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Nativer transparenter RS-Radar Always-on-Top Popout über dem Spiel | 🟢 Erledigt (`NativeRsOverlay.cs`) |
+| **In-Game Desktop Toasts** | Transparente native Toasts über dem Spielfenster für Aufzüge, Schiffszerstörung, Missionsabschluss | Nativer Win32 Topmost-Toast-Manager mit Auto-Fade & Stacking über Star Citizen | 🟢 Erledigt (`NativeToastOverlay.cs`) |
+| **Rechtsklick-Kontextmenüs** | Kontextmenüs auf allen Tabellenzeilen (*Im Wiki nachschlagen, Zeile kopieren, Filter setzen*) | Reusable Glassmorphism-Kontextmenü für Event-Tabelle (Wiki, Filter, Copy) | 🟢 Erledigt (`ContextMenu.tsx`) |
+| **DB-Diagnose & Schnell-Reparatur** | Visuelle Tabelle mit Prüfung aller Spalten, Tabellen, Indizes und `PRAGMA quick_check;` | Integrierte Diagnose-Tools in Einstellungen & Statusbar | 🟢 Erledigt (`DbDiagnosticsDto`) |
 
 ---
 

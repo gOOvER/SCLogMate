@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Avalonia.Threading;
+using System.Threading.Tasks;
 
 namespace SCLogMate.Core;
 
@@ -72,7 +72,7 @@ public static class GlobalHotkey
                 {
                     if (msg.message == WM_HOTKEY && (int)msg.wParam == HOTKEY_ID)
                     {
-                        Dispatcher.UIThread.Post(() => HotkeyPressed?.Invoke());
+                        Task.Run(() => HotkeyPressed?.Invoke());
                     }
                     else if (msg.message == WM_QUIT)
                     {

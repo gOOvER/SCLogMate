@@ -11,6 +11,7 @@ using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Photino.NET;
 using SCLogMate.Core.Ocr;
+using SCLogMate.Core.Overlays;
 using SCLogMate.Models;
 
 namespace SCLogMate.Core.Photino;
@@ -705,6 +706,7 @@ public class SettingsDto
     [JsonPropertyName("uexApiKey")] public string? UexApiKey { get; set; }
     [JsonPropertyName("overlayEnabled")] public bool OverlayEnabled { get; set; } = false;
     [JsonPropertyName("overlayOpacity")] public double OverlayOpacity { get; set; } = 0.92;
+    [JsonPropertyName("globalHotkeyEnabled")] public bool GlobalHotkeyEnabled { get; set; } = true;
     [JsonPropertyName("toastEnabled")] public bool ToastEnabled { get; set; } = true;
     [JsonPropertyName("toastBlueprintEnabled")] public bool ToastBlueprintEnabled { get; set; } = true;
     [JsonPropertyName("toastMissionEnabled")] public bool ToastMissionEnabled { get; set; } = true;
@@ -870,6 +872,9 @@ public class PhotinoBridge
     private readonly AuroraVoiceService _auroraService = new();
     private readonly NativeScanIndicator _walletScanIndicator = new("mobiGlas aUEC Scan", 0x22D3EE);
     private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
+    private readonly NativeMiniHudOverlay _miniHudOverlay = new();
+    private readonly NativeToastOverlay _toastOverlay = new();
+    private readonly NativeRsOverlay _rsOverlay = new();
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
@@ -900,6 +905,32 @@ public class PhotinoBridge
         {
             _chatScanner.Start();
         }
+
+        // Globaler Hotkey (Alt+H) für Mini-HUD
+        GlobalHotkey.HotkeyPressed += () =>
+        {
+            _miniHudOverlay.Toggle();
+            var curS = Settings.Load();
+            curS.OverlayEnabled = _miniHudOverlay.IsVisible;
+            Settings.Save(curS);
+            Broadcast("OVERLAY_STATE", new { isOverlayActive = _miniHudOverlay.IsVisible });
+        };
+        if (s.GlobalHotkeyEnabled)
+        {
+            GlobalHotkey.Start();
+        }
+        if (s.OverlayEnabled)
+        {
+            _miniHudOverlay.SetVisible(true);
+        }
+        _miniHudOverlay.VisibilityChanged += visible =>
+        {
+            Broadcast("OVERLAY_STATE", new { isOverlayActive = visible });
+        };
+        _rsOverlay.VisibilityChanged += visible =>
+        {
+            Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = visible });
+        };
 
         CitizenService.ProfileResolved += profile =>
         {
@@ -1117,6 +1148,10 @@ public class PhotinoBridge
 
     public void Broadcast<T>(string type, T payload)
     {
+        if (type == "HUD_UPDATE" && payload is HudTelemetryDto hudDto)
+        {
+            _miniHudOverlay.UpdateTelemetry(hudDto);
+        }
         if (_window == null) return;
         var msg = new
         {
@@ -2167,11 +2202,20 @@ public class PhotinoBridge
                     break;
 
                 case "open_overlay":
-                    SendResponse(req.Id, "open_overlay_response", new { success = true });
+                    _miniHudOverlay.Toggle();
+                    {
+                        var curS = Settings.Load();
+                        curS.OverlayEnabled = _miniHudOverlay.IsVisible;
+                        Settings.Save(curS);
+                    }
+                    SendResponse(req.Id, "open_overlay_response", new { success = true, isOverlayActive = _miniHudOverlay.IsVisible });
+                    Broadcast("OVERLAY_STATE", new { isOverlayActive = _miniHudOverlay.IsVisible });
                     break;
 
                 case "open_rs_overlay":
-                    SendResponse(req.Id, "open_rs_overlay_response", new { success = true });
+                    _rsOverlay.Toggle();
+                    SendResponse(req.Id, "open_rs_overlay_response", new { success = true, isRsOverlayActive = _rsOverlay.IsVisible });
+                    Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = _rsOverlay.IsVisible });
                     break;
 
                 case "record_expense":
@@ -4075,7 +4119,7 @@ public class PhotinoBridge
     private List<RsMatchDto> DecodeRsData(int rs)
     {
         var matches = RsDecoderCatalog.Decode(rs);
-        return matches.Select(m => new RsMatchDto
+        var dtos = matches.Select(m => new RsMatchDto
         {
             ResourceName = m.Resource.Name,
             BaseRs = m.Resource.BaseRs,
@@ -4089,6 +4133,12 @@ public class PhotinoBridge
             ScannedRs = m.ScannedRs,
             EstimatedClusterValue = (long)m.Resource.EstimatedPricePerScu * m.Nodes * 12
         }).ToList();
+
+        if (dtos.Count > 0)
+        {
+            _rsOverlay.UpdateRsMatch(dtos[0]);
+        }
+        return dtos;
     }
 
     private List<MarketCommodityDto> GetMarketData()
@@ -4191,6 +4241,7 @@ public class PhotinoBridge
             UexApiKey = s.UexApiKey,
             OverlayEnabled = s.OverlayEnabled,
             OverlayOpacity = s.OverlayOpacity,
+            GlobalHotkeyEnabled = s.GlobalHotkeyEnabled,
             ToastEnabled = s.ToastEnabled,
             ToastBlueprintEnabled = s.ToastBlueprintEnabled,
             ToastMissionEnabled = s.ToastMissionEnabled,
@@ -4234,6 +4285,12 @@ public class PhotinoBridge
         s.UexApiKey = dto.UexApiKey;
         s.OverlayEnabled = dto.OverlayEnabled;
         s.OverlayOpacity = dto.OverlayOpacity;
+        s.GlobalHotkeyEnabled = dto.GlobalHotkeyEnabled;
+        if (dto.GlobalHotkeyEnabled) GlobalHotkey.Start();
+        else GlobalHotkey.Stop();
+        _miniHudOverlay.SetVisible(dto.OverlayEnabled);
+        _miniHudOverlay.ApplyWindowStyles();
+
         s.ToastEnabled = dto.ToastEnabled;
         s.ToastBlueprintEnabled = dto.ToastBlueprintEnabled;
         s.ToastMissionEnabled = dto.ToastMissionEnabled;
@@ -4478,6 +4535,7 @@ public class PhotinoBridge
 
             if (isLive)
             {
+                CheckAndTriggerToast(entry, dto);
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
 
                 if (entry.Kind is EventKind.MissionDone or EventKind.MissionReward)
@@ -4498,6 +4556,42 @@ public class PhotinoBridge
         catch (Exception ex)
         {
             Logger.Error("PhotinoBridge.OnLogLineReceived", ex);
+        }
+    }
+
+    private void CheckAndTriggerToast(LogEntry entry, LogEventDto dto)
+    {
+        try
+        {
+            var s = Settings.Load();
+            if (!s.ToastEnabled) return;
+
+            if (s.ToastMissionEnabled && (entry.Kind == EventKind.MissionDone || entry.Kind == EventKind.MissionReward))
+            {
+                string reward = entry.Amount > 0 ? $"+{entry.Amount:N0} aUEC" : "Erfolgreich abgeschlossen";
+                _toastOverlay.ShowToast("🏆", "AUFTRAG ERFOLGREICH", dto.Title, reward, 0x0080DE4Au);
+            }
+            else if (s.ToastShipDestructionEnabled && (entry.Kind == EventKind.ShipLoss || entry.Kind == EventKind.Death))
+            {
+                string shipName = !string.IsNullOrWhiteSpace(entry.Ship) ? entry.Ship : (!string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—" ? _currentShip : "Schiff verloren");
+                _toastOverlay.ShowToast("💥", "SCHIFF ZERSTÖRT", shipName, "Versicherungsfall registriert", 0x007171F8u);
+            }
+            else if (s.ToastElevatorEnabled && ((dto.RawText != null && dto.RawText.Contains("elevator", StringComparison.OrdinalIgnoreCase)) || (dto.Title != null && dto.Title.Contains("Aufzug", StringComparison.OrdinalIgnoreCase))))
+            {
+                _toastOverlay.ShowToast("🚪", "AUFZUG", dto.Title ?? "Aufzug", dto.Description ?? "", 0x00EED322u);
+            }
+            else if (s.ToastBlueprintEnabled && ((dto.Title != null && dto.Title.Contains("Bauplan", StringComparison.OrdinalIgnoreCase)) || (dto.Description != null && dto.Description.Contains("Bauplan", StringComparison.OrdinalIgnoreCase))))
+            {
+                _toastOverlay.ShowToast("📜", "BAUPLAN ERLERNT", dto.Title ?? "Bauplan", dto.Description ?? "", 0x000BB5F5u);
+            }
+            else if (s.ToastReputationEnabled && dto.Title != null && dto.Title.Contains("Ruf", StringComparison.OrdinalIgnoreCase))
+            {
+                _toastOverlay.ShowToast("🎖️", "RUF GESTIEGEN", dto.Title, dto.Description ?? "", 0x00EED322u);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("CheckAndTriggerToast", ex);
         }
     }
 
