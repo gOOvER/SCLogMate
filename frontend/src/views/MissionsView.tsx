@@ -15,7 +15,7 @@ export const MissionsView: React.FC = () => {
     history: [],
     catalog: [],
   });
-  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>('history');
+  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>('active');
   const [search, setSearch] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
@@ -47,6 +47,23 @@ export const MissionsView: React.FC = () => {
 
   useEffect(() => {
     fetchMissions();
+
+    const unsubHud = bridge.on('HUD_UPDATE', () => {
+      fetchMissions();
+    });
+
+    const unsubMissions = bridge.on('MISSIONS_UPDATED', (payload: any) => {
+      if (payload && payload.active) {
+        setData(payload);
+      } else {
+        fetchMissions();
+      }
+    });
+
+    return () => {
+      unsubHud();
+      unsubMissions();
+    };
   }, []);
 
   const formatNumber = (num?: number) => {
@@ -81,7 +98,12 @@ export const MissionsView: React.FC = () => {
     <div className="flex flex-col min-h-full space-y-4">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">
+        <div
+          onClick={() => setActiveTab('active')}
+          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-emerald-500/50 ${
+            activeTab === 'active' ? 'ring-1 ring-emerald-500/40 bg-emerald-950/15' : ''
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Aktive Aufträge (Live)
@@ -94,7 +116,12 @@ export const MissionsView: React.FC = () => {
           <div className="mt-1 text-xs text-slate-400">Aus Game.log &amp; SQLite Master-DB</div>
         </div>
 
-        <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">
+        <div
+          onClick={() => setActiveTab('history')}
+          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-cyan-500/50 ${
+            activeTab === 'history' ? 'ring-1 ring-cyan-500/40 bg-cyan-950/15' : ''
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Abgeschlossene Missionen
@@ -104,10 +131,15 @@ export const MissionsView: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-cyan-300">
             {data.history.length} <span className="text-xs font-normal text-slate-400">im Log erfasst</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">Historische Missionsabschlüsse & Belohnungen</div>
+          <div className="mt-1 text-xs text-slate-400">Historische Missionsabschlüsse &amp; Belohnungen</div>
         </div>
 
-        <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner">
+        <div
+          onClick={() => setActiveTab('catalog')}
+          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-amber-500/50 ${
+            activeTab === 'catalog' ? 'ring-1 ring-amber-500/40 bg-amber-950/15' : ''
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               SC Auftrags-Katalog
@@ -117,24 +149,13 @@ export const MissionsView: React.FC = () => {
           <div className="mt-2 text-2xl font-bold font-mono text-amber-300">
             {data.catalog.length} <span className="text-xs font-normal text-slate-400">Missionstypen</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">CIG Spieldatenbank (Stanton & Pyro)</div>
+          <div className="mt-1 text-xs text-slate-400">CIG Spieldatenbank (Stanton &amp; Pyro)</div>
         </div>
       </div>
 
       {/* Subtabs Bar & Filter */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'history'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" /> Verlauf ({data.history.length})
-          </button>
-
           <button
             onClick={() => setActiveTab('active')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
@@ -144,6 +165,17 @@ export const MissionsView: React.FC = () => {
             }`}
           >
             <Radio className="w-3.5 h-3.5" /> Aktive Aufträge ({data.active.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'history'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" /> Verlauf ({data.history.length})
           </button>
 
           <button

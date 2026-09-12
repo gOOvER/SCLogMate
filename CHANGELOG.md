@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
+- **Active Contracts Detection & Live Missions View Layout (`PhotinoBridge.cs`, `LogParser.cs`, `MissionsView.tsx`)**:
+  - Fixed an issue where accepted and in-progress missions from `Game.log` were not populated in the "Aktive Aufträge" table or count, because `GetMissionsData()` only queried OCR database records.
+  - Linked `GetMissionsData()` to `_parser.ContractsList` (`Outcome == InProgress`), merging real-time parsed missions with database contracts.
+  - Switched the tab order in `MissionsView.tsx` so "Aktive Aufträge" is placed first and selected by default, followed by "Verlauf" and "Auftragskatalog".
+  - Made the top KPI metric cards interactive to switch directly between "Aktive Aufträge", "Verlauf", and "Auftragskatalog".
+  - Added live bridge listeners (`HUD_UPDATE`, `MISSIONS_UPDATED`) to `MissionsView.tsx` to automatically re-fetch and synchronize mission lists in real-time when contracts are taken, completed, or cleared.
+  - Added `ClearActiveContracts()` to `LogParser` and wired it into `clear_contracts` IPC handler to clear both SQLite and in-memory active contracts.
 - **Real-Time Wallet Balance Dynamic Tracking via Game Log (`PhotinoBridge.cs`)**:
   - Implemented automatic wallet balance updating on live financial log events (mission payouts, commodity sales, item purchases, refuel/repairs, fines, transfers) and manual expense recordings, eliminating the need to press F1 mobiGlas just to see current funds.
   - Dynamically updates `Settings.Balance` and `BalanceSetAt` in real-time, instantly broadcasting `HUD_UPDATE` to synchronize the top HUD bar, the floating Always-on-Top Mini-HUD overlay, and the Finance overview.

@@ -428,6 +428,20 @@ public partial class LogParser
         }
     }
 
+    public void ClearActiveContracts()
+    {
+        lock (_stateLock)
+        {
+            var inProgress = _contracts.Where(kvp => kvp.Value.Outcome == ContractOutcome.InProgress)
+                                       .Select(kvp => kvp.Key)
+                                       .ToList();
+            foreach (var key in inProgress)
+            {
+                _contracts.Remove(key);
+            }
+        }
+    }
+
     public string PlaceAt(DateTime at)
     {
         for (int i = LocationVisits.Count - 1; i >= 0; i--)

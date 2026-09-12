@@ -1499,8 +1499,10 @@ public class PhotinoBridge
 
                 case "clear_contracts":
                     Database.ClearActiveContracts();
+                    _parser.ClearActiveContracts();
                     SendResponse(req.Id, "clear_contracts_response", new { success = true });
                     Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    Broadcast("MISSIONS_UPDATED", GetMissionsData());
                     break;
 
                 case "get_reputation":
@@ -3538,17 +3540,46 @@ public class PhotinoBridge
             Description = m.Description,
         }).ToList();
 
-        var activeContracts = Database.GetActiveContracts().Select(c => new MissionItemDto
+        var activeContracts = new List<MissionItemDto>();
+
+        // 1. Live-Verträge aus dem LogParser (Game.log) mit Status InProgress
+        foreach (var c in _parser.ContractsList.Where(c => c.Outcome == ContractOutcome.InProgress))
         {
-            Id = Guid.NewGuid().ToString("N"),
-            Title = c.Title,
-            Contractor = c.ContractedBy,
-            Faction = c.ContractedBy,
-            BaseReward = c.Reward,
-            IsActive = true,
-            Description = c.DisplayText,
-            Time = c.ScannedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
-        }).ToList();
+            activeContracts.Add(new MissionItemDto
+            {
+                Id = !string.IsNullOrWhiteSpace(c.MissionId) ? c.MissionId : Guid.NewGuid().ToString("N"),
+                Title = !string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag",
+                Contractor = !string.IsNullOrWhiteSpace(c.Issuer) ? c.Issuer : "Star Citizen Auftragsmanager",
+                Faction = !string.IsNullOrWhiteSpace(c.Issuer) ? c.Issuer : "Star Citizen Auftragsmanager",
+                MissionType = !string.IsNullOrWhiteSpace(c.Type) ? c.Type : "Auftrag",
+                BaseReward = (int)c.Reward,
+                IsActive = true,
+                Description = $"{c.Type} • {c.Difficulty} • System: {c.System}",
+                StarSystems = !string.IsNullOrWhiteSpace(c.System) && c.System != "k.A." ? c.System : "Stanton",
+                Time = c.AcceptedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
+            });
+        }
+
+        // 2. OCR-gescannte Verträge aus SQLite
+        foreach (var c in Database.GetActiveContracts())
+        {
+            if (!activeContracts.Any(a => string.Equals(a.Title, c.Title, StringComparison.OrdinalIgnoreCase)))
+            {
+                activeContracts.Add(new MissionItemDto
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Title = c.Title,
+                    Contractor = c.ContractedBy,
+                    Faction = c.ContractedBy,
+                    MissionType = "Auftrag",
+                    BaseReward = c.Reward,
+                    IsActive = true,
+                    Description = c.DisplayText,
+                    StarSystems = "Stanton",
+                    Time = c.ScannedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
+                });
+            }
+        }
 
         var history = Database.LoadRecentEvents(2500)
             .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken)
@@ -4622,6 +4653,10 @@ public class PhotinoBridge
                 if (isFinancial)
                 {
                     Broadcast("finance_response", GetFinanceOverview());
+                }
+                if (entry.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken or EventKind.MissionReward)
+                {
+                    Broadcast("MISSIONS_UPDATED", GetMissionsData());
                 }
             }
         }
