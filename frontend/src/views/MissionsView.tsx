@@ -6,6 +6,7 @@ import {
   Radio,
   Search,
   Target,
+  Trash2,
 } from 'lucide-react';
 
 export const MissionsView: React.FC = () => {
@@ -17,6 +18,12 @@ export const MissionsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>('history');
   const [search, setSearch] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchMissions = async () => {
     try {
@@ -24,6 +31,17 @@ export const MissionsView: React.FC = () => {
       setData(res);
     } catch (err) {
       console.error('Failed to load missions:', err);
+    }
+  };
+
+  const handleClearContracts = async () => {
+    try {
+      await bridge.sendRequest('clear_contracts');
+      await fetchMissions();
+      showToast('Aktive Auftragsliste geleert.');
+    } catch (err) {
+      console.error('Failed to clear contracts:', err);
+      showToast('Fehler beim Leeren der Aufträge');
     }
   };
 
@@ -166,6 +184,15 @@ export const MissionsView: React.FC = () => {
               className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-48"
             />
           </div>
+
+          <button
+            onClick={handleClearContracts}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-800/80 transition cursor-pointer shrink-0 ml-1"
+            title="Aktive Auftragsliste leeren (behebt feststeckende Aufträge)"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>✕ Aufträge leeren</span>
+          </button>
         </div>
       </div>
 
@@ -232,6 +259,13 @@ export const MissionsView: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-cyan-500/60 text-cyan-300 px-4 py-2.5 rounded-lg shadow-xl text-xs font-mono flex items-center gap-2">
+          <span>{toast}</span>
+        </div>
+      )}
     </div>
   );
 };

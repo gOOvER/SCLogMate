@@ -412,15 +412,6 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleClearContracts = async () => {
-    try {
-      await bridge.sendRequest('clear_contracts');
-      showToast('Aktive Auftragsliste geleert.');
-    } catch (err) {
-      showToast('Fehler beim Leeren der Aufträge');
-    }
-  };
-
   const handleVacuum = async () => {
     try {
       setIsCheckingDb(true);
@@ -2054,13 +2045,6 @@ export const SettingsView: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
                 <span>📄 Debug-Log öffnen</span>
-              </button>
-              <button
-                onClick={handleClearContracts}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/80 transition cursor-pointer"
-                title="Aktive Auftragsliste leeren"
-              >
-                <span>✕ Aufträge leeren</span>
               </button>
             </div>
           </div>

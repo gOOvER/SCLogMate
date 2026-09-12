@@ -39,10 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added direct "Bereich markieren" (interactive snipping tool) and "Test-Scan" buttons with real-time feedback directly into `ChatLogView.tsx` and `OreScannerView.tsx` for seamless, one-click OCR configuration and verification.
 
 ### Changed
+- **Relocated Active Contracts Reset Action to Missions Manager (`MissionsView.tsx`, `SettingsView.tsx`)**:
+  - Moved the `✕ Aufträge leeren` maintenance button out of the Database settings tab directly into the Missions Manager (`MissionsView.tsx`) header toolbar.
+  - Users can now clear stuck or stale active contracts directly from the mission management screen, with automatic view data refreshes and feedback toasts.
 - **OCR Settings Menu Cleanup & Reorganization (`SettingsView.tsx`)**:
   - Consolidated the orphaned "Auto-OCR Wächter & Schutzmechanismus" (dual-read, cross-grab, contrast filters) section directly into Sektion 1 (mobiGlas Wallet / Geldscanner aUEC) where it functionally belongs.
   - Completely removed the redundant OCR contracts section ("Aktive Aufträge & Missions-Tracking") from the OCR settings tab, as contract updates are parsed 100% natively from `Game.log`.
-  - Relocated the "Aufträge leeren" maintenance action button to the Database settings tab under diagnostic actions.
 - **Automatic Proceed after Database Synchronization (`DbUpdateModal.tsx`, `ROADMAP.md`)**:
   - Implemented an automatic 3-second transition timer upon database synchronization completion (`isCompleted`), displaying a dynamic `"Weiter (3s)"` button that smoothly enters the application without requiring a manual click.
 
