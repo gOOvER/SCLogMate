@@ -548,7 +548,7 @@ public static class MaintenanceService
             var trimmed = line.Trim();
 
             // Kommentare und Leerzeilen unverändert erhalten
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith(";") || trimmed.StartsWith("#") || trimmed.StartsWith("//"))
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith(";") || trimmed.StartsWith("#") || trimmed.StartsWith("//") || trimmed.StartsWith("--"))
             {
                 resultLines.Add(line);
                 continue;

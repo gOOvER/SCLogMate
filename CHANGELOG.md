@@ -42,11 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added live visual indicators in `MasterHeader.tsx` reflecting active state for Mini-HUD and RS-Decoder overlays with synchronized IPC broadcasts (`OVERLAY_STATE`, `RS_OVERLAY_STATE`).
 
 ### Changed
-- **Tools & Maintenance Studio Overhaul (`ToolsView.tsx`)**:
-  - Restructured cluttered view into 3 clean, dedicated sub-tabs:
-    1. `1. Wartung & Diagnose`: Shader cache cleanup (DirectX / Vulkan), crash dumps deletion, system & hardware check (RAM, NVMe disk space, pagefile status), and 4.x optimization tips.
-    2. `2. user.cfg Tuning & Live-Editor`: Safe non-destructive preset application (High FPS, Quality, Minimal), live sliders and switches (VSync, MotionBlur, Console, MaxFPS, StreamPool, DisplayInfo, Language) with instant live merge, and full-featured syntax code editor with copy and save actions.
-    3. `3. Backup-Tresor (user.cfg & Keybinds)`: Comprehensive backup management with chronological snapshot lists, file sizes, local/cloud status badges, 1-click rollback/restore buttons, manual backup creation with notes, and cloud replication controls.
+- **Tools & Maintenance Studio Overhaul (`ToolsView.tsx`, `MaintenanceService.cs`)**:
+  - Restructured view into 3 dedicated sub-tabs with `user.cfg` and its backups unified directly in Tab 1:
+    1. `1. user.cfg Tuning, Editor & Backups`: Integrated live code editor, two-way synchronized toggles (VSync, MotionBlur, Console, MaxFPS, StreamPool, DisplayInfo, Language), non-destructive preset insertion, and direct on-page user.cfg backup vault with 1-click rollback, manual snapshots, and local & cloud replication. Added `--` comment preservation.
+    2. `2. System-Wartung & Diagnose`: Shader cache cleanup (DirectX / Vulkan), crash dumps deletion, system & hardware check (RAM, NVMe disk space, pagefile status), and 4.x optimization tips.
+    3. `3. Steuerungs-Tresor (Keybinds & Cloud)`: Dedicated keybinds / actionmaps.xml backup vault and cloud replication controls.
 - **Market & Trading View Layout Overhaul (`MarketView.tsx`)**:
   - Reorganized cluttered, overflowing tab header into three concise, clean sub-views: "Handelsrouten", "Salvage & Schrott-Preise", and "Warenrechner".
   - Relocated ship cargo presets (C2, Caterpillar, Taurus, Freelancer MAX, Cutlass) from the global navigation tab bar into a dedicated configuration toolbar with custom SCU number input.
