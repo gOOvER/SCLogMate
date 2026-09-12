@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   Sparkles,
   Clock,
+  Radar,
+  MessageSquare,
 } from 'lucide-react';
 import {
   bridge,
@@ -146,6 +148,8 @@ export const SettingsView: React.FC = () => {
   const [isTestingScan, setIsTestingScan] = useState<string | null>(null);
   const [testScanResult, setTestScanResult] = useState<OcrTestResult | null>(null);
   const [manualWallet, setManualWallet] = useState<ScanRegionDto>({ x: 1300, y: 415, width: 500, height: 80 });
+  const [manualRs, setManualRs] = useState<ScanRegionDto>({ x: 720, y: 464, width: 480, height: 160 });
+  const [manualChat, setManualChat] = useState<ScanRegionDto>({ x: 20, y: 400, width: 620, height: 450 });
 
   const loadOcrConfig = async () => {
     try {
@@ -154,13 +158,17 @@ export const SettingsView: React.FC = () => {
         setOcrConfig(cfg);
         const curW = cfg.walletRegion || cfg.defaultWalletRegion;
         if (curW) setManualWallet(curW);
+        const curRs = cfg.rsScanRegion || cfg.defaultRsRegion;
+        if (curRs) setManualRs(curRs);
+        const curChat = cfg.chatRegion || cfg.defaultChatRegion;
+        if (curChat) setManualChat(curChat);
       }
     } catch (err) {
       console.error('Failed to load OCR config:', err);
     }
   };
 
-  const handleSelectRegion = async (target: 'wallet' | 'contract' | 'rs') => {
+  const handleSelectRegion = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
     try {
       setIsSelectingRegion(target);
       showToast('Bildschirm-Auswahl gestartet: Ziehe mit der Maus ein Rechteck...');
@@ -170,6 +178,8 @@ export const SettingsView: React.FC = () => {
         if (res.config) {
           setOcrConfig(res.config);
           if (target === 'wallet') setManualWallet(res.region);
+          if (target === 'rs') setManualRs(res.region);
+          if (target === 'chat') setManualChat(res.region);
         } else {
           loadOcrConfig();
         }
@@ -184,7 +194,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleTestScan = async (target: 'wallet' | 'contract') => {
+  const handleTestScan = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
     try {
       setIsTestingScan(target);
       setTestScanResult(null);
@@ -192,9 +202,17 @@ export const SettingsView: React.FC = () => {
       if (res) {
         setTestScanResult(res);
         if (res.success) {
-          showToast(res.extractedValue != null
-            ? `✓ Kontostand erkannt: ${res.extractedValue.toLocaleString('de-DE')} aUEC (${res.durationMs}ms)`
-            : `✓ Text erkannt: ${res.recognizedText.slice(0, 35)}... (${res.durationMs}ms)`);
+          if (target === 'wallet') {
+            showToast(res.extractedValue != null
+              ? `✓ Kontostand erkannt: ${res.extractedValue.toLocaleString('de-DE')} aUEC (${res.durationMs}ms)`
+              : `✓ Text erkannt: ${res.recognizedText.slice(0, 35)}... (${res.durationMs}ms)`);
+          } else if (target === 'rs') {
+            showToast(res.extractedValue != null
+              ? `✓ RS Signatur erkannt: ${res.extractedValue.toLocaleString('de-DE')} RS (${res.durationMs}ms)`
+              : `✓ Text erkannt: ${res.recognizedText.slice(0, 35)}... (${res.durationMs}ms)`);
+          } else {
+            showToast(`✓ Text erkannt: ${res.recognizedText.slice(0, 35)}... (${res.durationMs}ms)`);
+          }
         } else {
           showToast(`⚠️ OCR Test: Kein gültiger Wert erkannt (${res.recognizedText || 'leer'})`);
         }
@@ -207,12 +225,14 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleResetRegion = async (target: 'wallet' | 'contract' | 'rs') => {
+  const handleResetRegion = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
     try {
       const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: null });
       if (cfg) {
         setOcrConfig(cfg);
         if (target === 'wallet') setManualWallet(cfg.defaultWalletRegion);
+        if (target === 'rs') setManualRs(cfg.defaultRsRegion);
+        if (target === 'chat' && cfg.defaultChatRegion) setManualChat(cfg.defaultChatRegion);
       }
       showToast('Bereich auf Standard (Auto-Erkennung) zurückgesetzt');
     } catch (err) {
@@ -243,7 +263,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleApplyManualCoords = async (target: 'wallet' | 'contract' | 'rs', coords: ScanRegionDto) => {
+  const handleApplyManualCoords = async (target: 'wallet' | 'contract' | 'rs' | 'chat', coords: ScanRegionDto) => {
     try {
       const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: coords });
       if (cfg) setOcrConfig(cfg);
@@ -1249,7 +1269,351 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Sektion 2: Aktive Aufträge & Missions-Tracking (100% Game.log & SQLite) */}
+          {/* Sektion 2: RS Signal Radar Scan-Bereich (HUD-Ping) */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-cyan-400 flex items-center space-x-2">
+                    <Radar className="w-4 h-4" />
+                    <span>RS SIGNAL RADAR SCAN-BEREICH (HUD)</span>
+                  </h2>
+                  {ocrConfig?.rsScanRegion ? (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                      BENUTZERDEFINIERT: {ocrConfig.rsScanRegion.width}×{ocrConfig.rsScanRegion.height} @ ({ocrConfig.rsScanRegion.x},{ocrConfig.rsScanRegion.y})
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                      STANDARD AUTO-ERKENNUNG ({ocrConfig?.defaultRsRegion ? `${ocrConfig.defaultRsRegion.width}×${ocrConfig.defaultRsRegion.height}` : '480×160'})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Definiert das Bildschirm-Rechteck um das HUD-Fadenkreuz zur optischen Erfassung der RS-Signatur beim Radar-Ping.
+                </p>
+              </div>
+            </div>
+
+            {/* RS Aktionsleiste */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                onClick={() => handleSelectRegion('rs')}
+                disabled={isSelectingRegion !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-cyan-600/20 border border-cyan-400 transition"
+              >
+                {isSelectingRegion === 'rs' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Overlay aktiv...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crop className="w-4 h-4" />
+                    <span>Bereich am Bildschirm markieren</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleTestScan('rs')}
+                disabled={isTestingScan !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-cyan-300 text-xs font-bold border border-cyan-500/30 transition shadow-sm"
+              >
+                {isTestingScan === 'rs' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                    <span>Scanne Bildschirm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>Test-Scan ausführen</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleResetRegion('rs')}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-400" />
+                <span>Standard (Auto)</span>
+              </button>
+            </div>
+
+            {/* Test-Scan Feedback Box für RS */}
+            {testScanResult && testScanResult.target === 'rs' && (
+              <div
+                className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in slide-in-from-top-2 ${
+                  testScanResult.success
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-2">
+                    {testScanResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    )}
+                    <span>
+                      {testScanResult.success
+                        ? 'Test-Scan erfolgreich abgeschlossen'
+                        : 'Test-Scan: RS Signatur konnte nicht verifiziert werden'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] opacity-80">
+                    {testScanResult.durationMs} ms
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono mt-1">
+                  <div className="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+                    <span className="text-slate-400 block text-[10px]">ERKANNTES ERGEBNIS:</span>
+                    <span className="font-bold text-sm text-cyan-400">
+                      {testScanResult.extractedValue != null
+                        ? `${testScanResult.extractedValue.toLocaleString('de-DE')} RS`
+                        : 'Keine RS-Ziffer extrahierbar'}
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+                    <span className="text-slate-400 block text-[10px]">ROHTEXT (OCR):</span>
+                    <span className="text-slate-200 truncate block">
+                      {testScanResult.recognizedText || '—'}
+                    </span>
+                  </div>
+                </div>
+                {testScanResult.region && (
+                  <div className="text-[10px] text-slate-400">
+                    Gescannter Bereich: {testScanResult.region.width}×{testScanResult.region.height} Pixel bei X:{testScanResult.region.x}, Y:{testScanResult.region.y}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pixel-Feinjustierung manuell RS */}
+            <div className="p-4 rounded-lg bg-slate-950/40 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                <Sliders className="w-3.5 h-3.5 text-slate-400" />
+                <span>Pixel-Feinabstimmung RS (Manuelle Koordinaten):</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">X-Position (Links):</label>
+                  <input
+                    type="number"
+                    value={manualRs.x}
+                    onChange={(e) => setManualRs({ ...manualRs, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Y-Position (Oben):</label>
+                  <input
+                    type="number"
+                    value={manualRs.y}
+                    onChange={(e) => setManualRs({ ...manualRs, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Breite (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualRs.width}
+                    onChange={(e) => setManualRs({ ...manualRs, width: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Höhe (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualRs.height}
+                    onChange={(e) => setManualRs({ ...manualRs, height: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => handleApplyManualCoords('rs', manualRs)}
+                  className="px-4 py-1.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-semibold shadow border border-cyan-500 transition"
+                >
+                  RS-Koordinaten speichern & anwenden
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sektion 3: In-Game Chat Scan-Bereich (F12) */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4" />
+                    <span>IN-GAME CHAT SCAN-BEREICH (F12)</span>
+                  </h2>
+                  {ocrConfig?.chatRegion ? (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-sky-950 text-sky-300 border border-sky-800">
+                      BENUTZERDEFINIERT: {ocrConfig.chatRegion.width}×{ocrConfig.chatRegion.height} @ ({ocrConfig.chatRegion.x},{ocrConfig.chatRegion.y})
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                      STANDARD AUTO-ERKENNUNG ({ocrConfig?.defaultChatRegion ? `${ocrConfig.defaultChatRegion.width}×${ocrConfig.defaultChatRegion.height}` : '620×450'})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Definiert das Bildschirm-Rechteck des Chatfensters (Standard links oben), das der Live-Chat-Scanner erfasst.
+                </p>
+              </div>
+            </div>
+
+            {/* Chat Aktionsleiste */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                onClick={() => handleSelectRegion('chat')}
+                disabled={isSelectingRegion !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-sky-600/20 border border-sky-400 transition"
+              >
+                {isSelectingRegion === 'chat' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Overlay aktiv...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crop className="w-4 h-4" />
+                    <span>Bereich am Bildschirm markieren</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleTestScan('chat')}
+                disabled={isTestingScan !== null}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sky-300 text-xs font-bold border border-sky-500/30 transition shadow-sm"
+              >
+                {isTestingScan === 'chat' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+                    <span>Scanne Bildschirm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>Test-Scan ausführen</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleResetRegion('chat')}
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-400" />
+                <span>Standard (Auto)</span>
+              </button>
+            </div>
+
+            {/* Test-Scan Feedback Box für Chat */}
+            {testScanResult && testScanResult.target === 'chat' && (
+              <div
+                className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in slide-in-from-top-2 ${
+                  testScanResult.success
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-2">
+                    {testScanResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    )}
+                    <span>
+                      {testScanResult.success
+                        ? 'Test-Scan erfolgreich abgeschlossen'
+                        : 'Test-Scan: Kein Chat-Text erkannt'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] opacity-80">
+                    {testScanResult.durationMs} ms
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-2.5 rounded border border-slate-800/60 font-mono text-[11px]">
+                  <span className="text-slate-400 block text-[10px]">ERKANNTES TEXTFRAGMENT:</span>
+                  <div className="text-slate-200 max-h-24 overflow-y-auto whitespace-pre-wrap mt-0.5">
+                    {testScanResult.recognizedText || '—'}
+                  </div>
+                </div>
+                {testScanResult.region && (
+                  <div className="text-[10px] text-slate-400">
+                    Gescannter Bereich: {testScanResult.region.width}×{testScanResult.region.height} Pixel bei X:{testScanResult.region.x}, Y:{testScanResult.region.y}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pixel-Feinjustierung manuell Chat */}
+            <div className="p-4 rounded-lg bg-slate-950/40 border border-slate-800/80 space-y-3">
+              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                <Sliders className="w-3.5 h-3.5 text-slate-400" />
+                <span>Pixel-Feinabstimmung Chat (Manuelle Koordinaten):</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">X-Position (Links):</label>
+                  <input
+                    type="number"
+                    value={manualChat.x}
+                    onChange={(e) => setManualChat({ ...manualChat, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Y-Position (Oben):</label>
+                  <input
+                    type="number"
+                    value={manualChat.y}
+                    onChange={(e) => setManualChat({ ...manualChat, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Breite (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualChat.width}
+                    onChange={(e) => setManualChat({ ...manualChat, width: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 font-mono block mb-1">Höhe (Pixel):</label>
+                  <input
+                    type="number"
+                    value={manualChat.height}
+                    onChange={(e) => setManualChat({ ...manualChat, height: Math.max(10, parseInt(e.target.value) || 10) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => handleApplyManualCoords('chat', manualChat)}
+                  className="px-4 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-white text-xs font-semibold shadow border border-sky-500 transition"
+                >
+                  Chat-Koordinaten speichern & anwenden
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sektion 4: Aktive Aufträge & Missions-Tracking (100% Game.log & SQLite) */}
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>

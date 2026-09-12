@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Multi-Monitor OCR & Secondary Display Support (`NativeRegionSelector.cs`, `WalletCapture.cs`)**:
+  - Fixed an issue where mobiGlas wallet OCR aborted or failed when selecting or scanning on a secondary monitor by removing coordinate clamping (`Math.Max(0, region.X)` and `Math.Max(0, region.Y)`), properly supporting virtual desktop coordinates including negative X/Y offsets.
+  - Rewrote `NativeRegionSelector.cs` to span the entire virtual desktop (`SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, `SM_CXVIRTUALSCREEN`, `SM_CYVIRTUALSCREEN`) as a single seamless layered overlay across all connected monitors simultaneously, preventing focus loss, clicks passing through to background windows, or premature aborts when moving the mouse to a second display.
+  - Rendered intuitive instructional selection banners on each individual connected monitor with monitor indices and display dimensions.
 - **UEX Corp Ship Pricing Link in Hangar (`FleetView.tsx`)**:
   - Fixed 404 Not Found error caused by outdated `/ships/?search=` URL endpoint, switching to UEX Corp's global search endpoint `https://uexcorp.space/search?q={shipName}`.
   - Routed the link action through `bridge.openExternalUrl()` to reliably launch the user's default desktop browser instead of triggering in-app WebView2 navigation.
 - **Star Citizen Wiki Multilingual Localized JSON Parsing (`WikiApiClient.cs`, `Database.cs`, `WikiDossierModal.tsx`, `WikiExplorerView.tsx`)**:
   - Resolved an issue where vehicle attributes returned as multilingual translation maps by the API (such as `size`, `role`, `type`, `production_status`) rendered raw JSON strings like `Größe {"en_EN":"Large","de_DE":"Groß",...}` instead of clean, localized human-readable labels.
   - Added robust localization extractors in `WikiApiClient.ExtractLocalizedOrString()` and `CleanLocalizedField()` across SQLite cache persistence and retrieval, alongside defensive client-side sanitizers in `WikiDossierModal.tsx` and `WikiExplorerView.tsx`.
+
+### Added
+- **Universal OCR Region Calibration & In-View Controls (`PhotinoBridge.cs`, `SettingsView.tsx`, `ChatLogView.tsx`, `OreScannerView.tsx`, `photinoBridge.ts`)**:
+  - Added dedicated OCR scan region management, interactive screen selection, test-scans, and reset controls for RS Signal Radar (`rs`) and In-Game Chat (`chat`) in `Core/Photino/PhotinoBridge.cs` and `SettingsView.tsx`.
+  - Added direct "Bereich markieren" (interactive snipping tool) and "Test-Scan" buttons with real-time feedback directly into `ChatLogView.tsx` and `OreScannerView.tsx` for seamless, one-click OCR configuration and verification.
 
 ### Changed
 - **Automatic Proceed after Database Synchronization (`DbUpdateModal.tsx`, `ROADMAP.md`)**:

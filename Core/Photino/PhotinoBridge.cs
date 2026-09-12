@@ -1696,6 +1696,10 @@ public class PhotinoBridge
                         {
                             s.RsScanRegion = region;
                         }
+                        else if (target == "chat")
+                        {
+                            s.ChatRegion = region;
+                        }
                         Settings.Save(s);
                     }
                     SendResponse(req.Id, "save_ocr_region_response", GetOcrRegionsConfig());
@@ -1711,6 +1715,7 @@ public class PhotinoBridge
                     {
                         "contract" => "Auftragsmanager (Contracts)",
                         "rs" => "RS Signal Radar",
+                        "chat" => "In-Game Chat",
                         _ => "mobiGlas aUEC"
                     };
                     var selected = await NativeRegionSelector.SelectRegionAsync(selTitle);
@@ -1730,6 +1735,10 @@ public class PhotinoBridge
                         else if (selTarget == "rs")
                         {
                             s.RsScanRegion = selected;
+                        }
+                        else if (selTarget == "chat")
+                        {
+                            s.ChatRegion = selected;
                         }
                         Settings.Save(s);
                         SendResponse(req.Id, "select_ocr_region_response", new { success = true, cancelled = false, region = selected, config = GetOcrRegionsConfig() });
@@ -4159,6 +4168,54 @@ public class PhotinoBridge
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
             var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 12);
+            sw.Stop();
+            return new OcrTestResultDto
+            {
+                Success = !string.IsNullOrWhiteSpace(text),
+                Target = target,
+                RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
+                DurationMs = (int)sw.ElapsedMilliseconds,
+                Region = region
+            };
+        }
+        else if (target == "rs")
+        {
+            var region = s.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion();
+            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+            if (raw == null)
+            {
+                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
+            }
+            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 2, padding: 8);
+            sw.Stop();
+            long? rsVal = null;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(text, @"\b(\d{3,6})\b");
+                if (m.Success && long.TryParse(m.Groups[1].Value, out var parsed))
+                {
+                    rsVal = parsed;
+                }
+            }
+            return new OcrTestResultDto
+            {
+                Success = !string.IsNullOrWhiteSpace(text),
+                Target = target,
+                RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
+                ExtractedValue = rsVal,
+                DurationMs = (int)sw.ElapsedMilliseconds,
+                Region = region
+            };
+        }
+        else if (target == "chat")
+        {
+            var region = s.ChatRegion ?? ScreenCapture.GetDefaultChatRegion();
+            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+            if (raw == null)
+            {
+                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
+            }
+            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 2, padding: 8);
             sw.Stop();
             return new OcrTestResultDto
             {

@@ -54,8 +54,8 @@ public sealed class WalletCapture : IDisposable
         var region = _regionProvider() ?? ScreenCapture.GetDefaultWalletRegion();
         if (!region.IsValid) return null;
 
-        int capX = Math.Max(0, region.X);
-        int capY = Math.Max(0, region.Y);
+        int capX = region.X;
+        int capY = region.Y;
         int capW = region.Width;
         int capH = region.Height;
 
@@ -121,8 +121,8 @@ public sealed class WalletCapture : IDisposable
                     return;
                 }
 
-                int capX = Math.Max(0, region.X);
-                int capY = Math.Max(0, region.Y);
+                int capX = region.X;
+                int capY = region.Y;
                 int capW = region.Width;
                 int capH = region.Height;
 

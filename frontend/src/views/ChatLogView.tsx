@@ -10,6 +10,8 @@ import {
   Radio,
   User,
   ChevronDown,
+  Crop,
+  Zap,
 } from 'lucide-react';
 import { ChatMessageDto, PilotProfile, bridge } from '../services/photinoBridge';
 import { PlayerReportModal } from '../components/PlayerReportModal';
@@ -24,6 +26,14 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
   const [loading, setLoading] = useState(false);
   const [scanningNow, setScanningNow] = useState(false);
   const [ocrEnabled, setOcrEnabled] = useState(true);
+  const [selectingRegion, setSelectingRegion] = useState(false);
+  const [testingScan, setTestingScan] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
 
   // Filters
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
@@ -110,6 +120,41 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
       setOcrEnabled(res.enabled);
     } catch (err) {
       console.error('Failed to toggle chat OCR:', err);
+    }
+  };
+
+  const handleSelectRegion = async () => {
+    try {
+      setSelectingRegion(true);
+      showToast('Bildschirm-Auswahl: Ziehe mit der Maus ein Rechteck über dein Chatfenster...');
+      const res = await bridge.sendRequest<any>('select_ocr_region', { target: 'chat' });
+      if (res?.success && res.region) {
+        showToast(`✓ Chat-Bereich gespeichert: ${res.region.width}×${res.region.height} @ (${res.region.x}, ${res.region.y})`);
+      } else if (res?.cancelled) {
+        showToast('Auswahl abgebrochen');
+      }
+    } catch (err) {
+      console.error('Failed to select chat region:', err);
+      showToast('Fehler bei der Bildschirmauswahl');
+    } finally {
+      setSelectingRegion(false);
+    }
+  };
+
+  const handleTestScan = async () => {
+    try {
+      setTestingScan(true);
+      const res = await bridge.sendRequest<any>('test_ocr_scan', { target: 'chat' });
+      if (res?.success) {
+        showToast(`✓ Text erkannt: ${res.recognizedText?.slice(0, 35) || 'leer'} (${res.durationMs}ms)`);
+      } else {
+        showToast('⚠️ Kein Chat-Text erkannt. Prüfe den Scan-Bereich.');
+      }
+    } catch (err) {
+      console.error('Test scan failed:', err);
+      showToast('Fehler beim OCR Test-Scan');
+    } finally {
+      setTestingScan(false);
     }
   };
 
@@ -260,21 +305,39 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 {ocrEnabled ? 'AKTIV' : 'PAUSIERT'}
               </span>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={handleSelectRegion}
+                disabled={selectingRegion}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700 flex items-center space-x-1 transition-colors disabled:opacity-50"
+                title="Chat-Scanbereich interaktiv am Bildschirm markieren"
+              >
+                <Crop className={`w-3 h-3 text-cyan-400 ${selectingRegion ? 'animate-spin' : ''}`} />
+                <span>Bereich</span>
+              </button>
+              <button
+                onClick={handleTestScan}
+                disabled={testingScan}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs border border-slate-700 flex items-center space-x-1 transition-colors disabled:opacity-50"
+                title="OCR-Test auf aktuellem Chat-Bereich ausführen"
+              >
+                <Zap className={`w-3 h-3 text-amber-400 ${testingScan ? 'animate-spin' : ''}`} />
+                <span>Test</span>
+              </button>
               <button
                 onClick={handleToggleOcr}
-                className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+                className={`px-2 py-1 rounded text-xs border transition-colors ${
                   ocrEnabled
                     ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
                     : 'border-emerald-600/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
                 }`}
               >
-                {ocrEnabled ? 'Pausieren' : 'Aktivieren'}
+                {ocrEnabled ? 'Pause' : 'Start'}
               </button>
               <button
                 onClick={handleTriggerScan}
                 disabled={scanningNow}
-                className="px-2.5 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs border border-cyan-500/50 flex items-center space-x-1 transition-colors disabled:opacity-50"
+                className="px-2 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs border border-cyan-500/50 flex items-center space-x-1 transition-colors disabled:opacity-50"
                 title="Manuellen Chat-Scan sofort auslösen"
               >
                 <RefreshCw className={`w-3 h-3 ${scanningNow ? 'animate-spin' : ''}`} />
@@ -284,6 +347,14 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
           </div>
         </div>
       </div>
+
+      {/* Toast Message Banner */}
+      {toastMsg && (
+        <div className="p-2.5 rounded-lg bg-cyan-950/80 border border-cyan-500/50 text-cyan-200 text-xs flex items-center justify-between animate-in fade-in">
+          <span>{toastMsg}</span>
+          <button onClick={() => setToastMsg(null)} className="text-cyan-400 hover:text-white text-xs font-bold px-1.5 cursor-pointer">✕</button>
+        </div>
+      )}
 
       {/* Filter and Action Toolbar */}
       <div className="sc-glass rounded-xl p-3 border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">

@@ -8,8 +8,9 @@ using SCLogMate.Models;
 namespace SCLogMate.Core.Ocr;
 
 /// <summary>
-/// Nativer Win32-Overlay-Bildschirmwähler zur interaktiven Auswahl von Scan-Bereichen (z.B. mobiGlas Wallet).
-/// Unterstützt Multi-Monitor (Umschalten per Tab/M), Live-Dimensionen-Badge und ESC zum Abbrechen.
+/// Nativer Win32-Overlay-Bildschirmwähler zur interaktiven Auswahl von Scan-Bereichen (mobiGlas, RS-Scanner, Chat).
+/// Erstreckt sich nahtlos über den gesamten virtuellen Desktop aller Monitore gleichzeitig.
+/// Ermöglicht pixelgenaues Zeichnen auf beliebigen Monitoren (inkl. sekundärer Monitore mit negativen Offsets).
 /// </summary>
 public static class NativeRegionSelector
 {
@@ -41,22 +42,26 @@ public static class NativeRegionSelector
     private static ScanRegion? ShowSelectorModal(string targetTitle)
     {
         var monitors = GetMonitors();
-        if (monitors.Count == 0)
+
+        // 1. Virtuellen Bildschirm über ALLE Monitore ermitteln
+        int vX = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int vY = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int vW = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int vH = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+        if (vW <= 0 || vH <= 0)
         {
-            monitors.Add(new RECT { left = 0, top = 0, right = 1920, bottom = 1080 });
+            vX = 0;
+            vY = 0;
+            vW = GetSystemMetrics(SM_CXSCREEN);
+            vH = GetSystemMetrics(SM_CYSCREEN);
+            if (vW <= 0) vW = 1920;
+            if (vH <= 0) vH = 1080;
         }
 
-        // Finde Monitor mit der aktuellen Mausposition
-        GetCursorPos(out var pt);
-        int currentMonitorIndex = 0;
-        for (int i = 0; i < monitors.Count; i++)
+        if (monitors.Count == 0)
         {
-            var m = monitors[i];
-            if (pt.X >= m.left && pt.X < m.right && pt.Y >= m.top && pt.Y < m.bottom)
-            {
-                currentMonitorIndex = i;
-                break;
-            }
+            monitors.Add(new RECT { left = vX, top = vY, right = vX + vW, bottom = vY + vH });
         }
 
         ScanRegion? result = null;
@@ -76,7 +81,6 @@ public static class NativeRegionSelector
         IntPtr badgeBgBrush = CreateSolidBrush(0x001A1009);
 
         IntPtr hCursorCross = LoadCursor(IntPtr.Zero, (IntPtr)32515 /*IDC_CROSS*/);
-        IntPtr hCursorArrow = LoadCursor(IntPtr.Zero, (IntPtr)32512 /*IDC_ARROW*/);
 
         string className = "SCLogMate_RegionSelectorClass_" + Guid.NewGuid().ToString("N");
         IntPtr hInstance = GetModuleHandle(IntPtr.Zero);
@@ -91,7 +95,7 @@ public static class NativeRegionSelector
 
                 case 0x0201: // WM_LBUTTONDOWN
                     isDragging = true;
-                    startPt = new POINT(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                    GetCursorPos(out startPt); // Physische absolute Bildschirm-Koordinaten
                     curPt = startPt;
                     SetCapture(hWnd);
                     InvalidateRect(hWnd, IntPtr.Zero, false);
@@ -100,7 +104,7 @@ public static class NativeRegionSelector
                 case 0x0200: // WM_MOUSEMOVE
                     if (isDragging)
                     {
-                        curPt = new POINT(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                        GetCursorPos(out curPt);
                         InvalidateRect(hWnd, IntPtr.Zero, false);
                     }
                     return IntPtr.Zero;
@@ -110,7 +114,7 @@ public static class NativeRegionSelector
                     {
                         isDragging = false;
                         ReleaseCapture();
-                        curPt = new POINT(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                        GetCursorPos(out curPt);
 
                         int rx = Math.Min(startPt.X, curPt.X);
                         int ry = Math.Min(startPt.Y, curPt.Y);
@@ -119,11 +123,10 @@ public static class NativeRegionSelector
 
                         if (rw > 5 && rh > 5)
                         {
-                            var mon = monitors[currentMonitorIndex];
                             result = new ScanRegion
                             {
-                                X = mon.left + rx,
-                                Y = mon.top + ry,
+                                X = rx,
+                                Y = ry,
                                 Width = rw,
                                 Height = rh
                             };
@@ -133,24 +136,17 @@ public static class NativeRegionSelector
                     }
                     return IntPtr.Zero;
 
+                case 0x0204: // WM_RBUTTONDOWN
+                    // Rechtsklick bricht sofort ab
+                    result = null;
+                    DestroyWindow(hWnd);
+                    return IntPtr.Zero;
+
                 case 0x0100: // WM_KEYDOWN
                     if (wParam == (IntPtr)0x1B) // VK_ESCAPE
                     {
                         result = null;
                         DestroyWindow(hWnd);
-                    }
-                    else if (wParam == (IntPtr)0x09 || wParam == (IntPtr)0x4D) // VK_TAB or 'M'
-                    {
-                        if (monitors.Count > 1)
-                        {
-                            isDragging = false;
-                            currentMonitorIndex = (currentMonitorIndex + 1) % monitors.Count;
-                            var nextMon = monitors[currentMonitorIndex];
-                            int nw = nextMon.right - nextMon.left;
-                            int nh = nextMon.bottom - nextMon.top;
-                            SetWindowPos(hWnd, new IntPtr(-1) /*HWND_TOPMOST*/, nextMon.left, nextMon.top, nw, nh, 0x0040 /*SWP_SHOWWINDOW*/);
-                            InvalidateRect(hWnd, IntPtr.Zero, true);
-                        }
                     }
                     return IntPtr.Zero;
 
@@ -165,39 +161,49 @@ public static class NativeRegionSelector
                         IntPtr memBmp = CreateCompatibleBitmap(hdc, w, h);
                         IntPtr oldBmp = SelectObject(memDC, memBmp);
 
-                        // 1. Hintergrund füllen (dunkel)
+                        // 1. Hintergrund füllen (dunkles Overlay über gesamten Desktop)
                         FillRect(memDC, ref rc, bgBrush);
 
-                        // 2. Info-Banner oben zeichnen
-                        int bannerW = 620;
-                        int bannerH = 76;
-                        int bannerX = (w - bannerW) / 2;
-                        int bannerY = 24;
-                        var bannerRc = new RECT { left = bannerX, top = bannerY, right = bannerX + bannerW, bottom = bannerY + bannerH };
+                        // 2. Info-Banner auf JEDEM Monitor zeichnen, damit er auf allen Displays sichtbar ist
+                        int bannerW = 660;
+                        int bannerH = 78;
 
-                        IntPtr oldBrush = SelectObject(memDC, bannerBrush);
-                        IntPtr oldPen = SelectObject(memDC, bannerBorderPen);
-                        RoundRect(memDC, bannerRc.left, bannerRc.top, bannerRc.right, bannerRc.bottom, 12, 12);
+                        for (int i = 0; i < monitors.Count; i++)
+                        {
+                            var m = monitors[i];
+                            int monW = m.right - m.left;
+                            int monClientLeft = m.left - vX;
+                            int monClientTop = m.top - vY;
+                            int bannerX = monClientLeft + (monW - bannerW) / 2;
+                            int bannerY = monClientTop + 28;
+                            var bannerRc = new RECT { left = bannerX, top = bannerY, right = bannerX + bannerW, bottom = bannerY + bannerH };
 
-                        SetBkMode(memDC, 1 /*TRANSPARENT*/);
+                            IntPtr oldBrush = SelectObject(memDC, bannerBrush);
+                            IntPtr oldPen = SelectObject(memDC, bannerBorderPen);
+                            RoundRect(memDC, bannerRc.left, bannerRc.top, bannerRc.right, bannerRc.bottom, 12, 12);
 
-                        // Titel
-                        SelectObject(memDC, hFontBold);
-                        SetTextColor(memDC, 0x00F8BD38); // Cyan BGR
-                        var titleRc = new RECT { left = bannerX + 16, top = bannerY + 10, right = bannerX + bannerW - 16, bottom = bannerY + 32 };
-                        string monInfo = monitors.Count > 1 ? $" · Monitor {currentMonitorIndex + 1}/{monitors.Count} ({w}x{h})" : $" · {w}x{h}";
-                        DrawText(memDC, $"🎯 {targetTitle} auswählen{monInfo}", -1, ref titleRc, 0x00000001 /*DT_CENTER*/ | 0x00000004 /*DT_VCENTER*/ | 0x00000020 /*DT_SINGLELINE*/);
+                            SetBkMode(memDC, 1 /*TRANSPARENT*/);
 
-                        // Instruktionen
-                        SelectObject(memDC, hFontRegular);
-                        SetTextColor(memDC, 0x00D0D0D0); // Weiß/Hellgrau
-                        var subRc = new RECT { left = bannerX + 16, top = bannerY + 34, right = bannerX + bannerW - 16, bottom = bannerY + 52 };
-                        DrawText(memDC, "Ziehe mit gedrückter linker Maustaste ein Rechteck um den gewünschten Bildschirmbereich.", -1, ref subRc, 0x00000001 | 0x00000004 | 0x00000020);
+                            // Titel
+                            SelectObject(memDC, hFontBold);
+                            SetTextColor(memDC, 0x00F8BD38); // Cyan BGR
+                            var titleRc = new RECT { left = bannerX + 16, top = bannerY + 10, right = bannerX + bannerW - 16, bottom = bannerY + 32 };
+                            string monInfo = monitors.Count > 1 ? $" · Monitor {i + 1}/{monitors.Count} ({monW}x{m.bottom - m.top})" : $" · {monW}x{m.bottom - m.top}";
+                            DrawText(memDC, $"🎯 {targetTitle} auswählen{monInfo}", -1, ref titleRc, 0x00000001 /*DT_CENTER*/ | 0x00000004 /*DT_VCENTER*/ | 0x00000020 /*DT_SINGLELINE*/);
 
-                        SetTextColor(memDC, 0x007171F8); // Rötlich/Orange
-                        var keyRc = new RECT { left = bannerX + 16, top = bannerY + 53, right = bannerX + bannerW - 16, bottom = bannerY + 70 };
-                        string keyText = monitors.Count > 1 ? "[ESC] Abbrechen  ·  [M] oder [Tab] Monitor wechseln" : "[ESC] Abbrechen";
-                        DrawText(memDC, keyText, -1, ref keyRc, 0x00000001 | 0x00000004 | 0x00000020);
+                            // Instruktionen
+                            SelectObject(memDC, hFontRegular);
+                            SetTextColor(memDC, 0x00D0D0D0); // Weiß/Hellgrau
+                            var subRc = new RECT { left = bannerX + 16, top = bannerY + 34, right = bannerX + bannerW - 16, bottom = bannerY + 52 };
+                            DrawText(memDC, "Ziehe mit gedrückter linker Maustaste ein Rechteck auf einem beliebigen Monitor.", -1, ref subRc, 0x00000001 | 0x00000004 | 0x00000020);
+
+                            SetTextColor(memDC, 0x007171F8); // Rötlich/Orange
+                            var keyRc = new RECT { left = bannerX + 16, top = bannerY + 54, right = bannerX + bannerW - 16, bottom = bannerY + 72 };
+                            DrawText(memDC, "[ESC] oder Rechtsklick: Abbrechen  ·  Nahtlos über alle Monitore aktiv", -1, ref keyRc, 0x00000001 | 0x00000004 | 0x00000020);
+
+                            SelectObject(memDC, oldBrush);
+                            SelectObject(memDC, oldPen);
+                        }
 
                         // 3. Wenn gezogen wird: Markierungsrechteck + Abmessungen-Badge
                         if (isDragging)
@@ -209,20 +215,24 @@ public static class NativeRegionSelector
 
                             if (rw > 0 && rh > 0)
                             {
+                                // Absolute Bildschirm-Koordinaten in Fenster-Client-Koordinaten umrechnen
+                                int clientRx = rx - vX;
+                                int clientRy = ry - vY;
+
                                 SelectObject(memDC, dragFillBrush);
                                 SelectObject(memDC, cyanPen);
-                                Rectangle(memDC, rx, ry, rx + rw, ry + rh);
+                                Rectangle(memDC, clientRx, clientRy, clientRx + rw, clientRy + rh);
 
-                                // Dimensions-Badge
-                                string badgeText = $"{rw} × {rh} px";
+                                // Dimensions-Badge mit Echtzeit-Koordinaten
+                                string badgeText = $"{rw} × {rh} px  (X:{rx}, Y:{ry})";
                                 SelectObject(memDC, hFontBadge);
                                 SelectObject(memDC, badgeBgBrush);
                                 SelectObject(memDC, bannerBorderPen);
 
-                                int badgeW = 96;
-                                int badgeH = 22;
-                                int badgeX = rx;
-                                int badgeY = (ry - badgeH - 4 >= bannerY + bannerH + 4) ? (ry - badgeH - 4) : (ry + rh + 4);
+                                int badgeW = 180;
+                                int badgeH = 24;
+                                int badgeX = clientRx;
+                                int badgeY = clientRy >= 32 ? (clientRy - badgeH - 4) : (clientRy + rh + 4);
 
                                 RoundRect(memDC, badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, 6, 6);
                                 SetTextColor(memDC, 0x00F8BD38);
@@ -235,8 +245,6 @@ public static class NativeRegionSelector
                         BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, 0x00CC0020 /*SRCCOPY*/);
 
                         // Cleanup GDI Objektauswahl
-                        SelectObject(memDC, oldBrush);
-                        SelectObject(memDC, oldPen);
                         SelectObject(memDC, oldBmp);
                         DeleteObject(memBmp);
                         DeleteDC(memDC);
@@ -278,19 +286,16 @@ public static class NativeRegionSelector
 
         try
         {
-            var mon = monitors[currentMonitorIndex];
-            int monW = mon.right - mon.left;
-            int monH = mon.bottom - mon.top;
-
             uint exStyle = 0x00000008 /*WS_EX_TOPMOST*/ | 0x00080000 /*WS_EX_LAYERED*/ | 0x00000080 /*WS_EX_TOOLWINDOW*/;
             uint style = 0x80000000 /*WS_POPUP*/ | 0x10000000 /*WS_VISIBLE*/;
 
+            // Fenster erstreckt sich über den GESAMTEN virtuellen Bildschirm aller Monitore
             IntPtr hWnd = CreateWindowEx(
                 exStyle,
                 className,
                 "SCLogMate - Bereich auswählen",
                 style,
-                mon.left, mon.top, monW, monH,
+                vX, vY, vW, vH,
                 IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
 
             if (hWnd == IntPtr.Zero)
@@ -301,7 +306,7 @@ public static class NativeRegionSelector
 
             // Halbtransparenter Hintergrund (~65% Deckkraft)
             SetLayeredWindowAttributes(hWnd, 0, 165, 0x00000002 /*LWA_ALPHA*/);
-            SetWindowPos(hWnd, new IntPtr(-1) /*HWND_TOPMOST*/, mon.left, mon.top, monW, monH, 0x0040 /*SWP_SHOWWINDOW*/);
+            SetWindowPos(hWnd, new IntPtr(-1) /*HWND_TOPMOST*/, vX, vY, vW, vH, 0x0040 /*SWP_SHOWWINDOW*/);
             SetForegroundWindow(hWnd);
             SetFocus(hWnd);
 
@@ -341,8 +346,12 @@ public static class NativeRegionSelector
         return list;
     }
 
-    private static int GET_X_LPARAM(IntPtr lp) => unchecked((short)(long)lp);
-    private static int GET_Y_LPARAM(IntPtr lp) => unchecked((short)((long)lp >> 16));
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
+    private const int SM_XVIRTUALSCREEN = 76;
+    private const int SM_YVIRTUALSCREEN = 77;
+    private const int SM_CXVIRTUALSCREEN = 78;
+    private const int SM_CYVIRTUALSCREEN = 79;
 
     private delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, ref RECT rect, IntPtr data);
@@ -412,6 +421,7 @@ public static class NativeRegionSelector
     [DllImport("user32.dll")] private static extern IntPtr DispatchMessage([In] ref MSG lpMsg);
     [DllImport("user32.dll")] private static extern void PostQuitMessage(int nExitCode);
     [DllImport("user32.dll")] private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc proc, IntPtr data);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)] private static extern IntPtr GetModuleHandle(IntPtr lpModuleName);
 
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);

@@ -462,9 +462,11 @@ export interface OcrRegionsConfig {
   walletRegion: ScanRegionDto | null;
   contractRegion: ScanRegionDto | null;
   rsScanRegion: ScanRegionDto | null;
+  chatRegion?: ScanRegionDto | null;
   defaultWalletRegion: ScanRegionDto;
   defaultContractRegion: ScanRegionDto;
   defaultRsRegion: ScanRegionDto;
+  defaultChatRegion?: ScanRegionDto;
   screenWidth: number;
   screenHeight: number;
   isWalletScanBoxVisible: boolean;

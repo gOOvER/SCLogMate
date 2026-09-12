@@ -4,6 +4,8 @@ import {
   Search,
   Radar,
   HelpCircle,
+  Crop,
+  Zap,
 } from 'lucide-react';
 
 export const OreScannerView: React.FC = () => {
@@ -13,6 +15,14 @@ export const OreScannerView: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [isSelectingRegion, setIsSelectingRegion] = useState(false);
+  const [isTestingScan, setIsTestingScan] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
 
   const fetchSignatures = async () => {
     try {
@@ -45,6 +55,44 @@ export const OreScannerView: React.FC = () => {
   const handleInputChange = (val: string) => {
     setInputRs(val);
     decodeRs(val);
+  };
+
+  const handleSelectRegion = async () => {
+    try {
+      setIsSelectingRegion(true);
+      showToast('Bildschirm-Auswahl: Ziehe mit der Maus ein Rechteck über dein HUD-Fadenkreuz / RS-Signal...');
+      const res = await bridge.sendRequest<any>('select_ocr_region', { target: 'rs' });
+      if (res?.success && res.region) {
+        showToast(`✓ RS-Scanbereich gespeichert: ${res.region.width}×${res.region.height} @ (${res.region.x}, ${res.region.y})`);
+      } else if (res?.cancelled) {
+        showToast('Auswahl abgebrochen');
+      }
+    } catch (err) {
+      console.error('Failed to select RS region:', err);
+      showToast('Fehler bei der Bildschirmauswahl');
+    } finally {
+      setIsSelectingRegion(false);
+    }
+  };
+
+  const handleTestScan = async () => {
+    try {
+      setIsTestingScan(true);
+      const res = await bridge.sendRequest<any>('test_ocr_scan', { target: 'rs' });
+      if (res?.success && res.extractedValue != null) {
+        showToast(`✓ RS-Signatur erkannt: ${res.extractedValue.toLocaleString('de-DE')} RS (${res.durationMs}ms)`);
+        handleInputChange(res.extractedValue.toString());
+      } else if (res?.recognizedText && res.recognizedText !== '(Kein Text erkannt)') {
+        showToast(`Text erfasst: '${res.recognizedText}' (keine RS-Ziffer gefunden)`);
+      } else {
+        showToast('⚠️ Keine RS-Signatur im Scanbereich erkannt');
+      }
+    } catch (err) {
+      console.error('Test scan failed:', err);
+      showToast('Fehler beim OCR Test-Scan');
+    } finally {
+      setIsTestingScan(false);
+    }
   };
 
   const quickPresets = [
@@ -102,23 +150,55 @@ export const OreScannerView: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick preset chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            {quickPresets.map((p) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick OCR Action Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
-                key={p.value}
-                onClick={() => handleInputChange(p.value)}
-                className={`px-2.5 py-1 text-[11px] font-mono rounded border transition cursor-pointer shrink-0 ${
-                  inputRs === p.value
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(0,240,255,0.2)]'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
+                onClick={handleSelectRegion}
+                disabled={isSelectingRegion}
+                className="px-2.5 py-1 text-xs font-mono rounded bg-slate-900 border border-slate-700 hover:border-cyan-500 text-slate-300 hover:text-white flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                title="Scanbereich für RS-HUD-Signal auf beliebigem Monitor markieren"
               >
-                {p.label}
+                <Crop className={`w-3.5 h-3.5 text-cyan-400 ${isSelectingRegion ? 'animate-spin' : ''}`} />
+                <span>Bereich markieren</span>
               </button>
-            ))}
+              <button
+                onClick={handleTestScan}
+                disabled={isTestingScan}
+                className="px-2.5 py-1 text-xs font-mono rounded bg-cyan-950/80 border border-cyan-700 hover:bg-cyan-900 text-cyan-200 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                title="RS-Signal jetzt vom Bildschirm scannen & automatisch decodieren"
+              >
+                <Zap className={`w-3.5 h-3.5 text-amber-400 ${isTestingScan ? 'animate-spin' : ''}`} />
+                <span>Test-Scan</span>
+              </button>
+            </div>
+
+            {/* Quick preset chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {quickPresets.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => handleInputChange(p.value)}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded border transition cursor-pointer shrink-0 ${
+                    inputRs === p.value
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(0,240,255,0.2)]'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Toast Message Banner */}
+        {toastMsg && (
+          <div className="p-2 rounded-lg bg-cyan-950/80 border border-cyan-500/50 text-cyan-200 text-xs flex items-center justify-between animate-in fade-in">
+            <span>{toastMsg}</span>
+            <button onClick={() => setToastMsg(null)} className="text-cyan-400 hover:text-white text-xs font-bold px-1.5 cursor-pointer">✕</button>
+          </div>
+        )}
 
         {/* Decoder Input & Result Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
