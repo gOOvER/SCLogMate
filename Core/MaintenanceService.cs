@@ -37,6 +37,23 @@ public class SystemDiagnosticInfo
     public string PagefileStatus { get; set; } = "Aktiv";
     public bool PagefileOk { get; set; } = true;
     public string StarCitizenVersion { get; set; } = "Unbekannt";
+
+    // Hardware Details from Game.log
+    public string CpuModel { get; set; } = "Unbekannt";
+    public int CpuLogicalCores { get; set; }
+    public string GpuModel { get; set; } = "Unbekannt";
+    public string GpuVramMb { get; set; } = "";
+    public string GpuDriverVersion { get; set; } = "";
+    public string DisplayResolution { get; set; } = "";
+    public string WindowsVersion { get; set; } = "";
+
+    // Startup Benchmarks from Game.log
+    public string CpuBenchmark { get; set; } = "";
+    public string GpuBenchmark { get; set; } = "";
+    public string PerformanceIndexCpu { get; set; } = "";
+    public string PerformanceIndexGpu { get; set; } = "";
+    public string PsoCacheGenTime { get; set; } = "";
+    public string DataCoreLoadTime { get; set; } = "";
 }
 
 public static class MaintenanceService
@@ -852,7 +869,156 @@ public static class MaintenanceService
             catch { }
         }
 
+        // 3. Hardware & Benchmark Details aus Game.log extrahieren
+        ParseHardwareAndBenchmarksFromLog(logPath, info);
+
         return info;
+    }
+
+    private static void ParseHardwareAndBenchmarksFromLog(string? logPath, SystemDiagnosticInfo info)
+    {
+        string? targetLog = null;
+        if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
+        {
+            targetLog = logPath;
+        }
+        else if (!string.IsNullOrEmpty(logPath))
+        {
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                var candidate = Path.Combine(dir, "Game.log");
+                if (File.Exists(candidate)) targetLog = candidate;
+                else
+                {
+                    var buDir = Path.Combine(dir, "logbackups");
+                    if (Directory.Exists(buDir))
+                    {
+                        targetLog = Directory.GetFiles(buDir, "*.log")
+                            .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                            .FirstOrDefault();
+                    }
+                }
+            }
+        }
+
+        if (string.IsNullOrEmpty(targetLog) && Directory.Exists(LogArchive.Dir))
+        {
+            targetLog = Directory.GetFiles(LogArchive.Dir, "*.log")
+                .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                .FirstOrDefault();
+        }
+
+        if (string.IsNullOrEmpty(targetLog) || !File.Exists(targetLog)) return;
+
+        try
+        {
+            using var fs = new FileStream(targetLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var sr = new StreamReader(fs, Encoding.UTF8);
+
+            string? line;
+            int linesRead = 0;
+            // Die relevanten Hardware- & Benchmark-Informationen stehen immer in den ersten 250 Zeilen
+            while ((line = sr.ReadLine()) != null && linesRead < 350)
+            {
+                linesRead++;
+
+                // Host CPU: AMD Ryzen 7 5800X3D 8-Core Processor
+                if (line.Contains("Host CPU:"))
+                {
+                    var idx = line.IndexOf("Host CPU:");
+                    info.CpuModel = line.Substring(idx + "Host CPU:".Length).Trim();
+                }
+                // Logical CPU Count: 16
+                else if (line.Contains("Logical CPU Count:"))
+                {
+                    var idx = line.IndexOf("Logical CPU Count:");
+                    if (int.TryParse(line.Substring(idx + "Logical CPU Count:".Length).Trim(), out int cores))
+                    {
+                        info.CpuLogicalCores = cores;
+                    }
+                }
+                // Windows Version: Windows 10 64 bit (build 10.0.26200)
+                else if (line.Contains("Windows ") && line.Contains("64 bit"))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"Windows\s+[^\r\n]+");
+                    if (m.Success) info.WindowsVersion = m.Value.Trim();
+                }
+                // Current display mode is 2560x1440x32
+                else if (line.Contains("Current display mode is "))
+                {
+                    var idx = line.IndexOf("Current display mode is ");
+                    info.DisplayResolution = line.Substring(idx + "Current display mode is ".Length).Trim();
+                }
+                // Logging video adapters: / - NVIDIA GeForce RTX 5070
+                else if (line.Contains("- NVIDIA ") || line.Contains("- AMD ") || line.Contains("- Intel "))
+                {
+                    if (info.GpuModel == "Unbekannt" && !line.Contains("Microsoft Basic Render Driver"))
+                    {
+                        var dashIdx = line.IndexOf('-');
+                        if (dashIdx >= 0)
+                        {
+                            var rest = line.Substring(dashIdx + 1).Trim();
+                            var parenIdx = rest.IndexOf('(');
+                            info.GpuModel = parenIdx > 0 ? rest.Substring(0, parenIdx).Trim() : rest;
+                        }
+                    }
+                }
+                // Dedicated video memory: 11943 MB / GPU: DedicatedVidMemMB = 11175
+                else if (line.Contains("Dedicated video memory:") && string.IsNullOrEmpty(info.GpuVramMb))
+                {
+                    var idx = line.IndexOf("Dedicated video memory:");
+                    info.GpuVramMb = line.Substring(idx + "Dedicated video memory:".Length).Trim();
+                }
+                // Chosen Vulkan GPU Device (...) Driver Version (616.92.0.0) / Driver 616.92.0.0
+                else if (line.Contains("Driver Version (") || line.Contains("Driver "))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"Driver(?:\s+Version\s*\()?\s*([0-9\.]+)\)?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m.Success && string.IsNullOrEmpty(info.GpuDriverVersion))
+                    {
+                        info.GpuDriverVersion = m.Groups[1].Value.Trim();
+                    }
+                }
+                // CPU benchmark: 34.24 ms (int+mem), 30.37 ms (fp+mem)
+                else if (line.Contains("CPU benchmark:"))
+                {
+                    var idx = line.IndexOf("CPU benchmark:");
+                    info.CpuBenchmark = line.Substring(idx + "CPU benchmark:".Length).Trim();
+                }
+                // GPU benchmark: 23.25 ms (Adapter index: 0)
+                else if (line.Contains("GPU benchmark:"))
+                {
+                    var idx = line.IndexOf("GPU benchmark:");
+                    info.GpuBenchmark = line.Substring(idx + "GPU benchmark:".Length).Trim();
+                }
+                // Performance Index: 184.87 (CPU), 443.02 (GPU)
+                else if (line.Contains("Performance Index:"))
+                {
+                    var idx = line.IndexOf("Performance Index:");
+                    var rest = line.Substring(idx + "Performance Index:".Length).Trim();
+                    var mCpu = System.Text.RegularExpressions.Regex.Match(rest, @"([0-9\.]+)\s*\(CPU\)");
+                    var mGpu = System.Text.RegularExpressions.Regex.Match(rest, @"([0-9\.]+)\s*\(GPU\)");
+                    if (mCpu.Success) info.PerformanceIndexCpu = mCpu.Groups[1].Value;
+                    if (mGpu.Success) info.PerformanceIndexGpu = mGpu.Groups[1].Value;
+                }
+                // [PSOCacheGen] Loaded PSOCache (...) (0.378s)
+                else if (line.Contains("[PSOCacheGen] Loaded PSOCache"))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"\(([0-9\.]+s)\)");
+                    if (m.Success) info.PsoCacheGenTime = m.Groups[1].Value;
+                }
+                // [DataCore] Binary Data Loaded. Total Time took 3.725363s
+                else if (line.Contains("[DataCore] Binary Data Loaded."))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"Total Time took\s+([0-9\.]+s)");
+                    if (m.Success) info.DataCoreLoadTime = m.Groups[1].Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("ParseHardwareAndBenchmarksFromLog", ex);
+        }
     }
 
     private static string SanitizeFileName(string name)

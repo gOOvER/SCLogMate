@@ -585,6 +585,19 @@ export interface ToolsStatusDto {
   configBackups?: ConfigBackupItemDto[];
   keybindsDir?: string;
   configDir?: string;
+  cpuModel?: string;
+  cpuLogicalCores?: number;
+  gpuModel?: string;
+  gpuVramMb?: string;
+  gpuDriverVersion?: string;
+  displayResolution?: string;
+  windowsVersion?: string;
+  cpuBenchmark?: string;
+  gpuBenchmark?: string;
+  performanceIndexCpu?: string;
+  performanceIndexGpu?: string;
+  psoCacheGenTime?: string;
+  dataCoreLoadTime?: string;
 }
 
 export interface ScanRegionDto {

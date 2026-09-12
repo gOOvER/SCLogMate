@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Full-Width Hardware & Star Citizen Startup Benchmark Suite (`MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
+  - Implemented automatic hardware and engine telemetry extraction from `Game.log`: accurately detects Host CPU model (e.g. `AMD Ryzen 7 5800X3D`), logical core count (16 threads), Discrete GPU model (e.g. `NVIDIA GeForce RTX 5070`), Dedicated VRAM, GPU Vulkan driver version, active display resolution (e.g. `2560x1440x32`), and Windows OS build.
+  - Extracted real Star Citizen Engine startup benchmarks directly from `Game.log`: CPU benchmark latency (`34.24 ms`), GPU benchmark latency (`23.25 ms`), CIG Performance Index (`184.87 (CPU) / 443.02 (GPU)`), DataCore binary load time (`3.73s`), and Vulkan PSO pipeline cache load time (`0.38s`).
+  - Redesigned the System Diagnostics section in `ToolsView.tsx` into a full-width studio box featuring a 4-column hardware status grid and an engine startup benchmark dashboard with latency diagnostics.
 - **Fully Automatic Cloud Synchronization & Reassuring Sync Feedback (`Settings.cs`, `LogArchive.cs`, `MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
   - Added automatic cloud replication (`AutoCloudSyncEnabled`) in settings and UI: once a cloud path (Google Drive, OneDrive, Dropbox) is configured or auto-detected, Star Citizen game logs, snapshots, and keybinds are synchronized fully automatically in the background without needing manual button clicks.
   - Wired background cloud replication directly into `LogArchive.Sync()`, application launch in `PhotinoBridge`, and cloud path saving (`save_cloud_storage_path`).

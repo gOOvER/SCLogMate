@@ -750,6 +750,21 @@ public class ToolsStatusDto
     [JsonPropertyName("configBackups")] public List<ConfigBackupItemDto> ConfigBackups { get; set; } = new();
     [JsonPropertyName("keybindsDir")] public string KeybindsDir { get; set; } = MaintenanceService.LocalKeybindsBackupDir;
     [JsonPropertyName("configDir")] public string ConfigDir { get; set; } = MaintenanceService.LocalConfigBackupDir;
+
+    // Hardware & Benchmark Details
+    [JsonPropertyName("cpuModel")] public string CpuModel { get; set; } = "Unbekannt";
+    [JsonPropertyName("cpuLogicalCores")] public int CpuLogicalCores { get; set; }
+    [JsonPropertyName("gpuModel")] public string GpuModel { get; set; } = "Unbekannt";
+    [JsonPropertyName("gpuVramMb")] public string GpuVramMb { get; set; } = "";
+    [JsonPropertyName("gpuDriverVersion")] public string GpuDriverVersion { get; set; } = "";
+    [JsonPropertyName("displayResolution")] public string DisplayResolution { get; set; } = "";
+    [JsonPropertyName("windowsVersion")] public string WindowsVersion { get; set; } = "";
+    [JsonPropertyName("cpuBenchmark")] public string CpuBenchmark { get; set; } = "";
+    [JsonPropertyName("gpuBenchmark")] public string GpuBenchmark { get; set; } = "";
+    [JsonPropertyName("performanceIndexCpu")] public string PerformanceIndexCpu { get; set; } = "";
+    [JsonPropertyName("performanceIndexGpu")] public string PerformanceIndexGpu { get; set; } = "";
+    [JsonPropertyName("psoCacheGenTime")] public string PsoCacheGenTime { get; set; } = "";
+    [JsonPropertyName("dataCoreLoadTime")] public string DataCoreLoadTime { get; set; } = "";
 }
 
 public class SettingsDto
@@ -4792,7 +4807,20 @@ public class PhotinoBridge
                 SizeFormatted = c.SizeFormatted
             }).ToList(),
             KeybindsDir = MaintenanceService.LocalKeybindsBackupDir,
-            ConfigDir = MaintenanceService.LocalConfigBackupDir
+            ConfigDir = MaintenanceService.LocalConfigBackupDir,
+            CpuModel = diag.CpuModel,
+            CpuLogicalCores = diag.CpuLogicalCores,
+            GpuModel = diag.GpuModel,
+            GpuVramMb = diag.GpuVramMb,
+            GpuDriverVersion = diag.GpuDriverVersion,
+            DisplayResolution = diag.DisplayResolution,
+            WindowsVersion = diag.WindowsVersion,
+            CpuBenchmark = diag.CpuBenchmark,
+            GpuBenchmark = diag.GpuBenchmark,
+            PerformanceIndexCpu = diag.PerformanceIndexCpu,
+            PerformanceIndexGpu = diag.PerformanceIndexGpu,
+            PsoCacheGenTime = diag.PsoCacheGenTime,
+            DataCoreLoadTime = diag.DataCoreLoadTime
         };
     }
 
