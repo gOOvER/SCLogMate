@@ -40,14 +40,20 @@ public sealed class NativeToastOverlay : IDisposable
     private const int SW_HIDE = 0;
     private const int SW_SHOWNOACTIVATE = 4;
 
+    private const uint LWA_COLORKEY = 0x00000001;
     private const uint LWA_ALPHA = 0x00000002;
+
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     private const int WM_PAINT = 0x000F;
     private const int WM_DESTROY = 0x0002;
 
-    public const int ToastWidth = 470;
-    public const int SingleToastHeight = 64;
-    public const int ToastSpacing = 6;
+    public const int ToastWidth = 560;
+    public const int SingleToastHeight = 86;
+    public const int ToastSpacing = 8;
     public const int MaxVisibleToasts = 3;
 
     private IntPtr _hwnd = IntPtr.Zero;
@@ -158,7 +164,7 @@ public sealed class NativeToastOverlay : IDisposable
 
         if (_hwnd != IntPtr.Zero)
         {
-            SetLayeredWindowAttributes(_hwnd, 0, 245, LWA_ALPHA);
+            SetLayeredWindowAttributes(_hwnd, 0x00000000, 250, LWA_COLORKEY | LWA_ALPHA);
         }
     }
 
@@ -186,6 +192,8 @@ public sealed class NativeToastOverlay : IDisposable
 
         if (_hwnd != IntPtr.Zero)
         {
+            int currentH = Math.Max(1, _activeToasts.Count * (SingleToastHeight + ToastSpacing));
+            SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, ToastWidth, currentH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             ShowWindow(_hwnd, SW_SHOWNOACTIVATE);
             InvalidateRect(_hwnd, IntPtr.Zero, false);
         }
@@ -222,8 +230,10 @@ public sealed class NativeToastOverlay : IDisposable
             hasVisible = _activeToasts.Count > 0;
         }
 
-        if (needsRepaint)
+        if (needsRepaint && _hwnd != IntPtr.Zero)
         {
+            int currentH = Math.Max(1, _activeToasts.Count * (SingleToastHeight + ToastSpacing));
+            SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, ToastWidth, currentH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             InvalidateRect(_hwnd, IntPtr.Zero, false);
         }
 
@@ -241,22 +251,24 @@ public sealed class NativeToastOverlay : IDisposable
             copy = new List<NativeToastItem>(_activeToasts);
         }
 
-        int totalH = (SingleToastHeight + ToastSpacing) * MaxVisibleToasts;
+        if (copy.Count == 0) return;
+
+        int totalH = Math.Max(SingleToastHeight, copy.Count * (SingleToastHeight + ToastSpacing));
 
         IntPtr memDC = CreateCompatibleDC(hdc);
         IntPtr memBmp = CreateCompatibleBitmap(hdc, ToastWidth, totalH);
         IntPtr oldBmp = SelectObject(memDC, memBmp);
 
-        // Hintergrund Transparent / Leer (Schwarz 0x00000000)
+        // Hintergrund Transparent / Leer (Schwarz 0x00000000 wird per LWA_COLORKEY 100% transparent!)
         IntPtr emptyBrush = CreateSolidBrush(0x00000000);
         var fullRc = new RECT { left = 0, top = 0, right = ToastWidth, bottom = totalH };
         FillRect(memDC, ref fullRc, emptyBrush);
         DeleteObject(emptyBrush);
 
-        IntPtr fontHeader = CreateFont(11, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
-        IntPtr fontTitle = CreateFont(15, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
-        IntPtr fontSub = CreateFont(12, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
-        IntPtr fontIcon = CreateFont(22, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI Emoji");
+        IntPtr fontHeader = CreateFont(13, 0, 0, 0, 800, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
+        IntPtr fontTitle = CreateFont(20, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
+        IntPtr fontSub = CreateFont(14, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
+        IntPtr fontIcon = CreateFont(32, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI Emoji");
 
         SetBkMode(memDC, 1 /*TRANSPARENT*/);
 
@@ -265,43 +277,47 @@ public sealed class NativeToastOverlay : IDisposable
             var item = copy[i];
             int yOffset = i * (SingleToastHeight + ToastSpacing);
 
-            // Toast-Box (Dunkles Navy-Schwarz: 0x00180E08)
-            IntPtr boxBrush = CreateSolidBrush(0x00180E08);
-            IntPtr boxPen = CreatePen(0, 1, item.BorderColor);
+            // Toast-Box (Dunkles Navy-Schwarz: 0x001A1009)
+            IntPtr boxBrush = CreateSolidBrush(0x001A1009);
+            IntPtr boxPen = CreatePen(0, 2, item.BorderColor);
 
             IntPtr oldB = SelectObject(memDC, boxBrush);
             IntPtr oldP = SelectObject(memDC, boxPen);
 
-            RoundRect(memDC, 2, yOffset + 2, ToastWidth - 2, yOffset + SingleToastHeight - 2, 10, 10);
+            RoundRect(memDC, 2, yOffset + 2, ToastWidth - 2, yOffset + SingleToastHeight - 2, 14, 14);
 
-            // Linkes Wappen-Icon Schild (44x44)
-            int iconBoxX = 10;
-            int iconBoxY = yOffset + 10;
+            // Linkes Wappen-Icon Schild (60x60)
+            int iconBoxX = 14;
+            int iconBoxY = yOffset + 13;
+            int iconBoxSize = 60;
             IntPtr iconBg = CreateSolidBrush(0x002A1C14);
+            IntPtr iconPen = CreatePen(0, 1, item.BorderColor);
             SelectObject(memDC, iconBg);
-            RoundRect(memDC, iconBoxX, iconBoxY, iconBoxX + 44, iconBoxY + 44, 8, 8);
+            SelectObject(memDC, iconPen);
+            RoundRect(memDC, iconBoxX, iconBoxY, iconBoxX + iconBoxSize, iconBoxY + iconBoxSize, 12, 12);
             DeleteObject(iconBg);
+            DeleteObject(iconPen);
 
             // Icon Text
             SelectObject(memDC, fontIcon);
             SetTextColor(memDC, item.BorderColor);
-            var iconRc = new RECT { left = iconBoxX, top = iconBoxY + 2, right = iconBoxX + 44, bottom = iconBoxY + 44 };
+            var iconRc = new RECT { left = iconBoxX, top = iconBoxY + 4, right = iconBoxX + iconBoxSize, bottom = iconBoxY + iconBoxSize };
             DrawText(memDC, item.Icon, -1, ref iconRc, 0x00000001 | 0x00000004 | 0x00000020);
 
             // Text-Bereich
-            int textX = iconBoxX + 54;
-            int textR = ToastWidth - 14;
+            int textX = iconBoxX + iconBoxSize + 16;
+            int textR = ToastWidth - 18;
 
-            // 1. Header (z. B. "AUFTRAG ERFOLGREICH" in Amber / Cyan)
+            // 1. Header (z. B. "AUFTRAG ERFOLGREICH" in Amber / Cyan / Green)
             SelectObject(memDC, fontHeader);
             SetTextColor(memDC, item.BorderColor);
-            var hRc = new RECT { left = textX, top = yOffset + 8, right = textR, bottom = yOffset + 22 };
+            var hRc = new RECT { left = textX, top = yOffset + 11, right = textR, bottom = yOffset + 27 };
             DrawText(memDC, item.Header, -1, ref hRc, 0x00000000 | 0x00000004 | 0x00000020);
 
             // 2. Title (z. B. "Covalex Cargo Transport" in Weiß)
             SelectObject(memDC, fontTitle);
-            SetTextColor(memDC, 0x00FCF6F0);
-            var tRc = new RECT { left = textX, top = yOffset + 22, right = textR, bottom = yOffset + 42 };
+            SetTextColor(memDC, 0x00FFFFFF);
+            var tRc = new RECT { left = textX, top = yOffset + 28, right = textR, bottom = yOffset + 54 };
             DrawText(memDC, item.Title, -1, ref tRc, 0x00000000 | 0x00000004 | 0x00000020);
 
             // 3. Subtitle (z. B. "+45.000 aUEC Belohnung")
@@ -309,7 +325,7 @@ public sealed class NativeToastOverlay : IDisposable
             {
                 SelectObject(memDC, fontSub);
                 SetTextColor(memDC, 0x0080DE4A); // Grün
-                var sRc = new RECT { left = textX, top = yOffset + 42, right = textR, bottom = yOffset + 58 };
+                var sRc = new RECT { left = textX, top = yOffset + 55, right = textR, bottom = yOffset + 75 };
                 DrawText(memDC, item.Subtitle, -1, ref sRc, 0x00000000 | 0x00000004 | 0x00000020);
             }
 
@@ -404,6 +420,7 @@ public sealed class NativeToastOverlay : IDisposable
         IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
 
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] private static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
     [DllImport("user32.dll")] private static extern IntPtr BeginPaint(IntPtr hWnd, out PAINTSTRUCT lpPaint);
     [DllImport("user32.dll")] private static extern bool EndPaint(IntPtr hWnd, ref PAINTSTRUCT lpPaint);

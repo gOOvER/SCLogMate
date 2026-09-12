@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
+- **In-Game Toast Notifications Window Transparency, Sizing & Typography Overhaul (`NativeToastOverlay.cs`)**:
+  - Fixed an issue where a large black rectangular box appeared beneath and around desktop toasts, caused by missing `LWA_COLORKEY` flag in layered window attribute setup and a static 3-toast canvas height.
+  - Enabled `LWA_COLORKEY` (`0x00000001`) with pure black keying (`0x00000000`) and dynamic window height adjustment via `SetWindowPos`, eliminating all black borders, background artifacts, and empty space below active toasts.
+  - Enlarged toast dimensions and layout from 470x64px to 560x86px to provide comfortable readability on 1080p, 1440p, and 4K displays.
+  - Increased font sizes across all elements (Title: 15px -> 20px Bold, Header: 11px -> 13px Bold, Subtitle: 12px -> 14px SemiBold, Icon badge: 22px -> 32px inside 60x60px shield) and upgraded border thickness to a crisp 2px colored outline.
 - **In-Game Chat OCR Multi-Line Message Parsing, Chronicle Display & Compact Layout (`OcrEngineService.cs`, `ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
   - Resolved an issue where in-game chat messages (such as custom organization channels like `[SC KRAUTZ]`) were not detected or displayed in `Chat-Protokoll`.
   - Fixed a critical OCR line flattening issue in `OcrEngineService.cs`: Windows Media OCR's default `OcrResult.Text` strips all newlines and combines all physical screen lines into a single continuous space-separated string, causing multiple chat messages to be collapsed into one giant entry with multiple player names embedded inside the message text. Implemented `FormatOcrLines` to explicitly join `OcrResult.Lines` with `\n`, preserving distinct lines.
