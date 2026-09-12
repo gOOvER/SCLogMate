@@ -38,6 +38,21 @@ export const WikiExplorerView: React.FC<WikiExplorerViewProps> = ({ onOpenDossie
   const [results, setResults] = useState<WikiInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  const cleanLocalizedText = (raw: string | undefined | null): string => {
+    if (!raw) return '';
+    let str = String(raw).trim();
+    if (str.startsWith('{') && (str.includes('"de_DE"') || str.includes('"en_EN"') || str.includes('"zh_CN"'))) {
+      try {
+        const obj = JSON.parse(str);
+        const val = obj.de_DE || obj.en_EN || Object.values(obj)[0];
+        if (val) return String(val).trim();
+      } catch {
+        // fallback
+      }
+    }
+    return str;
+  };
+
   const executeSearch = (searchTerm: string, cat: string) => {
     setIsLoading(true);
     bridge.searchWiki(searchTerm, cat, 40)
@@ -226,13 +241,13 @@ export const WikiExplorerView: React.FC<WikiExplorerViewProps> = ({ onOpenDossie
                     <span className="text-cyan-400 font-bold truncate">
                       {item.manufacturer || 'Star Citizen'}
                     </span>
-                    {item.productionStatus && (
+                    {cleanLocalizedText(item.productionStatus) && (
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                        item.productionStatus.toLowerCase().includes('flight')
+                        cleanLocalizedText(item.productionStatus).toLowerCase().includes('flight')
                           ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
                           : 'bg-amber-950/80 border-amber-500/40 text-amber-300'
                       }`}>
-                        {item.productionStatus}
+                        {cleanLocalizedText(item.productionStatus)}
                       </span>
                     )}
                   </div>
@@ -258,7 +273,7 @@ export const WikiExplorerView: React.FC<WikiExplorerViewProps> = ({ onOpenDossie
                     {item.name}
                   </h3>
                   <div className="text-xs text-slate-400 font-mono mt-0.5 truncate">
-                    {item.role || item.type || item.category}
+                    {cleanLocalizedText(item.role) || cleanLocalizedText(item.type) || item.category}
                   </div>
                 </div>
 

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Star Citizen Wiki Multilingual Localized JSON Parsing (`WikiApiClient.cs`, `Database.cs`, `WikiDossierModal.tsx`, `WikiExplorerView.tsx`)**:
+  - Resolved an issue where vehicle attributes returned as multilingual translation maps by the API (such as `size`, `role`, `type`, `production_status`) rendered raw JSON strings like `Größe {"en_EN":"Large","de_DE":"Groß",...}` instead of clean, localized human-readable labels.
+  - Added robust localization extractors in `WikiApiClient.ExtractLocalizedOrString()` and `CleanLocalizedField()` across SQLite cache persistence and retrieval, alongside defensive client-side sanitizers in `WikiDossierModal.tsx` and `WikiExplorerView.tsx`.
+
 ### Changed
 - **Automatic Proceed after Database Synchronization (`DbUpdateModal.tsx`, `ROADMAP.md`)**:
   - Implemented an automatic 3-second transition timer upon database synchronization completion (`isCompleted`), displaying a dynamic `"Weiter (3s)"` button that smoothly enters the application without requiring a manual click.

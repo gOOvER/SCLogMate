@@ -434,9 +434,9 @@ public static class WikiApiClient
             Category = "Schiff & Fahrzeug",
             WebUrl = first.TryGetProperty("web_url", out var wu) ? wu.GetString() ?? "" : "",
             PledgeUrl = first.TryGetProperty("pledge_url", out var pu) ? pu.GetString() ?? "" : "",
-            Role = first.TryGetProperty("role", out var r) ? r.GetString() ?? "" : "",
+            Role = ExtractLocalizedOrString(first, "role"),
             Msrp = first.TryGetProperty("msrp", out var ms) && ms.ValueKind == JsonValueKind.Number ? ms.GetDouble() : null,
-            Size = first.TryGetProperty("size", out var sz) ? sz.ToString() : ""
+            Size = ExtractLocalizedOrString(first, "size")
         };
 
         // Hersteller
@@ -446,15 +446,7 @@ public static class WikiApiClient
         }
 
         // Typ
-        if (first.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.Object)
-        {
-            if (t.TryGetProperty("de_DE", out var tde)) info.Type = tde.GetString() ?? "";
-            else if (t.TryGetProperty("en_EN", out var ten)) info.Type = ten.GetString() ?? "";
-        }
-        else if (first.TryGetProperty("type", out var tStr))
-        {
-            info.Type = tStr.GetString() ?? "";
-        }
+        info.Type = ExtractLocalizedOrString(first, "type");
 
         // Fokus
         if (first.TryGetProperty("foci", out var fociEl) && fociEl.ValueKind == JsonValueKind.Array && fociEl.GetArrayLength() > 0)
@@ -465,15 +457,7 @@ public static class WikiApiClient
         }
 
         // Status
-        if (first.TryGetProperty("production_status", out var ps) && ps.ValueKind == JsonValueKind.Object)
-        {
-            if (ps.TryGetProperty("de_DE", out var psde)) info.ProductionStatus = psde.GetString() ?? "";
-            else if (ps.TryGetProperty("en_EN", out var psen)) info.ProductionStatus = psen.GetString() ?? "";
-        }
-        else if (first.TryGetProperty("production_status", out var psStr))
-        {
-            info.ProductionStatus = psStr.GetString() ?? "";
-        }
+        info.ProductionStatus = ExtractLocalizedOrString(first, "production_status");
 
         // Crew
         if (first.TryGetProperty("crew", out var crewObj) && crewObj.ValueKind == JsonValueKind.Object)
@@ -544,8 +528,15 @@ public static class WikiApiClient
         if (info.QuantumFuel.HasValue) info.Specs["Quantum Treibstoff"] = $"{info.QuantumFuel.Value:N0} l";
         if (info.Length.HasValue && info.Beam.HasValue && info.Height.HasValue)
             info.Specs["Abmessungen (L×B×H)"] = $"{info.Length.Value:N1} m × {info.Beam.Value:N1} m × {info.Height.Value:N1} m";
-        if (info.Mass.HasValue) info.Specs["Masse"] = $"{info.Mass.Value:N0} kg";
-        if (!string.IsNullOrEmpty(info.Size)) info.Specs["Fahrzeuggröße"] = $"Größe {info.Size}";
+        if (!string.IsNullOrEmpty(info.Size))
+        {
+            var cleanSize = CleanLocalizedField(info.Size);
+            info.Size = cleanSize;
+            if (int.TryParse(cleanSize, out _) || cleanSize.Length == 1)
+                info.Specs["Fahrzeuggröße"] = $"Größe {cleanSize}";
+            else
+                info.Specs["Fahrzeuggröße"] = cleanSize;
+        }
 
         // Händlerorte anreichern (FleetCatalog & Standard Verse Händler)
         var catEntry = FleetCatalog.Lookup(info.Name);
@@ -653,5 +644,49 @@ public static class WikiApiClient
 
         var cleaned = string.Join("\n", resultLines).Trim();
         return !string.IsNullOrEmpty(cleaned) ? cleaned : raw.Trim();
+    }
+
+    public static string ExtractLocalizedOrString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var prop)) return "";
+        if (prop.ValueKind == JsonValueKind.String) return CleanLocalizedField(prop.GetString() ?? "");
+        if (prop.ValueKind == JsonValueKind.Number) return prop.ToString();
+        if (prop.ValueKind == JsonValueKind.Object)
+        {
+            if (prop.TryGetProperty("de_DE", out var de) && !string.IsNullOrWhiteSpace(de.GetString()))
+                return de.GetString()!;
+            if (prop.TryGetProperty("en_EN", out var en) && !string.IsNullOrWhiteSpace(en.GetString()))
+                return en.GetString()!;
+            foreach (var p in prop.EnumerateObject())
+            {
+                if (p.Value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(p.Value.GetString()))
+                    return p.Value.GetString()!;
+            }
+        }
+        return CleanLocalizedField(prop.ToString());
+    }
+
+    public static string CleanLocalizedField(string? val)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return "";
+        var trimmed = val.Trim();
+        if (trimmed.StartsWith("{") && trimmed.Contains("\""))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(trimmed);
+                if (doc.RootElement.TryGetProperty("de_DE", out var de) && !string.IsNullOrWhiteSpace(de.GetString()))
+                    return de.GetString()!;
+                if (doc.RootElement.TryGetProperty("en_EN", out var en) && !string.IsNullOrWhiteSpace(en.GetString()))
+                    return en.GetString()!;
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(prop.Value.GetString()))
+                        return prop.Value.GetString()!;
+                }
+            }
+            catch { }
+        }
+        return trimmed;
     }
 }

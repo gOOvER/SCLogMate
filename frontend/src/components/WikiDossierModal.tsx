@@ -73,10 +73,53 @@ export const WikiDossierModal: React.FC<WikiDossierModalProps> = ({
     }
   };
 
+  const cleanLocalizedText = (raw: string | undefined | null): string => {
+    if (!raw) return '';
+    let str = String(raw).trim();
+    if (str.startsWith('{') && (str.includes('"de_DE"') || str.includes('"en_EN"') || str.includes('"zh_CN"'))) {
+      try {
+        const obj = JSON.parse(str);
+        const val = lang === 'de'
+          ? (obj.de_DE || obj.en_EN || Object.values(obj)[0])
+          : (obj.en_EN || obj.de_DE || Object.values(obj)[0]);
+        if (val) return String(val).trim();
+      } catch {
+        // fallback
+      }
+    }
+    return str;
+  };
+
+  const formatSpecValue = (raw: string | undefined | null): string => {
+    if (!raw) return '—';
+    let str = String(raw).trim();
+    let hadGroeße = false;
+    if (str.startsWith('Größe ')) {
+      hadGroeße = true;
+      str = str.slice(6).trim();
+    } else if (str.startsWith('Size ')) {
+      hadGroeße = true;
+      str = str.slice(5).trim();
+    }
+    const cleaned = cleanLocalizedText(str);
+    if (hadGroeße) {
+      if (!isNaN(Number(cleaned)) || cleaned.length === 1) {
+        return lang === 'de' ? `Größe ${cleaned}` : `Size ${cleaned}`;
+      }
+      return cleaned;
+    }
+    return cleaned || '—';
+  };
+
   const imageSrc = data?.localImageBase64 || data?.imageUrl || data?.thumbnailUrl;
   const descriptionText = lang === 'de'
     ? (data?.descriptionDe || data?.descriptionEn || 'Keine Beschreibung verfügbar.')
     : (data?.descriptionEn || data?.descriptionDe || 'No description available.');
+
+  const productionStatusClean = cleanLocalizedText(data?.productionStatus);
+  const roleClean = cleanLocalizedText(data?.role);
+  const typeClean = cleanLocalizedText(data?.type);
+  const focusClean = cleanLocalizedText(data?.focus);
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
@@ -100,13 +143,13 @@ export const WikiDossierModal: React.FC<WikiDossierModalProps> = ({
                     {data.category}
                   </span>
                 )}
-                {data?.productionStatus && (
+                {productionStatusClean && (
                   <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                    data.productionStatus.toLowerCase().includes('flight')
+                    productionStatusClean.toLowerCase().includes('flight')
                       ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
                       : 'bg-amber-950/80 border-amber-500/50 text-amber-300'
                   }`}>
-                    {data.productionStatus}
+                    {productionStatusClean}
                   </span>
                 )}
               </div>
@@ -187,14 +230,14 @@ export const WikiDossierModal: React.FC<WikiDossierModalProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020712] via-transparent to-transparent opacity-80 pointer-events-none" />
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-mono text-slate-300 pointer-events-none">
                   <div className="flex items-center gap-2">
-                    {data.role && (
+                    {roleClean && (
                       <span className="px-2 py-0.5 rounded bg-black/60 border border-slate-700 text-cyan-300">
-                        {data.role}
+                        {roleClean}
                       </span>
                     )}
-                    {data.type && (
+                    {typeClean && (
                       <span className="px-2 py-0.5 rounded bg-black/60 border border-slate-700 text-slate-300">
-                        {data.type}
+                        {typeClean}
                       </span>
                     )}
                   </div>
@@ -301,10 +344,10 @@ export const WikiDossierModal: React.FC<WikiDossierModalProps> = ({
                   </p>
                 </div>
 
-                {data.focus && (
+                {focusClean && (
                   <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-slate-400">Einsatzfokus:</span>
-                    <span className="font-bold text-cyan-300">{data.focus}</span>
+                    <span className="font-bold text-cyan-300">{focusClean}</span>
                   </div>
                 )}
               </div>
@@ -319,7 +362,7 @@ export const WikiDossierModal: React.FC<WikiDossierModalProps> = ({
                     className="bg-[#051122]/90 border border-cyan-950/80 rounded-xl p-2.5 flex items-center justify-between"
                   >
                     <span className="text-slate-400">{key}:</span>
-                    <span className="font-bold text-white text-right ml-2">{val}</span>
+                    <span className="font-bold text-white text-right ml-2">{formatSpecValue(val)}</span>
                   </div>
                 ))}
                 {Object.keys(data.specs || {}).length === 0 && (

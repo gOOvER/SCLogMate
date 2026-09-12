@@ -2431,7 +2431,7 @@ public static class Database
                     Role = reader.IsDBNull(2) ? "" : reader.GetString(2),
                     Type = reader.IsDBNull(3) ? "" : reader.GetString(3),
                     Focus = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    Size = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    Size = reader.IsDBNull(5) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(5)),
                     CrewMin = reader.IsDBNull(6) ? null : reader.GetInt32(6),
                     CrewMax = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     CargoScu = reader.IsDBNull(8) ? null : reader.GetDouble(8),
@@ -2441,7 +2441,7 @@ public static class Database
                     Height = reader.IsDBNull(12) ? null : reader.GetDouble(12),
                     Mass = reader.IsDBNull(13) ? null : reader.GetDouble(13),
                     Msrp = reader.IsDBNull(14) ? null : reader.GetDouble(14),
-                    ProductionStatus = reader.IsDBNull(15) ? "" : reader.GetString(15),
+                    ProductionStatus = reader.IsDBNull(15) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(15)),
                     DescriptionDe = reader.IsDBNull(16) ? "" : reader.GetString(16),
                     DescriptionEn = reader.IsDBNull(17) ? "" : reader.GetString(17),
                     ThumbnailUrl = reader.IsDBNull(18) ? "" : reader.GetString(18),
@@ -2455,7 +2455,19 @@ public static class Database
                     try
                     {
                         var json = reader.GetString(22);
-                        info.Specs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+                        var rawSpecs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+                        var cleanSpecs = new Dictionary<string, string>();
+                        foreach (var kv in rawSpecs)
+                        {
+                            var v = kv.Value;
+                            if (v.Contains("{") && v.Contains("\""))
+                            {
+                                var cleanInner = WikiApiClient.CleanLocalizedField(v.Replace("Größe ", ""));
+                                v = int.TryParse(cleanInner, out _) || cleanInner.Length == 1 ? $"Größe {cleanInner}" : cleanInner;
+                            }
+                            cleanSpecs[kv.Key] = v;
+                        }
+                        info.Specs = cleanSpecs;
                     }
                     catch { }
                 }
@@ -2528,6 +2540,28 @@ public static class Database
                     updated_at = excluded.updated_at;
             ";
 
+            info.Size = WikiApiClient.CleanLocalizedField(info.Size);
+            info.Role = WikiApiClient.CleanLocalizedField(info.Role);
+            info.Type = WikiApiClient.CleanLocalizedField(info.Type);
+            info.Focus = WikiApiClient.CleanLocalizedField(info.Focus);
+            info.ProductionStatus = WikiApiClient.CleanLocalizedField(info.ProductionStatus);
+
+            if (info.Specs != null && info.Specs.Count > 0)
+            {
+                var cleanedSpecs = new Dictionary<string, string>();
+                foreach (var kv in info.Specs)
+                {
+                    var val = kv.Value;
+                    if (val.Contains("{") && val.Contains("\""))
+                    {
+                        var cleanInner = WikiApiClient.CleanLocalizedField(val.Replace("Größe ", ""));
+                        val = int.TryParse(cleanInner, out _) || cleanInner.Length == 1 ? $"Größe {cleanInner}" : cleanInner;
+                    }
+                    cleanedSpecs[kv.Key] = val;
+                }
+                info.Specs = cleanedSpecs;
+            }
+
             cmd.Parameters.AddWithValue("$name", info.Name.Trim());
             cmd.Parameters.AddWithValue("$mfg", info.Manufacturer ?? "");
             cmd.Parameters.AddWithValue("$role", info.Role ?? "");
@@ -2585,15 +2619,15 @@ public static class Database
                     Name = reader.GetString(0),
                     Category = "Schiff & Fahrzeug",
                     Manufacturer = reader.IsDBNull(1) ? "" : reader.GetString(1),
-                    Role = reader.IsDBNull(2) ? "" : reader.GetString(2),
-                    Type = reader.IsDBNull(3) ? "" : reader.GetString(3),
-                    Focus = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    Size = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    Role = reader.IsDBNull(2) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(2)),
+                    Type = reader.IsDBNull(3) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(3)),
+                    Focus = reader.IsDBNull(4) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(4)),
+                    Size = reader.IsDBNull(5) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(5)),
                     CrewMin = reader.IsDBNull(6) ? null : reader.GetInt32(6),
                     CrewMax = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     CargoScu = reader.IsDBNull(8) ? null : reader.GetDouble(8),
                     Msrp = reader.IsDBNull(9) ? null : reader.GetDouble(9),
-                    ProductionStatus = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                    ProductionStatus = reader.IsDBNull(10) ? "" : WikiApiClient.CleanLocalizedField(reader.GetString(10)),
                     ThumbnailUrl = reader.IsDBNull(11) ? "" : reader.GetString(11),
                     ImageUrl = reader.IsDBNull(12) ? "" : reader.GetString(12),
                     WebUrl = reader.IsDBNull(13) ? "" : reader.GetString(13)
