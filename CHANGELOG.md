@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Streamlined Tools & Maintenance View Header (`ToolsView.tsx`)**:
+  - Removed misplaced cloud synchronization status badge and redundant `user.cfg` action buttons from the global Tools header banner.
+  - Replaced crowded header with a clean, uncluttered title and refresh control, moving the `user.cfg` file path directly into Tab 1's Live Editor header where it belongs contextually.
+
 ### Added
 - **Full-Width Hardware & Star Citizen Startup Benchmark Suite (`MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
   - Implemented automatic hardware and engine telemetry extraction from `Game.log`: accurately detects Host CPU model (e.g. `AMD Ryzen 7 5800X3D`), logical core count (16 threads), Discrete GPU model (e.g. `NVIDIA GeForce RTX 5070`), Dedicated VRAM, GPU Vulkan driver version, active display resolution (e.g. `2560x1440x32`), and Windows OS build.

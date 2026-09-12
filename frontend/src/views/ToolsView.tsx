@@ -483,7 +483,7 @@ export const ToolsView: React.FC = () => {
       )}
 
       {/* Header Banner */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-950 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-950 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-inner shrink-0">
             <Zap className="w-6 h-6" />
@@ -494,49 +494,21 @@ export const ToolsView: React.FC = () => {
               <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-sky-950 text-sky-400 border border-sky-800 font-mono">
                 LIVE
               </span>
-              {status?.cloudStoragePath && (
-                <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 flex items-center space-x-1" title={cloudDisplay}>
-                  <Cloud className="w-3 h-3" />
-                  <span>Cloud {status.autoCloudSyncEnabled !== false ? 'Auto-Sync aktiv' : 'bereit'}</span>
-                  {typeof status.cloudLogCount === 'number' && status.cloudLogCount > 0 && (
-                    <span className="ml-1 text-[10px] text-emerald-300 font-mono">({status.cloudLogCount} Logs)</span>
-                  )}
-                </span>
-              )}
             </div>
-            <p className="text-xs text-slate-400 mt-1 font-mono truncate max-w-xl">
-              user.cfg: {status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}
+            <p className="text-xs text-slate-400 mt-1">
+              Client-Tuning, Cache-Bereinigung, Hardware-Benchmark &amp; Backups
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2.5 shrink-0">
           <button
             onClick={loadStatus}
             disabled={actionLoading !== null}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} />
             <span>Neu laden</span>
-          </button>
-
-          <button
-            onClick={handleBackupUserCfgSnapshot}
-            disabled={actionLoading !== null}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-purple-950 hover:bg-purple-900 text-purple-300 text-xs font-semibold border border-purple-800 transition cursor-pointer"
-            title="Sichert die aktuelle user.cfg jetzt lokal und in der Cloud"
-          >
-            <Archive className="w-3.5 h-3.5" />
-            <span>Jetzt sichern</span>
-          </button>
-
-          <button
-            onClick={handleSaveUserCfg}
-            disabled={actionLoading !== null}
-            className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Speichern &amp; Anwenden</span>
           </button>
         </div>
       </div>
@@ -826,13 +798,20 @@ export const ToolsView: React.FC = () => {
             <div className="lg:col-span-7 flex flex-col space-y-4">
               <div className="flex-1 p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col shadow-2xl">
                 {/* Editor Header Bar */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-sky-400" />
-                    <span className="text-sm font-bold text-white">LIVE user.cfg Editor</span>
-                    <span className="text-xs text-slate-500 font-mono">
-                      ({cfgContent.split('\n').length} Zeilen)
-                    </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 mb-3 gap-2">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold text-white">LIVE user.cfg Editor</span>
+                        <span className="text-xs text-slate-500 font-mono">
+                          ({cfgContent.split('\n').length} Zeilen)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono truncate max-w-md" title={status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}>
+                        {status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
