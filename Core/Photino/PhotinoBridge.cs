@@ -2298,6 +2298,7 @@ public class PhotinoBridge
                         string? sess = null;
                         if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var sessProp)) sess = sessProp.GetString();
                         Database.ClearChatMessages(sess);
+                        _chatScanner?.ClearRecentHistory();
                         SendResponse(req.Id, "clear_chat_messages_response", new { success = true });
                         break;
                     }

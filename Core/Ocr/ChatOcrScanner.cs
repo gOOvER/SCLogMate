@@ -26,7 +26,19 @@ public sealed class ChatOcrScanner : IDisposable
     private int _busy;
     private readonly HashSet<string> _recentMessageHashes = new();
     private readonly Queue<string> _hashQueue = new();
+    private readonly List<ChatMessageDto> _recentMessages = new();
     private const int MaxHashHistory = 500;
+    private const int MaxRecentHistory = 60;
+
+    public void ClearRecentHistory()
+    {
+        lock (_recentMessages)
+        {
+            _recentMessages.Clear();
+            _recentMessageHashes.Clear();
+            _hashQueue.Clear();
+        }
+    }
 
     public event Action<List<ChatMessageDto>>? MessagesScanned;
     public event Action<bool>? RunningChanged;
@@ -198,19 +210,43 @@ public sealed class ChatOcrScanner : IDisposable
         var newMessages = new List<ChatMessageDto>();
         var visibleMessages = new List<ChatMessageDto>();
 
-        lock (_recentMessageHashes)
+        lock (_recentMessages)
         {
             foreach (var msg in parsed)
             {
+                // 1. Exakter Hash-Check
                 var hash = ComputeMessageHash(msg.Channel, msg.Sender, msg.Message);
-                bool isNew = _recentMessageHashes.Add(hash);
-                if (isNew)
+                bool exactMatch = _recentMessageHashes.Contains(hash);
+
+                // 2. Fuzzy-Ähnlichkeits-Check gegen kürzlich erfasste Nachrichten
+                // (fängt OCR-Flicker und Jitter von lingering Textzeilen auf dem Bildschirm ab)
+                bool fuzzyDuplicate = false;
+                if (!exactMatch)
                 {
+                    foreach (var recent in _recentMessages)
+                    {
+                        if (ChatParser.IsDuplicateMessage(msg.Sender, msg.Message, recent.Sender, recent.Message))
+                        {
+                            fuzzyDuplicate = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!exactMatch && !fuzzyDuplicate)
+                {
+                    _recentMessageHashes.Add(hash);
                     _hashQueue.Enqueue(hash);
                     if (_hashQueue.Count > MaxHashHistory)
                     {
                         var old = _hashQueue.Dequeue();
                         _recentMessageHashes.Remove(old);
+                    }
+
+                    _recentMessages.Add(msg);
+                    if (_recentMessages.Count > MaxRecentHistory)
+                    {
+                        _recentMessages.RemoveAt(0);
                     }
 
                     // In Datenbank speichern
@@ -220,11 +256,6 @@ public sealed class ChatOcrScanner : IDisposable
                         msg.Id = savedId;
                         newMessages.Add(msg);
                     }
-                }
-                else
-                {
-                    var existingId = Database.InsertChatMessage(msg);
-                    if (existingId > 0) msg.Id = existingId;
                 }
 
                 visibleMessages.Add(msg);

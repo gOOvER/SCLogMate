@@ -2843,20 +2843,25 @@ public static class Database
             using var db = new SqliteConnection(Conn);
             db.Open();
 
-            // Deduplizierung: Selbe Nachricht vom selben Sender überspringen (tolerant gegenüber Satzzeichen am Ende)
+            // Deduplizierung: Letzte Nachrichten dieses Senders auf Fuzzy-Ähnlichkeit prüfen
             using var checkCmd = db.CreateCommand();
             checkCmd.CommandText = @"
-                SELECT id FROM chat_messages 
+                SELECT id, message FROM chat_messages 
                 WHERE LOWER(sender) = LOWER(@s) 
-                  AND (LOWER(message) = LOWER(@m) OR RTRIM(LOWER(message), ' .,!?-;') = RTRIM(LOWER(@m), ' .,!?-;'))
-                ORDER BY id DESC LIMIT 1;
+                ORDER BY id DESC LIMIT 5;
             ";
             checkCmd.Parameters.AddWithValue("@s", msg.Sender.Trim());
-            checkCmd.Parameters.AddWithValue("@m", msg.Message.Trim());
-            var existing = checkCmd.ExecuteScalar();
-            if (existing != null && existing != DBNull.Value)
+            using (var reader = checkCmd.ExecuteReader())
             {
-                return Convert.ToInt64(existing);
+                while (reader.Read())
+                {
+                    var existingId = reader.GetInt64(0);
+                    var existingMsg = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    if (Ocr.ChatParser.IsDuplicateMessage(msg.Sender, msg.Message, msg.Sender, existingMsg))
+                    {
+                        return existingId;
+                    }
+                }
             }
 
             using var cmd = db.CreateCommand();

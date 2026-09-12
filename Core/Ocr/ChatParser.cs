@@ -90,7 +90,10 @@ public static class ChatParser
             if (current != null && !string.IsNullOrWhiteSpace(current.Sender) && !string.IsNullOrWhiteSpace(current.Message))
             {
                 current.Message = current.Message.Trim();
-                current.Sender = CleanHandle(current.Sender);
+                var cleanSender = CleanHandle(current.Sender);
+                var (fixedSender, fixedChannel) = ExtractGluedChannel(cleanSender, current.Channel);
+                current.Sender = fixedSender;
+                current.Channel = fixedChannel;
                 if (!string.IsNullOrEmpty(current.Recipient))
                 {
                     current.Recipient = CleanHandle(current.Recipient);
@@ -261,7 +264,94 @@ public static class ChatParser
         return "Global";
     }
 
-    private static string CleanHandle(string raw)
+    private static readonly Regex GluedChannelPrefixPattern = new(
+        @"^(?:['`""~!\*]*[\[\(\{I|tl1B]?)(?<ch>GLOBAL|SC\s*KRAUTZ|PARTY|DIRECT|WHISPER)[\]\)\}\|I1ljkK\>_]*(?<name>[a-zA-Z0-9_\-\.]{2,25})$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    public static (string Sender, string Channel) ExtractGluedChannel(string rawSender, string currentChannel)
+    {
+        var m = GluedChannelPrefixPattern.Match(rawSender);
+        if (m.Success)
+        {
+            var detectedCh = NormalizeChannel(m.Groups["ch"].Value);
+            var cleanName = m.Groups["name"].Value;
+            return (cleanName, detectedCh);
+        }
+        return (rawSender, currentChannel);
+    }
+
+    /// <summary>
+    /// Prüft, ob zwei Chat-Nachrichten semantisch dasselbe Ereignis beschreiben (Fuzzy-Vergleich).
+    /// Schützt vor doppelten Log-Einträgen bei lingering On-Screen Chatzeilen und OCR-Jitter (z.B. raffenerie vs raffenprie).
+    /// </summary>
+    public static bool IsDuplicateMessage(string newSender, string newMsg, string oldSender, string oldMsg)
+    {
+        var candSnd = CleanHandle(newSender).ToLowerInvariant();
+        var recSnd = CleanHandle(oldSender).ToLowerInvariant();
+
+        // Sender muss identisch oder extrem ähnlich sein (z. B. goovER vs goovEk: Levenshtein <= 1)
+        bool senderMatch = candSnd == recSnd ||
+                           (candSnd.Length >= 4 && LevenshteinDistance(candSnd, recSnd) <= 1);
+        if (!senderMatch) return false;
+
+        var candNorm = NormalizeForComparison(newMsg);
+        var recNorm = NormalizeForComparison(oldMsg);
+
+        if (candNorm == recNorm) return true;
+
+        if (candNorm.Length >= 8 && recNorm.Length >= 8)
+        {
+            // Eine Nachricht ist Teil der anderen (z. B. unvollständiger OCR-Ausschnitt vs voller Text)
+            if (candNorm.Contains(recNorm) || recNorm.Contains(candNorm)) return true;
+
+            int maxLen = Math.Max(candNorm.Length, recNorm.Length);
+            int dist = LevenshteinDistance(candNorm, recNorm);
+            double similarity = 1.0 - ((double)dist / maxLen);
+
+            // Ab 75% Ähnlichkeit bei >= 8 Zeichen handelt es sich um denselben Text mit OCR-Jitter
+            if (similarity >= 0.75) return true;
+        }
+
+        return false;
+    }
+
+    public static string NormalizeForComparison(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (var c in s.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c)) sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    public static int LevenshteinDistance(string s, string t)
+    {
+        if (string.IsNullOrEmpty(s)) return t?.Length ?? 0;
+        if (string.IsNullOrEmpty(t)) return s.Length;
+
+        int n = s.Length;
+        int m = t.Length;
+        int[,] d = new int[n + 1, m + 1];
+
+        for (int i = 0; i <= n; d[i, 0] = i++) { }
+        for (int j = 0; j <= m; d[0, j] = j++) { }
+
+        for (int i = 1; i <= n; i++)
+        {
+            for (int j = 1; j <= m; j++)
+            {
+                int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
+                d[i, j] = Math.Min(
+                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                    d[i - 1, j - 1] + cost);
+            }
+        }
+        return d[n, m];
+    }
+
+    public static string CleanHandle(string raw)
     {
         // Entfernt führende/nachfolgende OCR-Artefakte wie Klammern, Doppelpunkte, Tilden, Anführungszeichen
         return raw.Trim(' ', '[', ']', '(', ')', ':', '<', '>', '~', '|', '-', '{', '}', '\'', '"', ';')
@@ -269,7 +359,7 @@ public static class ChatParser
                   .Replace('ø', '0');
     }
 
-    private static bool IsLikelyPlayerName(string s, bool requireStrict = false)
+    public static bool IsLikelyPlayerName(string s, bool requireStrict = false)
     {
         var clean = CleanHandle(s);
         if (clean.Length < 2 || clean.Length > 25) return false;
