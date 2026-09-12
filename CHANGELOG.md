@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **In-Game Chat OCR Multi-Line Message Parsing, Chronicle Display & Compact Layout (`ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
+- **In-Game Chat OCR Multi-Line Message Parsing, Chronicle Display & Compact Layout (`OcrEngineService.cs`, `ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
   - Resolved an issue where in-game chat messages (such as custom organization channels like `[SC KRAUTZ]`) were not detected or displayed in `Chat-Protokoll`.
+  - Fixed a critical OCR line flattening issue in `OcrEngineService.cs`: Windows Media OCR's default `OcrResult.Text` strips all newlines and combines all physical screen lines into a single continuous space-separated string, causing multiple chat messages to be collapsed into one giant entry with multiple player names embedded inside the message text. Implemented `FormatOcrLines` to explicitly join `OcrResult.Lines` with `\n`, preserving distinct lines.
+  - Added embedded header splitting (`EmbeddedHeaderSplitPattern`) in `ChatParser.cs` to reliably extract individual messages even if OCR merges multiple messages into one line.
+  - Added standalone channel tag parsing (`ChannelOnlyPattern`) to associate channel badges spanning separate lines (e.g. `[GLOBAL]` followed by pilot name on the next line) with the subsequent message instead of appending channel tags into the previous message body.
+  - Added common stopword filtering (`is`, `it`, `to`, `in`, `at`, `on`, etc.) in `IsLikelyPlayerName` to eliminate false sender detections (such as `is: t possible...`).
+  - Improved cross-pass channel promotion in `ChatOcrScanner.cs`: dynamically upgrades channel badges from generic `"Global"` to authentic organization channels (e.g. `"SC Krautz"`) when detected in the inverted OCR pass.
+  - Strengthened message hashing and SQLite deduplication in `ChatOcrScanner.cs` and `Database.cs` (tolerant of trailing punctuation differences), preventing repetitive entries every 3.5 seconds for messages remaining on-screen.
   - Upgraded `ChatParser.cs` regexes (`HeaderPattern`, `StandaloneHeaderPattern`) to flexibly recognize custom organization and group channel tags with OCR bracket anomalies (`[...j`, `'I...I`, `tsc ...`), spaces, and accented glyphs, normalizing them cleanly into proper org titles (`SC Krautz`).
   - Improved handle sanitization and sender delimiter handling (`:`, `-`, `.`, `;`, `i`) to reliably capture multi-line chat messages and avoid swallowing subsequent headers into message bodies.
   - Enabled `ChatOcrEnabled = true` by default in `Settings.cs` and combined plain and inverted OCR passes in `ChatOcrScanner.cs` for enhanced recognition of both bright and dimmed chat text.

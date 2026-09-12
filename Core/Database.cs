@@ -2843,11 +2843,12 @@ public static class Database
             using var db = new SqliteConnection(Conn);
             db.Open();
 
-            // Deduplizierung: Selbe Nachricht vom selben Sender innerhalb von 15 Sekunden überspringen
+            // Deduplizierung: Selbe Nachricht vom selben Sender überspringen (tolerant gegenüber Satzzeichen am Ende)
             using var checkCmd = db.CreateCommand();
             checkCmd.CommandText = @"
                 SELECT id FROM chat_messages 
-                WHERE sender = @s AND message = @m 
+                WHERE LOWER(sender) = LOWER(@s) 
+                  AND (LOWER(message) = LOWER(@m) OR RTRIM(LOWER(message), ' .,!?-;') = RTRIM(LOWER(@m), ' .,!?-;'))
                 ORDER BY id DESC LIMIT 1;
             ";
             checkCmd.Parameters.AddWithValue("@s", msg.Sender.Trim());

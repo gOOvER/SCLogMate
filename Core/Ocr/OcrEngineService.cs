@@ -54,7 +54,7 @@ public sealed class OcrEngineService : IDisposable
             var invResult = await _engine.RecognizeAsync(invBmp);
             var plainResult = await _engine.RecognizeAsync(plainBmp);
 
-            return (invResult?.Text, plainResult?.Text);
+            return (FormatOcrLines(invResult), FormatOcrLines(plainResult));
         }
         catch (Exception ex)
         {
@@ -81,7 +81,7 @@ public sealed class OcrEngineService : IDisposable
             var buf = Preprocess(bgra, w, h, scale, padding, invert: true, boostContrast: true, out int outW, out int outH);
             using var bmp = ToSoftwareBitmap(buf, outW, outH);
             var result = await _engine.RecognizeAsync(bmp);
-            return result?.Text;
+            return FormatOcrLines(result);
         }
         catch (Exception ex)
         {
@@ -92,6 +92,26 @@ public sealed class OcrEngineService : IDisposable
         {
             _ocrLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Formatiert das OcrResult unter Erhaltung der physikalischen Zeilenumbrüche (\n),
+    /// da OcrResult.Text alle Zeilen zu einem einzigen Fließtext-Absatz ohne Newlines verbindet.
+    /// </summary>
+    private static string? FormatOcrLines(OcrResult? res)
+    {
+        if (res == null) return null;
+        if (res.Lines != null && res.Lines.Count > 0)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < res.Lines.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(res.Lines[i].Text);
+            }
+            return sb.ToString();
+        }
+        return res.Text;
     }
 
     private static byte[] Preprocess(byte[] bgra, int w, int h, int scale, int padding, bool invert, bool boostContrast, out int outW, out int outH)

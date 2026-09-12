@@ -17,19 +17,35 @@ public static class ChatParser
     // [SékRAUTZj AnthonyBenson:
     // tsc KRAUTZ] Ravaxx:
     // 'IS&KRAUTZI goovERi
+    // Erkennt Chat-Header wie:
+    // [GLOBAL] Minoofie: text
+    // [SC KRAUTZ] AnthonyBenson: text
+    // [SékRAUTZj AnthonyBenson:
+    // tsc KRAUTZ] Ravaxx:
+    // 'IS&KRAUTZI goovERi
     // [Direct] Pilot to Target: whisper
     private static readonly Regex HeaderPattern = new(
-        @"^(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?(?:\s*[:\-\.;i]\s*|\s+)(?<inlineMsg>.*)$",
+        @"^(?:(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)+)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?(?:\s*[:\-\.;i]\s*|\s+)(?<inlineMsg>.*)$",
         RegexOptions.Compiled);
 
     // Standalone Header wie "[SC KRAUTZ] AnthonyBenson:" auf einer eigenen Zeile
     private static readonly Regex StandaloneHeaderPattern = new(
-        @"^(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?\s*[:\-\.;i]?$",
+        @"^(?:(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)+)\[?(?:(?:From\s+)?(?<sender>[a-zA-Z0-9_\-\.]{2,25}?)(?:\s+to\s+\[?(?<recipient>[a-zA-Z0-9_\-\.]{2,25})\]?)?)\]?\s*[:\-\.;i]?$",
+        RegexOptions.Compiled);
+
+    // Reine Kanal-Zeile wie "[GLOBAL]" oder "[SC KRAUTZ]" (ohne Sender auf derselben Zeile)
+    private static readonly Regex ChannelOnlyPattern = new(
+        @"^(?:(?:['`""~!\*]*[\[\(\{I|tl1](?<channel>[a-zA-Z0-9\s&_\-\.\p{L}]{2,25})[\]\)\}\|I1lj\>]\s*)+)$",
         RegexOptions.Compiled);
 
     // Fallback für einfache "Player: Text" Zeilen (ohne Kanal-Tag davor)
     private static readonly Regex ColonSenderPattern = new(
         @"^\[?(?<sender>[a-zA-Z0-9_\-\.]{2,25})\]?\s*[:\-]\s*(?<inlineMsg>.*)$",
+        RegexOptions.Compiled);
+
+    // Erkennt eingebettete neue Nachrichten innerhalb einer Zeile (falls OCR zwei Chatzeilen zusammenzieht)
+    private static readonly Regex EmbeddedHeaderSplitPattern = new(
+        @"(?<=\S)\s+(?=(?:['`""~!\*]*[\[\(\{I|tl1][a-zA-Z0-9\s&_\-\.\p{L}]{2,25}[\]\)\}\|I1lj\>]\s*)+[a-zA-Z0-9_\-\.]{2,25}\s*[:\-\.;i])",
         RegexOptions.Compiled);
 
     private static readonly HashSet<string> IgnoredPhrases = new(StringComparer.OrdinalIgnoreCase)
@@ -40,15 +56,34 @@ public static class ChatParser
         "contacts", "broadcast", "channel list", "members (", "online ("
     };
 
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "is", "it", "to", "in", "at", "on", "no", "so", "do", "we", "he", "me", "my",
+        "if", "or", "an", "as", "am", "be", "by", "up", "ok", "of", "and", "the", "for"
+    };
+
     public static List<ChatMessageDto> ParseChatLines(string rawOcrText, string? sessionId = null)
     {
         var list = new List<ChatMessageDto>();
         if (string.IsNullOrWhiteSpace(rawOcrText)) return list;
 
-        var lines = rawOcrText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var rawLines = rawOcrText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
         var now = DateTime.UtcNow.ToString("o");
 
+        // Vorab: Zeilen aufteilen, falls Windows OCR mehrere Nachrichten in eine Zeile gepackt hat
+        var lines = new List<string>();
+        foreach (var r in rawLines)
+        {
+            if (string.IsNullOrWhiteSpace(r)) continue;
+            var subLines = EmbeddedHeaderSplitPattern.Split(r);
+            foreach (var s in subLines)
+            {
+                if (!string.IsNullOrWhiteSpace(s)) lines.Add(s.Trim());
+            }
+        }
+
         ChatMessageDto? current = null;
+        string? pendingChannel = null;
 
         void FinalizeCurrent()
         {
@@ -92,6 +127,15 @@ public static class ChatParser
             }
             if (shouldIgnore) continue;
 
+            // 0. Reine Kanal-Zeile: [GLOBAL] oder [SC KRAUTZ]
+            var mChanOnly = ChannelOnlyPattern.Match(line);
+            if (mChanOnly.Success)
+            {
+                FinalizeCurrent();
+                pendingChannel = NormalizeChannel(mChanOnly.Groups["channel"].Value.Trim());
+                continue;
+            }
+
             // 1. Muster mit Kanal-Header und Inline-Nachricht: [Global] Sender: Message
             var mHeader = HeaderPattern.Match(line);
             var mStandalone = StandaloneHeaderPattern.Match(line);
@@ -99,10 +143,11 @@ public static class ChatParser
             if (mHeader.Success && IsLikelyPlayerName(mHeader.Groups["sender"].Value))
             {
                 FinalizeCurrent();
-                var channelRaw = mHeader.Groups["channel"].Value.Trim();
+                var channelRaw = mHeader.Groups["channel"].Success ? mHeader.Groups["channel"].Value.Trim() : (pendingChannel ?? "Global");
                 var sender = mHeader.Groups["sender"].Value.Trim();
                 var recipient = mHeader.Groups["recipient"].Success ? mHeader.Groups["recipient"].Value.Trim() : null;
                 var inlineMsg = mHeader.Groups["inlineMsg"].Value.Trim();
+                pendingChannel = null;
 
                 current = new ChatMessageDto
                 {
@@ -120,9 +165,10 @@ public static class ChatParser
             else if (mStandalone.Success && IsLikelyPlayerName(mStandalone.Groups["sender"].Value))
             {
                 FinalizeCurrent();
-                var channelRaw = mStandalone.Groups["channel"].Value.Trim();
+                var channelRaw = mStandalone.Groups["channel"].Success ? mStandalone.Groups["channel"].Value.Trim() : (pendingChannel ?? "Global");
                 var sender = mStandalone.Groups["sender"].Value.Trim();
                 var recipient = mStandalone.Groups["recipient"].Success ? mStandalone.Groups["recipient"].Value.Trim() : null;
+                pendingChannel = null;
 
                 current = new ChatMessageDto
                 {
@@ -145,14 +191,17 @@ public static class ChatParser
                 var sender = mColon.Groups["sender"].Value.Trim();
                 var inlineMsg = mColon.Groups["inlineMsg"].Value.Trim();
 
-                if (IsLikelyPlayerName(sender))
+                if (IsLikelyPlayerName(sender, requireStrict: pendingChannel == null))
                 {
                     FinalizeCurrent();
+                    var ch = pendingChannel ?? "Global";
+                    pendingChannel = null;
+
                     current = new ChatMessageDto
                     {
                         Timestamp = now,
                         SessionId = sessionId,
-                        Channel = "Global",
+                        Channel = ch,
                         Sender = sender,
                         Message = inlineMsg,
                         RawOcr = line,
@@ -220,13 +269,15 @@ public static class ChatParser
                   .Replace('ø', '0');
     }
 
-    private static bool IsLikelyPlayerName(string s)
+    private static bool IsLikelyPlayerName(string s, bool requireStrict = false)
     {
         var clean = CleanHandle(s);
         if (clean.Length < 2 || clean.Length > 25) return false;
         if (int.TryParse(clean, out _)) return false;
         var lower = clean.ToLowerInvariant();
-        if (lower is "http" or "https" or "error" or "warning" or "info" or "size" or "scu" or "time" or "date" or "name" or "press" or "f12" or "enter" or "online" or "members") return false;
+        if (lower is "http" or "https" or "error" or "warning" or "info" or "size" or "scu" or "time" or "date" or "name" or "press" or "f12" or "enter" or "online" or "members" or "global" or "party" or "direct") return false;
+        if (StopWords.Contains(lower)) return false;
+        if (requireStrict && clean.Length < 3) return false;
         return true;
     }
 }

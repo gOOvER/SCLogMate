@@ -154,7 +154,7 @@ public sealed class ChatOcrScanner : IDisposable
             ? ChatParser.ParseChatLines(plainText, currentSession)
             : new List<ChatMessageDto>();
 
-        // 2. Inverted-Pass ergänzen (erfasst ggf. dunklere oder invertiert besser lesbare Nachrichten)
+        // 2. Inverted-Pass ergänzen (erfasst ggf. dunklere oder invertiert besser lesbare Nachrichten & Org-Kanäle)
         if (!string.IsNullOrWhiteSpace(invText))
         {
             var invParsed = ChatParser.ParseChatLines(invText, currentSession);
@@ -167,7 +167,21 @@ public sealed class ChatOcrScanner : IDisposable
                 var existingHashes = new HashSet<string>(parsed.Select(m => ComputeMessageHash(m.Channel, m.Sender, m.Message)));
                 foreach (var invMsg in invParsed)
                 {
-                    if (existingHashes.Add(ComputeMessageHash(invMsg.Channel, invMsg.Sender, invMsg.Message)))
+                    var invHash = ComputeMessageHash(invMsg.Channel, invMsg.Sender, invMsg.Message);
+
+                    // Falls bereits in Plain erkannt, aber in Invert mit echtem Org-Kanal (z. B. 'SC Krautz' statt 'Global'):
+                    var existing = parsed.FirstOrDefault(p =>
+                        string.Equals(p.Sender, invMsg.Sender, StringComparison.OrdinalIgnoreCase) &&
+                        ComputeMessageHash("", p.Sender, p.Message) == invHash);
+
+                    if (existing != null)
+                    {
+                        if (existing.Channel == "Global" && invMsg.Channel != "Global")
+                        {
+                            existing.Channel = invMsg.Channel;
+                        }
+                    }
+                    else if (existingHashes.Add(invHash))
                     {
                         parsed.Add(invMsg);
                     }
@@ -233,7 +247,8 @@ public sealed class ChatOcrScanner : IDisposable
 
     private static string ComputeMessageHash(string channel, string sender, string message)
     {
-        var raw = $"{channel.ToLowerInvariant()}:{sender.ToLowerInvariant()}:{message.Trim().ToLowerInvariant()}";
+        var cleanMsg = message.Trim().TrimEnd('.', ',', '!', '?', '-', ';').ToLowerInvariant();
+        var raw = $"{sender.Trim().ToLowerInvariant()}:{cleanMsg}";
         using var md5 = MD5.Create();
         var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(bytes);
