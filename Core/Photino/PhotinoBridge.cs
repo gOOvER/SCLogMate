@@ -744,6 +744,8 @@ public class ToolsStatusDto
     [JsonPropertyName("keybindBackups")] public List<string> KeybindBackups { get; set; } = new();
     [JsonPropertyName("cloudStoragePath")] public string? CloudStoragePath { get; set; }
     [JsonPropertyName("cloudAutoDetected")] public bool CloudAutoDetected { get; set; }
+    [JsonPropertyName("autoCloudSyncEnabled")] public bool AutoCloudSyncEnabled { get; set; } = true;
+    [JsonPropertyName("cloudLogCount")] public int CloudLogCount { get; set; }
     [JsonPropertyName("keybindItems")] public List<KeybindBackupItemDto> KeybindItems { get; set; } = new();
     [JsonPropertyName("configBackups")] public List<ConfigBackupItemDto> ConfigBackups { get; set; } = new();
     [JsonPropertyName("keybindsDir")] public string KeybindsDir { get; set; } = MaintenanceService.LocalKeybindsBackupDir;
@@ -1286,6 +1288,27 @@ public class PhotinoBridge
                         _hasSyncedLogs = true;
                         SyncAllLogs(forceRescan: false);
                     }
+
+                    // Automatische Cloud-Synchronisation im Hintergrund prüfen
+                    try
+                    {
+                        var startSettings = Settings.Load();
+                        if (startSettings.AutoCloudSyncEnabled && !string.IsNullOrWhiteSpace(startSettings.CloudStoragePath))
+                        {
+                            _ = Task.Run(() =>
+                            {
+                                try
+                                {
+                                    MaintenanceService.SyncLogsToCloud(startSettings.CloudStoragePath, _currentLogPath);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error("AutoCloudSyncOnReady", ex);
+                                }
+                            });
+                        }
+                    }
+                    catch { }
 
                     // Auto-Check auf App-Updates nach Start
                     try
@@ -1916,7 +1939,57 @@ public class PhotinoBridge
                         var s = Settings.Load();
                         s.CloudStoragePath = string.IsNullOrWhiteSpace(cPath) ? null : cPath.Trim();
                         Settings.Save(s);
+
+                        // Wenn ein Pfad hinterlegt wurde und Auto-Sync aktiv ist, direkt im Hintergrund synchronisieren
+                        if (!string.IsNullOrWhiteSpace(s.CloudStoragePath) && s.AutoCloudSyncEnabled)
+                        {
+                            _ = Task.Run(() =>
+                            {
+                                try
+                                {
+                                    MaintenanceService.SyncLogsToCloud(s.CloudStoragePath, _currentLogPath);
+                                    Broadcast("TOOLS_UPDATED", GetToolsStatus());
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error("save_cloud_storage_path.AutoSync", ex);
+                                }
+                            });
+                        }
+
                         SendResponse(req.Id, "save_cloud_storage_path_response", new { success = true, tools = GetToolsStatus() });
+                    }
+                    break;
+
+                case "toggle_auto_cloud_sync":
+                    if (req.Payload.HasValue)
+                    {
+                        bool isEnabled = true;
+                        if (req.Payload.Value.TryGetProperty("enabled", out var enProp))
+                        {
+                            isEnabled = enProp.GetBoolean();
+                        }
+                        var sAuto = Settings.Load();
+                        sAuto.AutoCloudSyncEnabled = isEnabled;
+                        Settings.Save(sAuto);
+
+                        if (isEnabled && !string.IsNullOrWhiteSpace(sAuto.CloudStoragePath))
+                        {
+                            _ = Task.Run(() =>
+                            {
+                                try
+                                {
+                                    MaintenanceService.SyncLogsToCloud(sAuto.CloudStoragePath, _currentLogPath);
+                                    Broadcast("TOOLS_UPDATED", GetToolsStatus());
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error("toggle_auto_cloud_sync.AutoSync", ex);
+                                }
+                            });
+                        }
+
+                        SendResponse(req.Id, "toggle_auto_cloud_sync_response", new { success = true, autoCloudSyncEnabled = isEnabled, tools = GetToolsStatus() });
                     }
                     break;
 
@@ -4669,6 +4742,21 @@ public class PhotinoBridge
         var keybindList = MaintenanceService.ListKeybindBackups(settings.CloudStoragePath);
         var configList = MaintenanceService.ListConfigBackups(settings.CloudStoragePath);
 
+        int cloudLogCount = 0;
+        var chosenCloud = !string.IsNullOrWhiteSpace(settings.CloudStoragePath) ? settings.CloudStoragePath : effectiveCloud;
+        if (!string.IsNullOrWhiteSpace(chosenCloud))
+        {
+            try
+            {
+                var cloudLogsDir = Path.Combine(chosenCloud, "SCLogMate", "Logs");
+                if (Directory.Exists(cloudLogsDir))
+                {
+                    cloudLogCount = Directory.GetFiles(cloudLogsDir, "*.log").Length;
+                }
+            }
+            catch { }
+        }
+
         return new ToolsStatusDto
         {
             ShaderCacheMb = shaderMb,
@@ -4681,8 +4769,10 @@ public class PhotinoBridge
             DriveName = diag.DriveName,
             FreeDiskGb = diag.FreeDiskGb,
             PagefileStatus = diag.PagefileStatus,
-            CloudStoragePath = !string.IsNullOrWhiteSpace(settings.CloudStoragePath) ? settings.CloudStoragePath : effectiveCloud,
+            CloudStoragePath = chosenCloud,
             CloudAutoDetected = string.IsNullOrWhiteSpace(settings.CloudStoragePath) && !string.IsNullOrWhiteSpace(effectiveCloud),
+            AutoCloudSyncEnabled = settings.AutoCloudSyncEnabled,
+            CloudLogCount = cloudLogCount,
             KeybindBackups = keybindList.Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList(),
             KeybindItems = keybindList.Select(k => new KeybindBackupItemDto
             {

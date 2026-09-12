@@ -412,6 +412,17 @@ export const ToolsView: React.FC = () => {
     }
   };
 
+  const handleToggleAutoCloudSync = async (enabled: boolean) => {
+    try {
+      const res = await bridge.send<{ success: boolean; autoCloudSyncEnabled: boolean; tools?: ToolsStatusDto }>('toggle_auto_cloud_sync', { enabled });
+      if (res.tools) setStatus(res.tools);
+      showToast(enabled ? 'Automatische Cloud-Synchronisation aktiviert' : 'Automatische Cloud-Synchronisation pausiert');
+    } catch (err) {
+      console.error(err);
+      showToast('Fehler beim Ändern der Cloud-Einstellung');
+    }
+  };
+
   const handleOpenFolder = async (folderType: 'keybinds' | 'config' | 'cloud' | 'logbackups') => {
     try {
       const res = await bridge.send<{ success: boolean; error?: string }>('open_folder', { folderType });
@@ -432,6 +443,15 @@ export const ToolsView: React.FC = () => {
 
   useEffect(() => {
     loadStatus();
+    const unsubscribe = bridge.on<ToolsStatusDto>('TOOLS_UPDATED', (newStatus) => {
+      if (newStatus) {
+        setStatus(newStatus);
+        if (newStatus.cloudStoragePath !== undefined) {
+          setCloudPath(newStatus.cloudStoragePath || '');
+        }
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   if (loading && !status) {
@@ -474,7 +494,10 @@ export const ToolsView: React.FC = () => {
               {status?.cloudStoragePath && (
                 <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 flex items-center space-x-1" title={cloudDisplay}>
                   <Cloud className="w-3 h-3" />
-                  <span>Cloud aktiv</span>
+                  <span>Cloud {status.autoCloudSyncEnabled !== false ? 'Auto-Sync aktiv' : 'bereit'}</span>
+                  {typeof status.cloudLogCount === 'number' && status.cloudLogCount > 0 && (
+                    <span className="ml-1 text-[10px] text-emerald-300 font-mono">({status.cloudLogCount} Logs)</span>
+                  )}
                 </span>
               )}
             </div>
@@ -1166,6 +1189,33 @@ export const ToolsView: React.FC = () => {
               >
                 Pfad speichern
               </button>
+            </div>
+
+            {/* Auto Cloud Sync Toggle & Guarantee */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-purple-900/30 text-xs bg-purple-950/20 -mx-5 -mb-4 px-5 py-3 rounded-b-2xl">
+              <label className="flex items-center space-x-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={status?.autoCloudSyncEnabled !== false}
+                  onChange={(e) => handleToggleAutoCloudSync(e.target.checked)}
+                  className="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-purple-500 cursor-pointer"
+                />
+                <div>
+                  <span className="font-bold text-white block">
+                    Vollautomatische Cloud-Synchronisation aktiv
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    Alle neuen Game.log-Dateien, user.cfg-Snapshots und Keybinds werden nach Spielende und App-Start automatisch ohne Klick synchronisiert.
+                  </span>
+                </div>
+              </label>
+
+              {typeof status?.cloudLogCount === 'number' && status.cloudLogCount > 0 && (
+                <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-mono text-xs shrink-0 self-start sm:self-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{status.cloudLogCount} Logs aktuell in Cloud gesichert</span>
+                </div>
+              )}
             </div>
           </div>
 

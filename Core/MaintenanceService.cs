@@ -446,7 +446,7 @@ public static class MaintenanceService
         var effectiveCloud = GetEffectiveCloudPath(cloudPath);
         if (string.IsNullOrWhiteSpace(effectiveCloud) || !Directory.Exists(effectiveCloud))
         {
-            return (false, "Kein gültiger oder erreichbarer Cloud-Speicherpfad gefunden (OneDrive nicht verfügbar oder unvollständig eingerichtet).", 0);
+            return (false, "Kein gültiger oder erreichbarer Cloud-Speicherpfad gefunden (bitte Pfad prüfen).", 0);
         }
 
         try
@@ -462,6 +462,12 @@ public static class MaintenanceService
 
             if (!string.IsNullOrEmpty(logPath))
             {
+                // Auch aktuelle Game.log prüfen
+                if (File.Exists(logPath))
+                {
+                    files.Add(logPath);
+                }
+
                 var liveDir = Path.GetDirectoryName(logPath);
                 if (!string.IsNullOrEmpty(liveDir))
                 {
@@ -474,17 +480,37 @@ public static class MaintenanceService
             }
 
             int copied = 0;
+            int total = files.Count;
             foreach (var f in files)
             {
                 var dest = Path.Combine(targetDir, Path.GetFileName(f));
-                if (!File.Exists(dest) || new FileInfo(f).Length > new FileInfo(dest).Length)
+                bool needsCopy = false;
+                if (!File.Exists(dest))
+                {
+                    needsCopy = true;
+                }
+                else
+                {
+                    var srcFi = new FileInfo(f);
+                    var dstFi = new FileInfo(dest);
+                    if (srcFi.Length > dstFi.Length || srcFi.LastWriteTimeUtc > dstFi.LastWriteTimeUtc.AddSeconds(2))
+                    {
+                        needsCopy = true;
+                    }
+                }
+
+                if (needsCopy)
                 {
                     File.Copy(f, dest, overwrite: true);
                     copied++;
                 }
             }
 
-            return (true, $"✓ Cloud-Sync abgeschlossen: {copied} neue/aktualisierte Logs nach '{targetDir}' synchronisiert.", copied);
+            string msg = copied > 0
+                ? $"✓ Cloud-Sync erfolgreich: {copied} neue/aktualisierte Log(s) synchronisiert ({total} insgesamt in deiner Cloud gesichert)."
+                : $"✓ Cloud-Sync aktuell: Alle {total} Log-Dateien sind bereits auf dem neuesten Stand in deiner Cloud ('{targetDir}').";
+
+            return (true, msg, copied);
         }
         catch (Exception ex)
         {

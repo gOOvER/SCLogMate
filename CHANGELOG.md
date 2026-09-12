@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Fully Automatic Cloud Synchronization & Reassuring Sync Feedback (`Settings.cs`, `LogArchive.cs`, `MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
+  - Added automatic cloud replication (`AutoCloudSyncEnabled`) in settings and UI: once a cloud path (Google Drive, OneDrive, Dropbox) is configured or auto-detected, Star Citizen game logs, snapshots, and keybinds are synchronized fully automatically in the background without needing manual button clicks.
+  - Wired background cloud replication directly into `LogArchive.Sync()`, application launch in `PhotinoBridge`, and cloud path saving (`save_cloud_storage_path`).
+  - Added `toggle_auto_cloud_sync` IPC command and reactive `TOOLS_UPDATED` event streaming.
+  - Enhanced `SyncLogsToCloud` reporting to include the active `Game.log` file, total synced log count in the cloud (e.g. 553 logs), and crystal-clear feedback distinguishing between newly copied files and already up-to-date cloud archives instead of misleading "0 synchronisiert" messages.
+  - Added dedicated auto-sync toggle, real-time cloud log counter badge, and clear status indicators in `ToolsView.tsx`.
 - **Safe Non-Destructive `user.cfg` Merging & Mandatory Cloud/Local Backups (`MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
-  - Implemented intelligent key-value merging (`MergeUserCfg`) for Star Citizen `user.cfg`: preserves 100% of existing comments (`;`, `#`, `//`), custom cvars (such as `cl_fov`, `r_Sharpening`, custom resolutions, and graphics tweaks), and custom formatting. Only targeted parameters are updated in-place, and new cvars are appended at the bottom.
+  - Implemented intelligent key-value merging (`MergeUserCfg`) for Star Citizen `user.cfg`: preserves 100% of existing comments (including CryEngine `--`, `;`, `#`, `//`), custom cvars (such as `cl_fov`, `r_ssdo`, `r_HDRDisplayOutput`, `sys_budget_sysmemkb`, custom resolutions, and graphics tweaks), and custom formatting. Only targeted parameters are updated in-place, and new cvars are appended at the bottom.
   - Added mandatory pre-modification archiving (`BackupUserCfg`): every change, preset application, or save operation automatically writes a timestamped snapshot to local storage (`%APPDATA%\SCLogMate\ConfigBackups`), creates a safety fallback copy (`user.cfg.bak`) directly in the Star Citizen LIVE folder, and replicates to cloud storage (`%OneDrive%\SCLogMate\Config`).
   - Added automatic cloud storage detection (`GetEffectiveCloudPath`): automatically resolves Windows OneDrive, Dropbox, or Google Drive if no explicit custom path is specified in settings, guaranteeing cloud backup out-of-the-box.
   - Added `merge_user_cfg` IPC command and updated `save_user_cfg` to support both `content` and `cfgContent` payloads.

@@ -109,6 +109,9 @@ public class AppSettings
     /// <summary>Vom Nutzer gewählter Cloud-Sync-Pfad (z. B. OneDrive, Dropbox, Nextcloud).</summary>
     public string? CloudStoragePath { get; set; }
 
+    /// <summary>Automatische Synchronisation neuer Logs, user.cfg-Snapshots und Keybinds in die Cloud.</summary>
+    public bool AutoCloudSyncEnabled { get; set; } = true;
+
     /// <summary>Vom Nutzer gewählte UI-Schriftart.</summary>
     public string SelectedFontFamily { get; set; } = "Inter";
 
