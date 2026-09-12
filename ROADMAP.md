@@ -145,8 +145,8 @@ flowchart LR
 
 ---
 
-## 💬 7. In-Game Chat-Verlauf & OCR-Protokollierung (Player Reports)
-- [x] **OCR-basierte Chat-Erfassung (`Core/Ocr/ChatOcrScanner.cs`):**
+## 💬 7. In-Game Chat-Verlauf & OCR-Protokollierung (Player Reports) — [Vorübergehend pausiert / Deaktiviert]
+- [ ] **OCR-basierte Chat-Erfassung (`Core/Ocr/ChatOcrScanner.cs`):** *(Pausiert für Rework, siehe Schritt 9 am Ende der Roadmap)*
   - Dedizierte, ressourcenschonende OCR-Erfassung des Star Citizen Chat-Fensters (Global, Party, Direct Message, Channel).
   - Robust gegen variierende Transparenzen, Chat-Schriftarten und Hintergründe.
 - [x] **Strukturierte Chat-Chronik mit Zeitstempel & User-ID (`Core/Database.cs`):**
@@ -275,6 +275,12 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
   - Erfassung von Mineralienbeständen mit Reinheitsstufen (Quality Ratings) und automatischer Ermittlung der besten Verkaufsorte via UEX Corp API.
 - [ ] **Schritt 8 (Rock Breaking Calculator & Optimal Loadout Finder):**
   - Laser-Power vs. Gesteinsmasse/Resistenz Rechner, Ausrüstungs-Datenbank und Multi-Crew Bergbau-Planer.
+- [ ] **Schritt 9 (In-Game Chat-Protokoll & OCR-Rework — Backlog):**
+  - **Komplette Überarbeitung der Chat-Texterkennung & Protokollierung:**
+    - Trennung des Spielernamens / Senders in eine separate Tabellenspalte und UI-Spalte zur besseren visuellen Gliederung.
+    - Zuverlässigere Textextraktion bei wechselnden Spielhintergründen und Visor-Transparenzen (Adaptive Thresholding / Hintergrund-Maskierung).
+    - Verbesserte Vermeidung von Mehrfachlesungen stehender Nachrichten bei inaktivem Chatverlauf.
+    - Reaktivierung des Navigationstabs und der Hintergrund-Erfassung nach erfolgreicher Fertigstellung.
 
 
 

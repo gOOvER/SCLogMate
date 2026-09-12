@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **In-Game Chat-Protokoll & Background OCR (`Sidebar.tsx`, `Settings.cs`, `PhotinoBridge.cs`, `ROADMAP.md`)**:
+  - Temporarily deactivated the In-Game Chat-Protokoll navigation tab from the main sidebar and defaulted `ChatOcrEnabled = false` in application settings and Photino bridge state.
+  - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
+
 ### Fixed
 - **In-Game Chat OCR Multi-Line Message Parsing, Chronicle Display & Compact Layout (`OcrEngineService.cs`, `ChatParser.cs`, `ChatOcrScanner.cs`, `Settings.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
   - Resolved an issue where in-game chat messages (such as custom organization channels like `[SC KRAUTZ]`) were not detected or displayed in `Chat-Protokoll`.

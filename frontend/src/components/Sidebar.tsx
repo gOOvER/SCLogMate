@@ -19,7 +19,6 @@ import {
   Target,
   Wrench,
   BookOpen,
-  MessageSquare,
 } from 'lucide-react';
 
 export type NavTabId =
@@ -76,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Hauptfunktionen',
       items: [
         { id: 'events', label: 'Ereignisse', icon: Scroll, badge: liveEventCount },
-        { id: 'chat', label: 'Chat-Protokoll', icon: MessageSquare },
+        // { id: 'chat', label: 'Chat-Protokoll', icon: MessageSquare },
         { id: 'finances', label: 'Finanzen', icon: Coins },
         { id: 'missions', label: 'Missionen', icon: Target },
         { id: 'reputation', label: 'Ruf & Fraktionen', icon: Award },

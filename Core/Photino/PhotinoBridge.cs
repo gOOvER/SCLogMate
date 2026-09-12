@@ -720,7 +720,7 @@ public class SettingsDto
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
     [JsonPropertyName("chatRegion")] public ScanRegion? ChatRegion { get; set; }
-    [JsonPropertyName("chatOcrEnabled")] public bool ChatOcrEnabled { get; set; } = true;
+    [JsonPropertyName("chatOcrEnabled")] public bool ChatOcrEnabled { get; set; } = false;
     [JsonPropertyName("chatOcrIntervalMs")] public int ChatOcrIntervalMs { get; set; } = 3500;
 
     // RC2 Wipe Filter Settings
