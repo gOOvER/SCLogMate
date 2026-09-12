@@ -80,7 +80,7 @@ public sealed class ChatOcrScanner : IDisposable
 
         try
         {
-            return await ExecuteScanAsync();
+            return await ExecuteScanAsync(forceReturnAllVisible: true);
         }
         finally
         {
@@ -100,7 +100,7 @@ public sealed class ChatOcrScanner : IDisposable
                 return;
             }
 
-            await ExecuteScanAsync();
+            await ExecuteScanAsync(forceReturnAllVisible: false);
         }
         catch (Exception ex)
         {
@@ -118,7 +118,7 @@ public sealed class ChatOcrScanner : IDisposable
         }
     }
 
-    private async Task<List<ChatMessageDto>> ExecuteScanAsync()
+    private async Task<List<ChatMessageDto>> ExecuteScanAsync(bool forceReturnAllVisible = false)
     {
         var resultList = new List<ChatMessageDto>();
 
@@ -142,27 +142,39 @@ public sealed class ChatOcrScanner : IDisposable
             return resultList;
         }
 
-        // Dual-pass OCR mit Kontrastverstärkung für semitransparentes Star Citizen Chat-HUD
+        // Dual-pass OCR (Scale=1 für scharfe HUD-Schrift, kein aggressives Boosting)
         var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(
-            raw, region.Width, region.Height, scale: 2, padding: 8, boostContrast: true);
+            raw, region.Width, region.Height, scale: 1, padding: 8, boostContrast: false);
 
-        var combinedText = (invText ?? "") + "\n" + (plainText ?? "");
-        if (string.IsNullOrWhiteSpace(combinedText))
+        var currentSession = _sessionIdProvider?.Invoke();
+
+        // 1. Zuerst Plain-Pass (natürlicher weißer HUD-Text) parsen
+        var parsed = !string.IsNullOrWhiteSpace(plainText)
+            ? ChatParser.ParseChatLines(plainText, currentSession)
+            : new List<ChatMessageDto>();
+
+        // 2. Falls Plain-Pass keine Nachrichten liefert, Inverted-Pass als Fallback versuchen
+        if (parsed.Count == 0 && !string.IsNullOrWhiteSpace(invText))
         {
-            SetStage("notext");
+            parsed = ChatParser.ParseChatLines(invText, currentSession);
+        }
+
+        if (parsed.Count == 0)
+        {
+            SetStage(string.IsNullOrWhiteSpace(plainText) && string.IsNullOrWhiteSpace(invText) ? "notext" : "idle");
             return resultList;
         }
 
-        var currentSession = _sessionIdProvider?.Invoke();
-        var parsed = ChatParser.ParseChatLines(combinedText, currentSession);
-
         var newMessages = new List<ChatMessageDto>();
+        var visibleMessages = new List<ChatMessageDto>();
+
         lock (_recentMessageHashes)
         {
             foreach (var msg in parsed)
             {
                 var hash = ComputeMessageHash(msg.Channel, msg.Sender, msg.Message);
-                if (_recentMessageHashes.Add(hash))
+                bool isNew = _recentMessageHashes.Add(hash);
+                if (isNew)
                 {
                     _hashQueue.Enqueue(hash);
                     if (_hashQueue.Count > MaxHashHistory)
@@ -179,6 +191,13 @@ public sealed class ChatOcrScanner : IDisposable
                         newMessages.Add(msg);
                     }
                 }
+                else
+                {
+                    var existingId = Database.InsertChatMessage(msg);
+                    if (existingId > 0) msg.Id = existingId;
+                }
+
+                visibleMessages.Add(msg);
             }
         }
 
@@ -193,7 +212,7 @@ public sealed class ChatOcrScanner : IDisposable
             SetStage("idle");
         }
 
-        return newMessages;
+        return forceReturnAllVisible ? visibleMessages : newMessages;
     }
 
     private static string ComputeMessageHash(string channel, string sender, string message)

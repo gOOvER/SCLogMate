@@ -4378,8 +4378,24 @@ public class PhotinoBridge
             {
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
-            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 2, padding: 8);
+            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 8);
             sw.Stop();
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                var curSess = _activeSessionName ?? "__live__";
+                var parsed = ChatParser.ParseChatLines(text, curSess);
+                if (parsed.Count > 0)
+                {
+                    foreach (var msg in parsed)
+                    {
+                        var id = Database.InsertChatMessage(msg);
+                        if (id > 0) msg.Id = id;
+                    }
+                    Broadcast("CHAT_MESSAGES_RECEIVED", parsed);
+                }
+            }
+
             return new OcrTestResultDto
             {
                 Success = !string.IsNullOrWhiteSpace(text),

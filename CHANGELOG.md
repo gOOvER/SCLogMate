@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **In-Game Chat OCR Multi-Line Message Parsing & Chronicle Display (`ChatParser.cs`, `ChatOcrScanner.cs`, `Database.cs`, `PhotinoBridge.cs`, `ChatLogView.tsx`)**:
+  - Fixed an issue where the in-game chat chronicle remained empty even after successful OCR scans due to single-line regex rejection on Star Citizen's multi-line wrapped chat layout (where channel and player handle header `[GLOBAL] Pilot:` appear on line 1, while chat message text wraps onto lines 2 and 3).
+  - Rewrote `ChatParser.cs` into a stateful multi-line accumulator supporting flexible bracket variants (`[GLOBAL]`, `[GLOBAL)`, `[GLOBALI`, `(GLOBAL)`, `BALI`), sender handle cleaning (`Ø` to `0`), and multi-line continuation line merging.
+  - Prioritized crisp, non-inverted HUD text parsing in `ChatOcrScanner.cs` (with inverted pass fallback) and added `forceReturnAllVisible` on manual scans to immediately return and display all currently visible chat lines.
+  - Enhanced `test_ocr_scan` in `PhotinoBridge.cs` to automatically ingest and broadcast parsed messages so that test-scans immediately populate the chat chronicle.
+  - Fixed SQLite session filtering in `Database.GetChatMessages` and `InsertChatMessage` to properly handle `__live__` session scopes and chronological sorting (`ORDER BY id ASC`), ensuring incoming messages append smoothly to the bottom.
+  - Synchronized `ocrEnabled` toggle state in `ChatLogView.tsx` with backend `Settings.ChatOcrEnabled` and updated manual scan toast notifications.
 - **Wallet Balance Delta Tracking & Live-Log Synchronization (`PhotinoBridge.cs`, `HudBar.tsx`)**:
   - Fixed an issue where recognized or manual mobiGlas wallet balances did not update session deltas (`sessionIncome`, `sessionSpend`, `sessionNet`), causing the HUD to show `+0` and the Live-Log stream to omit income/expense entries.
   - Implemented automatic delta calculation in `OnBalanceCaptured`: comparing new balances against prior balances minus logged game events, dynamically inserting `TransferIn` (for credits/payouts) or `Maintenance` (for debits/expenses) events into SQLite `events` and `_liveEvents`.

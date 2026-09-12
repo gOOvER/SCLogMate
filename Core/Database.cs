@@ -2869,7 +2869,7 @@ public static class Database
                 SELECT last_insert_rowid();
             ";
             cmd.Parameters.AddWithValue("@ts", string.IsNullOrEmpty(msg.Timestamp) ? DateTime.UtcNow.ToString("o") : msg.Timestamp);
-            cmd.Parameters.AddWithValue("@sid", (object?)msg.SessionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@sid", string.IsNullOrWhiteSpace(msg.SessionId) ? "__live__" : msg.SessionId);
             cmd.Parameters.AddWithValue("@ch", string.IsNullOrEmpty(msg.Channel) ? "Global" : msg.Channel);
             cmd.Parameters.AddWithValue("@s", msg.Sender.Trim());
             cmd.Parameters.AddWithValue("@r", (object?)msg.Recipient ?? DBNull.Value);
@@ -2906,10 +2906,17 @@ public static class Database
             using var cmd = db.CreateCommand();
 
             var whereClauses = new List<string>();
-            if (!string.IsNullOrWhiteSpace(sessionId) && sessionId != "ALL")
+            if (!string.IsNullOrWhiteSpace(sessionId) && sessionId != "ALL" && sessionId != "__all__")
             {
-                whereClauses.Add("session_id = @sid");
-                cmd.Parameters.AddWithValue("@sid", sessionId.Trim());
+                if (sessionId == "__live__")
+                {
+                    whereClauses.Add("(session_id = '__live__' OR session_id = 'Game.log' OR session_id IS NULL OR session_id = '')");
+                }
+                else
+                {
+                    whereClauses.Add("session_id = @sid");
+                    cmd.Parameters.AddWithValue("@sid", sessionId.Trim());
+                }
             }
             if (!string.IsNullOrWhiteSpace(channel) && channel != "ALL")
             {
@@ -2935,10 +2942,15 @@ public static class Database
             cmd.CommandText = $@"
                 SELECT id, timestamp, session_id, channel, sender, recipient, 
                        message, raw_ocr, is_flagged, created_at
-                FROM chat_messages
-                {where}
-                ORDER BY id DESC
-                LIMIT @lim OFFSET @off;
+                FROM (
+                    SELECT id, timestamp, session_id, channel, sender, recipient, 
+                           message, raw_ocr, is_flagged, created_at
+                    FROM chat_messages
+                    {where}
+                    ORDER BY id DESC
+                    LIMIT @lim OFFSET @off
+                )
+                ORDER BY id ASC;
             ";
             cmd.Parameters.AddWithValue("@lim", Math.Clamp(limit, 1, 1000));
             cmd.Parameters.AddWithValue("@off", Math.Max(0, offset));

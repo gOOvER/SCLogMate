@@ -25,7 +25,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanningNow, setScanningNow] = useState(false);
-  const [ocrEnabled, setOcrEnabled] = useState(true);
+  const [ocrEnabled, setOcrEnabled] = useState(false);
   const [selectingRegion, setSelectingRegion] = useState(false);
   const [testingScan, setTestingScan] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -72,8 +72,22 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
   useEffect(() => {
     fetchMessages();
 
+    // Fetch initial OCR active state
+    bridge.sendRequest<any>('get_settings').then((st: any) => {
+      if (st && typeof st.chatOcrEnabled === 'boolean') {
+        setOcrEnabled(st.chatOcrEnabled);
+      }
+    }).catch(() => {});
+
+    // Listen for backend status updates
+    const unbindStatus = bridge.on<any>('STATUS_UPDATE', (st) => {
+      if (st && typeof st.chatOcrEnabled === 'boolean') {
+        setOcrEnabled(st.chatOcrEnabled);
+      }
+    });
+
     // Subscribe to live scanned messages from backend
-    const unbind = bridge.on<ChatMessageDto[]>('CHAT_MESSAGES_RECEIVED', (newMsgs) => {
+    const unbindMsgs = bridge.on<ChatMessageDto[]>('CHAT_MESSAGES_RECEIVED', (newMsgs) => {
       if (newMsgs && newMsgs.length > 0) {
         setMessages((prev) => {
           const existingIds = new Set(prev.map((m) => m.id));
@@ -85,7 +99,8 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
     });
 
     return () => {
-      unbind();
+      unbindStatus();
+      unbindMsgs();
     };
   }, [initialSession]);
 
@@ -106,9 +121,13 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
           const toAdd = res.messages.filter((m) => !existingIds.has(m.id));
           return [...prev, ...toAdd];
         });
+        showToast(`✓ ${res.messages.length} Chat-Nachricht(en) erfasst`);
+      } else {
+        showToast('Keine neuen Chat-Nachrichten im Scan-Bereich gefunden.');
       }
     } catch (err) {
       console.error('Scan now failed:', err);
+      showToast('Fehler beim Chat-Scan');
     } finally {
       setTimeout(() => setScanningNow(false), 500);
     }
@@ -147,6 +166,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
       const res = await bridge.sendRequest<any>('test_ocr_scan', { target: 'chat' });
       if (res?.success) {
         showToast(`✓ Text erkannt: ${res.recognizedText?.slice(0, 35) || 'leer'} (${res.durationMs}ms)`);
+        await fetchMessages();
       } else {
         showToast('⚠️ Kein Chat-Text erkannt. Prüfe den Scan-Bereich.');
       }
