@@ -743,6 +743,7 @@ public class ToolsStatusDto
     [JsonPropertyName("pagefileStatus")] public string PagefileStatus { get; set; } = "Aktiv";
     [JsonPropertyName("keybindBackups")] public List<string> KeybindBackups { get; set; } = new();
     [JsonPropertyName("cloudStoragePath")] public string? CloudStoragePath { get; set; }
+    [JsonPropertyName("cloudAutoDetected")] public bool CloudAutoDetected { get; set; }
     [JsonPropertyName("keybindItems")] public List<KeybindBackupItemDto> KeybindItems { get; set; } = new();
     [JsonPropertyName("configBackups")] public List<ConfigBackupItemDto> ConfigBackups { get; set; } = new();
     [JsonPropertyName("keybindsDir")] public string KeybindsDir { get; set; } = MaintenanceService.LocalKeybindsBackupDir;
@@ -1820,11 +1821,32 @@ public class PhotinoBridge
 
                 case "save_user_cfg":
                     string cfgContent = "";
-                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("content", out var cProp))
+                    if (req.Payload.HasValue)
                     {
-                        cfgContent = cProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("content", out var cProp))
+                        {
+                            cfgContent = cProp.GetString() ?? "";
+                        }
+                        else if (req.Payload.Value.TryGetProperty("cfgContent", out var cProp2))
+                        {
+                            cfgContent = cProp2.GetString() ?? "";
+                        }
                     }
                     SendResponse(req.Id, "save_user_cfg_response", SaveUserCfg(cfgContent));
+                    break;
+
+                case "merge_user_cfg":
+                    var updates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("updates", out var uProp) && uProp.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var prop in uProp.EnumerateObject())
+                        {
+                            updates[prop.Name] = prop.Value.ToString();
+                        }
+                    }
+                    var mSettings = Settings.Load();
+                    var mRes = MaintenanceService.ApplyTuningUpdates(_currentLogPath, updates, mSettings.CloudStoragePath);
+                    SendResponse(req.Id, "merge_user_cfg_response", new { success = mRes.success, message = mRes.message, tools = GetToolsStatus() });
                     break;
 
                 case "backup_keybinds":
@@ -1877,7 +1899,7 @@ public class PhotinoBridge
                         var targetCfg = allCfgs.FirstOrDefault(c => (!string.IsNullOrEmpty(cPath) && c.FilePath.Equals(cPath, StringComparison.OrdinalIgnoreCase)) || c.Name.Equals(cName, StringComparison.OrdinalIgnoreCase));
                         if (targetCfg != null)
                         {
-                            var rRes = MaintenanceService.RestoreConfigBackup(targetCfg, _currentLogPath);
+                            var rRes = MaintenanceService.RestoreConfigBackup(targetCfg, _currentLogPath, st.CloudStoragePath);
                             SendResponse(req.Id, "restore_user_cfg_response", new { success = rRes.success, message = rRes.message, tools = GetToolsStatus() });
                         }
                         else
@@ -4638,6 +4660,7 @@ public class PhotinoBridge
     private ToolsStatusDto GetToolsStatus()
     {
         var settings = Settings.Load();
+        var effectiveCloud = MaintenanceService.GetEffectiveCloudPath(settings.CloudStoragePath);
         double shaderMb = MaintenanceService.GetShaderCacheSizeMb();
         double crashMb = MaintenanceService.GetCrashDumpsSizeMb();
         string cfgPath = MaintenanceService.GetUserCfgPath(_currentLogPath);
@@ -4658,7 +4681,8 @@ public class PhotinoBridge
             DriveName = diag.DriveName,
             FreeDiskGb = diag.FreeDiskGb,
             PagefileStatus = diag.PagefileStatus,
-            CloudStoragePath = settings.CloudStoragePath,
+            CloudStoragePath = !string.IsNullOrWhiteSpace(settings.CloudStoragePath) ? settings.CloudStoragePath : effectiveCloud,
+            CloudAutoDetected = string.IsNullOrWhiteSpace(settings.CloudStoragePath) && !string.IsNullOrWhiteSpace(effectiveCloud),
             KeybindBackups = keybindList.Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList(),
             KeybindItems = keybindList.Select(k => new KeybindBackupItemDto
             {

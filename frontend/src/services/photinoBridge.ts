@@ -578,6 +578,7 @@ export interface ToolsStatusDto {
   pagefileStatus: string;
   keybindBackups: string[];
   cloudStoragePath?: string;
+  cloudAutoDetected?: boolean;
   keybindItems?: KeybindBackupItemDto[];
   configBackups?: ConfigBackupItemDto[];
   keybindsDir?: string;

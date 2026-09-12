@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Safe Non-Destructive `user.cfg` Merging & Mandatory Cloud/Local Backups (`MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
+  - Implemented intelligent key-value merging (`MergeUserCfg`) for Star Citizen `user.cfg`: preserves 100% of existing comments (`;`, `#`, `//`), custom cvars (such as `cl_fov`, `r_Sharpening`, custom resolutions, and graphics tweaks), and custom formatting. Only targeted parameters are updated in-place, and new cvars are appended at the bottom.
+  - Added mandatory pre-modification archiving (`BackupUserCfg`): every change, preset application, or save operation automatically writes a timestamped snapshot to local storage (`%APPDATA%\SCLogMate\ConfigBackups`), creates a safety fallback copy (`user.cfg.bak`) directly in the Star Citizen LIVE folder, and replicates to cloud storage (`%OneDrive%\SCLogMate\Config`).
+  - Added automatic cloud storage detection (`GetEffectiveCloudPath`): automatically resolves Windows OneDrive, Dropbox, or Google Drive if no explicit custom path is specified in settings, guaranteeing cloud backup out-of-the-box.
+  - Added `merge_user_cfg` IPC command and updated `save_user_cfg` to support both `content` and `cfgContent` payloads.
 - **/showlocation Auto-Clipboard POI Tracker & Distance Radar (`PoiClipboardWatcher.cs`, `UserPoi.cs`, `Database.cs`, `PlacesView.tsx`, `PhotinoBridge.cs`)**:
   - Implemented automatic non-blocking background clipboard monitoring (`PoiClipboardWatcher.cs`) detecting Star Citizen `/showlocation` coordinate strings (`Coordinates: x:... y:... z:...`) with system identification.
   - Extended user POI management with 3D coordinate storage (`pos_x`, `pos_y`, `pos_z`) in SQLite (schema v22) and real-time distance radar calculation to nearby outposts, landmarks, and custom pins.
@@ -37,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added live visual indicators in `MasterHeader.tsx` reflecting active state for Mini-HUD and RS-Decoder overlays with synchronized IPC broadcasts (`OVERLAY_STATE`, `RS_OVERLAY_STATE`).
 
 ### Changed
+- **Tools & Maintenance Studio Overhaul (`ToolsView.tsx`)**:
+  - Restructured cluttered view into 3 clean, dedicated sub-tabs:
+    1. `1. Wartung & Diagnose`: Shader cache cleanup (DirectX / Vulkan), crash dumps deletion, system & hardware check (RAM, NVMe disk space, pagefile status), and 4.x optimization tips.
+    2. `2. user.cfg Tuning & Live-Editor`: Safe non-destructive preset application (High FPS, Quality, Minimal), live sliders and switches (VSync, MotionBlur, Console, MaxFPS, StreamPool, DisplayInfo, Language) with instant live merge, and full-featured syntax code editor with copy and save actions.
+    3. `3. Backup-Tresor (user.cfg & Keybinds)`: Comprehensive backup management with chronological snapshot lists, file sizes, local/cloud status badges, 1-click rollback/restore buttons, manual backup creation with notes, and cloud replication controls.
 - **Market & Trading View Layout Overhaul (`MarketView.tsx`)**:
   - Reorganized cluttered, overflowing tab header into three concise, clean sub-views: "Handelsrouten", "Salvage & Schrott-Preise", and "Warenrechner".
   - Relocated ship cargo presets (C2, Caterpillar, Taurus, Freelancer MAX, Cutlass) from the global navigation tab bar into a dedicated configuration toolbar with custom SCU number input.

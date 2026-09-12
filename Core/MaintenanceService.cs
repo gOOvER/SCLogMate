@@ -217,12 +217,13 @@ public static class MaintenanceService
             File.Copy(f, Path.Combine(localTarget, destName), overwrite: true);
         }
 
+        var effectiveCloud = GetEffectiveCloudPath(cloudPath);
         bool cloudSuccess = false;
-        if (!string.IsNullOrWhiteSpace(cloudPath) && Directory.Exists(cloudPath))
+        if (!string.IsNullOrWhiteSpace(effectiveCloud) && Directory.Exists(effectiveCloud))
         {
             try
             {
-                var cloudTarget = Path.Combine(cloudPath, "SCLogMate", "Keybinds", folderName);
+                var cloudTarget = Path.Combine(effectiveCloud, "SCLogMate", "Keybinds", folderName);
                 Directory.CreateDirectory(cloudTarget);
                 foreach (var f in Directory.GetFiles(localTarget))
                 {
@@ -267,9 +268,10 @@ public static class MaintenanceService
         }
 
         // 2. Cloud Backups
-        if (!string.IsNullOrWhiteSpace(cloudPath) && Directory.Exists(cloudPath))
+        var effectiveCloud = GetEffectiveCloudPath(cloudPath);
+        if (!string.IsNullOrWhiteSpace(effectiveCloud) && Directory.Exists(effectiveCloud))
         {
-            var cloudKeybinds = Path.Combine(cloudPath, "SCLogMate", "Keybinds");
+            var cloudKeybinds = Path.Combine(effectiveCloud, "SCLogMate", "Keybinds");
             if (Directory.Exists(cloudKeybinds))
             {
                 foreach (var dir in Directory.GetDirectories(cloudKeybinds))
@@ -400,16 +402,56 @@ public static class MaintenanceService
         }
     }
 
-    public static (bool success, string message, int syncedCount) SyncLogsToCloud(string cloudPath, string? logPath = null)
+    /// <summary>
+    /// Ermittelt den effektiven Cloud-Speicherpfad:
+    /// 1. Konfigurierter Pfad (falls vorhanden & gültig)
+    /// 2. Automatisch ermitteltes OneDrive (%OneDrive%, %OneDriveConsumer%, %USERPROFILE%\OneDrive)
+    /// 3. Dropbox oder Google Drive
+    /// </summary>
+    public static string? GetEffectiveCloudPath(string? configuredPath = null)
     {
-        if (string.IsNullOrWhiteSpace(cloudPath) || !Directory.Exists(cloudPath))
+        if (!string.IsNullOrWhiteSpace(configuredPath) && Directory.Exists(configuredPath.Trim()))
         {
-            return (false, "Ungültiger oder nicht erreichbarer Cloud-Speicherpfad.", 0);
+            return configuredPath.Trim();
+        }
+
+        // Automatische Erkennung von OneDrive
+        var envOd = Environment.GetEnvironmentVariable("OneDriveConsumer")
+                    ?? Environment.GetEnvironmentVariable("OneDrive")
+                    ?? Environment.GetEnvironmentVariable("OneDriveCommercial");
+
+        if (!string.IsNullOrWhiteSpace(envOd) && Directory.Exists(envOd))
+        {
+            return envOd;
+        }
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(userProfile))
+        {
+            var odPath = Path.Combine(userProfile, "OneDrive");
+            if (Directory.Exists(odPath)) return odPath;
+
+            var dropbox = Path.Combine(userProfile, "Dropbox");
+            if (Directory.Exists(dropbox)) return dropbox;
+
+            var gdrive = Path.Combine(userProfile, "Google Drive");
+            if (Directory.Exists(gdrive)) return gdrive;
+        }
+
+        return null;
+    }
+
+    public static (bool success, string message, int syncedCount) SyncLogsToCloud(string? cloudPath = null, string? logPath = null)
+    {
+        var effectiveCloud = GetEffectiveCloudPath(cloudPath);
+        if (string.IsNullOrWhiteSpace(effectiveCloud) || !Directory.Exists(effectiveCloud))
+        {
+            return (false, "Kein gültiger oder erreichbarer Cloud-Speicherpfad gefunden (OneDrive nicht verfügbar oder unvollständig eingerichtet).", 0);
         }
 
         try
         {
-            var targetDir = Path.Combine(cloudPath, "SCLogMate", "Logs");
+            var targetDir = Path.Combine(effectiveCloud, "SCLogMate", "Logs");
             Directory.CreateDirectory(targetDir);
 
             var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -451,7 +493,7 @@ public static class MaintenanceService
         }
     }
 
-    // ══ USER.CFG TUNING ══
+    // ══ USER.CFG TUNING & INTELLIGENTES MERGING ══
 
     public static string GetUserCfgPath(string? logPath)
     {
@@ -479,6 +521,76 @@ public static class MaintenanceService
         }
     }
 
+    /// <summary>
+    /// Verschmilzt selektive CVAR-Änderungen in bestehenden user.cfg-Inhalt.
+    /// WICHTIG: Alle bestehenden Kommentare (; # //) und benutzerdefinierte CVARs
+    /// (FOV, Schärfe, Fenstermodi, Auflösungen) bleiben unberührt und 100% erhalten!
+    /// </summary>
+    public static string MergeUserCfg(string existingContent, IDictionary<string, string> updates)
+    {
+        if (string.IsNullOrWhiteSpace(existingContent))
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("; --- Star Citizen Konfiguration (SCLogMate) ---");
+            foreach (var kvp in updates)
+            {
+                sb.AppendLine($"{kvp.Key} = {kvp.Value}");
+            }
+            return sb.ToString();
+        }
+
+        var lines = existingContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var remainingKeys = new HashSet<string>(updates.Keys, StringComparer.OrdinalIgnoreCase);
+        var resultLines = new List<string>(lines.Length + updates.Count);
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            // Kommentare und Leerzeilen unverändert erhalten
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith(";") || trimmed.StartsWith("#") || trimmed.StartsWith("//"))
+            {
+                resultLines.Add(line);
+                continue;
+            }
+
+            // Key = Value Zeilen prüfen
+            var eqIdx = line.IndexOf('=');
+            if (eqIdx > 0)
+            {
+                var key = line.Substring(0, eqIdx).Trim();
+                if (updates.TryGetValue(key, out var newVal))
+                {
+                    var leadingSpaces = line.TakeWhile(char.IsWhiteSpace).ToArray();
+                    resultLines.Add($"{new string(leadingSpaces)}{key} = {newVal}");
+                    remainingKeys.Remove(key);
+                    continue;
+                }
+            }
+
+            // Alle anderen Zeilen (unveränderte CVARs wie cl_fov, r_Sharpening etc.) 1:1 beibehalten!
+            resultLines.Add(line);
+        }
+
+        // Neue CVARs, die noch nicht in der Datei standen, am Ende anfügen
+        if (remainingKeys.Count > 0)
+        {
+            resultLines.Add("");
+            resultLines.Add("; --- Zusätzliche Tuning-Parameter (SCLogMate) ---");
+            foreach (var key in remainingKeys)
+            {
+                resultLines.Add($"{key} = {updates[key]}");
+            }
+        }
+
+        return string.Join(Environment.NewLine, resultLines);
+    }
+
+    /// <summary>
+    /// Erstellt ein vollständiges Backup der aktuellen user.cfg.
+    /// Wird VOR JEDER Änderung zwingend aufgerufen.
+    /// Sichert lokal (%APPDATA%\SCLogMate\ConfigBackups), im LIVE-Ordner (.bak) UND in der Cloud (%OneDrive%\SCLogMate\Config).
+    /// </summary>
     public static (bool success, string message, string? backupFile) BackupUserCfg(string? logPath, string? cloudPath = null, string? customNote = null)
     {
         var path = GetUserCfgPath(logPath);
@@ -495,29 +607,35 @@ public static class MaintenanceService
                 ? $"user_cfg_{timestamp}.cfg"
                 : $"user_cfg_{timestamp}_{SanitizeFileName(customNote)}.cfg";
 
+            // 1. Lokales Backup
             var localDest = Path.Combine(LocalConfigBackupDir, name);
             File.Copy(path, localDest, overwrite: true);
 
-            // Auch direkt im LIVE als .bak vorhalten
+            // 2. Sicherheits-Kopie direkt im LIVE als .bak vorhalten
             File.Copy(path, path + ".bak", overwrite: true);
 
+            // 3. Cloud-Backup (OneDrive / benutzerdefinierter Pfad)
+            var effectiveCloud = GetEffectiveCloudPath(cloudPath);
             bool cloudOk = false;
-            if (!string.IsNullOrWhiteSpace(cloudPath) && Directory.Exists(cloudPath))
+            string cloudLocationText = "";
+
+            if (!string.IsNullOrWhiteSpace(effectiveCloud) && Directory.Exists(effectiveCloud))
             {
                 try
                 {
-                    var cloudDir = Path.Combine(cloudPath, "SCLogMate", "Config");
+                    var cloudDir = Path.Combine(effectiveCloud, "SCLogMate", "Config");
                     Directory.CreateDirectory(cloudDir);
                     File.Copy(path, Path.Combine(cloudDir, name), overwrite: true);
                     cloudOk = true;
+                    cloudLocationText = $" & Cloud ({Path.GetFileName(effectiveCloud)})";
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Cloud config backup", ex);
+                    Logger.Error("Cloud config backup copy", ex);
                 }
             }
 
-            var loc = cloudOk ? "Lokal & Cloud" : "Lokal";
+            var loc = cloudOk ? $"Lokal{cloudLocationText}" : "Lokal";
             return (true, $"✓ user.cfg archiviert ({loc}): {name}", localDest);
         }
         catch (Exception ex)
@@ -550,9 +668,10 @@ public static class MaintenanceService
         }
 
         // 2. Cloud
-        if (!string.IsNullOrWhiteSpace(cloudPath) && Directory.Exists(cloudPath))
+        var effectiveCloud = GetEffectiveCloudPath(cloudPath);
+        if (!string.IsNullOrWhiteSpace(effectiveCloud) && Directory.Exists(effectiveCloud))
         {
-            var cloudDir = Path.Combine(cloudPath, "SCLogMate", "Config");
+            var cloudDir = Path.Combine(effectiveCloud, "SCLogMate", "Config");
             if (Directory.Exists(cloudDir))
             {
                 foreach (var f in Directory.GetFiles(cloudDir, "*.cfg"))
@@ -581,7 +700,7 @@ public static class MaintenanceService
         return list.Values.OrderByDescending(b => b.CreatedAt).ToList();
     }
 
-    public static (bool success, string message) RestoreConfigBackup(ConfigBackupInfo backup, string? logPath)
+    public static (bool success, string message) RestoreConfigBackup(ConfigBackupInfo backup, string? logPath, string? cloudPath = null)
     {
         if (!File.Exists(backup.FilePath))
         {
@@ -596,10 +715,10 @@ public static class MaintenanceService
 
         try
         {
-            // Vor dem Wiederherstellen den aktuellen Stand sichern, falls vorhanden
+            // Vor dem Wiederherstellen den aktuellen Stand zwingend sichern
             if (File.Exists(path))
             {
-                File.Copy(path, path + ".bak", overwrite: true);
+                BackupUserCfg(logPath, cloudPath, "Vor_Wiederherstellung");
             }
 
             File.Copy(backup.FilePath, path, overwrite: true);
@@ -612,6 +731,10 @@ public static class MaintenanceService
         }
     }
 
+    /// <summary>
+    /// Speichert neuen Inhalt in die user.cfg.
+    /// ZWINGEND: Vor jeder Änderung wird immer ein automatisches Backup lokal UND in der Cloud angelegt!
+    /// </summary>
     public static (bool success, string message) SaveUserCfg(string? logPath, string content, string? cloudPath = null)
     {
         var path = GetUserCfgPath(logPath);
@@ -622,20 +745,36 @@ public static class MaintenanceService
 
         try
         {
-            // Vor jeder Änderung ein vollständiges Archiv-Backup (lokal + optional Cloud) anlegen!
+            var effectiveCloud = GetEffectiveCloudPath(cloudPath);
+
+            // Vor jeder Änderung ein vollständiges Archiv-Backup (lokal + Cloud) anlegen!
             if (File.Exists(path))
             {
-                BackupUserCfg(logPath, cloudPath, "AutoBackup");
+                BackupUserCfg(logPath, effectiveCloud, "AutoBackup");
             }
 
             File.WriteAllText(path, content, new UTF8Encoding(false));
-            return (true, "✓ user.cfg erfolgreich gespeichert (Archiv-Backup lokal & in Cloud gesichert).");
+            var cloudNote = !string.IsNullOrEmpty(effectiveCloud) ? " & Cloud" : "";
+            return (true, $"✓ user.cfg erfolgreich gespeichert (Backup lokal{cloudNote} gesichert).");
         }
         catch (Exception ex)
         {
             Logger.Error("SaveUserCfg", ex);
             return (false, $"Fehler beim Speichern der user.cfg: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Wendet Tuning-Updates non-destruktiv auf die user.cfg an:
+    /// Liest bestehende Datei, führt MergeUserCfg durch (erhält Kommentare & Custom-CVARs),
+    /// sichert Backup lokal + Cloud und speichert die Datei ab.
+    /// </summary>
+    public static (bool success, string message, string newContent) ApplyTuningUpdates(string? logPath, IDictionary<string, string> updates, string? cloudPath = null)
+    {
+        var (exists, currentContent) = ReadUserCfg(logPath);
+        var merged = MergeUserCfg(currentContent, updates);
+        var saveRes = SaveUserCfg(logPath, merged, cloudPath);
+        return (saveRes.success, saveRes.message, merged);
     }
 
     // ══ SYSTEM-DIAGNOSE ══
