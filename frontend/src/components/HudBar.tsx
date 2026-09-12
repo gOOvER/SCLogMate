@@ -581,24 +581,50 @@ export const HudBar: React.FC<HudBarProps> = ({
           </div>
 
           {/* Mission Title & Reward */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-bold font-mono text-slate-100 truncate" title={telemetry.activeMissionTitle}>
-              {telemetry.activeMissionTitle}
-            </div>
-            {telemetry.activeMissionReward > 0 && (
-              <span className="text-xs font-mono font-bold text-emerald-400 shrink-0">
-                +{formatAuec(telemetry.activeMissionReward)} aUEC
-              </span>
-            )}
-          </div>
+          {(() => {
+            const hasMission = Boolean(
+              telemetry.activeMissionTitle &&
+              telemetry.activeMissionTitle !== 'Kein aktiver Auftrag' &&
+              telemetry.activeMissionTitle !== '—'
+            );
+            return (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <div
+                    className={`text-sm font-mono truncate ${
+                      hasMission
+                        ? 'font-bold text-slate-100'
+                        : 'font-normal italic text-slate-400'
+                    }`}
+                    title={telemetry.activeMissionTitle}
+                  >
+                    {hasMission ? telemetry.activeMissionTitle : 'Kein aktiver Auftrag'}
+                  </div>
+                  {hasMission && telemetry.activeMissionReward > 0 && (
+                    <span className="text-xs font-mono font-bold text-emerald-400 shrink-0">
+                      +{formatAuec(telemetry.activeMissionReward)} aUEC
+                    </span>
+                  )}
+                </div>
 
-          {/* Subline: Giver & Status */}
-          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center justify-between mt-0.5">
-            <span className="text-slate-300 truncate">{telemetry.activeMissionGiver}</span>
-            <span className="text-[10px] text-cyan-400 font-semibold shrink-0 ml-2">
-              ● {telemetry.activeMissionStatus}
-            </span>
-          </div>
+                {/* Subline: Giver & Status */}
+                <div className="text-[11px] font-mono text-slate-400 truncate flex items-center justify-between mt-0.5">
+                  <span className="text-slate-400 truncate">
+                    {hasMission && telemetry.activeMissionGiver && telemetry.activeMissionGiver !== '—'
+                      ? telemetry.activeMissionGiver
+                      : 'Bereit für Auftragsannahme'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-semibold shrink-0 ml-2 ${
+                      hasMission ? 'text-cyan-400' : 'text-slate-500'
+                    }`}
+                  >
+                    ● {hasMission ? (telemetry.activeMissionStatus || 'Aktiv') : 'Bereit'}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 

@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
+- **Active Mission Telemetry Synchronization & False Fallback Cleanup (`PhotinoBridge.cs`, `HudBar.tsx`, `photinoBridge.ts`)**:
+  - Fixed an issue where the HUD telemetry card always displayed a hardcoded dummy mission ("Kopfgeld: MRT Ziel eliminieren" with +45.000 aUEC) when no active contracts were in progress.
+  - Linked active mission telemetry directly to `Database.GetActiveContracts()` and parser `ContractsList`, correctly reflecting live active contracts or defaulting cleanly to "Kein aktiver Auftrag" (with reward = 0, giver = "—", and status = "Bereit").
+  - Updated `HudBar.tsx` to render an elegant, muted empty-state layout for the mission widget when no missions are active.
 - **In-Game Toast Notifications Window Transparency, Sizing & Typography Overhaul (`NativeToastOverlay.cs`)**:
   - Fixed an issue where a large black rectangular box appeared beneath and around desktop toasts, caused by missing `LWA_COLORKEY` flag in layered window attribute setup and a static 3-toast canvas height.
   - Enabled `LWA_COLORKEY` (`0x00000001`) with pure black keying (`0x00000000`) and dynamic window height adjustment via `SetWindowPos`, eliminating all black borders, background artifacts, and empty space below active toasts.

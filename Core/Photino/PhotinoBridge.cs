@@ -2737,11 +2737,29 @@ public class PhotinoBridge
         long net = income - spend;
 
         // Active Mission
+        var dbActiveContracts = Database.GetActiveContracts();
         var activeContract = _parser.ContractsList.FirstOrDefault(c => c.Outcome == ContractOutcome.InProgress);
-        string missionTitle = activeContract != null && !string.IsNullOrWhiteSpace(activeContract.Title) ? activeContract.Title : "Kopfgeld: MRT Ziel eliminieren";
-        string missionGiver = activeContract != null && !string.IsNullOrWhiteSpace(activeContract.Issuer) ? activeContract.Issuer : "Bounty Hunters Guild";
-        long missionReward = 45000;
-        string missionStatus = activeContract != null ? activeContract.OutcomeText : "Aktiv (Hurston)";
+
+        string missionTitle = "Kein aktiver Auftrag";
+        string missionGiver = "—";
+        long missionReward = 0;
+        string missionStatus = "Bereit";
+
+        if (activeContract != null && !string.IsNullOrWhiteSpace(activeContract.Title))
+        {
+            missionTitle = activeContract.Title;
+            missionGiver = !string.IsNullOrWhiteSpace(activeContract.Issuer) ? activeContract.Issuer : "Auftraggeber";
+            missionReward = activeContract.Reward;
+            missionStatus = !string.IsNullOrWhiteSpace(activeContract.OutcomeText) ? activeContract.OutcomeText : "In Durchführung";
+        }
+        else if (dbActiveContracts.Count > 0)
+        {
+            var first = dbActiveContracts[0];
+            missionTitle = !string.IsNullOrWhiteSpace(first.Title) ? first.Title : "Aktiver Auftrag";
+            missionGiver = !string.IsNullOrWhiteSpace(first.ContractedBy) ? first.ContractedBy : "Auftraggeber";
+            missionReward = first.Reward;
+            missionStatus = "Aktiv";
+        }
 
         // Session Span Text
         string spanText = "—";
