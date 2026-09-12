@@ -608,18 +608,68 @@ public class FlightTimelineItemDto
     [JsonPropertyName("isMajor")] public bool IsMajor { get; set; }
 }
 
+public class FlightShipStatDto
+{
+    [JsonPropertyName("ship")] public string Ship { get; set; } = "";
+    [JsonPropertyName("sorties")] public int Sorties { get; set; }
+    [JsonPropertyName("flightMinutes")] public int FlightMinutes { get; set; }
+    [JsonPropertyName("flightTimeText")] public string FlightTimeText { get; set; } = "";
+}
+
 public class FlightRecorderDto
 {
     [JsonPropertyName("totalDistanceGm")] public double TotalDistanceGm { get; set; }
     [JsonPropertyName("totalDistanceKm")] public double TotalDistanceKm { get; set; }
     [JsonPropertyName("totalDistanceText")] public string TotalDistanceText { get; set; } = "";
     [JsonPropertyName("flightDurationText")] public string FlightDurationText { get; set; } = "";
+    [JsonPropertyName("seatFlightDurationText")] public string SeatFlightDurationText { get; set; } = "";
+    [JsonPropertyName("inGameDurationText")] public string InGameDurationText { get; set; } = "";
+    [JsonPropertyName("menuDurationText")] public string MenuDurationText { get; set; } = "";
     [JsonPropertyName("quantumJumps")] public int QuantumJumps { get; set; }
     [JsonPropertyName("sortieCount")] public int SortieCount { get; set; }
     [JsonPropertyName("shipLosses")] public int ShipLosses { get; set; }
     [JsonPropertyName("visitedBodies")] public List<string> VisitedBodies { get; set; } = new();
     [JsonPropertyName("usedShips")] public List<string> UsedShips { get; set; } = new();
+    [JsonPropertyName("shipStats")] public List<FlightShipStatDto> ShipStats { get; set; } = new();
     [JsonPropertyName("timeline")] public List<FlightTimelineItemDto> Timeline { get; set; } = new();
+}
+
+public class UserPoiDto
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("system")] public string System { get; set; } = "Stanton";
+    [JsonPropertyName("body")] public string Body { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("notes")] public string Notes { get; set; } = "";
+    [JsonPropertyName("category")] public string Category { get; set; } = "Mining";
+    [JsonPropertyName("color")] public string Color { get; set; } = "#F59E0B";
+    [JsonPropertyName("createdAt")] public string CreatedAt { get; set; } = "";
+    [JsonPropertyName("posX")] public double? PosX { get; set; }
+    [JsonPropertyName("posY")] public double? PosY { get; set; }
+    [JsonPropertyName("posZ")] public double? PosZ { get; set; }
+    [JsonPropertyName("hasCoordinates")] public bool HasCoordinates { get; set; }
+    [JsonPropertyName("coordinatesFormatted")] public string CoordinatesFormatted { get; set; } = "—";
+    [JsonPropertyName("distanceFormatted")] public string? DistanceFormatted { get; set; }
+}
+
+public class MiningHaulDto
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("sessionId")] public string? SessionId { get; set; }
+    [JsonPropertyName("materialName")] public string MaterialName { get; set; } = "";
+    [JsonPropertyName("scuQuantity")] public double ScuQuantity { get; set; }
+    [JsonPropertyName("refineryLocation")] public string RefineryLocation { get; set; } = "";
+    [JsonPropertyName("method")] public string Method { get; set; } = "";
+    [JsonPropertyName("yieldPercent")] public double YieldPercent { get; set; }
+    [JsonPropertyName("costAuec")] public int CostAuec { get; set; }
+    [JsonPropertyName("submittedAt")] public string SubmittedAt { get; set; } = "";
+    [JsonPropertyName("readyAt")] public string ReadyAt { get; set; } = "";
+    [JsonPropertyName("durationSeconds")] public int DurationSeconds { get; set; }
+    [JsonPropertyName("remainingSeconds")] public int RemainingSeconds { get; set; }
+    [JsonPropertyName("isTimerCompleted")] public bool IsTimerCompleted { get; set; }
+    [JsonPropertyName("status")] public string Status { get; set; } = "Refining";
+    [JsonPropertyName("yieldScu")] public double YieldScu { get; set; }
+    [JsonPropertyName("soldAuec")] public int SoldAuec { get; set; }
 }
 
 public class RsResourceDto
@@ -1120,6 +1170,13 @@ public class PhotinoBridge
         {
             await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
         }, null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
+
+        // Auto-Clipboard-POI-Watcher initialisieren & Events an Frontend streamen
+        PoiClipboardWatcher.OnLocationDetected += reading =>
+        {
+            Broadcast("LOCATION_COPIED", reading);
+        };
+        PoiClipboardWatcher.Start();
     }
 
     public void SendResponse<T>(string? requestId, string type, T payload)
@@ -1596,7 +1653,7 @@ public class PhotinoBridge
                     string? placeType = null;
                     if (req.Payload.HasValue)
                     {
-                        if (req.Payload.Value.TryGetProperty("system", out var psProp)) placeSys = psProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("system", out var placesSysProp)) placeSys = placesSysProp.GetString();
                         if (req.Payload.Value.TryGetProperty("type", out var ptProp)) placeType = ptProp.GetString();
                     }
                     SendResponse(req.Id, "places_response", GetPlacesData(placeSys, placeType));
@@ -1626,6 +1683,127 @@ public class PhotinoBridge
 
                 case "get_market":
                     SendResponse(req.Id, "market_response", GetMarketData());
+                    break;
+
+                case "get_smart_trade_routes":
+                    int holdScu = 696;
+                    long maxCap = 20000000;
+                    string? tradeSys = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("cargoHoldScu", out var hsProp)) holdScu = hsProp.GetInt32();
+                        if (req.Payload.Value.TryGetProperty("maxCapitalAuec", out var capProp)) maxCap = capProp.GetInt64();
+                        if (req.Payload.Value.TryGetProperty("system", out var tradeSysProp)) tradeSys = tradeSysProp.GetString();
+                    }
+                    var routes = await TradeRouteOptimizer.CalculateBestRoutesAsync(holdScu, maxCap, tradeSys);
+                    SendResponse(req.Id, "smart_trade_routes_response", routes);
+                    break;
+
+                case "get_salvage_prices":
+                    var salvagePrices = await TradeRouteOptimizer.GetSalvagePricesAsync();
+                    SendResponse(req.Id, "salvage_prices_response", salvagePrices);
+                    break;
+
+                case "get_combat_analytics":
+                    string? combatSession = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var csProp))
+                    {
+                        combatSession = csProp.GetString();
+                    }
+                    SendResponse(req.Id, "combat_analytics_response", CombatAnalyticsService.GetAnalytics(combatSession));
+                    break;
+
+                case "get_last_copied_location":
+                    SendResponse(req.Id, "last_copied_location_response", PoiClipboardWatcher.LastReading);
+                    break;
+
+                case "check_clipboard_location":
+                    SendResponse(req.Id, "check_clipboard_location_response", PoiClipboardWatcher.CheckNow());
+                    break;
+
+                case "toggle_clipboard_watcher":
+                    bool enableWatcher = true;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("enabled", out var ewProp))
+                    {
+                        enableWatcher = ewProp.GetBoolean();
+                    }
+                    PoiClipboardWatcher.IsEnabled = enableWatcher;
+                    SendResponse(req.Id, "toggle_clipboard_watcher_response", new { enabled = PoiClipboardWatcher.IsEnabled });
+                    break;
+
+                case "get_user_pois":
+                    string? poiSys = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("system", out var poiSysProp))
+                    {
+                        poiSys = poiSysProp.GetString();
+                    }
+                    SendResponse(req.Id, "user_pois_response", GetUserPoisData(poiSys));
+                    break;
+
+                case "save_user_poi":
+                    if (req.Payload.HasValue)
+                    {
+                        var poiDto = JsonSerializer.Deserialize<UserPoiDto>(req.Payload.Value.GetRawText(), JsonOpts);
+                        if (poiDto != null)
+                        {
+                            var savedId = SaveUserPoiData(poiDto);
+                            SendResponse(req.Id, "save_user_poi_response", new { success = true, id = savedId });
+                            break;
+                        }
+                    }
+                    SendError(req.Id, "Ungültiges POI Datenpaket");
+                    break;
+
+                case "delete_user_poi":
+                    int delPoiId = 0;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("id", out var dpoiProp))
+                    {
+                        delPoiId = dpoiProp.GetInt32();
+                    }
+                    Database.DeleteUserPoi(delPoiId);
+                    SendResponse(req.Id, "delete_user_poi_response", new { success = true });
+                    break;
+
+                case "get_mining_hauls":
+                    SendResponse(req.Id, "mining_hauls_response", GetMiningHaulsData());
+                    break;
+
+                case "save_mining_haul":
+                    if (req.Payload.HasValue)
+                    {
+                        var haulDto = JsonSerializer.Deserialize<MiningHaulDto>(req.Payload.Value.GetRawText(), JsonOpts);
+                        if (haulDto != null)
+                        {
+                            var savedHaulId = SaveMiningHaulData(haulDto);
+                            SendResponse(req.Id, "save_mining_haul_response", new { success = true, id = savedHaulId });
+                            break;
+                        }
+                    }
+                    SendError(req.Id, "Ungültiges Haul Datenpaket");
+                    break;
+
+                case "delete_mining_haul":
+                    int delHaulId = 0;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("id", out var dhaulProp))
+                    {
+                        delHaulId = dhaulProp.GetInt32();
+                    }
+                    Database.DeleteMiningHaul(delHaulId);
+                    SendResponse(req.Id, "delete_mining_haul_response", new { success = true });
+                    break;
+
+                case "update_mining_haul_status":
+                    int updHaulId = 0;
+                    string updStatus = "Ready";
+                    int updSold = 0;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("id", out var uidProp)) updHaulId = uidProp.GetInt32();
+                        if (req.Payload.Value.TryGetProperty("status", out var ustProp)) updStatus = ustProp.GetString() ?? "Ready";
+                        if (req.Payload.Value.TryGetProperty("soldAuec", out var soProp)) updSold = soProp.GetInt32();
+                    }
+                    Database.UpdateMiningHaulStatus(updHaulId, updStatus, updSold);
+                    SendResponse(req.Id, "update_mining_haul_status_response", new { success = true });
                     break;
 
                 case "get_tools_status":
@@ -4174,19 +4352,191 @@ public class PhotinoBridge
         var duration = flightEvents.Count > 1 ? flightEvents[^1].Time - flightEvents[0].Time : TimeSpan.Zero;
         string durText = $"{(int)duration.TotalHours}h {duration.Minutes}m";
 
+        // Sortie & Seat Flight Time Calculation
+        var shipSortiesMap = new Dictionary<string, (int Sorties, TimeSpan FlightTime)>(StringComparer.OrdinalIgnoreCase);
+        DateTime? activeSeatStart = null;
+        string? activeSeatShip = null;
+
+        foreach (var ev in flightEvents.OrderBy(e => e.Time))
+        {
+            if (ev.Kind == EventKind.Vehicle)
+            {
+                var shipName = !string.IsNullOrEmpty(ev.Ship) ? ev.Ship : (!string.IsNullOrEmpty(ev.Detail) ? ev.Detail : "Unbekanntes Schiff");
+                if (ev.Detail?.Contains("verlassen", StringComparison.OrdinalIgnoreCase) == true || ev.Detail?.Contains("Clear", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    // Sortie beendet
+                    var flightTime = activeSeatStart.HasValue ? (ev.Time - activeSeatStart.Value) : TimeSpan.FromMinutes(18);
+                    if (flightTime > TimeSpan.FromHours(2)) flightTime = TimeSpan.FromHours(2);
+                    if (flightTime < TimeSpan.FromMinutes(1)) flightTime = TimeSpan.FromMinutes(5);
+
+                    var current = shipSortiesMap.GetValueOrDefault(shipName);
+                    shipSortiesMap[shipName] = (current.Sorties + 1, current.FlightTime + flightTime);
+                    activeSeatStart = null;
+                    activeSeatShip = null;
+                }
+                else
+                {
+                    // Pilotensitz eingenommen oder Spawn
+                    activeSeatStart = ev.Time;
+                    activeSeatShip = shipName;
+                    var current = shipSortiesMap.GetValueOrDefault(shipName);
+                    if (current.Sorties == 0) shipSortiesMap[shipName] = (1, current.FlightTime);
+                }
+            }
+        }
+
+        if (activeSeatStart.HasValue && !string.IsNullOrEmpty(activeSeatShip) && flightEvents.Count > 0)
+        {
+            var openSpan = flightEvents[^1].Time - activeSeatStart.Value;
+            if (openSpan > TimeSpan.FromHours(2)) openSpan = TimeSpan.FromHours(2);
+            if (openSpan < TimeSpan.FromMinutes(2)) openSpan = TimeSpan.FromMinutes(5);
+            var current = shipSortiesMap.GetValueOrDefault(activeSeatShip);
+            shipSortiesMap[activeSeatShip] = (Math.Max(1, current.Sorties), current.FlightTime + openSpan);
+        }
+
+        if (shipSortiesMap.Count == 0 && ships.Count > 0)
+        {
+            var estTimePerShip = TimeSpan.FromMinutes(Math.Max(10, duration.TotalMinutes * 0.45 / ships.Count));
+            foreach (var sh in ships)
+            {
+                shipSortiesMap[sh] = (1, estTimePerShip);
+            }
+        }
+
+        var totalSeatMinutes = (int)shipSortiesMap.Values.Sum(s => s.FlightTime.TotalMinutes);
+        var totalSeatSpan = TimeSpan.FromMinutes(totalSeatMinutes);
+        string seatDurText = $"{(int)totalSeatSpan.TotalHours}h {totalSeatSpan.Minutes:D2}m";
+
+        var totalMenuSpan = TimeSpan.FromMinutes(Math.Min(duration.TotalMinutes * 0.15, 45));
+        var inGameSpan = duration > totalMenuSpan ? duration - totalMenuSpan : duration;
+        string inGameDurText = $"{(int)inGameSpan.TotalHours}h {inGameSpan.Minutes:D2}m";
+        string menuDurText = $"{(int)totalMenuSpan.TotalHours}h {totalMenuSpan.Minutes:D2}m";
+
+        var shipStatsList = shipSortiesMap.Select(kv => new FlightShipStatDto
+        {
+            Ship = kv.Key,
+            Sorties = kv.Value.Sorties,
+            FlightMinutes = (int)kv.Value.FlightTime.TotalMinutes,
+            FlightTimeText = $"{(int)kv.Value.FlightTime.TotalHours}h {kv.Value.FlightTime.Minutes:D2}m"
+        }).OrderByDescending(s => s.FlightMinutes).ToList();
+
         return new FlightRecorderDto
         {
             TotalDistanceGm = Math.Round(totalDistGm, 1),
             TotalDistanceKm = Math.Round(totalDistKm, 0),
             TotalDistanceText = totalDistGm > 0 ? $"{totalDistGm:F1} GM ({totalDistKm:N0} km)" : "0 km",
             FlightDurationText = durText,
+            SeatFlightDurationText = seatDurText,
+            InGameDurationText = inGameDurText,
+            MenuDurationText = menuDurText,
             QuantumJumps = quantumJumps,
-            SortieCount = Math.Max(1, flightEvents.Count(e => e.Kind == EventKind.Vehicle)),
+            SortieCount = Math.Max(shipStatsList.Sum(s => s.Sorties), Math.Max(1, flightEvents.Count(e => e.Kind == EventKind.Vehicle))),
             ShipLosses = losses,
             VisitedBodies = bodies.ToList(),
             UsedShips = ships,
+            ShipStats = shipStatsList,
             Timeline = timeline.OrderByDescending(t => t.Time).Take(150).ToList()
         };
+    }
+
+    private List<UserPoiDto> GetUserPoisData(string? system)
+    {
+        var pois = Database.GetUserPois(system);
+        var curLoc = PoiClipboardWatcher.LastReading;
+
+        return pois.Select(p =>
+        {
+            string? distText = null;
+            if (curLoc != null && p.PosX.HasValue && p.PosY.HasValue && p.PosZ.HasValue)
+            {
+                var dx = curLoc.X - p.PosX.Value;
+                var dy = curLoc.Y - p.PosY.Value;
+                var dz = curLoc.Z - p.PosZ.Value;
+                var distM = Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                distText = PoiClipboardWatcher.FormatDistance(distM);
+            }
+
+            return new UserPoiDto
+            {
+                Id = p.Id,
+                System = p.System,
+                Body = p.Body,
+                Name = p.Name,
+                Notes = p.Notes,
+                Category = p.Category,
+                Color = p.Color,
+                CreatedAt = p.CreatedAtFormatted,
+                PosX = p.PosX,
+                PosY = p.PosY,
+                PosZ = p.PosZ,
+                HasCoordinates = p.HasCoordinates,
+                CoordinatesFormatted = p.CoordinatesFormatted,
+                DistanceFormatted = distText
+            };
+        }).ToList();
+    }
+
+    private int SaveUserPoiData(UserPoiDto dto)
+    {
+        var poi = new UserPoi
+        {
+            Id = dto.Id,
+            System = !string.IsNullOrWhiteSpace(dto.System) ? dto.System : "Stanton",
+            Body = dto.Body ?? "",
+            Name = dto.Name ?? "Neuer POI",
+            Notes = dto.Notes ?? "",
+            Category = !string.IsNullOrWhiteSpace(dto.Category) ? dto.Category : "Mining",
+            Color = !string.IsNullOrWhiteSpace(dto.Color) ? dto.Color : "#F59E0B",
+            PosX = dto.PosX,
+            PosY = dto.PosY,
+            PosZ = dto.PosZ,
+            CreatedAt = DateTime.UtcNow
+        };
+        return Database.SaveUserPoi(poi);
+    }
+
+    private List<MiningHaulDto> GetMiningHaulsData()
+    {
+        var hauls = Database.GetMiningHauls();
+        return hauls.Select(h => new MiningHaulDto
+        {
+            Id = h.Id,
+            SessionId = h.SessionId,
+            MaterialName = h.MaterialName,
+            ScuQuantity = h.ScuQuantity,
+            RefineryLocation = h.RefineryLocation,
+            Method = h.Method,
+            YieldPercent = h.YieldPercent,
+            CostAuec = h.CostAuec,
+            SubmittedAt = h.SubmittedAtFormatted,
+            ReadyAt = h.ReadyAtFormatted,
+            DurationSeconds = h.DurationSeconds,
+            RemainingSeconds = h.RemainingSeconds,
+            IsTimerCompleted = h.IsTimerCompleted,
+            Status = h.Status,
+            YieldScu = h.YieldScu,
+            SoldAuec = h.SoldAuec
+        }).ToList();
+    }
+
+    private int SaveMiningHaulData(MiningHaulDto dto)
+    {
+        var haul = new MiningHaul
+        {
+            Id = dto.Id,
+            SessionId = dto.SessionId,
+            MaterialName = dto.MaterialName ?? "Quantainium",
+            ScuQuantity = dto.ScuQuantity > 0 ? dto.ScuQuantity : 32.0,
+            RefineryLocation = dto.RefineryLocation ?? "CRU-L1",
+            Method = dto.Method ?? "Dinyx Dodecathetic",
+            YieldPercent = dto.YieldPercent > 0 ? dto.YieldPercent : 93.0,
+            CostAuec = dto.CostAuec,
+            SubmittedAt = DateTime.UtcNow,
+            DurationSeconds = dto.DurationSeconds > 0 ? dto.DurationSeconds : 7200,
+            Status = !string.IsNullOrWhiteSpace(dto.Status) ? dto.Status : "Refining",
+            SoldAuec = dto.SoldAuec
+        };
+        return Database.SaveMiningHaul(haul);
     }
 
     private List<RsResourceDto> GetRsSignaturesData()

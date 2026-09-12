@@ -173,21 +173,55 @@ export const BlackboxView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">FLUGDAUER</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">PILOTENSITZ FLUGZEIT</div>
             <div className="text-lg font-bold text-amber-400 mt-0.5">
-              {data?.flightDurationText || '0h 0m'}
+              {data?.seatFlightDurationText || data?.flightDurationText || '0h 0m'}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleCopyReport}
-              title="Bericht als Markdown kopieren"
-              className="p-2 rounded-md border border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            </button>
+          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Rocket className="w-5 h-5" />
           </div>
         </div>
+      </div>
+
+      {/* Sortie & Seat-Time vs Menu-Idle Breakdown */}
+      <div className="sc-glass rounded-lg p-3.5 border border-cyan-500/30 bg-slate-900/60 sc-hud-corner flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span className="text-slate-400">Reine Flugzeit (Seat-Time):</span>
+            <strong className="text-amber-300">{data?.seatFlightDurationText || '0h 00m'}</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span className="text-slate-400">PU In-Game:</span>
+            <strong className="text-emerald-300">{data?.inGameDurationText || '0h 00m'}</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+            <span className="text-slate-400">Menü / Idle:</span>
+            <strong className="text-slate-300">{data?.menuDurationText || '0h 00m'}</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span className="text-slate-400">Starts / Sorties:</span>
+            <strong className="text-cyan-300">{data?.sortieCount ?? 1}</strong>
+          </div>
+        </div>
+
+        {/* Per-Ship Sorties Pills */}
+        {data?.shipStats && data.shipStats.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto">
+            {data.shipStats.map((s) => (
+              <span
+                key={s.ship}
+                className="px-2.5 py-1 rounded bg-slate-950/80 border border-amber-500/30 text-amber-300 font-mono text-[11px] shrink-0"
+              >
+                🚀 {s.ship} · <strong>{s.sorties} Sortie{s.sorties === 1 ? '' : 's'}</strong> ({s.flightTimeText})
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Meta Chips: Visited Bodies & Used Ships */}

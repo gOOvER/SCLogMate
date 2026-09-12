@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 21; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 22; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -511,6 +511,42 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v21 (chat_messages Tabelle & Indizes) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 22)
+        {
+            try
+            {
+                try { Exec(db, "ALTER TABLE user_pois ADD COLUMN pos_x REAL;"); } catch { }
+                try { Exec(db, "ALTER TABLE user_pois ADD COLUMN pos_y REAL;"); } catch { }
+                try { Exec(db, "ALTER TABLE user_pois ADD COLUMN pos_z REAL;"); } catch { }
+
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS mining_hauls (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT,
+                        material_name TEXT NOT NULL,
+                        scu_quantity REAL NOT NULL,
+                        refinery_location TEXT NOT NULL,
+                        method TEXT NOT NULL,
+                        yield_percent REAL NOT NULL,
+                        cost_auec INTEGER NOT NULL,
+                        submitted_at TEXT NOT NULL,
+                        duration_seconds INTEGER NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'Refining',
+                        sold_auec INTEGER NOT NULL DEFAULT 0
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_mining_hauls_status ON mining_hauls(status);
+                    CREATE INDEX IF NOT EXISTS ix_mining_hauls_submitted ON mining_hauls(submitted_at);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v22 (user_pois 3d coordinates & mining_hauls)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 22;");
+            dbSchemaVersion = 22;
+            Logger.Log("DB Schema: Migration auf v22 (user_pois 3D Koordinaten & mining_hauls) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -907,6 +943,7 @@ public static class Database
                 ["events"] = new[] { "session", "time", "kind", "amount", "detail", "ship" },
                 ["contracts"] = new[] { "id", "title", "reward", "contracted_by", "scanned_at", "status" },
                 ["user_pois"] = new[] { "id", "system", "body", "name", "notes", "category", "color", "created_at" },
+                ["mining_hauls"] = new[] { "id", "session_id", "material_name", "scu_quantity", "refinery_location", "method", "yield_percent", "cost_auec", "submitted_at", "duration_seconds", "status", "sold_auec" },
                 ["reputation"] = new[] { "faction_id", "xp", "completed_missions", "last_updated" },
                 ["fleet_user_ships"] = new[] { "name", "in_hangar", "is_pledge", "pledge_usd", "insurance", "acquisition", "notes" },
                 ["warehouse_items"] = new[] { "location", "location_code", "system", "parent_body", "item_class", "item_name", "category", "quantity", "last_updated" },
@@ -962,6 +999,7 @@ public static class Database
                 "ix_events_kind_time",
                 "ix_contracts_status",
                 "ix_user_pois_system",
+                "ix_mining_hauls_status",
                 "ix_warehouse_location",
                 "ix_warehouse_category"
             };
@@ -1819,17 +1857,20 @@ public static class Database
         using var cmd = db.CreateCommand();
         if (!string.IsNullOrEmpty(system))
         {
-            cmd.CommandText = "SELECT id, system, body, name, notes, category, color, created_at FROM user_pois WHERE system=$sys ORDER BY id DESC;";
+            cmd.CommandText = "SELECT id, system, body, name, notes, category, color, created_at, pos_x, pos_y, pos_z FROM user_pois WHERE system=$sys ORDER BY id DESC;";
             cmd.Parameters.AddWithValue("$sys", system);
         }
         else
         {
-            cmd.CommandText = "SELECT id, system, body, name, notes, category, color, created_at FROM user_pois ORDER BY id DESC;";
+            cmd.CommandText = "SELECT id, system, body, name, notes, category, color, created_at, pos_x, pos_y, pos_z FROM user_pois ORDER BY id DESC;";
         }
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
             DateTime.TryParse(r.GetString(7), out var dt);
+            double? px = r.IsDBNull(8) ? null : r.GetDouble(8);
+            double? py = r.IsDBNull(9) ? null : r.GetDouble(9);
+            double? pz = r.IsDBNull(10) ? null : r.GetDouble(10);
             list.Add(new UserPoi
             {
                 Id = r.GetInt32(0),
@@ -1839,7 +1880,10 @@ public static class Database
                 Notes = r.GetString(4),
                 Category = r.GetString(5),
                 Color = r.GetString(6),
-                CreatedAt = dt != default ? dt : DateTime.UtcNow
+                CreatedAt = dt != default ? dt : DateTime.UtcNow,
+                PosX = px,
+                PosY = py,
+                PosZ = pz
             });
         }
         return list;
@@ -1855,15 +1899,15 @@ public static class Database
             if (poi.Id > 0)
             {
                 cmd.CommandText = @"
-                    UPDATE user_pois SET system=$sys, body=$body, name=$name, notes=$notes, category=$cat, color=$col
+                    UPDATE user_pois SET system=$sys, body=$body, name=$name, notes=$notes, category=$cat, color=$col, pos_x=$px, pos_y=$py, pos_z=$pz
                     WHERE id=$id;";
                 cmd.Parameters.AddWithValue("$id", poi.Id);
             }
             else
             {
                 cmd.CommandText = @"
-                    INSERT INTO user_pois (system, body, name, notes, category, color, created_at)
-                    VALUES ($sys, $body, $name, $notes, $cat, $col, $created);
+                    INSERT INTO user_pois (system, body, name, notes, category, color, created_at, pos_x, pos_y, pos_z)
+                    VALUES ($sys, $body, $name, $notes, $cat, $col, $created, $px, $py, $pz);
                     SELECT last_insert_rowid();";
                 cmd.Parameters.AddWithValue("$created", poi.CreatedAt.ToString("o"));
             }
@@ -1873,6 +1917,9 @@ public static class Database
             cmd.Parameters.AddWithValue("$notes", poi.Notes);
             cmd.Parameters.AddWithValue("$cat", poi.Category);
             cmd.Parameters.AddWithValue("$col", poi.Color);
+            cmd.Parameters.AddWithValue("$px", poi.PosX.HasValue ? (object)poi.PosX.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("$py", poi.PosY.HasValue ? (object)poi.PosY.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("$pz", poi.PosZ.HasValue ? (object)poi.PosZ.Value : DBNull.Value);
 
             if (poi.Id > 0)
             {
@@ -1900,6 +1947,122 @@ public static class Database
             cmd.ExecuteNonQuery();
         }
     }
+
+    #region Mining Hauls & Refinery Tracking
+
+    public static List<MiningHaul> GetMiningHauls()
+    {
+        EnsureInitialized();
+        var list = new List<MiningHaul>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, session_id, material_name, scu_quantity, refinery_location, method, yield_percent, cost_auec, submitted_at, duration_seconds, status, sold_auec
+            FROM mining_hauls
+            ORDER BY id DESC;";
+
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt);
+            list.Add(new MiningHaul
+            {
+                Id = r.GetInt32(0),
+                SessionId = r.IsDBNull(1) ? null : r.GetString(1),
+                MaterialName = r.GetString(2),
+                ScuQuantity = r.GetDouble(3),
+                RefineryLocation = r.GetString(4),
+                Method = r.GetString(5),
+                YieldPercent = r.GetDouble(6),
+                CostAuec = r.GetInt32(7),
+                SubmittedAt = dt != default ? dt : DateTime.UtcNow,
+                DurationSeconds = r.GetInt32(9),
+                Status = r.GetString(10),
+                SoldAuec = r.GetInt32(11)
+            });
+        }
+        return list;
+    }
+
+    public static int SaveMiningHaul(MiningHaul haul)
+    {
+        lock (_writeLock)
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            if (haul.Id > 0)
+            {
+                cmd.CommandText = @"
+                    UPDATE mining_hauls
+                    SET session_id=$sess, material_name=$mat, scu_quantity=$scu, refinery_location=$loc, method=$meth,
+                        yield_percent=$yld, cost_auec=$cost, submitted_at=$sub, duration_seconds=$dur, status=$stat, sold_auec=$sold
+                    WHERE id=$id;";
+                cmd.Parameters.AddWithValue("$id", haul.Id);
+            }
+            else
+            {
+                cmd.CommandText = @"
+                    INSERT INTO mining_hauls (session_id, material_name, scu_quantity, refinery_location, method, yield_percent, cost_auec, submitted_at, duration_seconds, status, sold_auec)
+                    VALUES ($sess, $mat, $scu, $loc, $meth, $yld, $cost, $sub, $dur, $stat, $sold);
+                    SELECT last_insert_rowid();";
+            }
+            cmd.Parameters.AddWithValue("$sess", haul.SessionId ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("$mat", haul.MaterialName);
+            cmd.Parameters.AddWithValue("$scu", haul.ScuQuantity);
+            cmd.Parameters.AddWithValue("$loc", haul.RefineryLocation);
+            cmd.Parameters.AddWithValue("$meth", haul.Method);
+            cmd.Parameters.AddWithValue("$yld", haul.YieldPercent);
+            cmd.Parameters.AddWithValue("$cost", haul.CostAuec);
+            cmd.Parameters.AddWithValue("$sub", haul.SubmittedAt.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$dur", haul.DurationSeconds);
+            cmd.Parameters.AddWithValue("$stat", haul.Status);
+            cmd.Parameters.AddWithValue("$sold", haul.SoldAuec);
+
+            if (haul.Id > 0)
+            {
+                cmd.ExecuteNonQuery();
+                return haul.Id;
+            }
+            else
+            {
+                var newId = Convert.ToInt32(cmd.ExecuteScalar());
+                haul.Id = newId;
+                return newId;
+            }
+        }
+    }
+
+    public static void DeleteMiningHaul(int id)
+    {
+        lock (_writeLock)
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "DELETE FROM mining_hauls WHERE id=$id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public static void UpdateMiningHaulStatus(int id, string status, int soldAuec = 0)
+    {
+        lock (_writeLock)
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "UPDATE mining_hauls SET status=$stat, sold_auec=CASE WHEN $sold > 0 THEN $sold ELSE sold_auec END WHERE id=$id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.Parameters.AddWithValue("$stat", status);
+            cmd.Parameters.AddWithValue("$sold", soldAuec);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    #endregion
 
     #region Faction Reputation Tracking
 

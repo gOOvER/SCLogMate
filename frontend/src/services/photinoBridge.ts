@@ -367,17 +367,150 @@ export interface FlightTimelineItemDto {
   isMajor: boolean;
 }
 
+export interface FlightShipStatDto {
+  ship: string;
+  sorties: number;
+  flightMinutes: number;
+  flightTimeText: string;
+}
+
 export interface FlightRecorderDto {
   totalDistanceGm: number;
   totalDistanceKm: number;
   totalDistanceText: string;
   flightDurationText: string;
+  seatFlightDurationText?: string;
+  inGameDurationText?: string;
+  menuDurationText?: string;
   quantumJumps: number;
   sortieCount: number;
   shipLosses: number;
   visitedBodies: string[];
   usedShips: string[];
+  shipStats?: FlightShipStatDto[];
   timeline: FlightTimelineItemDto[];
+}
+
+export interface PoiDistanceInfo {
+  id: number;
+  name: string;
+  category: string;
+  body: string;
+  distanceMeters: number;
+  formattedDistance: string;
+}
+
+export interface CopiedLocationReading {
+  x: number;
+  y: number;
+  z: number;
+  timestamp: string;
+  rawText: string;
+  detectedSystem: string;
+  nearestPois: PoiDistanceInfo[];
+}
+
+export interface UserPoiDto {
+  id: number;
+  system: string;
+  body: string;
+  name: string;
+  notes: string;
+  category: string;
+  color: string;
+  createdAt: string;
+  posX?: number | null;
+  posY?: number | null;
+  posZ?: number | null;
+  hasCoordinates: boolean;
+  coordinatesFormatted: string;
+  distanceFormatted?: string | null;
+}
+
+export interface MiningHaulDto {
+  id: number;
+  sessionId?: string | null;
+  materialName: string;
+  scuQuantity: number;
+  refineryLocation: string;
+  method: string;
+  yieldPercent: number;
+  costAuec: number;
+  submittedAt: string;
+  readyAt: string;
+  durationSeconds: number;
+  remainingSeconds: number;
+  isTimerCompleted: boolean;
+  status: string; // Refining, Ready, Collected, Sold
+  yieldScu: number;
+  soldAuec: number;
+}
+
+export interface TradeRouteDto {
+  id: string;
+  commodity: string;
+  origin: string;
+  destination: string;
+  system: string;
+  buyPricePerScu: number;
+  sellPricePerScu: number;
+  profitPerScu: number;
+  roiPercent: number;
+  maxScu: number;
+  investmentAuec: number;
+  totalProfitAuec: number;
+  riskLevel: string;
+}
+
+export interface SalvagePriceSummaryDto {
+  materialName: string;
+  category: string;
+  bestSellLocation: string;
+  bestSellPricePerScu: number;
+  avgSellPricePerScu: number;
+  system: string;
+}
+
+export interface CombatCategoryStatDto {
+  label: string;
+  count: number;
+  percent: number;
+  color: string;
+}
+
+export interface DangerZoneDto {
+  location: string;
+  system: string;
+  incidentCount: number;
+  deaths: number;
+  shipLosses: number;
+  threatLevel: string;
+}
+
+export interface CasualtyIncidentDto {
+  id: string;
+  timestamp: string;
+  session: string;
+  type: string;
+  title: string;
+  detail: string;
+  ship?: string;
+  location: string;
+  estimatedCostAuec: number;
+}
+
+export interface CombatAnalyticsDto {
+  totalKills: number;
+  totalDeaths: number;
+  kdRatio: number;
+  shipLosses: number;
+  medRespawns: number;
+  estimatedKitLossAuec: number;
+  estimatedShipClaimLossAuec: number;
+  estimatedTotalLossAuec: number;
+  deathCauses: CombatCategoryStatDto[];
+  dangerZones: DangerZoneDto[];
+  recentCasualties: CasualtyIncidentDto[];
 }
 
 export interface RsResourceDto {

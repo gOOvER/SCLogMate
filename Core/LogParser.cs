@@ -195,7 +195,7 @@ public partial class LogParser
     private static partial Regex ClientSpawnedRegex();
 
     // Fahrzeug-Kontrolle & Cockpit-Sitzwechsel
-    [GeneratedRegex(@"<Vehicle Control Flow>.*?(?<method>EnterDriver|ClearDriver).*?vehicleId=(?<veh>[^ ]+)")]
+    [GeneratedRegex(@"(?:<Vehicle Control Flow>\s*CVehicleMovementBase::(?<method>\w+):.*?control token for '(?<veh>[^']+)'|<Vehicle Control Flow>.*?(?<method>EnterDriver|ClearDriver).*?vehicleId=(?<veh>[^ ]+))", RegexOptions.Compiled)]
     private static partial Regex VehicleControlFlowRegex();
 
     // ASOP Terminal Fahrzeugbereitstellung
@@ -959,7 +959,7 @@ public partial class LogParser
         }
 
         // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel
-        if (line.Contains("<Vehicle Control Flow>", StringComparison.Ordinal))
+        if (line.Contains("<Vehicle Control Flow>", StringComparison.Ordinal) || line.Contains("CVehicleMovementBase::", StringComparison.Ordinal))
         {
             var vcf = VehicleControlFlowRegex().Match(line);
             if (vcf.Success)
@@ -967,9 +967,14 @@ public partial class LogParser
                 var method = vcf.Groups["method"].Value;
                 var vehRaw = vcf.Groups["veh"].Value;
                 var ship = Ships.Prettify(vehRaw);
-                if (method.Contains("Enter", StringComparison.OrdinalIgnoreCase))
+                _lastShip = ship;
+
+                if (method.Contains("Clear", StringComparison.OrdinalIgnoreCase))
                 {
-                    _lastShip = ship;
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"{ship} (Sortie beendet / Pilotensitz verlassen)", Ship = ship };
+                }
+                else
+                {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"{ship} (Pilotensitz eingenommen)", Ship = ship };
                 }
             }

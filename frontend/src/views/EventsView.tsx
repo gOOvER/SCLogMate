@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { bridge, LogEventItem, SessionSummary } from '../services/photinoBridge';
+import { bridge, LogEventItem, SessionSummary, CombatAnalyticsDto } from '../services/photinoBridge';
 import {
   Archive,
   BookOpen,
@@ -18,6 +18,10 @@ import {
   Target,
   Terminal,
   X,
+  Skull,
+  ShieldAlert,
+  AlertOctagon,
+  Activity,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 
@@ -32,8 +36,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
   sessions = [],
 }) => {
   const [events, setEvents] = useState<LogEventItem[]>([]);
-  const [viewMode, setViewMode] = useState<'live' | 'archive'>('live');
+  const [viewMode, setViewMode] = useState<'live' | 'archive' | 'combat'>('live');
   const [archiveSession, setArchiveSession] = useState<string>('__all__');
+  const [combatData, setCombatData] = useState<CombatAnalyticsDto | null>(null);
   const [category, setCategory] = useState<string>('Alle');
   const [search, setSearch] = useState<string>('');
   const [selectedEvent, setSelectedEvent] = useState<LogEventItem | null>(null);
@@ -44,6 +49,21 @@ export const EventsView: React.FC<EventsViewProps> = ({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; event: LogEventItem } | null>(null);
 
   const activeSession = viewMode === 'live' ? '__live__' : archiveSession;
+
+  const fetchCombatAnalytics = async (sessionTarget = activeSession) => {
+    try {
+      const res = await bridge.sendRequest<CombatAnalyticsDto>('get_combat_analytics', { session: sessionTarget });
+      setCombatData(res);
+    } catch (err) {
+      console.error('Failed to load combat analytics:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'combat') {
+      fetchCombatAnalytics(activeSession);
+    }
+  }, [viewMode, activeSession]);
 
   const fetchEvents = async (count = limit, sessionTarget = activeSession) => {
     try {
@@ -253,10 +273,24 @@ export const EventsView: React.FC<EventsViewProps> = ({
               <Archive className="w-3.5 h-3.5 text-cyan-400" />
               <span>Sitzungsarchiv</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('combat')}
+              className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === 'combat'
+                  ? 'bg-rose-950/80 text-rose-300 border border-rose-500/70 shadow-[0_0_8px_rgba(244,63,94,0.25)]'
+                  : 'text-slate-400 hover:text-white border border-transparent'
+              }`}
+              title="Combat- & Gefahren-Analytics: Kit-Verluste, Ursachen, Gefahrenzonen und K/D"
+            >
+              <Swords className="w-3.5 h-3.5 text-rose-400" />
+              <span>Combat-Analytics</span>
+            </button>
           </div>
 
-          {/* Wenn Archiv gewählt ist: Dropdown für archivierte Sitzungen */}
-          {viewMode === 'archive' && (
+          {/* Wenn Archiv oder Combat gewählt ist: Dropdown für archivierte Sitzungen */}
+          {(viewMode === 'archive' || viewMode === 'combat') && (
             <div className="relative shrink-0 animate-in fade-in duration-200">
               <select
                 value={archiveSession}
@@ -333,7 +367,168 @@ export const EventsView: React.FC<EventsViewProps> = ({
         </div>
       </div>
 
+      {/* ══ COMBAT & HAZARD ANALYTICS VIEW ══ */}
+      {viewMode === 'combat' && (
+        <div className="flex-1 flex flex-col space-y-3 overflow-y-auto pr-1">
+          {/* Top KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-mono">KILLS / TOTESVERHÄLTNIS</div>
+                <div className="text-xl font-bold text-emerald-400 mt-0.5">
+                  {combatData?.totalKills ?? 0} <span className="text-xs text-slate-400 font-normal">Kills</span> · <span className="text-cyan-300">K/D {combatData?.kdRatio ?? 0}</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <Target className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-mono">TODE & SCHIFFSVERLUSTE</div>
+                <div className="text-xl font-bold text-rose-400 mt-0.5">
+                  {combatData?.totalDeaths ?? 0} <span className="text-xs text-slate-400 font-normal">Tode</span> · <span className="text-rose-300">{combatData?.shipLosses ?? 0} Schiffe</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <Skull className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-mono">KIT-AUSRÜSTUNGSVERLUST</div>
+                <div className="text-xl font-bold text-amber-400 mt-0.5">
+                  ~ {((combatData?.estimatedKitLossAuec ?? 0) / 1000).toLocaleString('de-DE')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-mono">GESAMTSCHADEN AUSFÄLLE</div>
+                <div className="text-xl font-bold text-rose-400 mt-0.5">
+                  ~ {((combatData?.estimatedTotalLossAuec ?? 0) / 1000).toLocaleString('de-DE')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <AlertOctagon className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Analysis Split View */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-[400px]">
+            {/* Left: Death Causes Breakdown & Hazard Zones */}
+            <div className="space-y-3 flex flex-col">
+              {/* Causes */}
+              <div className="sc-glass rounded-lg p-3.5 border border-slate-800 space-y-3">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-rose-400" />
+                  Todesursachen-Verteilung
+                </h3>
+                <div className="space-y-2 font-mono text-xs">
+                  {combatData?.deathCauses.map((c) => (
+                    <div key={c.label} className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-300">{c.label}</span>
+                        <span className="text-slate-400">{c.count} Vorfälle ({c.percent}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(4, c.percent)}%`, backgroundColor: c.color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hotspots */}
+              <div className="sc-glass rounded-lg p-3.5 border border-slate-800 space-y-3 flex-1">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-amber-400" />
+                  Gefahrenzonen & Hotspots (Verlustschwerpunkte)
+                </h3>
+                <div className="space-y-1.5 font-mono text-xs">
+                  {combatData?.dangerZones && combatData.dangerZones.length > 0 ? (
+                    combatData.dangerZones.map((z) => (
+                      <div
+                        key={z.location}
+                        className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800"
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                          <div>
+                            <div className="font-bold text-slate-200">{z.location}</div>
+                            <div className="text-[10px] text-slate-400">{z.system}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px]">
+                          <span className="text-slate-400">
+                            ☠ {z.deaths} Tode · 💥 {z.shipLosses} Schiffe
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                              z.threatLevel === 'Kritisch'
+                                ? 'bg-rose-950/60 text-rose-400 border-rose-800'
+                                : 'bg-amber-950/60 text-amber-400 border-amber-800'
+                            }`}
+                          >
+                            {z.threatLevel}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-500 text-xs text-center py-6">Keine Gefahrenzonen verzeichnet.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Casualty Incidents Log */}
+            <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex flex-col">
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2 shrink-0">
+                <Skull className="w-4 h-4 text-rose-400" />
+                Letzte Verlust- & Gefechtsvorfälle ({combatData?.recentCasualties.length ?? 0})
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 font-mono text-xs pr-1 max-h-[500px]">
+                {combatData?.recentCasualties && combatData.recentCasualties.length > 0 ? (
+                  combatData.recentCasualties.map((inc) => (
+                    <div
+                      key={inc.id}
+                      className="p-2.5 rounded bg-slate-900/60 border border-slate-800 hover:border-rose-500/40 transition"
+                    >
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                        <span>{inc.timestamp}</span>
+                        <span className="text-rose-400 font-bold">~ {inc.estimatedCostAuec.toLocaleString('de-DE')} aUEC Kit-Kosten</span>
+                      </div>
+                      <div className="font-bold text-slate-200 text-[11px]">{inc.title}</div>
+                      <div className="text-slate-400 text-[10px] mt-0.5 truncate">{inc.detail}</div>
+                      <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-cyan-400" />
+                        {inc.location}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-500 text-xs text-center py-12">Keine Verluste in dieser Sitzung.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ 2. Hauptbereich: DataGrid Tabelle + ausziehbarer Detail-Drawer ══ */}
+      {viewMode !== 'combat' && (
       <div className="flex-1 flex gap-3 min-h-[350px]">
         {/* DataGrid Container */}
         <div className="flex-1 flex flex-col bg-[#040914]/90 rounded-lg border border-cyan-950/80 overflow-hidden shadow-sm min-w-0">
@@ -607,6 +802,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {contextMenu && (
         <ContextMenu

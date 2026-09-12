@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **/showlocation Auto-Clipboard POI Tracker & Distance Radar (`PoiClipboardWatcher.cs`, `UserPoi.cs`, `Database.cs`, `PlacesView.tsx`, `PhotinoBridge.cs`)**:
+  - Implemented automatic non-blocking background clipboard monitoring (`PoiClipboardWatcher.cs`) detecting Star Citizen `/showlocation` coordinate strings (`Coordinates: x:... y:... z:...`) with system identification.
+  - Extended user POI management with 3D coordinate storage (`pos_x`, `pos_y`, `pos_z`) in SQLite (schema v22) and real-time distance radar calculation to nearby outposts, landmarks, and custom pins.
+  - Added live coordinate telemetry card, 1-click POI pinning, and instant distance updates in `PlacesView.tsx` with live IPC event streaming (`LOCATION_COPIED`).
+- **Flight & Sortie Time Telemetry (`LogParser.cs`, `PhotinoBridge.cs`, `BlackboxView.tsx`)**:
+  - Improved `VehicleControlFlowRegex` matching Star Citizen 3.24/4.x `ClearDriver` and seat token release events to accurately calculate true in-seat cockpit flight time per ship versus menu/station idle.
+  - Added per-ship sortie metrics, total flight time badges, and breakdown cards in `BlackboxView.tsx`.
+- **Combat & Death Analytics with Kit Loss Estimation (`CombatAnalyticsService.cs`, `EventsView.tsx`, `PhotinoBridge.cs`)**:
+  - Added dedicated Combat Analytics view in `EventsView.tsx` tracking K/D ratio, pilot deaths, ship losses, hazard hotspots, death cause distribution, and estimated financial kit recovery / insurance expedite costs.
+- **Smart Trade Route Optimizer & Salvage Price Comparison (`TradeRouteOptimizer.cs`, `MarketView.tsx`, `PhotinoBridge.cs`)**:
+  - Implemented automated trading route calculator with cargo hold capacity and capital budget filtering, ranking routes by net profit and ROI.
+  - Added real-time scrap, salvage (RMC, Construction Materials), and mined ore market price summaries powered by the local UEX API cache.
+- **Refinery & Mining Haul Tracker (`MiningHaul.cs`, `Database.cs`, `OreScannerView.tsx`, `PhotinoBridge.cs`)**:
+  - Added dedicated refinery job tracker tab in `OreScannerView.tsx` with live ticking countdown timers, progress bars, yield calculations, and status progression (Refining -> Ready -> Transporting -> Sold).
+  - Database schema bumped to version 22 with migrations for `mining_hauls` table and 3D coordinate columns on `user_pois`.
 - **In-Game Toast Notifications Test Trigger (`PhotinoBridge.cs`, `SettingsView.tsx`)**:
   - Added dedicated "Test-Toast anzeigen" button in the In-Game Toast Settings card header and Developer simulation panel in `SettingsView.tsx` to immediately test and preview native Win32 Always-On-Top desktop toasts.
   - Implemented `test_toast` IPC command in `PhotinoBridge.cs` supporting customizable icon, header, title, subtitle, and accent border color parameters, immediately firing sample notifications via `NativeToastOverlay`.
