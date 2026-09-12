@@ -94,8 +94,8 @@ function mergeCfgContent(
 }
 
 export const ToolsView: React.FC = () => {
-  // Default tab is 'cfg' so user.cfg, editor, and backups are directly accessible
-  const [activeTab, setActiveTab] = useState<'cfg' | 'maintenance' | 'keybinds'>('cfg');
+  // Default tab is 'maintenance' for direct system maintenance & diagnostics
+  const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds'>('maintenance');
   const [status, setStatus] = useState<ToolsStatusDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -513,25 +513,8 @@ export const ToolsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3-Tab Bar: user.cfg is Tab 1 */}
+      {/* 3-Tab Bar: Wartung is Tab 1 */}
       <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
-        <button
-          onClick={() => setActiveTab('cfg')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-            activeTab === 'cfg'
-              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
-              : 'bg-slate-900/50 hover:bg-slate-800/70 text-slate-400 hover:text-slate-200 border border-transparent'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>1. user.cfg Tuning, Editor &amp; Backups</span>
-          {status?.configBackups && status.configBackups.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-sky-950 text-sky-400 text-[10px] font-mono border border-sky-800">
-              {status.configBackups.length}
-            </span>
-          )}
-        </button>
-
         <button
           onClick={() => setActiveTab('maintenance')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -541,7 +524,24 @@ export const ToolsView: React.FC = () => {
           }`}
         >
           <Wrench className="w-4 h-4" />
-          <span>2. System-Wartung &amp; Diagnose</span>
+          <span>1. Wartung &amp; Diagnose</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('cfg')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+            activeTab === 'cfg'
+              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+              : 'bg-slate-900/50 hover:bg-slate-800/70 text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>2. user.cfg (Editor &amp; Backups)</span>
+          {status?.configBackups && status.configBackups.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-sky-950 text-sky-400 text-[10px] font-mono border border-sky-800">
+              {status.configBackups.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -563,7 +563,7 @@ export const ToolsView: React.FC = () => {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════
-          TAB 1: USER.CFG TUNING, LIVE-EDITOR & BACKUPS
+          TAB 2: USER.CFG TUNING, LIVE-EDITOR & BACKUPS
           ══════════════════════════════════════════════════════════════ */}
       {activeTab === 'cfg' && (
         <div className="space-y-6">
@@ -988,7 +988,7 @@ export const ToolsView: React.FC = () => {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          TAB 2: WARTUNG & DIAGNOSE
+          TAB 1: WARTUNG & DIAGNOSE
           ══════════════════════════════════════════════════════════════ */}
       {activeTab === 'maintenance' && (
         <div className="space-y-6">

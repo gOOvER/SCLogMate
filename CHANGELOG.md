@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- **Tab Reordering in Tools & Maintenance (`ToolsView.tsx`)**:
+  - Reordered tabs to make `1. Wartung & Diagnose` the default landing tab upon opening the view, followed by `2. user.cfg (Editor & Backups)` and `3. Steuerungs-Tresor (Keybinds & Cloud)`.
 - **Hardware Telemetry Grid Coherence (`PhotinoBridge.cs`, `photinoBridge.ts`, `ToolsView.tsx`)**:
   - Relocated display resolution metric to the Graphics & Display card (`Grafikkarte & Anzeige`) alongside GPU model, VRAM, and driver version.
   - Dedicated the Storage Drive card (`Installations-Laufwerk`) strictly to drive metrics: drive letter, available free space, and drive type (`Interne SSD / NVMe`).
