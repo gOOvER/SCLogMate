@@ -634,15 +634,15 @@ export const FleetView: React.FC = () => {
                           </button>
 
                           {/* UEX */}
-                          <a
-                            href={`https://uexcorp.space/ships/?search=${encodeURIComponent(ship.name)}`}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            onClick={() => {
+                              bridge.openExternalUrl(`https://uexcorp.space/search?q=${encodeURIComponent(ship.name)}`);
+                            }}
                             className="p-1.5 rounded bg-[#071322] hover:bg-amber-950/60 border border-[#14263B] hover:border-amber-700 text-amber-400 transition cursor-pointer"
                             title="UEX Händlerpreise & Standorte prüfen"
                           >
                             <Coins className="w-3 h-3" />
-                          </a>
+                          </button>
 
                           {/* Notes */}
                           <button

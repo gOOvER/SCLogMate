@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **UEX Corp Ship Pricing Link in Hangar (`FleetView.tsx`)**:
+  - Fixed 404 Not Found error caused by outdated `/ships/?search=` URL endpoint, switching to UEX Corp's global search endpoint `https://uexcorp.space/search?q={shipName}`.
+  - Routed the link action through `bridge.openExternalUrl()` to reliably launch the user's default desktop browser instead of triggering in-app WebView2 navigation.
 - **Star Citizen Wiki Multilingual Localized JSON Parsing (`WikiApiClient.cs`, `Database.cs`, `WikiDossierModal.tsx`, `WikiExplorerView.tsx`)**:
   - Resolved an issue where vehicle attributes returned as multilingual translation maps by the API (such as `size`, `role`, `type`, `production_status`) rendered raw JSON strings like `Größe {"en_EN":"Large","de_DE":"Groß",...}` instead of clean, localized human-readable labels.
   - Added robust localization extractors in `WikiApiClient.ExtractLocalizedOrString()` and `CleanLocalizedField()` across SQLite cache persistence and retrieval, alongside defensive client-side sanitizers in `WikiDossierModal.tsx` and `WikiExplorerView.tsx`.
