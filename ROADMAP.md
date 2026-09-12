@@ -174,13 +174,82 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 | **SCWiki In-App Overlay** | Integriertes Modal mit Bild, Specs & deutscher Lore | Integriertes Glassmorphism-Modal mit HD-Render, Specs & Lore | 🟢 Erledigt (Abschnitt 6) |
 | **Lokaler SCWiki Bild-Cache** | Nur Remote-URLs (kein permanenter Disk-Cache) | Vollständiger Disk-Cache unter %APPDATA%\cache\wiki\ | 🟢 Erledigt (Abschnitt 6) |
 | **In-Game Chat-Chronik & Reports** | Nicht vorhanden | OCR-Chatlogger, SQLite-Speicherung & 1-Klick CIG Report | 🟢 Erledigt (Abschnitt 7) |
-| **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Nur Web-Dashboard im Hauptfenster | 🟡 Pop-out / Win32 Overlay fehlt noch |
-| **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Nur als View im Hauptfenster (`OreScannerView.tsx`) | 🟡 Transparenter In-Game-Modus fehlt |
-| **OCR Screen-Region-Selector** | Interaktiver Rahmen auf dem Desktop zum Zeichnen/Justieren der Scan-Region für Kontostand & Aufträge | Koordinaten-Eingabe in Settings | 🟡 Visueller Desktop-Drag-Selector fehlt |
-| **Scan Indicator Window** | Grüner/Gelber visueller Flash-Indikator am Monitorrand bei OCR-Erfassung | Kein sichtbares Feedback am Desktop | 🟡 Desktop-Flash fehlt (nur Web-Status) |
-| **In-Game Desktop Toasts** | Transparente native Toasts über dem Spielfenster für Aufzüge, Schiffszerstörung, Missionsabschluss | Nur interne Web-Toasts innerhalb der App | 🟡 Desktop-Always-On-Top Toasts fehlen |
+| **OCR Screen-Region-Selector** | Interaktiver Rahmen auf dem Desktop zum Zeichnen/Justieren der Scan-Region für Kontostand & Aufträge | Virtuelles Multi-Monitor Snipping-Tool über alle Displays mit Live-Pixelbadge & Tastaturkürzeln | 🟢 Erledigt (`NativeRegionSelector.cs`) |
+| **Scan Indicator Window** | Grüner/Gelber visueller Flash-Indikator am Monitorrand bei OCR-Erfassung | Nativer transparenter Color-Key Rahmen mit grünem Bestätigungs-Flash | 🟢 Erledigt (`NativeScanIndicator.cs`) |
+| **Floating Mini-HUD Overlay (`Alt+H`)** | Separates, transparentes, rahmenloses Always-on-Top Win32-Fenster mit Click-Through Modus direkt über dem Vollbild-Spiel | Web-Dashboard & Overlay-Schalter vorhanden | 🟡 Pop-out / Win32 Overlay Fenster finalisieren |
+| **RS-Scan Overlay Window** | Separates transparentes Radar-/Signatur-Fenster über dem Spiel | Im Hauptfenster vorhanden (`OreScannerView.tsx`) | 🟡 Transparenter In-Game Always-on-Top Modus |
+| **In-Game Desktop Toasts** | Transparente native Toasts über dem Spielfenster für Aufzüge, Schiffszerstörung, Missionsabschluss | Interne Web-Toasts innerhalb der App aktiv | 🟡 Native Win32 Always-On-Top Desktop-Toasts |
 | **Rechtsklick-Kontextmenüs** | Kontextmenüs auf allen Tabellenzeilen (*Im Wiki nachschlagen, Zeile kopieren, Filter setzen*) | Meist nur Klick-Auswahl oder Detail-Drawer | 🟢 In React nachrüstbar |
 | **DB-Diagnose & Schnell-Reparatur** | Visuelle Tabelle mit Prüfung aller Spalten, Tabellen, Indizes und `PRAGMA quick_check;` | Basis-Tools vorhanden | 🟢 UI-Angleichung an RC2-Diagnose |
+
+---
+
+## ⛏ 9. Industrial Mining & Refinery Suite (Bergbau, Veredelung & Warchest)
+
+Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge, Lagerverwaltung und Handelsoptimierung:
+
+### 9.1 Refinery Job Tracking & OCR-Kiosk Logging
+- [ ] **Vollständiges Auftrags-Management für Veredelungsaufträge (`RefineryView.tsx`, `Core/Database.cs`):**
+  - Übersicht aller aktiven, verarbeiteten und abholbereiten Veredelungsaufträge über alle Raffineriestationen (*ARC-L1, CRU-L1, HUR-L1, HUR-L2, MIC-L1, Pyro-Raffinerien*).
+  - Status-Phasen: *In Warteschlange*, *Wird veredelt (Live-Countdown)*, *Fertig zur Abholung*, *Eingelagert / Verkauft*.
+  - Berechnung der Veredelungszeiten, Kosten und Materialerträge je nach gewählter Methode (*Cormack, Dinyx, Electrostatic, Ferron, Gencore, Pyroxeres, Thermite*).
+  - Automatische Benachrichtigung (Desktop-Toast & Ton) bei Fertigstellung eines Auftrags.
+- [ ] **OCR Screenshot- & Snipping-Erfassung von Raffinerie-Aufträgen (`RefineryOcrScanner.cs`):**
+  - 1-Klick Bildschirmaufnahme oder interaktives Desktop-Snipping des In-Game Raffinerie-Terminals (*Refinery Kiosk*).
+  - Automatisches Extrahieren von Ausgangs-Erzen, Mengen (cSCU / SCU), gewählter Methode, Endertrag, Gebühren und Fertigstellungsdatum direkt in die Datenbank.
+
+### 9.2 Warchest Management & Qualitätsbewertung
+- [ ] **Mineralien- & Rohstoff-Tresor (Warchest):**
+  - Dedizierte Bestandsübersicht aller abgebauten Rohmineralien und veredelten Barren getrennt nach Standorten und Frachtbehältern.
+  - **Qualitäts- & Reinheitsbewertung (Quality Ratings):** Erfassung von prozentualem Reinheitsgrad, Verunreinigungen (Inert Materials) und SCU-Dichte zur gezielten Veredelungs- und Verkaufsplanung.
+  - Historische Gesamtertrags-Statistik und Entwicklung des Warchest-Wertes über Spielsitzungen hinweg.
+
+### 9.3 Live UEX Corp Preis-Integration für Bergbau & Warchest
+- [ ] **Echtzeit-Bewertung des Warchest-Bestands:**
+  - Automatische Neuberechnung des Marktwertes aller gelagerten Rohstoffe und veredelten Güter basierend auf Live-Preisen der UEX Corp API.
+  - Historische Preistrends und Margenwarnungen für Quantanium, Bexalite, Gold, Taranite, Larinite und RMC.
+
+### 9.4 Rock Breaking & Laser-Power Rechner
+- [ ] **Gesteinsbruch- & Überlastungs-Kalkulator:**
+  - Physikalischer Bruch-Rechner: Eingabe von Gesteinsmasse (kg / t), Resistenz (%) und Instabilität.
+  - Berechnung der benötigten Laserleistung (Watt / MW) zum Erreichen des optimalen Ladefensters (*Green Zone*).
+  - Warnung vor Gesteins-Überladung, Instabilitäts-Spitzen und Explosions-/Shatter-Gefahr.
+
+### 9.5 Multi-Crew & Team Mining Operations
+- [ ] **Mehrspieler- & Flotten-Bergbau-Planer:**
+  - Planung kooperativer Bergbau-Einsätze mit mehreren Schiffen und Lasern (z. B. Prospector-Paare, RSI MOLE mit bis zu 3 Geschütztürmen, Unterstützung durch Handlaser).
+  - Berechnung kombinierter Laserleistungen, überlappender Modul-Boni und synchronisierter Hitzeregulierung.
+  - Transparente Aufteilung von Ladekapazitäten, Kosten und Verkaufserlösen auf Crewmitglieder.
+
+### 9.6 Optimal Loadout Finder & Mining Equipment Database
+- [ ] **Optimal Loadout Finder (Intelligente Laser-Empfehlung):**
+  - Algorithmus zur Ermittlung der optimalen Ausrüstungskombination (Laser-Kopf + aktive/passive Sub-Module + Gadgets) für gewünschte Zielerze und Gesteinsgrößen.
+- [ ] **Mining Equipment Database:**
+  - Vollständiger interaktiver Katalog aller Star-Citizen-Mining-Laser (*S1 & S2: Helix, Lancet, Impact, Hofstede, Klein, Arbor*), Sub-Module (*Surge, Focus, Brandt, Torrent, Stampede, Lifeline etc.*) und platzierbarer Gadgets (*BoreMax, Sabir, Optimax*).
+  - Technische Kennzahlen: Laserleistung, Green Zone Multiplikator, Resistenz-Reduktion, Instabilitäts-Dämpfung, Shatter Damage und Modul-Slots sowie Kaufstationen und Preise.
+
+### 9.7 Rock Knowledge & Pinnbare Favoriten
+- [ ] **Erweiterte Gesteins- & Mineralien-Enzyklopädie:**
+  - Detailliertes Nachschlagewerk zu allen Erzen, Edelmetallen und Gasen im Star-Citizen-Universum.
+  - **Pinnbare Favoriten:** 1-Klick Favorisieren von Zielmineralien (z. B. Quantanium, Gold, Beryl) für priorisierte Hervorhebung im HUD, Decoder und Radar-Scanner.
+  - Spezifische Kennzahlen zu Materialdichte, Explosionsgefahr, Verfallszeit (z. B. instabiles Quantanium) und typischer Gesteinszusammensetzung.
+
+### 9.8 Standort- & Vorkommen-Atlas (Location Data)
+- [ ] **Präziser Rohstoff- & Spawn-Atlas:**
+  - Detaillierte Vorkommen-Datenbank: Wo spawnen bestimmte Erze und Gesteinstypen am häufigsten?
+  - Filterung nach planetaren Oberflächen (*Daymar, Lyria, Magda, Aberdeen, Calliope, Euterpe, Wala*) vs. Asteroidengürteln (*Aaron Halo Bänder 5–10, Yela-Ring, Lagrange-Cluster*).
+  - Anzeige von Cluster-Wahrscheinlichkeiten, Abbau-Schwierigkeit und Umgebungsbedingungen (Gravitation, Atmosphäre, extreme Temperaturen).
+
+### 9.9 Mineral Tracking & Blueprint-Bedarfsliste (Shopping List)
+- [ ] **Bedarfs-Tracker für Crafting & Baupläne:**
+  - Verknüpfung der erlernten Baupläne (`BlueprintsView.tsx`) mit dem Rohstoffbedarf: Markieren benötigter Mineralien für geplante Crafting-Rezepte als Live-Einkaufsliste.
+  - Dynamischer Soll/Ist-Abgleich mit dem aktuellen Lagerbestand (`Warehouse`) und dem Warchest-Tresor.
+  - Direktanzeige der besten Fundorte für aktuell noch fehlende Komponenten.
+
+### 9.10 Best Sales Locations (Routen-Optimierer für Warchest-Verkäufe)
+- [ ] **Verkaufs- & Routen-Optimierer:**
+  - Berechnet anhand des aktuellen Warchest-Inventars und der UEX-Echtzeitpreise den profitabelsten Verkaufsort im gesamten Verse (TDDs, Admin-Büros, Rohstoffhändler).
+  - Berücksichtigung von maximalen Ankaufsmengen (Demand Caps), Terminal-Limits und Reisedistanzen für maximalen Netto-Stundengewinn.
 
 ---
 
@@ -197,6 +266,15 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
   - Eine Suchmaske zum Durchstöbern aller Schiffe, Fahrzeuge und Gegenstände des Star Citizen Wikis direkt in SCLogMate (`WikiExplorerView.tsx`).
 - [x] **Schritt 4 (In-Game Chat-Verlauf & Player Reports - Abschnitt 7):**
   - OCR-basierte Chat-Erfassung, SQLite-Speicherung in `chat_messages` und 1-Klick CIG Support-Report Export.
+- [x] **Schritt 5 (OCR Multi-Monitor & Universal-Kalibrierung):**
+  - Multi-Monitor virtueller Desktop-Support für mobiGlas, RS Radar & Chat OCR ohne Abbruch auf Zweitmonitoren.
+  - Universelle Kalibrierung und interaktive Bereichsauswahl in Einstellungen, Radar-Decoder und Chat-Chronik.
+- [ ] **Schritt 6 (Refinery Job Tracking & OCR-Kiosk Logging):**
+  - Erstellung von `RefineryView.tsx` mit Auftrags-Management, Countdown-Timern und OCR-Screenshot-Erfassung von Kiosk-Terminals.
+- [ ] **Schritt 7 (Warchest Management & Best Sales Locations):**
+  - Erfassung von Mineralienbeständen mit Reinheitsstufen (Quality Ratings) und automatischer Ermittlung der besten Verkaufsorte via UEX Corp API.
+- [ ] **Schritt 8 (Rock Breaking Calculator & Optimal Loadout Finder):**
+  - Laser-Power vs. Gesteinsmasse/Resistenz Rechner, Ausrüstungs-Datenbank und Multi-Crew Bergbau-Planer.
 
 
 
