@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **Multi-Monitor OCR & Secondary Display Support (`NativeRegionSelector.cs`, `WalletCapture.cs`)**:
+- **Multi-Monitor OCR & Secondary Display Support (`NativeRegionSelector.cs`, `NativeScanIndicator.cs`, `ScreenCapture.cs`, `WalletCapture.cs`)**:
+  - Fixed Win32 class registration and window creation failures (`ERROR_CLASS_ALREADY_EXISTS 1410` and `ERROR_CANNOT_FIND_WND_CLASS 1407`) by explicitly enforcing `CharSet = CharSet.Unicode` on `WNDCLASSEX`, `RegisterClassEx`, and `UnregisterClass` P/Invokes, preventing single-byte ANSI string truncation that prevented the snipping overlay and scan indicator from ever rendering.
+  - Added graceful tolerance for `ERROR_CLASS_ALREADY_EXISTS` (1410) during overlay window class registration so window creation proceeds unhindered.
+  - Added `SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)` to `NativeRegionSelector`, `NativeScanIndicator`, and `ScreenCapture.Capture` ensuring accurate 1:1 physical pixel coordinates across multi-monitor setups with mixed scaling factors (e.g. 100% and 125%/150%).
+  - Added direct GDI DC painting fallback when virtual desktop offscreen bitmap allocation fails on high-resolution multi-monitor configurations (e.g. 4K / ultra-wide multi-display setups).
   - Fixed an issue where mobiGlas wallet OCR aborted or failed when selecting or scanning on a secondary monitor by removing coordinate clamping (`Math.Max(0, region.X)` and `Math.Max(0, region.Y)`), properly supporting virtual desktop coordinates including negative X/Y offsets.
   - Rewrote `NativeRegionSelector.cs` to span the entire virtual desktop (`SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, `SM_CXVIRTUALSCREEN`, `SM_CYVIRTUALSCREEN`) as a single seamless layered overlay across all connected monitors simultaneously, preventing focus loss, clicks passing through to background windows, or premature aborts when moving the mouse to a second display.
   - Rendered intuitive instructional selection banners on each individual connected monitor with monitor indices and display dimensions.

@@ -22,6 +22,7 @@ public static class NativeRegionSelector
         {
             try
             {
+                try { SetThreadDpiAwarenessContext((IntPtr)(-4)); } catch { }
                 var region = ShowSelectorModal(targetTitle);
                 tcs.TrySetResult(region);
             }
@@ -93,6 +94,9 @@ public static class NativeRegionSelector
                     SetCursor(hCursorCross);
                     return (IntPtr)1;
 
+                case 0x0014: // WM_ERASEBKGND
+                    return (IntPtr)1;
+
                 case 0x0201: // WM_LBUTTONDOWN
                     isDragging = true;
                     GetCursorPos(out startPt); // Physische absolute Bildschirm-Koordinaten
@@ -158,11 +162,12 @@ public static class NativeRegionSelector
                         int h = rc.bottom - rc.top;
 
                         IntPtr memDC = CreateCompatibleDC(hdc);
-                        IntPtr memBmp = CreateCompatibleBitmap(hdc, w, h);
-                        IntPtr oldBmp = SelectObject(memDC, memBmp);
+                        IntPtr memBmp = memDC != IntPtr.Zero ? CreateCompatibleBitmap(hdc, w, h) : IntPtr.Zero;
+                        IntPtr oldBmp = memBmp != IntPtr.Zero ? SelectObject(memDC, memBmp) : IntPtr.Zero;
+                        IntPtr targetDC = memBmp != IntPtr.Zero ? memDC : hdc;
 
                         // 1. Hintergrund füllen (dunkles Overlay über gesamten Desktop)
-                        FillRect(memDC, ref rc, bgBrush);
+                        FillRect(targetDC, ref rc, bgBrush);
 
                         // 2. Info-Banner auf JEDEM Monitor zeichnen, damit er auf allen Displays sichtbar ist
                         int bannerW = 660;
@@ -178,31 +183,31 @@ public static class NativeRegionSelector
                             int bannerY = monClientTop + 28;
                             var bannerRc = new RECT { left = bannerX, top = bannerY, right = bannerX + bannerW, bottom = bannerY + bannerH };
 
-                            IntPtr oldBrush = SelectObject(memDC, bannerBrush);
-                            IntPtr oldPen = SelectObject(memDC, bannerBorderPen);
-                            RoundRect(memDC, bannerRc.left, bannerRc.top, bannerRc.right, bannerRc.bottom, 12, 12);
+                            IntPtr oldBrush = SelectObject(targetDC, bannerBrush);
+                            IntPtr oldPen = SelectObject(targetDC, bannerBorderPen);
+                            RoundRect(targetDC, bannerRc.left, bannerRc.top, bannerRc.right, bannerRc.bottom, 12, 12);
 
-                            SetBkMode(memDC, 1 /*TRANSPARENT*/);
+                            SetBkMode(targetDC, 1 /*TRANSPARENT*/);
 
                             // Titel
-                            SelectObject(memDC, hFontBold);
-                            SetTextColor(memDC, 0x00F8BD38); // Cyan BGR
+                            SelectObject(targetDC, hFontBold);
+                            SetTextColor(targetDC, 0x00F8BD38); // Cyan BGR
                             var titleRc = new RECT { left = bannerX + 16, top = bannerY + 10, right = bannerX + bannerW - 16, bottom = bannerY + 32 };
                             string monInfo = monitors.Count > 1 ? $" · Monitor {i + 1}/{monitors.Count} ({monW}x{m.bottom - m.top})" : $" · {monW}x{m.bottom - m.top}";
-                            DrawText(memDC, $"🎯 {targetTitle} auswählen{monInfo}", -1, ref titleRc, 0x00000001 /*DT_CENTER*/ | 0x00000004 /*DT_VCENTER*/ | 0x00000020 /*DT_SINGLELINE*/);
+                            DrawText(targetDC, $"🎯 {targetTitle} auswählen{monInfo}", -1, ref titleRc, 0x00000001 /*DT_CENTER*/ | 0x00000004 /*DT_VCENTER*/ | 0x00000020 /*DT_SINGLELINE*/);
 
                             // Instruktionen
-                            SelectObject(memDC, hFontRegular);
-                            SetTextColor(memDC, 0x00D0D0D0); // Weiß/Hellgrau
+                            SelectObject(targetDC, hFontRegular);
+                            SetTextColor(targetDC, 0x00D0D0D0); // Weiß/Hellgrau
                             var subRc = new RECT { left = bannerX + 16, top = bannerY + 34, right = bannerX + bannerW - 16, bottom = bannerY + 52 };
-                            DrawText(memDC, "Ziehe mit gedrückter linker Maustaste ein Rechteck auf einem beliebigen Monitor.", -1, ref subRc, 0x00000001 | 0x00000004 | 0x00000020);
+                            DrawText(targetDC, "Ziehe mit gedrückter linker Maustaste ein Rechteck auf einem beliebigen Monitor.", -1, ref subRc, 0x00000001 | 0x00000004 | 0x00000020);
 
-                            SetTextColor(memDC, 0x007171F8); // Rötlich/Orange
+                            SetTextColor(targetDC, 0x007171F8); // Rötlich/Orange
                             var keyRc = new RECT { left = bannerX + 16, top = bannerY + 54, right = bannerX + bannerW - 16, bottom = bannerY + 72 };
-                            DrawText(memDC, "[ESC] oder Rechtsklick: Abbrechen  ·  Nahtlos über alle Monitore aktiv", -1, ref keyRc, 0x00000001 | 0x00000004 | 0x00000020);
+                            DrawText(targetDC, "[ESC] oder Rechtsklick: Abbrechen  ·  Nahtlos über alle Monitore aktiv", -1, ref keyRc, 0x00000001 | 0x00000004 | 0x00000020);
 
-                            SelectObject(memDC, oldBrush);
-                            SelectObject(memDC, oldPen);
+                            SelectObject(targetDC, oldBrush);
+                            SelectObject(targetDC, oldPen);
                         }
 
                         // 3. Wenn gezogen wird: Markierungsrechteck + Abmessungen-Badge
@@ -219,35 +224,39 @@ public static class NativeRegionSelector
                                 int clientRx = rx - vX;
                                 int clientRy = ry - vY;
 
-                                SelectObject(memDC, dragFillBrush);
-                                SelectObject(memDC, cyanPen);
-                                Rectangle(memDC, clientRx, clientRy, clientRx + rw, clientRy + rh);
+                                SelectObject(targetDC, dragFillBrush);
+                                SelectObject(targetDC, cyanPen);
+                                Rectangle(targetDC, clientRx, clientRy, clientRx + rw, clientRy + rh);
 
                                 // Dimensions-Badge mit Echtzeit-Koordinaten
                                 string badgeText = $"{rw} × {rh} px  (X:{rx}, Y:{ry})";
-                                SelectObject(memDC, hFontBadge);
-                                SelectObject(memDC, badgeBgBrush);
-                                SelectObject(memDC, bannerBorderPen);
+                                SelectObject(targetDC, hFontBadge);
+                                SelectObject(targetDC, badgeBgBrush);
+                                SelectObject(targetDC, bannerBorderPen);
 
                                 int badgeW = 180;
                                 int badgeH = 24;
                                 int badgeX = clientRx;
                                 int badgeY = clientRy >= 32 ? (clientRy - badgeH - 4) : (clientRy + rh + 4);
 
-                                RoundRect(memDC, badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, 6, 6);
-                                SetTextColor(memDC, 0x00F8BD38);
+                                RoundRect(targetDC, badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, 6, 6);
+                                SetTextColor(targetDC, 0x00F8BD38);
                                 var badgeRc = new RECT { left = badgeX, top = badgeY, right = badgeX + badgeW, bottom = badgeY + badgeH };
-                                DrawText(memDC, badgeText, -1, ref badgeRc, 0x00000001 | 0x00000004 | 0x00000020);
+                                DrawText(targetDC, badgeText, -1, ref badgeRc, 0x00000001 | 0x00000004 | 0x00000020);
                             }
                         }
 
-                        // Backbuffer übertragen
-                        BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, 0x00CC0020 /*SRCCOPY*/);
-
-                        // Cleanup GDI Objektauswahl
-                        SelectObject(memDC, oldBmp);
-                        DeleteObject(memBmp);
-                        DeleteDC(memDC);
+                        // Backbuffer übertragen falls Double-Buffering aktiv
+                        if (memBmp != IntPtr.Zero)
+                        {
+                            BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, 0x00CC0020 /*SRCCOPY*/);
+                            SelectObject(memDC, oldBmp);
+                            DeleteObject(memBmp);
+                        }
+                        if (memDC != IntPtr.Zero)
+                        {
+                            DeleteDC(memDC);
+                        }
 
                         EndPaint(hWnd, ref ps);
                         return IntPtr.Zero;
@@ -280,8 +289,12 @@ public static class NativeRegionSelector
         ushort atom = RegisterClassEx(ref wndClass);
         if (atom == 0)
         {
-            Logger.Log($"NativeRegionSelector: RegisterClassEx fehlgeschlagen (Error: {Marshal.GetLastWin32Error()})");
-            return null;
+            int err = Marshal.GetLastWin32Error();
+            if (err != 1410)
+            {
+                Logger.Log($"NativeRegionSelector: RegisterClassEx fehlgeschlagen (Error: {err})");
+                return null;
+            }
         }
 
         try
@@ -306,7 +319,9 @@ public static class NativeRegionSelector
 
             // Halbtransparenter Hintergrund (~65% Deckkraft)
             SetLayeredWindowAttributes(hWnd, 0, 165, 0x00000002 /*LWA_ALPHA*/);
+            ShowWindow(hWnd, 5 /*SW_SHOW*/);
             SetWindowPos(hWnd, new IntPtr(-1) /*HWND_TOPMOST*/, vX, vY, vW, vH, 0x0040 /*SWP_SHOWWINDOW*/);
+            UpdateWindow(hWnd);
             SetForegroundWindow(hWnd);
             SetFocus(hWnd);
 
@@ -362,7 +377,7 @@ public static class NativeRegionSelector
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT { public int X; public int Y; public POINT(int x, int y) { X = x; Y = y; } }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WNDCLASSEX
     {
         public uint cbSize;
@@ -390,10 +405,10 @@ public static class NativeRegionSelector
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public byte[] rgbReserved;
     }
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern ushort RegisterClassEx([In] ref WNDCLASSEX lpwcx);
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool UnregisterClass(string lpClassName, IntPtr hInstance);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -403,6 +418,9 @@ public static class NativeRegionSelector
 
     [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern IntPtr DefWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern bool UpdateWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
     [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);

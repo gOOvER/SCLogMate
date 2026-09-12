@@ -47,6 +47,7 @@ public sealed class NativeScanIndicator : IDisposable
         {
             try
             {
+                try { SetThreadDpiAwarenessContext((IntPtr)(-4)); } catch { }
                 CreateWindowInstance();
                 readyEvent.Set();
 
@@ -70,6 +71,8 @@ public sealed class NativeScanIndicator : IDisposable
         readyEvent.Wait(2000);
     }
 
+    private WndProc? _wndProcDelegate;
+
     private void CreateWindowInstance()
     {
         string className = "SCLogMate_ScanIndicatorClass_" + Guid.NewGuid().ToString("N");
@@ -78,7 +81,7 @@ public sealed class NativeScanIndicator : IDisposable
         IntPtr font = CreateFont(11, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
         IntPtr blackBrush = CreateSolidBrush(0x00000000); // Reines Schwarz als Color-Key (100% transparent)
 
-        WndProc wndProcDelegate = (hWnd, msg, wParam, lParam) =>
+        _wndProcDelegate = (hWnd, msg, wParam, lParam) =>
         {
             switch (msg)
             {
@@ -98,24 +101,60 @@ public sealed class NativeScanIndicator : IDisposable
                         IntPtr oldPen = SelectObject(hdc, borderPen);
                         IntPtr oldBrush = SelectObject(hdc, GetStockObject(5 /*NULL_BRUSH*/));
 
-                        Rectangle(hdc, 1, 1, w, h);
+                        Rectangle(hdc, 0, 0, w, h);
 
-                        // 3. Titel-Badge oben links
+                        // 3. Ecken akzentuieren (4px dicke Eckmarkierungen für echten Sci-Fi-HUD-Look)
+                        IntPtr thickPen = CreatePen(0 /*PS_SOLID*/, 4, borderColor);
+                        SelectObject(hdc, thickPen);
+                        int cornerLen = Math.Min(16, Math.Min(w / 4, h / 4));
+
+                        // Oben links
+                        MoveToEx(hdc, 0, 0, IntPtr.Zero);
+                        LineTo(hdc, cornerLen, 0);
+                        MoveToEx(hdc, 0, 0, IntPtr.Zero);
+                        LineTo(hdc, 0, cornerLen);
+
+                        // Oben rechts
+                        MoveToEx(hdc, w - 1, 0, IntPtr.Zero);
+                        LineTo(hdc, w - 1 - cornerLen, 0);
+                        MoveToEx(hdc, w - 1, 0, IntPtr.Zero);
+                        LineTo(hdc, w - 1, cornerLen);
+
+                        // Unten links
+                        MoveToEx(hdc, 0, h - 1, IntPtr.Zero);
+                        LineTo(hdc, cornerLen, h - 1);
+                        MoveToEx(hdc, 0, h - 1, IntPtr.Zero);
+                        LineTo(hdc, 0, h - 1 - cornerLen);
+
+                        // Unten rechts
+                        MoveToEx(hdc, w - 1, h - 1, IntPtr.Zero);
+                        LineTo(hdc, w - 1 - cornerLen, h - 1);
+                        MoveToEx(hdc, w - 1, h - 1, IntPtr.Zero);
+                        LineTo(hdc, w - 1, h - 1 - cornerLen);
+
+                        // 4. Titel-Badge oben links
                         SelectObject(hdc, font);
-                        SetBkMode(hdc, 1 /*TRANSPARENT*/);
+                        SetBkMode(hdc, 2 /*OPAQUE*/);
+                        SetBkColor(hdc, 0x001A1009); // Dunkelblau-Schwarz
                         SetTextColor(hdc, borderColor);
-                        var textRc = new RECT { left = 6, top = 4, right = w - 6, bottom = 22 };
-                        DrawText(hdc, _isFlashing ? $"✓ {_title}" : _title, -1, ref textRc, 0x00000000 | 0x00000020);
 
+                        string text = $" {_title} ({w}×{h}) ";
+                        var textRc = new RECT { left = 4, top = 2, right = w - 4, bottom = 18 };
+                        DrawText(hdc, text, -1, ref textRc, 0x00000000 /*DT_LEFT*/ | 0x00000004 /*DT_VCENTER*/ | 0x00000020 /*DT_SINGLELINE*/);
+
+                        // Cleanup GDI
                         SelectObject(hdc, oldPen);
                         SelectObject(hdc, oldBrush);
                         DeleteObject(borderPen);
+                        DeleteObject(thickPen);
 
                         EndPaint(hWnd, ref ps);
                         return IntPtr.Zero;
                     }
 
                 case 0x0002: // WM_DESTROY
+                    DeleteObject(font);
+                    DeleteObject(blackBrush);
                     PostQuitMessage(0);
                     return IntPtr.Zero;
             }
@@ -127,12 +166,20 @@ public sealed class NativeScanIndicator : IDisposable
         {
             cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
             style = 0x0001 | 0x0002,
-            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(wndProcDelegate),
+            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
             hInstance = hInstance,
             lpszClassName = className
         };
 
-        RegisterClassEx(ref wndClass);
+        ushort atom = RegisterClassEx(ref wndClass);
+        if (atom == 0)
+        {
+            int err = Marshal.GetLastWin32Error();
+            if (err != 1410)
+            {
+                Logger.Log($"NativeScanIndicator: RegisterClassEx fehlgeschlagen (Error: {err})");
+            }
+        }
 
         // WS_EX_TRANSPARENT = Klicks gehen direkt durch an das Spiel
         // WS_EX_LAYERED = Unterstützt Color-Key-Transparenz
@@ -153,6 +200,10 @@ public sealed class NativeScanIndicator : IDisposable
         {
             // Schwarz (0x000000) ist transparent
             SetLayeredWindowAttributes(_hwnd, 0x00000000, 255, 0x00000001 /*LWA_COLORKEY*/);
+        }
+        else
+        {
+            Logger.Log($"NativeScanIndicator: CreateWindowEx fehlgeschlagen (Error: {Marshal.GetLastWin32Error()})");
         }
     }
 
@@ -243,7 +294,7 @@ public sealed class NativeScanIndicator : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int left, top, right, bottom; }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WNDCLASSEX
     {
         public uint cbSize;
@@ -271,8 +322,11 @@ public sealed class NativeScanIndicator : IDisposable
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public byte[] rgbReserved;
     }
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern ushort RegisterClassEx([In] ref WNDCLASSEX lpwcx);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool UnregisterClass(string lpClassName, IntPtr hInstance);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateWindowEx(
@@ -292,6 +346,7 @@ public sealed class NativeScanIndicator : IDisposable
     [DllImport("user32.dll")] private static extern IntPtr DispatchMessage([In] ref MSG lpMsg);
     [DllImport("user32.dll")] private static extern void PostQuitMessage(int nExitCode);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)] private static extern IntPtr GetModuleHandle(IntPtr lpModuleName);
 
     [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
@@ -300,8 +355,11 @@ public sealed class NativeScanIndicator : IDisposable
     [DllImport("gdi32.dll")] private static extern IntPtr CreatePen(int fnPenStyle, int nWidth, uint crColor);
     [DllImport("gdi32.dll")] private static extern bool Rectangle(IntPtr hdc, int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
     [DllImport("gdi32.dll")] private static extern IntPtr GetStockObject(int fnObject);
+    [DllImport("gdi32.dll")] private static extern bool MoveToEx(IntPtr hdc, int x, int y, IntPtr lpPoint);
+    [DllImport("gdi32.dll")] private static extern bool LineTo(IntPtr hdc, int x, int y);
     [DllImport("user32.dll")] private static extern int FillRect(IntPtr hDC, [In] ref RECT lprc, IntPtr hbr);
     [DllImport("gdi32.dll")] private static extern int SetBkMode(IntPtr hdc, int iBkMode);
+    [DllImport("gdi32.dll")] private static extern uint SetBkColor(IntPtr hdc, uint crColor);
     [DllImport("gdi32.dll")] private static extern uint SetTextColor(IntPtr hdc, uint crColor);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int DrawText(IntPtr hDC, string lpchText, int nCount, ref RECT lpRect, uint uFormat);
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr CreateFont(

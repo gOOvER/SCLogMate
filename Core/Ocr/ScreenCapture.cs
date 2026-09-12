@@ -25,6 +25,7 @@ public static class ScreenCapture
     [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
     [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int nIndex);
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
     private const int SM_CXSCREEN = 0;
     private const int SM_CYSCREEN = 1;
@@ -44,6 +45,8 @@ public static class ScreenCapture
     public static unsafe byte[]? Capture(int x, int y, int w, int h)
     {
         if (w <= 0 || h <= 0) return null;
+
+        try { SetThreadDpiAwarenessContext((IntPtr)(-4)); } catch { }
 
         var hdc = GetDC(IntPtr.Zero);
         if (hdc == IntPtr.Zero) return null;
