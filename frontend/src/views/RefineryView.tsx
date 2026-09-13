@@ -25,6 +25,7 @@ import {
   Zap,
   HelpCircle,
   Timer,
+  Copy,
 } from 'lucide-react';
 
 interface RefineryViewProps {
@@ -934,8 +935,21 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
               {/* Raw OCR Text Box */}
               {lastOcrText && (
                 <div className="mt-4 pt-3 border-t border-slate-800">
-                  <div className="text-[11px] text-slate-400 font-mono mb-1">Erfasster Rohtext:</div>
-                  <pre className="text-[11px] bg-slate-950 p-2.5 rounded border border-slate-800/80 text-slate-300 font-mono max-h-36 overflow-y-auto whitespace-pre-wrap">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-slate-400 font-mono">Erfasster Rohtext:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(lastOcrText);
+                        showToast('✓ Rohtext in Zwischenablage kopiert!');
+                      }}
+                      className="px-2 py-0.5 text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/80 transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Kopieren
+                    </button>
+                  </div>
+                  <pre className="text-[11px] bg-slate-950 p-2.5 rounded border border-slate-800/80 text-slate-300 font-mono max-h-36 overflow-y-auto whitespace-pre-wrap select-text cursor-text">
                     {lastOcrText}
                   </pre>
                 </div>

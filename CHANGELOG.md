@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Refinery Kiosk OCR Duration & Order Parsing (`Core/Ocr/RefineryParser.cs`, `Core/Photino/PhotinoBridge.cs`, `RefineryView.tsx`)**:
+  - Fixed a critical regex bug in `RefineryParser.TimeRemainingTextRegex` where purely optional groups matched empty string at position 0, permanently preventing remaining duration extraction (`02h 45m`, `1h 30m`, `45m`).
+  - Implemented unified `DurationRegex` supporting days, hours, minutes, seconds, and clock notation (`1d 04h 30m`, `02h 45m`, `45m 20s`, `01:23:45`, `02:15`).
+  - Added fallback parsing in `ParseKioskText` when refining methods (`Dinyx`, `Ferron`, `Cormack`, `Electrostatic`, `Pyroxeres`, `Thermite`), durations, or status lines (`Ready`, `Refining`, `Processing`) are present even if the exact material name was not cleanly recognized.
+  - Added `Borase`, `Inert Materials`, and mining minerals (`Hadranite`, `Aphorite`, `Dolivine`) to `KnownMaterials` and `NormalizeMaterial`.
+  - Added direct copy button (`📋 Kopieren`) and enabled text selection (`select-text cursor-text`) for the raw OCR text box in `RefineryView.tsx`.
+  - Added comprehensive diagnostic logging (`[Refinery-OCR]` and `[Refinery-OCR-Test]`) in `PhotinoBridge.cs` outputting capture dimensions, scan latency, raw OCR text, and parsed orders directly into `SCLogMate.debug.log`.
 - **mobiGlas aUEC OCR Balance Recognition & Engine Prioritization (`Core/Ocr/WalletOcrTrigger.cs`, `Core/Ocr/WalletCapture.cs`, `Core/Ocr/ChatOcrScanner.cs`, `Core/Ocr/RsOcrScanner.cs`)**:
   - Fixed a critical OCR parsing failure where mobiGlas balances with formatted separators were misread by Windows Media OCR as `%` or other symbols (e.g. `25%031` instead of `25,031`), which previously caused the parser to discard the first block and extract only the truncated tail `31` aUEC.
   - Implemented `ThousandsSeparatorRegex` in `WalletOcrTrigger.ExtractBalance` to normalize typical OCR misinterpretations of commas/periods (`%`, `'`, `;`, `:`, `_`, `-`, `~`, spaces) between 1-3 digit blocks and 3 digit blocks into standard dot notation (`25%031` -> `25.031` -> `25,031 aUEC`).

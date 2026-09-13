@@ -28,7 +28,8 @@ public static partial class RefineryParser
         "Quantanium", "Quantainium", "Bexalite", "Gold", "Taranite", "Larinite", "Laranite",
         "Agricium", "Hephaestanite", "Beryl", "Beryll", "Diamond", "Diamant", "Titanium",
         "Titan", "Tungsten", "Wolfram", "Corundum", "Korund", "Quartz", "Quarz", "Copper",
-        "Kupfer", "Iron", "Eisen", "Lindinium", "RMC", "Aluminium", "Aluminum"
+        "Kupfer", "Iron", "Eisen", "Lindinium", "RMC", "Aluminium", "Aluminum", "Borase",
+        "Inert Materials", "Inert Material", "Hadranite", "Aphorite", "Dolivine"
     };
 
     // Bekannte Veredelungsmethoden
@@ -46,11 +47,8 @@ public static partial class RefineryParser
     [GeneratedRegex(@"\b(\d+(?:[.,]\d+)?)\s*(?:cSCU|SCU|Units|Einheiten)\b", RegexOptions.IgnoreCase)]
     private static partial Regex QuantityRegex();
 
-    [GeneratedRegex(@"(?:(\d{1,2})\s*h(?:rs?)?)?\s*(?:(\d{1,2})\s*m(?:in)?)?\s*(?:(\d{1,2})\s*s(?:ec)?)?", RegexOptions.IgnoreCase)]
-    private static partial Regex TimeRemainingTextRegex();
-
-    [GeneratedRegex(@"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b")]
-    private static partial Regex TimeRemainingClockRegex();
+    [GeneratedRegex(@"\b(?:(?:(?<d>\d{1,2})\s*d(?:ays?)?\s*)?(?<h>\d{1,2})\s*(?:h|hrs?|std?)\b\s*(?:(?<m>\d{1,2})\s*(?:m|min)\b)?|(?<m>\d{1,2})\s*(?:m|min)\b\s*(?:(?<s>\d{1,2})\s*(?:s|sec)\b)?|(?<h>\d{1,2})[:.;](?<m>\d{2})(?:[:.;](?<s>\d{2}))?)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex DurationRegex();
 
     [GeneratedRegex(@"\b(\d{1,3}(?:[.,]\d{3})*|\d+)\s*(?:aUEC|UEC)\b", RegexOptions.IgnoreCase)]
     private static partial Regex CostRegex();
@@ -120,6 +118,34 @@ public static partial class RefineryParser
             }
         }
 
+        // 3. Fallback: Falls keine bekannten Erze explizit namentlich erkannt wurden, aber Methoden oder Zeiten vorhanden sind
+        if (results.Count == 0)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                bool hasMethod = KnownMethods.Any(m => m.Keywords.Any(k => line.Contains(k, StringComparison.OrdinalIgnoreCase)));
+                bool hasDuration = DurationRegex().IsMatch(line);
+                bool hasStatus = line.Contains("Ready", StringComparison.OrdinalIgnoreCase) ||
+                                 line.Contains("Bereit", StringComparison.OrdinalIgnoreCase) ||
+                                 line.Contains("Refining", StringComparison.OrdinalIgnoreCase) ||
+                                 line.Contains("Processing", StringComparison.OrdinalIgnoreCase);
+
+                if (hasMethod || hasDuration || hasStatus)
+                {
+                    int start = Math.Max(0, i - 1);
+                    int count = Math.Min(lines.Count - start, 4);
+                    string block = string.Join(" ", lines.GetRange(start, count));
+                    var res = ParseBlock(block, "Gemischtes Erz", defaultLocation);
+                    if (res != null)
+                    {
+                        results.Add(res);
+                        break;
+                    }
+                }
+            }
+        }
+
         return results;
     }
 
@@ -159,26 +185,16 @@ public static partial class RefineryParser
             }
         }
 
-        // Restzeit extrahieren (z. B. "02h 45m" oder "01:30:15")
+        // Restzeit extrahieren (z. B. "1d 02h 45m", "02h 45m", "45m" oder "01:30:15")
         int parsedSeconds = 0;
-        var clockMatch = TimeRemainingClockRegex().Match(block);
-        if (clockMatch.Success)
+        var durMatch = DurationRegex().Match(block);
+        if (durMatch.Success)
         {
-            int h = int.Parse(clockMatch.Groups[1].Value);
-            int m = int.Parse(clockMatch.Groups[2].Value);
-            int s = clockMatch.Groups[3].Success ? int.Parse(clockMatch.Groups[3].Value) : 0;
-            parsedSeconds = (h * 3600) + (m * 60) + s;
-        }
-        else
-        {
-            var textMatch = TimeRemainingTextRegex().Match(block);
-            if (textMatch.Success && (textMatch.Groups[1].Success || textMatch.Groups[2].Success))
-            {
-                int h = textMatch.Groups[1].Success ? int.Parse(textMatch.Groups[1].Value) : 0;
-                int m = textMatch.Groups[2].Success ? int.Parse(textMatch.Groups[2].Value) : 0;
-                int s = textMatch.Groups[3].Success ? int.Parse(textMatch.Groups[3].Value) : 0;
-                parsedSeconds = (h * 3600) + (m * 60) + s;
-            }
+            int d = durMatch.Groups["d"].Success && int.TryParse(durMatch.Groups["d"].Value, out int dv) ? dv : 0;
+            int h = durMatch.Groups["h"].Success && int.TryParse(durMatch.Groups["h"].Value, out int hv) ? hv : 0;
+            int m = durMatch.Groups["m"].Success && int.TryParse(durMatch.Groups["m"].Value, out int mv) ? mv : 0;
+            int s = durMatch.Groups["s"].Success && int.TryParse(durMatch.Groups["s"].Value, out int sv) ? sv : 0;
+            parsedSeconds = (d * 86400) + (h * 3600) + (m * 60) + s;
         }
 
         if (parsedSeconds > 0)
@@ -258,6 +274,7 @@ public static partial class RefineryParser
         if (raw.Equals("Eisen", StringComparison.OrdinalIgnoreCase)) return "Iron";
         if (raw.Equals("Wolfram", StringComparison.OrdinalIgnoreCase)) return "Tungsten";
         if (raw.Equals("Titan", StringComparison.OrdinalIgnoreCase)) return "Titanium";
+        if (raw.StartsWith("Inert", StringComparison.OrdinalIgnoreCase)) return "Inert Materials";
         return raw;
     }
 }

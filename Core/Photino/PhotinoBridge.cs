@@ -5129,6 +5129,7 @@ public class PhotinoBridge
             sw.Stop();
             var locName = GetHudTelemetry(_selectedSession).LocationName;
             var parsed = RefineryParser.ParseKioskText(text ?? "", locName);
+            Logger.Log($"[Refinery-OCR-Test] Region={region.Width}x{region.Height}@({region.X},{region.Y}) in {sw.ElapsedMilliseconds}ms: {parsed.Count} Aufträge geparst. Rohtext:\n{text?.Trim()}");
             return new OcrTestResultDto
             {
                 Success = !string.IsNullOrWhiteSpace(text),
@@ -5213,9 +5214,11 @@ public class PhotinoBridge
             return new { success = false, error = "Bildschirm konnte nicht erfasst werden" };
         }
 
+        Logger.Log($"[Refinery-OCR] Kiosk-Scan gestartet für Region {region.Width}x{region.Height} @ ({region.X},{region.Y})...");
         var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 12);
         var locName = GetHudTelemetry(_selectedSession).LocationName;
         var parsed = RefineryParser.ParseKioskText(text ?? "", locName);
+        Logger.Log($"[Refinery-OCR] Text erkannt ({text?.Length ?? 0} Zeichen). {parsed.Count} Aufträge geparst:\n{text?.Trim()}");
 
         int savedCount = 0;
         var existing = Database.GetMiningHauls();
