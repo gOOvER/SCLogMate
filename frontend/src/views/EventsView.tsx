@@ -334,7 +334,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 <option value="__all__">🌐 Alle Sitzungen (Gesamthistorie)</option>
                 {sessions.map((s) => (
                   <option key={s.id || s.name} value={s.name}>
-                    📁 {s.name} ({s.startTime} · {s.duration})
+                    📁 {s.name} ({s.startTime} · {s.playTime && s.playTime !== '0m' ? `${s.playTime} In-Game` : s.duration}{s.crew && s.crew.length > 0 ? ` · 👥 ${s.crew.length}` : ''})
                   </option>
                 ))}
               </select>

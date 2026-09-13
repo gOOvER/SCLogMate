@@ -108,6 +108,12 @@ export interface SessionSummary {
   startTime: string;
   endTime: string;
   duration: string;
+  playTime?: string;
+  menuTime?: string;
+  playTimeSeconds?: number;
+  menuTimeSeconds?: number;
+  netPerHour?: number;
+  crew?: string[];
   income: number;
   spend: number;
   net: number;
@@ -394,6 +400,7 @@ export interface FlightRecorderDto {
   visitedBodies: string[];
   usedShips: string[];
   shipStats?: FlightShipStatDto[];
+  crew?: string[];
   timeline: FlightTimelineItemDto[];
 }
 

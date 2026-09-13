@@ -49,8 +49,11 @@ public partial class LogParser
     [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::OnQuantumDriveArrived")]
     private static partial Regex QtArriveRegex();
 
-    [GeneratedRegex(@"Added notification ""You have joined channel '(?<ship>[^':]+?)\s*:\s*(?<user>[^']+)'")]
-    private static partial Regex ShipChannelJoinRegex();
+    [GeneratedRegex(@"gamerules=""(?<gr>[^""]+)""", RegexOptions.Compiled)]
+    private static partial Regex GamerulesRegex();
+
+    [GeneratedRegex(@"Loading screen for (?<screen>[^:]+)\s*:\s*(?<rules>\S+)\s+closed after", RegexOptions.Compiled)]
+    private static partial Regex LoadingScreenClosedRegex();
 
     [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::(?:CalculateRoute|OnPlayerRequestFuelToQuantumTarget|OnPlayerSelectedQuantumTarget)")]
     private static partial Regex ItemNavShipRegex();
@@ -517,10 +520,81 @@ public partial class LogParser
     /// <summary>Anzahl verworfener Transferköpfe ohne folgende Betragszeile.</summary>
     public int ExpiredPendingTransfers { get; private set; }
 
+    private DateTime? _firstTime;
     private DateTime? _lastSeenTime;
     private bool? _lastArmisticeActive;
     private DateTime _lastArmisticeChangeTime = DateTime.MinValue;
     private const double ArmisticeDebounceSeconds = 4.0;
+
+    // Gamerules & In-Game vs. Menu Zeit-Tracking
+    private string? _currentRules;
+    private DateTime? _rulesSince;
+    private TimeSpan _inGameDuration = TimeSpan.Zero;
+    private TimeSpan _menuDuration = TimeSpan.Zero;
+
+    public TimeSpan InGameTime => CalculateInGameTime();
+    public TimeSpan MenuTime => CalculateMenuTime();
+    public string? CurrentGameRules => _currentRules;
+
+    private static bool IsMenuRules(string rules) =>
+        rules.Equals("SC_Frontend", StringComparison.OrdinalIgnoreCase);
+
+    private void SwitchGameRules(string rules, DateTime at)
+    {
+        if (string.IsNullOrWhiteSpace(rules)) return;
+
+        if (_currentRules == null)
+        {
+            _currentRules = rules;
+            _rulesSince = at;
+            LocationMachine.ApplyGameRules(rules, at);
+            return;
+        }
+
+        if (_currentRules.Equals(rules, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        AccrueRules(_currentRules, at - (_rulesSince ?? at));
+        _currentRules = rules;
+        _rulesSince = at;
+        LocationMachine.ApplyGameRules(rules, at);
+    }
+
+    private void AccrueRules(string rules, TimeSpan span)
+    {
+        if (span <= TimeSpan.Zero) return;
+        if (IsMenuRules(rules))
+            _menuDuration += span;
+        else
+            _inGameDuration += span;
+    }
+
+    private TimeSpan CalculateInGameTime()
+    {
+        var total = _inGameDuration;
+        if (_currentRules != null && !IsMenuRules(_currentRules) && _rulesSince.HasValue && _lastSeenTime.HasValue && _lastSeenTime.Value > _rulesSince.Value)
+        {
+            total += (_lastSeenTime.Value - _rulesSince.Value);
+        }
+        return total;
+    }
+
+    private TimeSpan CalculateMenuTime()
+    {
+        var total = _menuDuration;
+        if (_currentRules != null && IsMenuRules(_currentRules) && _rulesSince.HasValue && _lastSeenTime.HasValue && _lastSeenTime.Value > _rulesSince.Value)
+        {
+            total += (_lastSeenTime.Value - _rulesSince.Value);
+        }
+        return total;
+    }
+
+    // Multi-Crew & Ship-Channel Tracking
+    private readonly HashSet<string> _crewMembers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _currentShipCrew = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlySet<string> CrewMembers => _crewMembers;
+    public IReadOnlySet<string> CurrentShipCrew => _currentShipCrew;
+    public string? CurrentShipOwner { get; private set; }
 
     public LogEntry? Feed(string line)
     {
@@ -533,10 +607,34 @@ public partial class LogParser
                     DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dtParsed))
             {
                 _lastSeenTime = dtParsed;
+                if (!_firstTime.HasValue) _firstTime = dtParsed;
             }
         }
 
         CaptureMeta(line);
+
+        // Gamerules Auswertung (Menü / Queue vs. In-Game)
+        if (line.Contains("gamerules=\"", StringComparison.OrdinalIgnoreCase))
+        {
+            var grMatch = GamerulesRegex().Match(line);
+            if (grMatch.Success && _lastSeenTime.HasValue)
+            {
+                SwitchGameRules(grMatch.Groups["gr"].Value, _lastSeenTime.Value);
+            }
+        }
+        else if (line.Contains("Loading screen for ", StringComparison.OrdinalIgnoreCase) && line.Contains("closed after", StringComparison.OrdinalIgnoreCase))
+        {
+            var lsMatch = LoadingScreenClosedRegex().Match(line);
+            if (lsMatch.Success && _lastSeenTime.HasValue)
+            {
+                var rules = lsMatch.Groups["rules"].Value;
+                if (!rules.Equals("SC_Frontend", StringComparison.OrdinalIgnoreCase))
+                {
+                    SwitchGameRules(rules, _lastSeenTime.Value);
+                }
+            }
+        }
+
         bool isNotif = line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase);
 
         // Kiosk-Kaufbestätigung (Shop Flow Response)
@@ -995,6 +1093,42 @@ public partial class LogParser
 
         if (isNotif)
         {
+            var note = ShipChannel.Read(ParseTs(line), line);
+            if (note != null)
+            {
+                _lastShip = note.Ship;
+                if (note.Moment == ChannelMoment.YouBoarded)
+                {
+                    CurrentShipOwner = note.Owner;
+                    _currentShipCrew.Clear();
+                    bool isMyShip = string.Equals(note.Owner, LocalHandle, StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase);
+                    string desc = isMyShip
+                        ? $"Eigenes Schiff betreten: {note.Ship}"
+                        : $"Schiff betreten: {note.Ship} (Eigner: {note.Owner})";
+                    return new LogEntry { Time = note.At, Kind = EventKind.Vehicle, Detail = desc, Ship = note.Ship };
+                }
+                else if (note.Moment == ChannelMoment.TheyBoarded)
+                {
+                    if (!string.IsNullOrEmpty(note.Handle))
+                    {
+                        _crewMembers.Add(note.Handle);
+                        _currentShipCrew.Add(note.Handle);
+                    }
+                    string desc = $"Besatzung: {note.Handle} ist an Bord der {note.Ship} (Eigner: {note.Owner})";
+                    return new LogEntry { Time = note.At, Kind = EventKind.Party, Detail = desc, Ship = note.Ship };
+                }
+                else if (note.Moment == ChannelMoment.TheyLeft)
+                {
+                    if (!string.IsNullOrEmpty(note.Handle))
+                    {
+                        _currentShipCrew.Remove(note.Handle);
+                    }
+                    string desc = $"Besatzung: {note.Handle} hat die {note.Ship} verlassen";
+                    return new LogEntry { Time = note.At, Kind = EventKind.Party, Detail = desc, Ship = note.Ship };
+                }
+            }
+
             var gn = GenericNotificationRegex().Match(line);
             if (gn.Success)
             {
@@ -1349,17 +1483,6 @@ public partial class LogParser
             }
         }
 
-        if (isNotif)
-        {
-            var scj = ShipChannelJoinRegex().Match(line);
-            if (scj.Success)
-            {
-                var rawShip = scj.Groups["ship"].Value.Trim();
-                var ship = Ships.Prettify(rawShip);
-                _lastShip = ship;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = ship, Ship = ship };
-            }
-        }
 
         if (line.Contains("CSCItemNavigation::", StringComparison.Ordinal))
         {

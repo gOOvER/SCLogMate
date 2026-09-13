@@ -16,8 +16,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 22; // Erhöhen bei Tabellen- oder Spalten-Änderungen
-    public const int CurrentParserVersion = 34; // Erhöhen, wenn der LogParser neue Felder/Events liefert
+    public const int CurrentSchemaVersion = 23; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentParserVersion = 35; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }
@@ -547,6 +547,23 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v22 (user_pois 3D Koordinaten & mining_hauls) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 23)
+        {
+            try
+            {
+                try { Exec(db, "ALTER TABLE sessions ADD COLUMN play_time_seconds INTEGER DEFAULT 0;"); } catch { }
+                try { Exec(db, "ALTER TABLE sessions ADD COLUMN menu_time_seconds INTEGER DEFAULT 0;"); } catch { }
+                try { Exec(db, "ALTER TABLE sessions ADD COLUMN crew TEXT;"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v23 (sessions play_time, menu_time & crew)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 23;");
+            dbSchemaVersion = 23;
+            Logger.Log("DB Schema: Migration auf v23 (sessions play_time, menu_time & crew) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -689,7 +706,7 @@ public static class Database
                     using (var s = db.CreateCommand())
                     {
                         s.Transaction = tx;
-                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version) VALUES($n,$st,$en,$f,$pi,$sh,$v)";
+                        s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version,play_time_seconds,menu_time_seconds,crew) VALUES($n,$st,$en,$f,$pi,$sh,$v,$pt,$mt,$cr)";
                         s.Parameters.AddWithValue("$n", name);
                         s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                         s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
@@ -697,6 +714,9 @@ public static class Database
                         s.Parameters.AddWithValue("$pi", (object?)parser.Meta.GetValueOrDefault("character") ?? DBNull.Value);
                         s.Parameters.AddWithValue("$sh", (object?)parser.Meta.GetValueOrDefault("shard") ?? DBNull.Value);
                         s.Parameters.AddWithValue("$v", (object?)parser.Meta.GetValueOrDefault("version") ?? DBNull.Value);
+                        s.Parameters.AddWithValue("$pt", (long)parser.InGameTime.TotalSeconds);
+                        s.Parameters.AddWithValue("$mt", (long)parser.MenuTime.TotalSeconds);
+                        s.Parameters.AddWithValue("$cr", parser.CrewMembers.Count > 0 ? (object)string.Join(", ", parser.CrewMembers) : DBNull.Value);
                         s.ExecuteNonQuery();
                     }
                     tx.Commit();
@@ -802,7 +822,7 @@ public static class Database
                         using (var s = db.CreateCommand())
                         {
                             s.Transaction = tx;
-                            s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version) VALUES($n,$st,$en,$f,$pi,$sh,$v)";
+                            s.CommandText = "INSERT OR REPLACE INTO sessions(name,start,end,fingerprint,pilot,shard,version,play_time_seconds,menu_time_seconds,crew) VALUES($n,$st,$en,$f,$pi,$sh,$v,$pt,$mt,$cr)";
                             s.Parameters.AddWithValue("$n", name);
                             s.Parameters.AddWithValue("$st", (object?)first?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
                             s.Parameters.AddWithValue("$en", (object?)last?.ToString("o", CultureInfo.InvariantCulture) ?? DBNull.Value);
@@ -810,6 +830,9 @@ public static class Database
                             s.Parameters.AddWithValue("$pi", (object?)parser.Meta.GetValueOrDefault("character") ?? DBNull.Value);
                             s.Parameters.AddWithValue("$sh", (object?)parser.Meta.GetValueOrDefault("shard") ?? DBNull.Value);
                             s.Parameters.AddWithValue("$v", (object?)parser.Meta.GetValueOrDefault("version") ?? DBNull.Value);
+                            s.Parameters.AddWithValue("$pt", (long)parser.InGameTime.TotalSeconds);
+                            s.Parameters.AddWithValue("$mt", (long)parser.MenuTime.TotalSeconds);
+                            s.Parameters.AddWithValue("$cr", parser.CrewMembers.Count > 0 ? (object)string.Join(", ", parser.CrewMembers) : DBNull.Value);
                             s.ExecuteNonQuery();
                         }
                         tx.Commit();

@@ -107,6 +107,24 @@ public class SessionSummaryDto
 
     [JsonPropertyName("lastLocation")]
     public string LastLocation { get; set; } = "";
+
+    [JsonPropertyName("playTime")]
+    public string PlayTime { get; set; } = "";
+
+    [JsonPropertyName("menuTime")]
+    public string MenuTime { get; set; } = "";
+
+    [JsonPropertyName("playTimeSeconds")]
+    public long PlayTimeSeconds { get; set; }
+
+    [JsonPropertyName("menuTimeSeconds")]
+    public long MenuTimeSeconds { get; set; }
+
+    [JsonPropertyName("netPerHour")]
+    public long NetPerHour { get; set; }
+
+    [JsonPropertyName("crew")]
+    public List<string> Crew { get; set; } = new();
 }
 
 public class LogEventDto
@@ -637,6 +655,7 @@ public class FlightRecorderDto
     [JsonPropertyName("visitedBodies")] public List<string> VisitedBodies { get; set; } = new();
     [JsonPropertyName("usedShips")] public List<string> UsedShips { get; set; } = new();
     [JsonPropertyName("shipStats")] public List<FlightShipStatDto> ShipStats { get; set; } = new();
+    [JsonPropertyName("crew")] public List<string> Crew { get; set; } = new();
     [JsonPropertyName("timeline")] public List<FlightTimelineItemDto> Timeline { get; set; } = new();
 }
 
@@ -3322,10 +3341,13 @@ public class PhotinoBridge
                        COUNT(CASE WHEN e.kind = 'MedBed' THEN 1 END) AS deaths,
                        COUNT(CASE WHEN e.kind IN ('Mission', 'MissionDone') THEN 1 END) AS missions,
                        (SELECT e2.detail FROM events e2 WHERE e2.session = s.name AND e2.kind = 'Location' ORDER BY e2.time DESC LIMIT 1) AS last_loc,
-                       GROUP_CONCAT(DISTINCT e.ship) AS ships
+                       GROUP_CONCAT(DISTINCT e.ship) AS ships,
+                       COALESCE(s.play_time_seconds, 0) AS play_time_seconds,
+                       COALESCE(s.menu_time_seconds, 0) AS menu_time_seconds,
+                       s.crew
                 FROM sessions s
                 LEFT JOIN events e ON e.session = s.name
-                GROUP BY s.name, s.start, s.end
+                GROUP BY s.name, s.start, s.end, s.play_time_seconds, s.menu_time_seconds, s.crew
                 ORDER BY s.start DESC
                 LIMIT 50;";
 
@@ -3347,6 +3369,9 @@ public class PhotinoBridge
                 int missions = reader.GetInt32(8);
                 string lastLoc = reader.IsDBNull(9) ? "—" : reader.GetString(9);
                 string? shipsRaw = reader.IsDBNull(10) ? null : reader.GetString(10);
+                long playSec = reader.IsDBNull(11) ? 0 : reader.GetInt64(11);
+                long menuSec = reader.IsDBNull(12) ? 0 : reader.GetInt64(12);
+                string? crewRaw = reader.IsDBNull(13) ? null : reader.GetString(13);
 
                 DateTime.TryParse(startStr, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var st);
                 DateTime.TryParse(endStr, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var en);
@@ -3356,9 +3381,28 @@ public class PhotinoBridge
                     ? $"{(int)dur.TotalHours}h {dur.Minutes}m"
                     : $"{dur.Minutes}m";
 
+                var playSpan = TimeSpan.FromSeconds(playSec);
+                var menuSpan = TimeSpan.FromSeconds(menuSec);
+
+                string playStr = playSpan.TotalHours >= 1
+                    ? $"{(int)playSpan.TotalHours}h {playSpan.Minutes:D2}m"
+                    : $"{playSpan.Minutes}m";
+
+                string menuStr = menuSpan.TotalHours >= 1
+                    ? $"{(int)menuSpan.TotalHours}h {menuSpan.Minutes:D2}m"
+                    : $"{menuSpan.Minutes}m";
+
                 var shipsList = !string.IsNullOrEmpty(shipsRaw)
                     ? shipsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
                     : new List<string>();
+
+                var crewList = !string.IsNullOrEmpty(crewRaw)
+                    ? crewRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+                    : new List<string>();
+
+                long netVal = inc - spd;
+                double effectiveHours = playSpan.TotalHours > 0.05 ? playSpan.TotalHours : dur.TotalHours;
+                long netPerHour = effectiveHours > 0.05 ? (long)(netVal / effectiveHours) : 0;
 
                 list.Add(new SessionSummaryDto
                 {
@@ -3367,14 +3411,20 @@ public class PhotinoBridge
                     StartTime = st != DateTime.MinValue ? st.ToLocalTime().ToString("dd.MM. HH:mm") : "—",
                     EndTime = en != DateTime.MinValue ? en.ToLocalTime().ToString("HH:mm") : "—",
                     Duration = durStr,
+                    PlayTime = playStr,
+                    MenuTime = menuStr,
+                    PlayTimeSeconds = playSec,
+                    MenuTimeSeconds = menuSec,
+                    NetPerHour = netPerHour,
                     Income = inc,
                     Spend = spd,
-                    Net = inc - spd,
+                    Net = netVal,
                     Sales = sal,
                     Trade = trd,
                     Deaths = deaths,
                     Missions = missions,
                     Ships = shipsList,
+                    Crew = crewList,
                     LastLocation = lastLoc,
                 });
             }
@@ -4634,8 +4684,55 @@ public class PhotinoBridge
         var totalSeatSpan = TimeSpan.FromMinutes(totalSeatMinutes);
         string seatDurText = $"{(int)totalSeatSpan.TotalHours}h {totalSeatSpan.Minutes:D2}m";
 
-        var totalMenuSpan = TimeSpan.FromMinutes(Math.Min(duration.TotalMinutes * 0.15, 45));
-        var inGameSpan = duration > totalMenuSpan ? duration - totalMenuSpan : duration;
+        long measuredPlaySeconds = 0;
+        long measuredMenuSeconds = 0;
+        var crewList = new List<string>();
+
+        try
+        {
+            using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT play_time_seconds, menu_time_seconds, crew FROM sessions WHERE name = $n LIMIT 1;";
+            cmd.Parameters.AddWithValue("$n", target != "__live__" && target != "__all__" ? target : (_activeSessionName ?? "Game.log"));
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                measuredPlaySeconds = r.IsDBNull(0) ? 0 : r.GetInt64(0);
+                measuredMenuSeconds = r.IsDBNull(1) ? 0 : r.GetInt64(1);
+                string? crewRaw = r.IsDBNull(2) ? null : r.GetString(2);
+                if (!string.IsNullOrWhiteSpace(crewRaw))
+                {
+                    crewList.AddRange(crewRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                }
+            }
+        }
+        catch { }
+
+        // Falls aus Events weitere Besatzungsmitglieder hervorgehen
+        foreach (var ev in flightEvents.Where(e => e.Kind == EventKind.Party && e.Detail?.StartsWith("Besatzung:") == true))
+        {
+            var parts = ev.Detail!.Split(' ');
+            if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]) && !crewList.Contains(parts[1], StringComparer.OrdinalIgnoreCase))
+            {
+                crewList.Add(parts[1]);
+            }
+        }
+
+        TimeSpan inGameSpan;
+        TimeSpan totalMenuSpan;
+
+        if (measuredPlaySeconds > 0 || measuredMenuSeconds > 0)
+        {
+            inGameSpan = TimeSpan.FromSeconds(measuredPlaySeconds);
+            totalMenuSpan = TimeSpan.FromSeconds(measuredMenuSeconds);
+        }
+        else
+        {
+            totalMenuSpan = TimeSpan.FromMinutes(Math.Min(duration.TotalMinutes * 0.15, 45));
+            inGameSpan = duration > totalMenuSpan ? duration - totalMenuSpan : duration;
+        }
+
         string inGameDurText = $"{(int)inGameSpan.TotalHours}h {inGameSpan.Minutes:D2}m";
         string menuDurText = $"{(int)totalMenuSpan.TotalHours}h {totalMenuSpan.Minutes:D2}m";
 
@@ -4662,6 +4759,7 @@ public class PhotinoBridge
             VisitedBodies = bodies.ToList(),
             UsedShips = ships,
             ShipStats = shipStatsList,
+            Crew = crewList.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Timeline = timeline.OrderByDescending(t => t.Time).Take(150).ToList()
         };
     }

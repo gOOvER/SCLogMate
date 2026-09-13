@@ -252,6 +252,19 @@ export const BlackboxView: React.FC = () => {
               <span className="text-slate-500">Keine</span>
             )}
           </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500 font-mono">Besatzung:</span>
+            {data?.crew && data.crew.length > 0 ? (
+              data.crew.map((c) => (
+                <span key={c} className="px-2 py-0.5 rounded bg-indigo-950/40 border border-indigo-500/40 text-indigo-300 font-mono text-[11px] flex items-center gap-1">
+                  <span>👥</span> {c}
+                </span>
+              ))
+            ) : (
+              <span className="text-slate-500 font-mono">Solo</span>
+            )}
+          </div>
         </div>
 
         {/* Filter Pills */}

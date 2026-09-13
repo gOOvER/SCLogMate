@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Multi-Crew & Ship Channel Tracking (`Core/ShipChannel.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`)**:
+  - Implemented robust ship communication channel parser extracting ship names, ship owners, and aboard crew members across both English and German log formats.
+  - Distinguishes player boarding own ship vs. player boarding another pilot's ship (`ChannelMoment.YouBoarded`).
+  - Tracks other crew members boarding or leaving the ship (`ChannelMoment.TheyBoarded`, `ChannelMoment.TheyLeft`).
+  - Added crew manifest tracking to `LogParser` and exposed session crew lists in `SessionSummaryDto` and `FlightRecorderDto`.
+  - Added crew badges and multi-crew counts in `BlackboxView` and `EventsView`.
+- **True In-Game vs. Menu & Queue Time Separation (`Core/LogParser.cs`, `Core/Database.cs`, `PhotinoBridge.cs`)**:
+  - Integrated parsing of `gamerules="SC_Frontend"` (main menu, server queue, loading screens) vs. `gamerules="SC_Default"` (active Persistent Universe flight and gameplay).
+  - Accurately tracks accumulated in-game flight time (`play_time_seconds`) and menu/queue time (`menu_time_seconds`) without double-counting on live rebuilds.
+  - Replaced legacy proportional 15% menu estimation formula in `FlightRecorderDto` with genuine measured in-game vs. menu metrics.
+  - Updated net profit per hour (`netPerHour`) calculation to evaluate against real active in-game playtime rather than queue waiting time.
+  - Added database schema migration v23 (`sessions` columns `play_time_seconds`, `menu_time_seconds`, `crew`) and bumped parser version to v35 for automatic re-indexing.
 - **Intelligent Location State Machine & Multi-Signal Fusion (`Core/LocationStateMachine.cs`)**:
   - Implemented a multi-tier `LocationStateMachine` architecture fusing strong signals (local inventory requests = `High`), medium signals (quantum arrival, hangar assignment, armistice zones = `Medium`), and weak signals (client spawned = `Low`).
   - Added confidence tracking (`None`, `Low`, `Medium`, `High`), in-game vs. menu separation (`SC_Frontend` vs. `SC_Default`), and location change history logging.
