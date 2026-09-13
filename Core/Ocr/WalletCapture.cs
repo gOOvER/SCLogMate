@@ -65,7 +65,7 @@ public sealed class WalletCapture : IDisposable
         var raw = ScreenCapture.Capture(capX, capY, capW, capH);
         if (raw == null) return null;
 
-        int optScale = capH >= 100 ? 1 : (capH >= 45 ? 2 : 3);
+        int optScale = capH <= 65 ? 5 : (capH <= 110 ? 3 : (capH <= 180 ? 2 : 1));
         var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: optScale, padding: 24, boostContrast: false).ConfigureAwait(false);
         var bestText = WalletOcrTrigger.BestRead(invText, plainText);
         var balance = WalletOcrTrigger.ExtractBalance(bestText ?? invText ?? plainText);
@@ -138,7 +138,7 @@ public sealed class WalletCapture : IDisposable
                     continue;
                 }
 
-                int optScale = capH >= 100 ? 1 : (capH >= 45 ? 2 : 3);
+                int optScale = capH <= 65 ? 5 : (capH <= 110 ? 3 : (capH <= 180 ? 2 : 1));
                 var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: optScale, padding: 24, boostContrast: false).ConfigureAwait(false);
                 var bestText = WalletOcrTrigger.BestRead(invText, plainText);
                 var balance = WalletOcrTrigger.ExtractBalance(bestText);
@@ -156,6 +156,10 @@ public sealed class WalletCapture : IDisposable
                         return;
                     }
                     seen.Add(val);
+                }
+                else
+                {
+                    Logger.Log($"OCR Grab {grab}: Inv='{invText?.Trim()}', Plain='{plainText?.Trim()}'");
                 }
 
                 await Task.Delay(balance is null ? RetrySpacing : GrabSpacing, ct).ConfigureAwait(false);

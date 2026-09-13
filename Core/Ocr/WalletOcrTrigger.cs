@@ -20,12 +20,12 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"\b\d{1,2}:\d{2}(?::\d{2})?\b")]
     private static partial Regex ClockRegex();
 
-    [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥ÄäÅå©®]")]
+    [GeneratedRegex(@"(?i)\baUEC\b|(?i)\bUEC\b|(?i)\bSCU\b|(?i)\bSC\b|(?i)\bSc:?|\b[xX]:?|[\u00A4\$€£¥ÄäÅå©®]")]
     private static partial Regex CurrencyLabelRegex();
 
-    // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, Leerzeichen o.ä. fehlinterpretiert werden
+    // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, v, Leerzeichen o.ä. fehlinterpretiert werden
     // z.B. "25%031" -> "25.031", "25'031" -> "25.031", "1 250 000" -> "1.250.000", "1%250%031" -> "1.250.031"
-    [GeneratedRegex(@"(?<=\b\d{1,3})\s*[,.'’`´;:_%~|\-]\s*(?=\d{3}\b)")]
+    [GeneratedRegex(@"(?<=\b\d{1,3})\s*[,.'’`´;:_%~|\-vV]\s*(?=\d{3}\b)")]
     private static partial Regex ThousandsSeparatorRegex();
 
     [GeneratedRegex(@"[+*~|/\\()\[\]{}%^$#@!?;:_=]")]

@@ -133,7 +133,7 @@ public sealed class OcrEngineService : IDisposable
         // Adaptiver Skalierungsfaktor: Zeilenhöhe sollte für Windows.Media.Ocr optimal im Bereich ~35px bis ~90px liegen.
         // Zu hohe Skalierung (z.B. scale=6 bei 144px Bildhöhe) erzeugt Treppeneffekte und deformiert kursive Ziffern (z.B. 8, wird zu 4).
         int maxDim = Math.Max(w, h);
-        while (scale > 1 && (h * scale > 240 || (maxDim * scale + padding * 2) > 2600))
+        while (scale > 1 && (h * scale > 450 || (maxDim * scale + padding * 2) > 2600))
         {
             scale--;
         }
@@ -143,68 +143,103 @@ public sealed class OcrEngineService : IDisposable
             padding = Math.Max(0, (2600 - maxDim * scale) / 2);
         }
 
-        outW = w * scale + padding * 2;
-        outH = h * scale + padding * 2;
+        int targetW = w * scale;
+        int targetH = h * scale;
+        outW = targetW + padding * 2;
+        outH = targetH + padding * 2;
 
         var output = new byte[outW * outH * 4];
         Array.Fill(output, invert ? (byte)255 : (byte)0);
 
-        for (int sy = 0; sy < h; sy++)
+        if (scale == 1)
         {
-            int srcRow = (sy * step) * origW * 4;
-            for (int sx = 0; sx < w; sx++)
+            for (int sy = 0; sy < h; sy++)
             {
-                int src = srcRow + ((sx * step) * 4);
+                int srcRow = (sy * step) * origW * 4;
+                int dstRow = ((sy + padding) * outW + padding) * 4;
+                for (int sx = 0; sx < w; sx++)
+                {
+                    int src = srcRow + ((sx * step) * 4);
+                    int dst = dstRow + (sx * 4);
 
-                byte ib, ig, ir;
-                if (!boostContrast)
-                {
-                    // Clean invert/plain without contrast saturation (NexusApp calibrated for mobiGlas text)
-                    ib = invert ? (byte)(255 - bgra[src]) : bgra[src];
-                    ig = invert ? (byte)(255 - bgra[src + 1]) : bgra[src + 1];
-                    ir = invert ? (byte)(255 - bgra[src + 2]) : bgra[src + 2];
-                }
-                else
-                {
-                    // NexusApp Standard: Invert/boost contrast ×1.4 so ambiguous mid-gray pixels
-                    // are pushed cleanly toward white/black while preserving smooth anti-aliasing
-                    // (vital for Windows OCR to recognize 6/8/9/0 correctly).
-                    if (invert)
-                    {
-                        ib = (byte)Math.Min(255, (255 - bgra[src]) * 14 / 10);
-                        ig = (byte)Math.Min(255, (255 - bgra[src + 1]) * 14 / 10);
-                        ir = (byte)Math.Min(255, (255 - bgra[src + 2]) * 14 / 10);
-                    }
-                    else
-                    {
-                        ib = (byte)Math.Min(255, bgra[src] * 14 / 10);
-                        ig = (byte)Math.Min(255, bgra[src + 1] * 14 / 10);
-                        ir = (byte)Math.Min(255, bgra[src + 2] * 14 / 10);
-                    }
-                }
+                    byte b = bgra[src];
+                    byte g = bgra[src + 1];
+                    byte r = bgra[src + 2];
 
-                if (scale == 1)
-                {
-                    int dst = ((sy + padding) * outW + (sx + padding)) * 4;
-                    output[dst] = ib;
-                    output[dst + 1] = ig;
-                    output[dst + 2] = ir;
+                    if (boostContrast)
+                    {
+                        b = (byte)Math.Min(255, (invert ? 255 - b : b) * 14 / 10);
+                        g = (byte)Math.Min(255, (invert ? 255 - g : g) * 14 / 10);
+                        r = (byte)Math.Min(255, (invert ? 255 - r : r) * 14 / 10);
+                    }
+                    else if (invert)
+                    {
+                        b = (byte)(255 - b);
+                        g = (byte)(255 - g);
+                        r = (byte)(255 - r);
+                    }
+
+                    output[dst] = b;
+                    output[dst + 1] = g;
+                    output[dst + 2] = r;
                     output[dst + 3] = 255;
                 }
-                else
+            }
+        }
+        else
+        {
+            // Hochwertige bilineare Interpolation für glatte Glyphen ohne Treppeneffekte
+            for (int dy = 0; dy < targetH; dy++)
+            {
+                float srcY = (dy + 0.5f) / scale - 0.5f;
+                int sy0 = Math.Clamp((int)Math.Floor(srcY), 0, h - 1);
+                int sy1 = Math.Clamp(sy0 + 1, 0, h - 1);
+                float wy1 = srcY - sy0;
+                float wy0 = 1.0f - wy1;
+
+                int srcRow0 = (sy0 * step) * origW * 4;
+                int srcRow1 = (sy1 * step) * origW * 4;
+                int dstRow = ((dy + padding) * outW + padding) * 4;
+
+                for (int dx = 0; dx < targetW; dx++)
                 {
-                    for (int dy = 0; dy < scale; dy++)
+                    float srcX = (dx + 0.5f) / scale - 0.5f;
+                    int sx0 = Math.Clamp((int)Math.Floor(srcX), 0, w - 1);
+                    int sx1 = Math.Clamp(sx0 + 1, 0, w - 1);
+                    float wx1 = srcX - sx0;
+                    float wx0 = 1.0f - wx1;
+
+                    int p00 = srcRow0 + (sx0 * step * 4);
+                    int p10 = srcRow0 + (sx1 * step * 4);
+                    int p01 = srcRow1 + (sx0 * step * 4);
+                    int p11 = srcRow1 + (sx1 * step * 4);
+
+                    float fb = (bgra[p00] * wx0 + bgra[p10] * wx1) * wy0 + (bgra[p01] * wx0 + bgra[p11] * wx1) * wy1;
+                    float fg = (bgra[p00 + 1] * wx0 + bgra[p10 + 1] * wx1) * wy0 + (bgra[p01 + 1] * wx0 + bgra[p11 + 1] * wx1) * wy1;
+                    float fr = (bgra[p00 + 2] * wx0 + bgra[p10 + 2] * wx1) * wy0 + (bgra[p01 + 2] * wx0 + bgra[p11 + 2] * wx1) * wy1;
+
+                    byte b = (byte)Math.Clamp((int)Math.Round(fb), 0, 255);
+                    byte g = (byte)Math.Clamp((int)Math.Round(fg), 0, 255);
+                    byte r = (byte)Math.Clamp((int)Math.Round(fr), 0, 255);
+
+                    if (boostContrast)
                     {
-                        int dstRow = ((sy * scale + dy + padding) * outW + padding) * 4;
-                        for (int dx = 0; dx < scale; dx++)
-                        {
-                            int dst = dstRow + ((sx * scale + dx) * 4);
-                            output[dst] = ib;
-                            output[dst + 1] = ig;
-                            output[dst + 2] = ir;
-                            output[dst + 3] = 255;
-                        }
+                        b = (byte)Math.Min(255, (invert ? 255 - b : b) * 14 / 10);
+                        g = (byte)Math.Min(255, (invert ? 255 - g : g) * 14 / 10);
+                        r = (byte)Math.Min(255, (invert ? 255 - r : r) * 14 / 10);
                     }
+                    else if (invert)
+                    {
+                        b = (byte)(255 - b);
+                        g = (byte)(255 - g);
+                        r = (byte)(255 - r);
+                    }
+
+                    int dst = dstRow + (dx * 4);
+                    output[dst] = b;
+                    output[dst + 1] = g;
+                    output[dst + 2] = r;
+                    output[dst + 3] = 255;
                 }
             }
         }

@@ -5147,11 +5147,13 @@ public class PhotinoBridge
             {
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
-            int optScale = region.Height >= 100 ? 1 : (region.Height >= 45 ? 2 : 3);
+            int optScale = region.Height <= 65 ? 5 : (region.Height <= 110 ? 3 : (region.Height <= 180 ? 2 : 1));
             var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: optScale, padding: 24, boostContrast: false);
             var bestText = WalletOcrTrigger.BestRead(invText, plainText);
             var val = WalletOcrTrigger.ExtractBalance(bestText ?? invText ?? plainText);
             sw.Stop();
+
+            Logger.Log($"[OCR-Test] Region={region.Width}x{region.Height}@({region.X},{region.Y}), Scale={optScale}: Inv='{invText?.Trim()}', Plain='{plainText?.Trim()}' -> {val?.ToString() ?? "null"}");
 
             if (val.HasValue)
             {
@@ -5163,7 +5165,7 @@ public class PhotinoBridge
             {
                 Success = val.HasValue,
                 Target = target,
-                RecognizedText = bestText?.Trim() ?? (!string.IsNullOrEmpty(invText) ? invText.Trim() : "(Kein Text erkannt)"),
+                RecognizedText = bestText?.Trim() ?? (!string.IsNullOrEmpty(invText) ? invText.Trim() : (!string.IsNullOrEmpty(plainText) ? plainText.Trim() : "(Kein Text erkannt)")),
                 ExtractedValue = val,
                 DurationMs = (int)sw.ElapsedMilliseconds,
                 Region = region

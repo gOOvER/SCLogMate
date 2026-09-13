@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed a critical OCR parsing failure where mobiGlas balances with formatted separators were misread by Windows Media OCR as `%` or other symbols (e.g. `25%031` instead of `25,031`), which previously caused the parser to discard the first block and extract only the truncated tail `31` aUEC.
   - Implemented `ThousandsSeparatorRegex` in `WalletOcrTrigger.ExtractBalance` to normalize typical OCR misinterpretations of commas/periods (`%`, `'`, `;`, `:`, `_`, `-`, `~`, spaces) between 1-3 digit blocks and 3 digit blocks into standard dot notation (`25%031` -> `25.031` -> `25,031 aUEC`).
   - Added strict leading-zero rejection for multi-digit unformatted candidate numbers so truncated fragments like `031` can never be parsed as valid balances.
-  - Added `WalletCapture.IsBurstRunning` flag with priority yielding in `ChatOcrScanner` and `RsOcrScanner` to eliminate OCR engine lock contention during mobiGlas wallet bursts.
-  - Extended wallet capture burst budget to 7 seconds and up to 15 grabs for reliable cross-grab confirmation across UI fade-ins.
+  - Implemented high-quality bilinear interpolation in `OcrEngineService.Preprocess` to eliminate nearest-neighbor staircase artifacts on diagonal glyph strokes without blurring.
+  - Replaced restrictive scale caps with optimal adaptive height scaling (`capH <= 65 ? 5 : (capH <= 110 ? 3 : (capH <= 180 ? 2 : 1))`), ensuring character heights in the optimal 60-80px OCR sweet spot across all resolutions instead of downsampling to illegible 1x/2x sizes.
+  - Sanitized currency symbol artifacts (`Sc:`, `SC`, `x:`, `xl`) and added `v`/`V` thousands separator tolerance in `WalletOcrTrigger`.
+  - Added detailed diagnostic logging for Test-Scan and individual burst grabs in `PhotinoBridge.cs` and `WalletCapture.cs`.
 
 - **Interactive Template & Preset Preview Modal (`ToolsView.tsx`)**:
   - Added an interactive `Vorlagen-Vorschau` modal accessible from both the Live-Editor and Popout mode via the new `Vorlagen-Vorschau` button.
