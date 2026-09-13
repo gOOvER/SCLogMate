@@ -196,6 +196,16 @@ public sealed partial class RsOcrScanner : IDisposable
     private async void OnTick(object? sender, ElapsedEventArgs e)
     {
         if (!_running) return;
+        // Wallet-Burst hat Vorrang vor Hintergrund-RS-Radar-Polling
+        if (WalletCapture.IsBurstRunning)
+        {
+            if (_running && _timer != null)
+            {
+                try { _timer.Start(); }
+                catch (ObjectDisposedException) { }
+            }
+            return;
+        }
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return;
 
         try

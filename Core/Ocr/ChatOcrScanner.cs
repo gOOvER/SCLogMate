@@ -113,6 +113,12 @@ public sealed class ChatOcrScanner : IDisposable
                 return;
             }
 
+            // Wallet-Burst hat Vorrang vor Hintergrund-Chat-Polling
+            if (WalletCapture.IsBurstRunning)
+            {
+                return;
+            }
+
             await ExecuteScanAsync(forceReturnAllVisible: false);
         }
         catch (Exception ex)

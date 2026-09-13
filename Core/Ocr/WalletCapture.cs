@@ -15,8 +15,11 @@ public sealed class WalletCapture : IDisposable
     public static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(300); // Warten auf mobiGlas UI Fade-In
     public static readonly TimeSpan GrabSpacing = TimeSpan.FromMilliseconds(250);
     public static readonly TimeSpan RetrySpacing = TimeSpan.FromMilliseconds(100);
-    public static readonly TimeSpan BurstBudget = TimeSpan.FromSeconds(5);
-    public const int MaxGrabs = 12;
+    public static readonly TimeSpan BurstBudget = TimeSpan.FromSeconds(7);
+    public const int MaxGrabs = 15;
+
+    /// <summary>Zeigt an, ob gerade ein mobiGlas Wallet-Burst aktiv ist (damit Hintergrund-Scanner pausieren).</summary>
+    public static bool IsBurstRunning { get; private set; }
 
     private readonly OcrEngineService _ocrEngine;
     private readonly Func<ScanRegion?> _regionProvider;
@@ -65,7 +68,7 @@ public sealed class WalletCapture : IDisposable
         int optScale = capH >= 100 ? 1 : (capH >= 45 ? 2 : 3);
         var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, capW, capH, scale: optScale, padding: 24, boostContrast: false).ConfigureAwait(false);
         var bestText = WalletOcrTrigger.BestRead(invText, plainText);
-        var balance = WalletOcrTrigger.ExtractBalance(bestText);
+        var balance = WalletOcrTrigger.ExtractBalance(bestText ?? invText ?? plainText);
 
         if (balance is { } val)
         {
@@ -107,6 +110,7 @@ public sealed class WalletCapture : IDisposable
     {
         try
         {
+            IsBurstRunning = true;
             Logger.Log($"OCR: mobiGlas Trigger erkannt – Burst startet für Bereich {region}...");
             var start = DateTime.UtcNow;
 
@@ -170,6 +174,7 @@ public sealed class WalletCapture : IDisposable
         }
         finally
         {
+            IsBurstRunning = false;
             Interlocked.Exchange(ref _busy, 0);
         }
     }

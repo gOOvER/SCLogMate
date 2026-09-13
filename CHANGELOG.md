@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **mobiGlas aUEC OCR Balance Recognition & Engine Prioritization (`Core/Ocr/WalletOcrTrigger.cs`, `Core/Ocr/WalletCapture.cs`, `Core/Ocr/ChatOcrScanner.cs`, `Core/Ocr/RsOcrScanner.cs`)**:
+  - Fixed a critical OCR parsing failure where mobiGlas balances with formatted separators were misread by Windows Media OCR as `%` or other symbols (e.g. `25%031` instead of `25,031`), which previously caused the parser to discard the first block and extract only the truncated tail `31` aUEC.
+  - Implemented `ThousandsSeparatorRegex` in `WalletOcrTrigger.ExtractBalance` to normalize typical OCR misinterpretations of commas/periods (`%`, `'`, `;`, `:`, `_`, `-`, `~`, spaces) between 1-3 digit blocks and 3 digit blocks into standard dot notation (`25%031` -> `25.031` -> `25,031 aUEC`).
+  - Added strict leading-zero rejection for multi-digit unformatted candidate numbers so truncated fragments like `031` can never be parsed as valid balances.
+  - Added `WalletCapture.IsBurstRunning` flag with priority yielding in `ChatOcrScanner` and `RsOcrScanner` to eliminate OCR engine lock contention during mobiGlas wallet bursts.
+  - Extended wallet capture burst budget to 7 seconds and up to 15 grabs for reliable cross-grab confirmation across UI fade-ins.
+
 - **Interactive Template & Preset Preview Modal (`ToolsView.tsx`)**:
   - Added an interactive `Vorlagen-Vorschau` modal accessible from both the Live-Editor and Popout mode via the new `Vorlagen-Vorschau` button.
   - Allows inspecting all 4 configuration presets (`Hardware-Empfehlung`, `High FPS / E-Sport`, `Grafik & Immersion`, `60 FPS Cap`) before applying them.

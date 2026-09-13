@@ -23,7 +23,12 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"(?i)aUEC|(?i)UEC|[\u00A4\$€£¥ÄäÅå©®]")]
     private static partial Regex CurrencyLabelRegex();
 
-    [GeneratedRegex(@"[+*~|/\\()\[\]{}]")]
+    // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, Leerzeichen o.ä. fehlinterpretiert werden
+    // z.B. "25%031" -> "25.031", "25'031" -> "25.031", "1 250 000" -> "1.250.000", "1%250%031" -> "1.250.031"
+    [GeneratedRegex(@"(?<=\b\d{1,3})\s*[,.'’`´;:_%~|\-]\s*(?=\d{3}\b)")]
+    private static partial Regex ThousandsSeparatorRegex();
+
+    [GeneratedRegex(@"[+*~|/\\()\[\]{}%^$#@!?;:_=]")]
     private static partial Regex OcrNoiseCharsRegex();
 
     [GeneratedRegex(@"(?<=\b\d{1,3})\s+(?=\d{3}(?:\s+\d{3})*\b)")]
@@ -69,10 +74,14 @@ public static partial class WalletOcrTrigger
         // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289" oder "Ä 2.038.063")
         normalized = CurrencyLabelRegex().Replace(normalized, " ");
 
-        // 3. Führende Vorzeichen / OCR-Störzeichen entfernen
+        // 3. Tausendertrennzeichen normalisieren: Erkennt typische OCR-Fehlinterpretationen von Kommas/Punkten (% ' ; : _ - ~ Leerzeichen)
+        // zwischen Ziffernblöcken (z.B. "25%031" -> "25.031", "1 250 031" -> "1.250.031")
+        normalized = ThousandsSeparatorRegex().Replace(normalized, ".");
+
+        // 4. Verbliebene Vorzeichen / OCR-Störzeichen entfernen
         normalized = OcrNoiseCharsRegex().Replace(normalized, " ");
 
-        // 4. Leerzeichen als Tausendertrennzeichen zwischen Zifferngruppen normalisieren ("2 463 039" -> "2.463.039")
+        // 5. Verbliebene Leerzeichen als Tausendertrennzeichen zwischen Zifferngruppen normalisieren
         normalized = SpaceThousandsRegex().Replace(normalized, ".");
 
         long? bestValue = null;
@@ -95,6 +104,9 @@ public static partial class WalletOcrTrigger
                 // Tausender-Gruppierung: erste Gruppe 1-3 Ziffern, alle folgenden 3 Ziffern (oder Vielfache falls Trennzeichen verschmolzen)
                 if (parts[0].Length < 1 || parts[0].Length > 3) continue;
 
+                // Erste Gruppe darf bei mehrstelliger Gruppe keine führende Null haben (z.B. "031.000" ist ungültig)
+                if (parts[0].Length > 1 && parts[0].StartsWith('0')) continue;
+
                 bool validGrouping = true;
                 for (int i = 1; i < parts.Length; i++)
                 {
@@ -111,6 +123,9 @@ public static partial class WalletOcrTrigger
             {
                 // Unformatierte Ziffernfolge (z.B. "0", "846", "5105256")
                 if (parts[0].Length < 1 || parts[0].Length > 11) continue;
+
+                // Keine führenden Nullen bei mehrstelligen unformatierten Zahlen (z.B. "031" ist immer der abgerissene Schwanz von "25.031")
+                if (parts[0].Length > 1 && parts[0].StartsWith('0')) continue;
             }
 
             var digits = 0;
