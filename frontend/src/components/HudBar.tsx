@@ -182,7 +182,9 @@ export const HudBar: React.FC<HudBarProps> = ({
       ? `${telemetry.serverRegionName} (${telemetry.serverRegionCode})`
       : telemetry.serverRegionCode;
     const pingText = telemetry.serverPingMs != null ? `${telemetry.serverPingMs} ms` : 'Wird gemessen...';
-    const pilotText = telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Unbekannter Pilot';
+    const pilotText = telemetry.pilotName && telemetry.pilotName !== '—'
+      ? `${telemetry.pilotName}${telemetry.citizenRecord ? ` (${telemetry.citizenRecord})` : ''}`
+      : 'Unbekannter Pilot';
     const versionText = telemetry.serverVersion && telemetry.serverVersion !== '—' ? telemetry.serverVersion : '—';
 
     return `Vollständiger Shard-Name:\n${telemetry.serverShard}\n\nRegion: ${regionText}\nLatenz (RTT): ${pingText}\nKanal: LIVE\nSpieler: ${pilotText}\nStar Citizen Version: ${versionText}`;
@@ -278,16 +280,11 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
 
             <div className="min-w-0 flex-1">
-              {/* Handle + Citizen Record Badge */}
+              {/* Handle */}
               <div className="flex items-center gap-1.5 truncate">
                 <span className="text-sm font-bold font-mono text-white tracking-wide truncate group-hover:text-cyan-300 transition-colors">
                   {telemetry.pilotName && telemetry.pilotName !== '—' ? telemetry.pilotName : 'Unbekannter Pilot'}
                 </span>
-                {telemetry.citizenRecord && (
-                  <span className="px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-600/60 text-amber-300 font-mono text-[9px] font-bold shrink-0">
-                    {telemetry.citizenRecord}
-                  </span>
-                )}
               </div>
 
               {/* Title & Primary Org */}

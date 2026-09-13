@@ -181,6 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Temporarily deactivated the In-Game Chat-Protokoll navigation tab from the main sidebar and defaulted `ChatOcrEnabled = false` in application settings and Photino bridge state.
   - Deactivated and removed the In-Game Chat Scan calibration and testing section from the OCR settings view in alignment with the paused chat protocol feature.
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
+- **Pilot & Server HUD Bar Card Clean-Up (`HudBar.tsx`)**:
+  - Removed the raw Citizen Record number badge from next to the pilot handle in the Pilot & Server HUD card for a cleaner presentation, retaining the full record in the hover tooltip and interactive Citizen Dossier modal.
 
 ### Fixed
 - **Live-Stream Events Display & Active Game.log Synchronization (`PhotinoBridge.cs`, `EventsView.tsx`, `App.tsx`)**:
