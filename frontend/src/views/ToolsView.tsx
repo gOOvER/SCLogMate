@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Trash2,
   RefreshCw,
@@ -39,14 +39,103 @@ import {
 } from 'lucide-react';
 import { bridge, ToolsStatusDto, ConfigBackupItemDto, KeybindBackupItemDto } from '../services/photinoBridge';
 
-export const USER_PRESET_5800X3D_5070 = `Con_Restricted = 0
+export interface HardwareRecommendation {
+  cpuShort: string;
+  gpuShort: string;
+  hasDetectedHardware: boolean;
+  badge: string;
+  vramPool: number;
+  vramLabel: string;
+  cgfPool: number;
+}
 
--- Star Citizen - Optimierte USER.cfg für 5800X3D & RTX 5070
+export function getHardwareRecommendation(status: ToolsStatusDto | null): HardwareRecommendation {
+  let cpuShort = '';
+  if (status?.cpuModel && status.cpuModel !== 'Unbekannt') {
+    const raw = status.cpuModel;
+    if (raw.includes('5800X3D')) cpuShort = '5800X3D';
+    else if (raw.includes('7800X3D')) cpuShort = '7800X3D';
+    else if (raw.includes('9800X3D')) cpuShort = '9800X3D';
+    else {
+      cpuShort = raw.replace(/\(R\)|\(TM\)|Processor|Core|8-Core|16-Core|AMD|Intel/gi, '').trim().split(/\s+/).slice(0, 2).join(' ');
+    }
+  }
+
+  let gpuShort = '';
+  if (status?.gpuModel && status.gpuModel !== 'Unbekannt') {
+    const raw = status.gpuModel;
+    if (raw.includes('5070')) gpuShort = 'RTX 5070';
+    else if (raw.includes('5080')) gpuShort = 'RTX 5080';
+    else if (raw.includes('5090')) gpuShort = 'RTX 5090';
+    else if (raw.includes('4090')) gpuShort = 'RTX 4090';
+    else if (raw.includes('4080')) gpuShort = 'RTX 4080';
+    else if (raw.includes('4070')) gpuShort = 'RTX 4070';
+    else {
+      gpuShort = raw.replace(/NVIDIA|GeForce|AMD|Radeon/gi, '').trim().split(/\s+/).slice(0, 3).join(' ');
+    }
+  }
+
+  const hasDetectedHardware = Boolean(cpuShort || gpuShort);
+
+  // VRAM calculation
+  let vramPool = 8192;
+  let vramLabel = '12GB VRAM';
+  const vramNum = status?.gpuVramMb ? parseInt(status.gpuVramMb, 10) : 0;
+  const gpuUpper = (status?.gpuModel || '').toUpperCase();
+
+  if (vramNum >= 20000 || gpuUpper.includes('4090') || gpuUpper.includes('5090') || gpuUpper.includes('7900 XTX') || gpuUpper.includes('3090')) {
+    vramPool = 12288;
+    vramLabel = '16GB+ VRAM';
+  } else if (vramNum >= 14000 || gpuUpper.includes('4080') || gpuUpper.includes('5080') || gpuUpper.includes('7900 XT')) {
+    vramPool = 10240;
+    vramLabel = '16GB VRAM';
+  } else if (vramNum >= 10000 || gpuUpper.includes('5070') || gpuUpper.includes('4070') || gpuUpper.includes('3080') || gpuUpper.includes('7800 XT')) {
+    vramPool = 8192;
+    vramLabel = '12GB VRAM';
+  } else if (vramNum >= 7000 || gpuUpper.includes('4060') || gpuUpper.includes('3070') || gpuUpper.includes('3060') || gpuUpper.includes('6700 XT')) {
+    vramPool = 6144;
+    vramLabel = '8-10GB VRAM';
+  } else {
+    vramPool = 4096;
+    vramLabel = '6-8GB VRAM';
+  }
+
+  // CGF Pool based on RAM
+  let cgfPool = 4096;
+  if ((status?.totalRamGb || 0) >= 48) {
+    cgfPool = 6144;
+  } else if ((status?.totalRamGb || 0) <= 16 && (status?.totalRamGb || 0) > 0) {
+    cgfPool = 2048;
+  }
+
+  let badge = 'Auto-Tuning';
+  if (cpuShort && gpuShort) {
+    badge = `${cpuShort} · ${gpuShort}`;
+  } else if (cpuShort || gpuShort) {
+    badge = cpuShort || gpuShort;
+  }
+
+  return {
+    cpuShort: cpuShort || 'System-CPU',
+    gpuShort: gpuShort || 'System-GPU',
+    hasDetectedHardware,
+    badge,
+    vramPool,
+    vramLabel,
+    cgfPool,
+  };
+}
+
+export const generateHardwarePreset = (status: ToolsStatusDto | null): string => {
+  const rec = getHardwareRecommendation(status);
+  return `Con_Restricted = 0
+
+-- Star Citizen - Optimierte USER.cfg für ${rec.cpuShort} & ${rec.gpuShort}
 -- Con_Restricted = 0 MUSS ganz oben stehen, damit die Konsole und Datei geladen werden.
 
 -- Performance & Core Management
 r_multithreaded = 1
--- sys_job_system_max_worker wurde entfernt: Der 5800X3D nutzt jetzt alle 16 Threads optimal.
+-- sys_job_system_max_worker wurde entfernt: Die Engine nutzt alle CPU-Threads optimal.
 
 -- FPS, Monitor & Synchronisation
 sys_maxFps = 160
@@ -57,8 +146,8 @@ r_BorderlessWindow = 1
 
 -- Speicher- & Streaming-Optimierung
 r_TexturesStreaming = 1
-e_StreamCgfPoolSize = 4096
-r_TexturesStreamPoolSize = 8192 -- Perfekt für 12GB VRAM
+e_StreamCgfPoolSize = ${rec.cgfPool}
+r_TexturesStreamPoolSize = ${rec.vramPool} -- Abgestimmt auf ${rec.vramLabel}
 
 -- Detailstufen & Partikel
 e_ParticlesQuality = 3
@@ -78,10 +167,11 @@ r_ssdo = 1
 r_shadersasyncactivation = 1
 r_GsmCache = 1
 
--- Interface & Sonstiges
+-- Interface & Sprache
 pl_pit.forceSoftwareCursor = 0
 g_language = german_(germany)
 g_languageAudio = english`;
+};
 
 export interface CfgDocEntry {
   category: string;
@@ -350,6 +440,7 @@ export const ToolsView: React.FC = () => {
   const [editorPopout, setEditorPopout] = useState(false);
 
   const [status, setStatus] = useState<ToolsStatusDto | null>(null);
+  const hwRec = useMemo(() => getHardwareRecommendation(status), [status]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [cfgContent, setCfgContent] = useState('');
@@ -535,12 +626,15 @@ export const ToolsView: React.FC = () => {
     setLangAudioEnglish(audioEn);
   };
 
-  const applyPreset = (type: '5800x3d_5070' | 'esport' | 'quality' | 'minimal', replaceAll: boolean = false) => {
-    if (type === '5800x3d_5070') {
+  const applyPreset = (type: 'hardware_auto' | '5800x3d_5070' | 'esport' | 'quality' | 'minimal', replaceAll: boolean = false) => {
+    if (type === 'hardware_auto' || type === '5800x3d_5070') {
+      const rec = getHardwareRecommendation(status);
+      const template = generateHardwarePreset(status);
+
       if (replaceAll || !cfgContent.trim()) {
-        setCfgContent(USER_PRESET_5800X3D_5070);
-        parseCfgContent(USER_PRESET_5800X3D_5070);
-        showToast('⭐ Profil "AMD 5800X3D & RTX 5070" komplett geladen!');
+        setCfgContent(template);
+        parseCfgContent(template);
+        showToast(`⭐ Hardware-Empfehlung (${rec.badge}) als saubere Vorlage geladen!`);
         return;
       }
 
@@ -553,8 +647,8 @@ export const ToolsView: React.FC = () => {
         r_FullscreenWindow: 1,
         r_BorderlessWindow: 1,
         r_TexturesStreaming: 1,
-        e_StreamCgfPoolSize: 4096,
-        r_TexturesStreamPoolSize: 8192,
+        e_StreamCgfPoolSize: rec.cgfPool,
+        r_TexturesStreamPoolSize: rec.vramPool,
         e_ParticlesQuality: 3,
         r_DetailDistance: 22,
         r_HDRDisplayOutput: 1,
@@ -575,7 +669,7 @@ export const ToolsView: React.FC = () => {
         parseCfgContent(merged);
         return merged;
       });
-      showToast('⭐ Profil "AMD 5800X3D & RTX 5070" erfolgreich per Merge übernommen');
+      showToast(`⭐ Hardware-Empfehlung (${rec.badge}) per Merge übernommen`);
       return;
     }
 
@@ -1125,19 +1219,24 @@ export const ToolsView: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center rounded-xl bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-500/40 p-1 shadow-md shadow-amber-500/10">
                     <button
-                      onClick={() => applyPreset('5800x3d_5070', false)}
+                      onClick={() => applyPreset('hardware_auto', false)}
                       className="px-3 py-1.5 text-xs font-bold text-amber-300 hover:text-white transition flex items-center space-x-1.5 cursor-pointer"
-                      title="Wendet das 5800X3D & RTX 5070 Profil per Merge auf deine bestehende Datei an"
+                      title={`Wendet die Empfehlung (${hwRec.badge}) per Merge auf deine bestehende user.cfg an`}
                     >
                       <Rocket className="w-3.5 h-3.5 text-amber-400" />
-                      <span>⭐ 5800X3D &amp; RTX 5070</span>
+                      <span>⭐ Hardware-Empfehlung</span>
+                      {hwRec.badge && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 text-[10px] font-mono border border-amber-500/30 font-semibold">
+                          {hwRec.badge}
+                        </span>
+                      )}
                     </button>
                     <button
-                      onClick={() => applyPreset('5800x3d_5070', true)}
+                      onClick={() => applyPreset('hardware_auto', true)}
                       className="px-2 py-1 text-[10px] font-mono text-amber-400 hover:text-amber-200 bg-amber-950/60 hover:bg-amber-900/60 rounded-lg border border-amber-500/30 transition cursor-pointer"
-                      title="Ersetzt den Inhalt komplett durch die saubere 5800X3D & RTX 5070 Vorlage mit Kommentaren"
+                      title={`Ersetzt den Inhalt komplett durch die saubere Vorlage (${hwRec.badge}) mit Kommentaren`}
                     >
-                      Reines Template
+                      Template
                     </button>
                   </div>
 
@@ -2562,15 +2661,20 @@ export const ToolsView: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center rounded-lg bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-500/40 p-0.5">
                   <button
-                    onClick={() => applyPreset('5800x3d_5070', false)}
-                    className="px-2.5 py-1 text-xs font-bold text-amber-300 hover:text-white transition flex items-center space-x-1 cursor-pointer"
-                    title="Wendet das 5800X3D & RTX 5070 Profil per Merge an"
+                    onClick={() => applyPreset('hardware_auto', false)}
+                    className="px-2.5 py-1 text-xs font-bold text-amber-300 hover:text-white transition flex items-center space-x-1.5 cursor-pointer"
+                    title={`Wendet die Hardware-Empfehlung (${hwRec.badge}) per Merge an`}
                   >
                     <Rocket className="w-3.5 h-3.5 text-amber-400" />
-                    <span>⭐ 5800X3D &amp; RTX 5070</span>
+                    <span>⭐ Hardware-Empfehlung</span>
+                    {hwRec.badge && (
+                      <span className="px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 text-[9px] font-mono border border-amber-500/30">
+                        {hwRec.badge}
+                      </span>
+                    )}
                   </button>
                   <button
-                    onClick={() => applyPreset('5800x3d_5070', true)}
+                    onClick={() => applyPreset('hardware_auto', true)}
                     className="px-2 py-1 text-[10px] font-mono text-amber-400 hover:text-amber-200 bg-amber-950/60 rounded border border-amber-500/30 transition cursor-pointer"
                     title="Reines Template einfügen"
                   >

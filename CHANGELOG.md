@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- **Dynamic Hardware-Based Preset & Recommendation Engine (`ToolsView.tsx`)**:
+  - Replaced the static "5800X3D & RTX 5070" preset button with an intelligent, dynamic **Hardware-Empfehlung** feature.
+  - Automatically detects the user's hardware from telemetry (`status.cpuModel`, `status.gpuModel`, `status.gpuVramMb`, `status.totalRamGb`) and calculates tailored values for `r_TexturesStreamPoolSize` (e.g., 8192 MB for 12GB GPUs, 10240-12288 MB for 16GB+ GPUs) and `e_StreamCgfPoolSize` (based on system RAM).
+  - Displays dynamic badges (e.g. `5800X3D · RTX 5070` or `Auto-Tuning`) and generates customized configuration templates or non-destructive merges.
 - **Consolidated Tools Navigation & Dedicated Popout Editor (`ToolsView.tsx`)**:
   - Strictly limited top-level navigation to 3 clean, concise tool tabs: `Wartung & Diagnose`, `user.cfg Studio`, and strictly `Backups`.
   - Consolidated all non-user.cfg backup functions into the dedicated `Backups` tab: Keybind profiles (`actionmaps.xml` & `mappings/`), Game.log ZIP exports, cloud synchronization, and rollbacks.
