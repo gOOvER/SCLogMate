@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sanitized currency symbol artifacts (`Sc:`, `SC`, `x:`, `xl`, `æ`, `œ`) and added trailing separator trimming in `WalletOcrTrigger`, fixing mobiGlas aUEC small-caps ligatures and attached dots (`Ä 2.585.æ` -> `2,585 aUEC`).
   - Enforced minimum 3-digit length for unformatted candidate numbers and removed capital `Æ` from currency sanitization to prevent accidental digit merging into single-digit balances (e.g. `2 aUEC`).
   - Added automatic debug bitmap export (`captured_crop.bmp`) and detailed diagnostic logging for Test-Scan and individual burst grabs in `PhotinoBridge.cs` and `WalletCapture.cs`.
+- **Event Detail Flyout Automatic Popup on Startup (`EventsView.tsx`)**:
+  - Removed unwanted automatic selection of the first event upon data fetching, ensuring the event detail modal opens only when an event is explicitly clicked by the user.
 
 - **Interactive Template & Preset Preview Modal (`ToolsView.tsx`)**:
   - Added an interactive `Vorlagen-Vorschau` modal accessible from both the Live-Editor and Popout mode via the new `Vorlagen-Vorschau` button.

@@ -82,9 +82,6 @@ export const EventsView: React.FC<EventsViewProps> = ({
         limit: count,
       });
       setEvents(res);
-      if (res.length > 0 && !selectedEvent) {
-        setSelectedEvent(res[0]);
-      }
     } catch (err) {
       console.error('Failed to load events:', err);
     }
