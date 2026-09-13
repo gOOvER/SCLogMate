@@ -189,13 +189,14 @@ Im Vergleich zur Avalonia-Version (RC2) sind die meisten Kernbereiche (Chronik, 
 Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge, Lagerverwaltung und Handelsoptimierung:
 
 ### 9.1 Refinery Job Tracking & OCR-Kiosk Logging
-- [ ] **Vollständiges Auftrags-Management für Veredelungsaufträge (`RefineryView.tsx`, `Core/Database.cs`):**
-  - Übersicht aller aktiven, verarbeiteten und abholbereiten Veredelungsaufträge über alle Raffineriestationen (*ARC-L1, CRU-L1, HUR-L1, HUR-L2, MIC-L1, Pyro-Raffinerien*).
-  - Status-Phasen: *In Warteschlange*, *Wird veredelt (Live-Countdown)*, *Fertig zur Abholung*, *Eingelagert / Verkauft*.
-  - Berechnung der Veredelungszeiten, Kosten und Materialerträge je nach gewählter Methode (*Cormack, Dinyx, Electrostatic, Ferron, Gencore, Pyroxeres, Thermite*).
-  - Automatische Benachrichtigung (Desktop-Toast & Ton) bei Fertigstellung eines Auftrags.
-- [ ] **OCR Screenshot- & Snipping-Erfassung von Raffinerie-Aufträgen (`RefineryOcrScanner.cs`):**
-  - 1-Klick Bildschirmaufnahme oder interaktives Desktop-Snipping des In-Game Raffinerie-Terminals (*Refinery Kiosk*).
+- [x] **Vollständiges Auftrags-Management für Veredelungsaufträge (`RefineryView.tsx`, `Core/Database.cs`):**
+  - Übersicht aller aktiven, verarbeiteten und abholbereiten Veredelungsaufträge über alle Raffineriestationen in **Stanton, Pyro & Nyx** (*ARC-L1/L2, CRU-L1, HUR-L1/L2, MIC-L1/L2/L5, Pyro Gateway & Checkpoints, Levski / Delamar Mining Center, Glaciem RockCracker 12, QV Breaker BRK-267*).
+  - Status-Phasen: *Wird veredelt (Live-Countdown)*, *Fertig zur Abholung*, *Eingelagert / Ins Warenlager gebucht*.
+  - Berechnung der Veredelungszeiten, Kosten und Materialerträge je nach gewählter Methode (*Dinyx, Ferron, Cormack, Electrostatic, Pyroxeres, Gaskin-Kandah, Thermite*) im interaktiven Simulator.
+  - Automatische Benachrichtigung (Desktop-Toast & Ton) bei Fertigstellung eines Auftrags via Hintergrund-Timer.
+  - Nahtlose Verknüpfung mit **SCWiki** (Dossiers mit HD-Rendern) und **UEX Corp Live-Preisen** zur automatischen Schätzung von Erlösen und Netto-Margen.
+- [x] **OCR Screenshot- & Snipping-Erfassung von Raffinerie-Aufträgen (`RefineryParser.cs` & `PhotinoBridge.cs`):**
+  - 1-Klick Bildschirmaufnahme (sofort oder mit 3s Vorlauf zum Reintappen ins Spiel) oder interaktives Desktop-Snipping des In-Game Raffinerie-Terminals (*Refinery Kiosk*).
   - Automatisches Extrahieren von Ausgangs-Erzen, Mengen (cSCU / SCU), gewählter Methode, Endertrag, Gebühren und Fertigstellungsdatum direkt in die Datenbank.
 
 ### 9.2 Warchest Management & Qualitätsbewertung
@@ -269,8 +270,8 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
 - [x] **Schritt 5 (OCR Multi-Monitor & Universal-Kalibrierung):**
   - Multi-Monitor virtueller Desktop-Support für mobiGlas, RS Radar & Chat OCR ohne Abbruch auf Zweitmonitoren.
   - Universelle Kalibrierung und interaktive Bereichsauswahl in Einstellungen, Radar-Decoder und Chat-Chronik.
-- [ ] **Schritt 6 (Refinery Job Tracking & OCR-Kiosk Logging):**
-  - Erstellung von `RefineryView.tsx` mit Auftrags-Management, Countdown-Timern und OCR-Screenshot-Erfassung von Kiosk-Terminals.
+- [x] **Schritt 6 (Refinery Job Tracking & OCR-Kiosk Logging):**
+  - Erstellung von `RefineryView.tsx` mit 4 spezialisierten Ansichten (Auftrags-Tracking, OCR-Kiosk-Erfassung, UEX/SCWiki-Ertragsrechner, Stations-Atlas für Stanton, Pyro & Nyx) und Live-Sekunden-Countdown.
 - [ ] **Schritt 7 (Warchest Management & Best Sales Locations):**
   - Erfassung von Mineralienbeständen mit Reinheitsstufen (Quality Ratings) und automatischer Ermittlung der besten Verkaufsorte via UEX Corp API.
 - [ ] **Schritt 8 (Rock Breaking Calculator & Optimal Loadout Finder):**

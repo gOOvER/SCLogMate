@@ -816,10 +816,12 @@ public class OcrRegionsConfigDto
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
     [JsonPropertyName("chatRegion")] public ScanRegion? ChatRegion { get; set; }
+    [JsonPropertyName("refineryRegion")] public ScanRegion? RefineryRegion { get; set; }
     [JsonPropertyName("defaultWalletRegion")] public ScanRegion DefaultWalletRegion { get; set; } = new();
     [JsonPropertyName("defaultContractRegion")] public ScanRegion DefaultContractRegion { get; set; } = new();
     [JsonPropertyName("defaultRsRegion")] public ScanRegion DefaultRsRegion { get; set; } = new();
     [JsonPropertyName("defaultChatRegion")] public ScanRegion DefaultChatRegion { get; set; } = new();
+    [JsonPropertyName("defaultRefineryRegion")] public ScanRegion DefaultRefineryRegion { get; set; } = new();
     [JsonPropertyName("screenWidth")] public int ScreenWidth { get; set; } = 1920;
     [JsonPropertyName("screenHeight")] public int ScreenHeight { get; set; } = 1080;
     [JsonPropertyName("isWalletScanBoxVisible")] public bool IsWalletScanBoxVisible { get; set; }
@@ -833,8 +835,9 @@ public class OcrTestResultDto
     [JsonPropertyName("recognizedText")] public string RecognizedText { get; set; } = "";
     [JsonPropertyName("extractedValue")] public long? ExtractedValue { get; set; }
     [JsonPropertyName("durationMs")] public int DurationMs { get; set; }
-    [JsonPropertyName("region")] public ScanRegion? Region { get; set; }
     [JsonPropertyName("error")] public string? Error { get; set; }
+    [JsonPropertyName("region")] public ScanRegion? Region { get; set; }
+    [JsonPropertyName("details")] public object? Details { get; set; }
 }
 
 public class DetectedPathDto
@@ -947,6 +950,7 @@ public class PhotinoBridge
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
+    private System.Threading.Timer? _refineryCheckTimer;
 
     public PhotinoBridge()
     {
@@ -974,6 +978,8 @@ public class PhotinoBridge
         {
             _chatScanner.Start();
         }
+
+        _refineryCheckTimer = new System.Threading.Timer(_ => CheckRefineryCompletions(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
 
         // Globaler Hotkey (Alt+H) für Mini-HUD
         GlobalHotkey.HotkeyPressed += () =>
@@ -2159,6 +2165,10 @@ public class PhotinoBridge
                         {
                             s.ChatRegion = region;
                         }
+                        else if (target == "refinery")
+                        {
+                            s.RefineryRegion = region;
+                        }
                         Settings.Save(s);
                     }
                     SendResponse(req.Id, "save_ocr_region_response", GetOcrRegionsConfig());
@@ -2175,6 +2185,7 @@ public class PhotinoBridge
                         "contract" => "Auftragsmanager (Contracts)",
                         "rs" => "RS Signal Radar",
                         "chat" => "In-Game Chat",
+                        "refinery" => "Raffinerie-Kiosk Terminal",
                         _ => "mobiGlas aUEC"
                     };
                     var selected = await NativeRegionSelector.SelectRegionAsync(selTitle);
@@ -2199,6 +2210,10 @@ public class PhotinoBridge
                         {
                             s.ChatRegion = selected;
                         }
+                        else if (selTarget == "refinery")
+                        {
+                            s.RefineryRegion = selected;
+                        }
                         Settings.Save(s);
                         SendResponse(req.Id, "select_ocr_region_response", new { success = true, cancelled = false, region = selected, config = GetOcrRegionsConfig() });
                     }
@@ -2216,6 +2231,22 @@ public class PhotinoBridge
                     }
                     var testResult = await ExecuteOcrTestAsync(testTarget);
                     SendResponse(req.Id, "test_ocr_scan_response", testResult);
+                    break;
+
+                case "scan_refinery_kiosk":
+                    var scanRes = await ScanRefineryKioskAsync();
+                    SendResponse(req.Id, "scan_refinery_kiosk_response", scanRes);
+                    Broadcast("mining_hauls_response", GetMiningHaulsData());
+                    break;
+
+                case "get_refinery_catalog":
+                    SendResponse(req.Id, "refinery_catalog_response", new {
+                        stations = RefineryCatalog.AllStations,
+                        methods = RefineryCatalog.AllMethods,
+                        stationNames = RefineryCatalog.Stations,
+                        materials = RefineryCatalog.Materials,
+                        methodNames = RefineryCatalog.Methods
+                    });
                     break;
 
                 case "toggle_scan_indicator":
@@ -4975,10 +5006,12 @@ public class PhotinoBridge
             ContractRegion = s.ContractRegion,
             RsScanRegion = s.RsScanRegion,
             ChatRegion = s.ChatRegion,
+            RefineryRegion = s.RefineryRegion,
             DefaultWalletRegion = ScreenCapture.GetDefaultWalletRegion(),
             DefaultContractRegion = ScreenCapture.GetDefaultContractRegion(),
             DefaultRsRegion = ScreenCapture.GetDefaultRsRegion(),
             DefaultChatRegion = ScreenCapture.GetDefaultChatRegion(),
+            DefaultRefineryRegion = ScreenCapture.GetDefaultRefineryRegion(),
             ScreenWidth = sw,
             ScreenHeight = sh,
             IsWalletScanBoxVisible = _walletScanIndicator.IsVisible,
@@ -5084,6 +5117,28 @@ public class PhotinoBridge
                 Region = region
             };
         }
+        else if (target == "refinery")
+        {
+            var region = s.RefineryRegion ?? ScreenCapture.GetDefaultRefineryRegion();
+            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+            if (raw == null)
+            {
+                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
+            }
+            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 12);
+            sw.Stop();
+            var locName = GetHudTelemetry(_selectedSession).LocationName;
+            var parsed = RefineryParser.ParseKioskText(text ?? "", locName);
+            return new OcrTestResultDto
+            {
+                Success = !string.IsNullOrWhiteSpace(text),
+                Target = target,
+                RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
+                DurationMs = (int)sw.ElapsedMilliseconds,
+                Region = region,
+                Details = parsed
+            };
+        }
         else
         {
             var region = s.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion();
@@ -5113,6 +5168,95 @@ public class PhotinoBridge
                 DurationMs = (int)sw.ElapsedMilliseconds,
                 Region = region
             };
+        }
+    }
+
+    private async Task<object> ScanRefineryKioskAsync()
+    {
+        var s = Settings.Load();
+        if (!_ocrEngine.IsAvailable)
+        {
+            return new { success = false, error = "OCR Engine nicht verfügbar" };
+        }
+
+        var region = s.RefineryRegion ?? ScreenCapture.GetDefaultRefineryRegion();
+        var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
+        if (raw == null)
+        {
+            return new { success = false, error = "Bildschirm konnte nicht erfasst werden" };
+        }
+
+        var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 1, padding: 12);
+        var locName = GetHudTelemetry(_selectedSession).LocationName;
+        var parsed = RefineryParser.ParseKioskText(text ?? "", locName);
+
+        int savedCount = 0;
+        var existing = Database.GetMiningHauls();
+        foreach (var p in parsed)
+        {
+            bool alreadyExists = existing.Any(e => e.MaterialName.Equals(p.MaterialName, StringComparison.OrdinalIgnoreCase) &&
+                                                   Math.Abs(e.ScuQuantity - p.ScuQuantity) < 0.1 &&
+                                                   e.Status == p.Status);
+            if (!alreadyExists)
+            {
+                var haul = new MiningHaul
+                {
+                    SessionId = _selectedSession,
+                    MaterialName = p.MaterialName,
+                    ScuQuantity = p.ScuQuantity,
+                    RefineryLocation = p.RefineryLocation,
+                    Method = p.Method,
+                    YieldPercent = p.YieldPercent,
+                    CostAuec = p.CostAuec,
+                    SubmittedAt = DateTime.UtcNow,
+                    DurationSeconds = p.RemainingSeconds > 0 ? p.RemainingSeconds : 7200,
+                    Status = p.Status,
+                    SoldAuec = 0
+                };
+                Database.SaveMiningHaul(haul);
+                savedCount++;
+            }
+        }
+
+        _walletScanIndicator.FlashGreen();
+
+        return new
+        {
+            success = true,
+            recognizedText = text?.Trim() ?? "",
+            ordersFound = parsed.Count,
+            ordersSaved = savedCount,
+            orders = parsed
+        };
+    }
+
+    private void CheckRefineryCompletions()
+    {
+        try
+        {
+            var hauls = Database.GetMiningHauls();
+            var s = Settings.Load();
+            bool changed = false;
+            foreach (var h in hauls)
+            {
+                if (h.Status.Equals("Refining", StringComparison.OrdinalIgnoreCase) && h.IsTimerCompleted)
+                {
+                    Database.UpdateMiningHaulStatus(h.Id, "Ready");
+                    changed = true;
+                    if (s.ToastEnabled && s.ToastRefineryEnabled)
+                    {
+                        _toastOverlay.ShowToast("🏭", "VEREDELUNG ABGESCHLOSSEN", $"{h.YieldScu:F1} SCU {h.MaterialName}", $"Auf {h.RefineryLocation} abholbereit!", 0x0080DE4Au);
+                    }
+                }
+            }
+            if (changed)
+            {
+                Broadcast("mining_hauls_response", GetMiningHaulsData());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("CheckRefineryCompletions", ex);
         }
     }
 

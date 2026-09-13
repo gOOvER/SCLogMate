@@ -613,10 +613,12 @@ export interface OcrRegionsConfig {
   contractRegion: ScanRegionDto | null;
   rsScanRegion: ScanRegionDto | null;
   chatRegion?: ScanRegionDto | null;
+  refineryRegion?: ScanRegionDto | null;
   defaultWalletRegion: ScanRegionDto;
   defaultContractRegion: ScanRegionDto;
   defaultRsRegion: ScanRegionDto;
   defaultChatRegion?: ScanRegionDto;
+  defaultRefineryRegion?: ScanRegionDto;
   screenWidth: number;
   screenHeight: number;
   isWalletScanBoxVisible: boolean;
@@ -631,6 +633,56 @@ export interface OcrTestResult {
   durationMs: number;
   region?: ScanRegionDto;
   error?: string;
+  details?: any;
+}
+
+export interface RefineryStationDto {
+  id: string;
+  name: string;
+  system: string;
+  locationType: string;
+  description: string;
+  materialYieldBonuses: Record<string, number>;
+  preferredMethods: string[];
+  hasArmistice: boolean;
+}
+
+export interface RefineryMethodDto {
+  name: string;
+  displayName: string;
+  baseYield: number;
+  timeMultiplier: number;
+  costMultiplier: number;
+  speedRating: string;
+  costRating: string;
+  description: string;
+}
+
+export interface RefineryCatalogDto {
+  stations: RefineryStationDto[];
+  methods: RefineryMethodDto[];
+  stationNames: string[];
+  materials: string[];
+  methodNames: string[];
+}
+
+export interface RefineryScanResultDto {
+  success: boolean;
+  error?: string;
+  recognizedText?: string;
+  ordersFound: number;
+  ordersSaved: number;
+  orders: Array<{
+    materialName: string;
+    scuQuantity: number;
+    refineryLocation: string;
+    method: string;
+    yieldPercent: number;
+    costAuec: number;
+    remainingSeconds: number;
+    status: string;
+    rawMatchedText: string;
+  }>;
 }
 
 export interface SettingsDto {

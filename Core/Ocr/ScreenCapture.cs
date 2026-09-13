@@ -191,5 +191,17 @@ public static class ScreenCapture
         int h = (int)Math.Round(sh * 0.45);
         return new ScanRegion { X = x, Y = y, Width = Math.Max(w, 350), Height = Math.Max(h, 250) };
     }
+
+    /// <summary>Liefert die Standard-Region für das Star Citizen Raffinerie-Kiosk Terminal (zentraler Kiosk-Bereich).</summary>
+    public static ScanRegion GetDefaultRefineryRegion()
+    {
+        var (sw, sh) = GetPrimaryScreenSize();
+        // Das Terminal befindet sich in der Mitte des Bildschirms bei Kiosk-Interaktion
+        int x = (int)Math.Round(sw * 0.15);
+        int y = (int)Math.Round(sh * 0.10);
+        int w = (int)Math.Round(sw * 0.70);
+        int h = (int)Math.Round(sh * 0.80);
+        return new ScanRegion { X = x, Y = y, Width = Math.Max(w, 800), Height = Math.Max(h, 600) };
+    }
 }
 

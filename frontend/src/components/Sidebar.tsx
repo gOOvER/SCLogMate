@@ -19,6 +19,7 @@ import {
   Target,
   Wrench,
   BookOpen,
+  Flame,
 } from 'lucide-react';
 
 export type NavTabId =
@@ -31,6 +32,7 @@ export type NavTabId =
   | 'places'
   | 'blackbox'
   | 'orescanner'
+  | 'refinery'
   | 'market'
   | 'fleet'
   | 'wiki'
@@ -60,6 +62,7 @@ interface SidebarProps {
   onToggleCollapsed: () => void;
   warehouseCount?: number;
   liveEventCount?: number;
+  refineryCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -69,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapsed,
   warehouseCount,
   liveEventCount,
+  refineryCount,
 }) => {
   const navGroups: NavGroup[] = [
     {
@@ -88,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'places', label: 'Orte & POIs', icon: Compass },
         { id: 'blackbox', label: 'Flugschreiber', icon: MapPin },
         { id: 'orescanner', label: 'Erz-Scanner', icon: Pickaxe },
+        { id: 'refinery', label: 'Raffinerie', icon: Flame, badge: refineryCount },
       ],
     },
     {

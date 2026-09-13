@@ -36,6 +36,15 @@ public class AppSettings
     /// <summary>Vom Nutzer ausgewählter Chatfenster-Bereich auf dem Bildschirm.</summary>
     public ScanRegion? ChatRegion { get; set; }
 
+    /// <summary>Vom Nutzer ausgewählter Raffinerie-Kiosk Bereich auf dem Bildschirm.</summary>
+    public ScanRegion? RefineryRegion { get; set; }
+
+    /// <summary>Globaler Hotkey für Raffinerie-Kiosk Scan aktivieren (Standard: false, um Tastenkonflikte im Spiel zu vermeiden).</summary>
+    public bool RefineryHotkeyEnabled { get; set; } = false;
+
+    /// <summary>Taste für den Kiosk-Scan (Standard: F10).</summary>
+    public string RefineryHotkeyKey { get; set; } = "F10";
+
     /// <summary>Optionaler UEX Corp API-Schlüssel für erweiterte Abfragen &amp; Kontoverknüpfung.</summary>
     [JsonIgnore]
     public string? UexApiKey { get; set; }

@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced crowded header with a clean, uncluttered title and refresh control, moving the `user.cfg` file path directly into Tab 1's Live Editor header where it belongs contextually.
 
 ### Added
+- **Industrial Refinery & Processing Suite with OCR Kiosk Scanning (`RefineryView.tsx`, `RefineryCatalog.cs`, `RefineryParser.cs`, `PhotinoBridge.cs`, `Sidebar.tsx`, `App.tsx`)**:
+  - Implemented comprehensive industrial refining suite across all three Star Citizen star systems: **Stanton**, **Pyro**, and **Nyx** (including Levski / Delamar Mining Center, Glaciem RockCracker 12, and QV Breaker BRK-267).
+  - Built automatic optical character recognition (`RefineryParser.cs` & `scan_refinery_kiosk`) for Star Citizen Refinery Kiosks: extracts material names, batch quantities (cSCU / SCU), refining methods, costs, and remaining time durations directly from the in-game screen without manual data entry.
+  - Provided multiple conflict-free capture modes designed to avoid interference with Star Citizen controls: 1-click instant scan, 3-second delay scan (allowing switching focus back to the game), interactive snipping tool (`select_ocr_region`), and optional configurable hotkeys.
+  - Integrated real-time countdown timers with automatic status transitions (`Refining` → `Ready`) and native Windows top-most toast notifications (`ToastRefineryEnabled`) plus audio chime upon completion.
+  - Added 1-click **SCWiki Integration** (`onOpenWiki`) directly from refinery orders and station cards, loading official high-definition renders, resource properties, and mining deposit locations.
+  - Added **UEX Corp Market Price Calculation** and interactive **Method & Yield Simulator**: compares all refining methods (Dinyx, Ferron, Cormack, Electrostatic, Pyroxeres, etc.) across station bonuses to calculate net profits, processing times, and optimal margins.
+  - Added 1-click inventory transfer from completed refinery batches directly into station warehouses.
 - **Full-Width Hardware & Star Citizen Startup Benchmark Suite (`MaintenanceService.cs`, `PhotinoBridge.cs`, `ToolsView.tsx`)**:
   - Implemented automatic hardware and engine telemetry extraction from `Game.log`: accurately detects Host CPU model (e.g. `AMD Ryzen 7 5800X3D`), logical core count (16 threads), Discrete GPU model (e.g. `NVIDIA GeForce RTX 5070`), Dedicated VRAM, GPU Vulkan driver version, active display resolution (e.g. `2560x1440x32`), and Windows OS build.
   - Extracted real Star Citizen Engine startup benchmarks directly from `Game.log`: CPU benchmark latency (`34.24 ms`), GPU benchmark latency (`23.25 ms`), CIG Performance Index (`184.87 (CPU) / 443.02 (GPU)`), DataCore binary load time (`3.73s`), and Vulkan PSO pipeline cache load time (`0.38s`).

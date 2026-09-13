@@ -25,6 +25,7 @@ import { StarmapView } from './views/StarmapView';
 import { PlacesView } from './views/PlacesView';
 import { BlackboxView } from './views/BlackboxView';
 import { OreScannerView } from './views/OreScannerView';
+import { RefineryView } from './views/RefineryView';
 import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
 import { SettingsView } from './views/SettingsView';
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [events, setEvents] = useState<LogEventItem[]>([]);
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
+  const [refineryCount, setRefineryCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
@@ -99,12 +101,13 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusRes, sessionsRes, whRes, hudRes, eventsRes] = await Promise.all([
+      const [statusRes, sessionsRes, whRes, hudRes, eventsRes, haulsRes] = await Promise.all([
         bridge.sendRequest<AppStatus>('get_status'),
         bridge.sendRequest<SessionSummary[]>('get_sessions'),
         bridge.sendRequest<{ locations: any[] }>('get_warehouse'),
         bridge.sendRequest<HudTelemetry>('get_hud'),
         bridge.sendRequest<LogEventItem[]>('get_events', { session: '__live__', limit: 100 }),
+        bridge.sendRequest<any[]>('get_mining_hauls'),
       ]);
       setStatus(statusRes);
       setSessions(sessionsRes);
@@ -113,6 +116,9 @@ export const App: React.FC = () => {
       if (whRes?.locations) {
         const total = whRes.locations.reduce((acc: number, l: any) => acc + (l.totalItems || 0), 0);
         setWarehouseTotal(total);
+      }
+      if (haulsRes && Array.isArray(haulsRes)) {
+        setRefineryCount(haulsRes.filter((h: any) => h.status === 'Refining').length);
       }
     } catch (err) {
       console.error('Failed to load initial data:', err);
@@ -141,6 +147,12 @@ export const App: React.FC = () => {
 
     const unbindHud = bridge.on<HudTelemetry>('HUD_UPDATE', (newTelemetry) => {
       setTelemetry(newTelemetry);
+    });
+
+    const unbindMining = bridge.on<any[]>('mining_hauls_response', (hauls) => {
+      if (Array.isArray(hauls)) {
+        setRefineryCount(hauls.filter((h: any) => h.status === 'Refining').length);
+      }
     });
 
     const unbindWh = bridge.on<{ locations: any[] }>('WAREHOUSE_UPDATED', (data) => {
@@ -186,6 +198,7 @@ export const App: React.FC = () => {
       unbindLiveLoaded();
       unbindStatus();
       unbindHud();
+      unbindMining();
       unbindWh();
       unbindScan();
       unbindUpdate();
@@ -249,6 +262,7 @@ export const App: React.FC = () => {
         onToggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
         warehouseCount={warehouseTotal > 0 ? warehouseTotal : undefined}
         liveEventCount={events.length > 0 ? events.length : undefined}
+        refineryCount={refineryCount > 0 ? refineryCount : undefined}
       />
 
       {/* Main App Container */}
@@ -342,6 +356,8 @@ export const App: React.FC = () => {
           {activeTab === 'blackbox' && <BlackboxView />}
 
           {activeTab === 'orescanner' && <OreScannerView />}
+
+          {activeTab === 'refinery' && <RefineryView onOpenWiki={handleOpenWiki} />}
 
           {activeTab === 'market' && <MarketView />}
 
