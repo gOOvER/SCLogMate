@@ -1003,6 +1003,7 @@ public class PhotinoBridge
         _auroraService.QuantumArrivalEnabled = s.AuroraQuantumArrival;
         _auroraService.PlayerDeathEnabled = s.AuroraPlayerDeath;
         _auroraService.ServerErrorsEnabled = s.AuroraServerErrors;
+        UexApiClient.SetApiKey(s.UexApiKey);
         I18n.Instance.SetLanguage(s.AppLanguage ?? "Auto");
         _currentLogPath = s.LogPath ?? PathFinder.FindBest();
         Localization.Hint(_currentLogPath);
@@ -1426,6 +1427,24 @@ public class PhotinoBridge
                 case "play_aurora_test_sound":
                     _auroraService.PlayTestSound();
                     SendResponse(req.Id, "play_aurora_test_sound_response", new { ok = true });
+                    break;
+
+                case "test_uex_api_key":
+                    string? testKey = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("apiKey", out var keyEl))
+                    {
+                        testKey = keyEl.GetString();
+                    }
+                    if (string.IsNullOrWhiteSpace(testKey)) testKey = null;
+                    else testKey = testKey.Trim();
+
+                    var curSettings = Settings.Load();
+                    curSettings.UexApiKey = testKey;
+                    Settings.Save(curSettings);
+                    UexApiClient.SetApiKey(testKey);
+
+                    var testRes = await UexApiClient.TestConnectionAsync(testKey);
+                    SendResponse(req.Id, "test_uex_api_key_response", new { success = testRes.Success, message = testRes.Message });
                     break;
 
                 case "get_status":
@@ -5116,6 +5135,7 @@ public class PhotinoBridge
         s.LogPath = dto.LogPath;
         s.AutoOcrEnabled = dto.AutoOcrEnabled;
         s.UexApiKey = dto.UexApiKey;
+        UexApiClient.SetApiKey(dto.UexApiKey);
         s.OverlayEnabled = dto.OverlayEnabled;
         s.OverlayOpacity = dto.OverlayOpacity;
         s.GlobalHotkeyEnabled = dto.GlobalHotkeyEnabled;

@@ -28,6 +28,9 @@ import {
   ShoppingCart,
   ExternalLink,
   Mic,
+  EyeOff,
+  Key,
+  Trash2,
 } from 'lucide-react';
 import {
   bridge,
@@ -105,6 +108,51 @@ export const SettingsView: React.FC = () => {
 
   const handleOpenGumroad = () => {
     bridge.send('open_external_url', { url: 'https://3415383443272.gumroad.com/l/yzpmoa' });
+  };
+
+  const [uexApiKeyInput, setUexApiKeyInput] = useState<string>('');
+  const [showUexKey, setShowUexKey] = useState<boolean>(false);
+  const [isTestingUex, setIsTestingUex] = useState<boolean>(false);
+  const [uexStatusMessage, setUexStatusMessage] = useState<string>(
+    'Prüfe UEX Status...'
+  );
+  const [uexStatusColor, setUexStatusColor] = useState<string>('#8B949E');
+
+  const handleSaveAndTestUexKey = async (overrideKey?: string) => {
+    const keyToTest = overrideKey !== undefined ? overrideKey : uexApiKeyInput;
+    const cleanKey = keyToTest.trim();
+    setIsTestingUex(true);
+    setUexStatusMessage('Prüfe UEX Corp API-Verbindung...');
+    setUexStatusColor('#58A6FF');
+
+    try {
+      const res = await bridge.sendRequest<{ success: boolean; message: string }>('test_uex_api_key', {
+        apiKey: cleanKey,
+      });
+
+      setSettings((prev) => ({ ...prev, uexApiKey: cleanKey }));
+      if (cleanKey === '') {
+        setUexApiKeyInput('');
+        setUexStatusMessage('✓ API-Key entfernt (Öffentlicher Modus aktiv)');
+        setUexStatusColor('#8B949E');
+      } else if (res?.success) {
+        setUexStatusMessage(res.message || '✓ UEX API 2.0 erfolgreich verbunden!');
+        setUexStatusColor('#4ADE80');
+      } else {
+        setUexStatusMessage(res?.message || '⚠ UEX API Verbindungsfehler');
+        setUexStatusColor('#F87171');
+      }
+    } catch (err: any) {
+      setUexStatusMessage(`⚠ Fehler beim Verbindungsaufbau: ${err?.message || err}`);
+      setUexStatusColor('#F87171');
+    } finally {
+      setIsTestingUex(false);
+    }
+  };
+
+  const handleClearUexKey = () => {
+    setUexApiKeyInput('');
+    handleSaveAndTestUexKey('');
   };
 
   const [dbDiag, setDbDiag] = useState<any>(null);
@@ -318,6 +366,15 @@ export const SettingsView: React.FC = () => {
         setSettings(data);
         if (data.selectedFontFamily) {
           applyFontFamily(data.selectedFontFamily);
+        }
+        if (data.uexApiKey) {
+          setUexApiKeyInput(data.uexApiKey);
+          setUexStatusMessage('✓ API-Key hinterlegt (Klicke "Speichern & Testen" zur Validierung)');
+          setUexStatusColor('#58A6FF');
+        } else {
+          setUexApiKeyInput('');
+          setUexStatusMessage('✓ Öffentlicher Modus aktiv (Gecachte Community-Preise)');
+          setUexStatusColor('#8B949E');
         }
         setTimeout(() => {
           isLoadedRef.current = true;
@@ -2181,32 +2238,117 @@ export const SettingsView: React.FC = () => {
         );
       })()}
 
-      {/* Tab 5: UEX Corp */}
+      {/* Tab 5: UEX Corp API 2.0 Integration */}
       {activeSubTab === 'uex' && (
         <div className="space-y-6">
           <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Globe className="w-4 h-4" />
-                <span>UEX CORP API-SCHLÜSSEL & INTEGRATION</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Ermöglicht Live-Warenpreise, Handelsrouten und Marktvolumina von UEXCorp.space abzurufen.
-              </p>
+            {/* Header mit Titel und UEX Doku Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <Globe className="w-4 h-4 text-sky-400" />
+                  <span>UEX CORP API 2.0 INTEGRATION</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Verknüpfe deinen persönlichen UEX-Account &amp; API-Key für Live-Handelsdaten, Terminals und Preise.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => bridge.send('open_external_url', { url: 'https://uexcorp.space/api/documentation' })}
+                className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-sky-950/80 hover:bg-sky-900/80 border border-sky-800/60 text-sky-300 text-xs font-semibold flex items-center space-x-2 transition cursor-pointer shrink-0 shadow-sm"
+              >
+                <span>📖</span>
+                <span>UEX Doku</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="space-y-3 max-w-xl">
-              <label className="text-xs font-semibold text-slate-300">Dein UEX Corp API-Token:</label>
-              <input
-                type="password"
-                value={settings.uexApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, uexApiKey: e.target.value })}
-                placeholder="uex_token_..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
-              />
-              <p className="text-[11px] text-slate-500">
-                Erhältlich in deinen UEX Corp Kontoeinstellungen unter "API Keys". Ohne Key werden gecachte Community-Preise verwendet.
-              </p>
+            {/* Token Input & Speichern/Testen Button */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+                  <Key className="w-3.5 h-3.5 text-sky-400" />
+                  <span>UEX Access Token / API Key:</span>
+                </label>
+                {uexApiKeyInput && (
+                  <button
+                    type="button"
+                    onClick={handleClearUexKey}
+                    className="text-[11px] text-slate-400 hover:text-rose-400 flex items-center space-x-1 cursor-pointer transition"
+                    title="API-Key löschen und auf öffentlichen Modus zurücksetzen"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Schlüssel entfernen</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showUexKey ? 'text' : 'password'}
+                    value={uexApiKeyInput}
+                    onChange={(e) => setUexApiKeyInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveAndTestUexKey();
+                      }
+                    }}
+                    placeholder="UEX Access Token / API Key (z.B. Bearer Token)..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 pr-10 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUexKey(!showUexKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 cursor-pointer transition"
+                    title={showUexKey ? 'Schlüssel maskieren' : 'Schlüssel im Klartext anzeigen'}
+                  >
+                    {showUexKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSaveAndTestUexKey()}
+                  disabled={isTestingUex}
+                  className="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white text-xs font-bold transition flex items-center justify-center space-x-2 shrink-0 cursor-pointer shadow-md shadow-sky-950/50 disabled:opacity-50"
+                >
+                  <Save className={`w-3.5 h-3.5 ${isTestingUex ? 'animate-spin' : ''}`} />
+                  <span>{isTestingUex ? 'Prüfe Verbindung...' : '💾 Speichern & Testen'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live-Status Infobox */}
+            <div className="p-3.5 rounded-lg bg-[#0D1117] border border-[#21262D] flex items-start space-x-3 text-xs shadow-inner">
+              <span className="text-base shrink-0 leading-none mt-0.5" style={{ color: uexStatusColor }}>
+                ⚡
+              </span>
+              <div className="space-y-1 overflow-hidden">
+                <div className="font-semibold text-xs leading-snug" style={{ color: uexStatusColor }}>
+                  {uexStatusMessage}
+                </div>
+                <div className="text-[11px] text-slate-400 leading-relaxed">
+                  Dein geheimer API-Schlüssel wird lokal in settings.json gespeichert und für Preis- und Stationsabfragen genutzt.
+                </div>
+              </div>
+            </div>
+
+            {/* Infobox: Woher bekomme ich den Key? */}
+            <div className="p-3.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="text-[11px] text-slate-400">
+                Erhältlich in deinen UEX Corp Kontoeinstellungen unter <span className="text-slate-300 font-semibold">"API Keys"</span>. Ohne hinterlegten Schlüssel werden gecachte Community-Marktpreise verwendet.
+              </div>
+              <button
+                type="button"
+                onClick={() => bridge.send('open_external_url', { url: 'https://uexcorp.space' })}
+                className="text-[11px] text-sky-400 hover:text-sky-300 hover:underline flex items-center space-x-1 shrink-0 cursor-pointer"
+              >
+                <span>UEXCorp.space öffnen</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>

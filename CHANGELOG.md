@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **UEX Corp API 2.0 Integration Suite (`SettingsView.tsx`, `PhotinoBridge.cs`, `UexApiClient.cs`)**:
+  - Restored full UEX Corp API 2.0 management suite matching the desktop release design.
+  - Added dedicated UEX documentation quick-link button opening official documentation (`https://uexcorp.space/api/documentation`).
+  - Added secure API token input with show/hide password toggle, clear key shortcut, and inline validation.
+  - Implemented interactive "Save & Test" action (`test_uex_api_key`) validating connection and authenticated account handle against the UEX API.
+  - Added live status card with dynamic state coloring, lightning status indicator, and fallback notice when running in cached community mode.
 - **VoiceAttack & Aurora Log-Wächter Settings Suite (`SettingsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
   - Restored full VoiceAttack & Aurora Log-Wächter management interface matching the desktop release design.
   - Added installation detection banner with auto-path resolution (`Documents` / `OneDrive`), real-time profile status badges, and debug-mode installation simulation toggle.
