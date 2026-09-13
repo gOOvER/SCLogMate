@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added cursor-centric wheel zooming keeping the exact coordinate under the mouse cursor fixed.
 
 ### Removed
+- **Redundant Category Filter Chips in Event Log Header (`EventsView.tsx`)**:
+  - Removed the cramped 9-button category filter bar (`Alle`, `Geld`, `Aufträge`, `Baupläne`, `Schiffe`, `Orte`, `Crew`, `Loot`, `Sonst`) from the top header of `EventsView`.
+  - Resolves duplicate functionality since dedicated sidebar tabs already exist for Finances, Missions, Blueprints, Fleet, and Locations.
+  - Eliminates the horizontal overflow and unwanted scrollbar in the event log header bar.
+  - Retained full event search input, session selection dropdown, and context-menu filtering with a clean removable active filter indicator.
 - **Redundant Refinery & Haul Tracker Tab in RS Radar (`OreScannerView.tsx`)**:
   - Removed duplicate "Raffinerie-Aufträge & Mining-Haul-Tracker" tab from the Ore Scanner view since all haul tracking, OCR scanning, yield calculation, and station bonuses are already consolidated in the dedicated Refinery view (`RefineryView.tsx`).
   - Streamlined `OreScannerView` to focus purely on RS radar ping decoding, rock mass signatures, and resource database lookups.

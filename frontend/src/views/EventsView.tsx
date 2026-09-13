@@ -342,34 +342,20 @@ export const EventsView: React.FC<EventsViewProps> = ({
             </div>
           )}
 
-          <div className="h-4 w-px bg-cyan-950/80 hidden sm:block shrink-0" />
-
-          {/* Filter-Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {[
-              { id: 'Alle', label: 'Alle' },
-              { id: 'Geld', label: '💰 Geld' },
-              { id: 'Aufträge', label: '❖ Aufträge' },
-              { id: 'Baupläne', label: '⬡ Baupläne' },
-              { id: 'Schiffe', label: '🚀 Schiffe' },
-              { id: 'Orte', label: '📍 Orte' },
-              { id: 'Crew', label: '👥 Crew' },
-              { id: 'Loot', label: '📦 Loot' },
-              { id: 'Sonst', label: '⚙️ Sonst' },
-            ].map((c) => (
+          {/* Aktiver Kategorie-Filter (falls über Kontextmenü gesetzt) */}
+          {category !== 'Alle' && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/40 text-xs font-mono text-cyan-300 shrink-0">
+              <span>Filter: {category}</span>
               <button
-                key={c.id}
-                onClick={() => setCategory(c.id)}
-                className={`px-2.5 py-1 text-xs font-mono font-semibold rounded transition cursor-pointer shrink-0 ${
-                  category === c.id
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80 border border-slate-800/80'
-                }`}
+                type="button"
+                onClick={() => setCategory('Alle')}
+                className="hover:text-white cursor-pointer ml-0.5"
+                title="Kategorie-Filter aufheben"
               >
-                {c.label}
+                <X className="w-3 h-3" />
               </button>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Search Input + Refresh */}
