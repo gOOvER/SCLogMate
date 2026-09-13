@@ -20,7 +20,7 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"\b\d{1,2}:\d{2}(?::\d{2})?\b")]
     private static partial Regex ClockRegex();
 
-    [GeneratedRegex(@"(?i)[.,\s]*(?:\baUEC\b|\bUEC\b|\bSCU\b|\bSC\b|\bSc:?|\b[xX]:?|[æÆœŒ\u00A4\$€£¥ÄäÅå©®])|[æÆœŒ]")]
+    [GeneratedRegex(@"(?i)[.,\s]*(?:\baUEC\b|\bUEC\b|\bSCU\b|\bSC\b|\bSc:?|\b[xX]:?|[æœ\u00A4\$€£¥ÄäÅå©®])|[æœ]")]
     private static partial Regex CurrencyLabelRegex();
 
     // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, v, Leerzeichen o.ä. fehlinterpretiert werden
@@ -117,11 +117,11 @@ public static partial class WalletOcrTrigger
             }
             else
             {
-                // Unformatierte Ziffernfolge (z.B. "0", "846", "5105256")
-                if (parts[0].Length < 1 || parts[0].Length > 11) continue;
+                // Unformatierte Ziffernfolge (z.B. "100", "846", "5105256"): mindestens 3 Stellen.
+                // 1- oder 2-stellige Zahlen ("2", "5", "31") sind OCR-Fragmente und NIEMALS ein gültiger mobiGlas-Saldo!
+                if (parts[0].Length < 3 || parts[0].Length > 11) continue;
 
-                // Keine führenden Nullen bei mehrstelligen unformatierten Zahlen (z.B. "031" ist immer der abgerissene Schwanz von "25.031")
-                if (parts[0].Length > 1 && parts[0].StartsWith('0')) continue;
+                if (parts[0].StartsWith('0')) continue;
             }
 
             var digits = 0;

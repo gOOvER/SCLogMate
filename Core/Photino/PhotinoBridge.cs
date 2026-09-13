@@ -5147,6 +5147,31 @@ public class PhotinoBridge
             {
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
+
+            try
+            {
+                string debugPath = @"C:\Users\goove\.gemini\antigravity-ide\brain\9c5f6247-edfd-4be1-aced-4cc3d934e8be\captured_crop.bmp";
+                using var fs = new System.IO.FileStream(debugPath, System.IO.FileMode.Create, System.IO.FileAccess.Write);
+                using var bw = new System.IO.BinaryWriter(fs);
+                bw.Write((byte)'B'); bw.Write((byte)'M');
+                bw.Write(54 + raw.Length);
+                bw.Write((int)0);
+                bw.Write(54);
+                bw.Write(40);
+                bw.Write(region.Width);
+                bw.Write(-region.Height);
+                bw.Write((short)1);
+                bw.Write((short)32);
+                bw.Write(0);
+                bw.Write(raw.Length);
+                bw.Write(0); bw.Write(0); bw.Write(0); bw.Write(0);
+                bw.Write(raw);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SaveDebugBmp", ex);
+            }
+
             int optScale = region.Height <= 65 ? 5 : (region.Height <= 110 ? 3 : (region.Height <= 180 ? 2 : 1));
             var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: optScale, padding: 24, boostContrast: false);
             var bestText = WalletOcrTrigger.BestRead(invText, plainText);
