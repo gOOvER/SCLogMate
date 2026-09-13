@@ -20,7 +20,7 @@ public static partial class WalletOcrTrigger
     [GeneratedRegex(@"\b\d{1,2}:\d{2}(?::\d{2})?\b")]
     private static partial Regex ClockRegex();
 
-    [GeneratedRegex(@"(?i)\baUEC\b|(?i)\bUEC\b|(?i)\bSCU\b|(?i)\bSC\b|(?i)\bSc:?|\b[xX]:?|[\u00A4\$€£¥ÄäÅå©®]")]
+    [GeneratedRegex(@"(?i)[.,\s]*(?:\baUEC\b|\bUEC\b|\bSCU\b|\bSC\b|\bSc:?|\b[xX]:?|[æÆœŒ\u00A4\$€£¥ÄäÅå©®])|[æÆœŒ]")]
     private static partial Regex CurrencyLabelRegex();
 
     // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, v, Leerzeichen o.ä. fehlinterpretiert werden
@@ -71,7 +71,7 @@ public static partial class WalletOcrTrigger
         // 1. Uhrzeiten entfernen (z.B. "14:02 1,067,200 aUEC" -> "  1,067,200 aUEC")
         var normalized = ClockRegex().Replace(ocrText, " ");
 
-        // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289" oder "Ä 2.038.063")
+        // 2. Explizite Währungskennungen sauber entfernen (auch wenn direkt an Zahl geklebt: "aUEC2.349.289", "Ä 2.038.063", "2.585.æ")
         normalized = CurrencyLabelRegex().Replace(normalized, " ");
 
         // 3. Tausendertrennzeichen normalisieren: Erkennt typische OCR-Fehlinterpretationen von Kommas/Punkten (% ' ; : _ - ~ Leerzeichen)
@@ -89,12 +89,8 @@ public static partial class WalletOcrTrigger
 
         foreach (Match m in CandidateNumberRegex().Matches(normalized))
         {
-            var raw = m.Value.Trim();
+            var raw = m.Value.Trim().Trim('.', ',', ' ');
             if (raw.Length == 0) continue;
-
-            // Darf nicht mit Trennzeichen beginnen oder enden (z.B. "2.349." ist abgeschnitten)
-            if (raw.StartsWith('.') || raw.StartsWith(',') || raw.EndsWith('.') || raw.EndsWith(','))
-                continue;
 
             var parts = raw.Split(new[] { '.', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) continue;

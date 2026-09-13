@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added strict leading-zero rejection for multi-digit unformatted candidate numbers so truncated fragments like `031` can never be parsed as valid balances.
   - Implemented high-quality bilinear interpolation in `OcrEngineService.Preprocess` to eliminate nearest-neighbor staircase artifacts on diagonal glyph strokes without blurring.
   - Replaced restrictive scale caps with optimal adaptive height scaling (`capH <= 65 ? 5 : (capH <= 110 ? 3 : (capH <= 180 ? 2 : 1))`), ensuring character heights in the optimal 60-80px OCR sweet spot across all resolutions instead of downsampling to illegible 1x/2x sizes.
-  - Sanitized currency symbol artifacts (`Sc:`, `SC`, `x:`, `xl`) and added `v`/`V` thousands separator tolerance in `WalletOcrTrigger`.
+  - Sanitized currency symbol artifacts (`Sc:`, `SC`, `x:`, `xl`, `æ`, `Æ`, `œ`, `Œ`) and added trailing separator trimming in `WalletOcrTrigger`, fixing mobiGlas aUEC small-caps ligatures and attached dots (`Ä 2.585.æ` -> `2,585 aUEC`).
   - Added detailed diagnostic logging for Test-Scan and individual burst grabs in `PhotinoBridge.cs` and `WalletCapture.cs`.
 
 - **Interactive Template & Preset Preview Modal (`ToolsView.tsx`)**:
