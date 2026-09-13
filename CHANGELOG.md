@@ -177,8 +177,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reorganized cluttered, overflowing tab header into three concise, clean sub-views: "Handelsrouten", "Salvage & Schrott-Preise", and "Warenrechner".
   - Relocated ship cargo presets (C2, Caterpillar, Taurus, Freelancer MAX, Cutlass) from the global navigation tab bar into a dedicated configuration toolbar with custom SCU number input.
   - Eliminated browser scrollbar glitch on ship presets and unified visual hierarchy matching SCLogMate HUD aesthetic.
-- **In-Game Chat-Protokoll & Background OCR (`Sidebar.tsx`, `Settings.cs`, `PhotinoBridge.cs`, `ROADMAP.md`)**:
+- **In-Game Chat-Protokoll & Background OCR (`Sidebar.tsx`, `Settings.cs`, `PhotinoBridge.cs`, `SettingsView.tsx`, `ROADMAP.md`)**:
   - Temporarily deactivated the In-Game Chat-Protokoll navigation tab from the main sidebar and defaulted `ChatOcrEnabled = false` in application settings and Photino bridge state.
+  - Deactivated and removed the In-Game Chat Scan calibration and testing section from the OCR settings view in alignment with the paused chat protocol feature.
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 
 ### Fixed
