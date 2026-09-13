@@ -51,9 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Streamlined `OreScannerView` to focus purely on RS radar ping decoding, rock mass signatures, and resource database lookups.
 
 ### Fixed
-- **Font Chooser & Live Typography Preview (`index.html`, `index.css`, `photinoBridge.ts`, `SettingsView.tsx`, `App.tsx`)**:
+- **Font Chooser & Live Typography Preview (`main.tsx`, `index.html`, `index.css`, `photinoBridge.ts`, `SettingsView.tsx`, `App.tsx`)**:
   - Fixed font chooser preview in Settings not rendering selected fonts (`Orbitron`, `Rajdhani`, `JetBrains Mono`, `Roboto`) due to missing web font imports in the Chromium WebView environment.
-  - Added Google Fonts CDN imports and CSS variables (`--font-family-primary`) enabling seamless rendering of `Inter`, `Orbitron`, `Rajdhani`, `Roboto`, and `JetBrains Mono`.
+  - Integrated 100% self-hosted, offline-ready, and GDPR/DSGVO-compliant `@fontsource` packages (`Inter`, `Orbitron`, `Rajdhani`, `Roboto`, `JetBrains Mono`), completely avoiding external Google CDN requests.
   - Added interactive font selection chips with live typography styling per font and instantaneous real-time UI application via `applyFontFamily`.
   - Replaced truncated single-line preview with an expansive live typography preview card displaying HUD telemetry headings, descriptive text, currency values, SCU cargo numbers, latency metrics, and glyphs.
   - Persisted user-selected font in `localStorage` for instant zero-flicker startup application before backend RPC completion.
@@ -183,6 +183,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deferred comprehensive chat OCR overhaul (adaptive background thresholding, sender column separation, and enhanced static message deduplication) to the roadmap backlog (Step 9).
 - **Pilot & Server HUD Bar Card Clean-Up (`HudBar.tsx`)**:
   - Removed the raw Citizen Record number badge from next to the pilot handle in the Pilot & Server HUD card for a cleaner presentation, retaining the full record in the hover tooltip and interactive Citizen Dossier modal.
+- **GDPR / DSGVO-Compliant Self-Hosted Typography (`main.tsx`, `index.html`, `index.css`)**:
+  - Completely removed external Google Fonts CDN endpoints (`fonts.googleapis.com` / `fonts.gstatic.com`) to ensure full GDPR / DSGVO compliance without remote IP transmission.
+  - Bundled all web fonts locally via `@fontsource` packages (`Inter`, `Orbitron`, `Rajdhani`, `Roboto`, `JetBrains Mono`) directly into the local application bundle for full offline support.
 
 ### Fixed
 - **Live-Stream Events Display & Active Game.log Synchronization (`PhotinoBridge.cs`, `EventsView.tsx`, `App.tsx`)**:
