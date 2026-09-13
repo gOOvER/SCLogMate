@@ -57,6 +57,7 @@ public sealed class ResolvedLocation
     public string DisplayName { get; set; } = "—";
     public string SystemName { get; set; } = "Stanton";
     public string ParentBody { get; set; } = "—";
+    public string StarmapId { get; set; } = "";
     public StarmapObjectType Type { get; set; } = StarmapObjectType.Outpost;
     public bool IsArmistice { get; set; }
     public string ArmisticeStatusText => IsArmistice ? "🟢 Schutzzone aktiv" : "🔴 Keine Schutzzone (Waffen scharf)";

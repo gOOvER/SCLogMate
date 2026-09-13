@@ -349,7 +349,7 @@ export const App: React.FC = () => {
 
           {activeTab === 'reputation' && <ReputationView />}
 
-          {activeTab === 'starmap' && <StarmapView />}
+          {activeTab === 'starmap' && <StarmapView telemetry={telemetry} />}
 
           {activeTab === 'places' && <PlacesView />}
 

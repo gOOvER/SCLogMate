@@ -166,9 +166,15 @@ public class HudTelemetryDto
     [JsonPropertyName("serverVersion")] public string ServerVersion { get; set; } = "—";
     [JsonPropertyName("serverPingMs")] public int? ServerPingMs { get; set; }
     [JsonPropertyName("locationName")] public string LocationName { get; set; } = "—";
+    [JsonPropertyName("locationId")] public string LocationId { get; set; } = "";
+    [JsonPropertyName("locationConfidence")] public string LocationConfidence { get; set; } = "None";
     [JsonPropertyName("locationSystem")] public string LocationSystem { get; set; } = "Stanton";
     [JsonPropertyName("locationBody")] public string LocationBody { get; set; } = "—";
     [JsonPropertyName("locationType")] public string LocationType { get; set; } = "Standort";
+    [JsonPropertyName("isTravelling")] public bool IsTravelling { get; set; }
+    [JsonPropertyName("travellingToName")] public string? TravellingToName { get; set; }
+    [JsonPropertyName("travellingToId")] public string? TravellingToId { get; set; }
+    [JsonPropertyName("travellingToSystem")] public string? TravellingToSystem { get; set; }
     [JsonPropertyName("isArmistice")] public bool IsArmistice { get; set; } = true;
     [JsonPropertyName("jurisdiction")] public string Jurisdiction { get; set; } = "UEE";
     [JsonPropertyName("shipName")] public string ShipName { get; set; } = "—";
@@ -2958,34 +2964,67 @@ public class PhotinoBridge
 
         int? ping = isGameRunning ? 28 : null;
 
-        // Location
-        string locRaw = "—";
-        if (_parser.LocationVisits.Count > 0)
-        {
-            locRaw = _parser.LocationVisits.Last().RawId;
-        }
+        // Location from LocationStateMachine & DB Fallback
+        var locState = _parser.LocationMachine.State;
+        ResolvedLocation resolvedLoc;
+        string locConfidence = locState.Confidence.ToString();
+        bool isTravelling = locState.IsTravelling;
+        string? travellingToName = locState.TravellingTo?.DisplayName;
+        string? travellingToId = locState.TravellingTo?.StarmapId;
+        string? travellingToSys = locState.TravellingTo?.SystemName;
 
-        if (locRaw == "—" || string.IsNullOrWhiteSpace(locRaw))
+        if (locState.Current != null && locState.Current.DisplayName != "—")
         {
-            try
+            resolvedLoc = locState.Current;
+        }
+        else
+        {
+            string locRaw = "—";
+            if (_parser.LocationVisits.Count > 0)
             {
-                using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
-                db.Open();
-                using var cmd = db.CreateCommand();
-                cmd.CommandText = targetSession == "__all__"
-                    ? "SELECT detail FROM events WHERE kind = 'Location' ORDER BY time DESC LIMIT 1;"
-                    : "SELECT detail FROM events WHERE (session = @sess OR @sess = '') AND kind = 'Location' ORDER BY time DESC LIMIT 1;";
-                cmd.Parameters.AddWithValue("@sess", targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession);
-                var res = cmd.ExecuteScalar()?.ToString();
-                if (!string.IsNullOrWhiteSpace(res)) locRaw = res;
+                locRaw = _parser.LocationVisits.Last().RawId;
             }
-            catch { }
+
+            if (locRaw == "—" || string.IsNullOrWhiteSpace(locRaw))
+            {
+                try
+                {
+                    using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+                    db.Open();
+                    using var cmd = db.CreateCommand();
+                    cmd.CommandText = targetSession == "__all__"
+                        ? "SELECT detail FROM events WHERE kind = 'Location' ORDER BY time DESC LIMIT 1;"
+                        : "SELECT detail FROM events WHERE (session = @sess OR @sess = '') AND kind = 'Location' ORDER BY time DESC LIMIT 1;";
+                    cmd.Parameters.AddWithValue("@sess", targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession);
+                    var res = cmd.ExecuteScalar()?.ToString();
+                    if (!string.IsNullOrWhiteSpace(res)) locRaw = res;
+                }
+                catch { }
+            }
+
+            if (locRaw != "—" && !string.IsNullOrWhiteSpace(locRaw))
+            {
+                resolvedLoc = Locations.ResolveLocation(locRaw);
+                locConfidence = "Medium";
+            }
+            else
+            {
+                resolvedLoc = new ResolvedLocation
+                {
+                    DisplayName = "Unbekannt",
+                    SystemName = _parser.LocationMachine.State.Current?.SystemName ?? "Stanton",
+                    ParentBody = "—",
+                    Type = StarmapObjectType.Outpost,
+                    IsArmistice = false,
+                    StarmapId = ""
+                };
+            }
         }
 
-        var resolvedLoc = Locations.ResolveLocation(locRaw != "—" ? locRaw : "Port_Tressler");
-        string locName = resolvedLoc.DisplayName != "—" ? resolvedLoc.DisplayName : "Port Tressler";
+        string locName = resolvedLoc.DisplayName;
+        string locId = resolvedLoc.StarmapId;
         string locSys = !string.IsNullOrEmpty(resolvedLoc.SystemName) ? resolvedLoc.SystemName : "Stanton";
-        string locBody = !string.IsNullOrEmpty(resolvedLoc.ParentBody) ? resolvedLoc.ParentBody : "microTech";
+        string locBody = !string.IsNullOrEmpty(resolvedLoc.ParentBody) ? resolvedLoc.ParentBody : "—";
         string locType = resolvedLoc.Type switch
         {
             StarmapObjectType.LandingZone => "Landezone",
@@ -2997,7 +3036,7 @@ public class PhotinoBridge
             _ => "Außenposten"
         };
         bool isArmistice = resolvedLoc.IsArmistice;
-        string jurisdiction = locSys == "Pyro" ? "Gesetzlos (Outlaw)" : "UEE Protektorat";
+        string jurisdiction = locSys == "Pyro" ? "Gesetzlos (Outlaw)" : (locSys == "Nyx" ? "People's Alliance" : "UEE Protektorat");
 
         // Ship
         string shipName = "—";
@@ -3214,9 +3253,15 @@ public class PhotinoBridge
             ServerVersion = scVersion,
             ServerPingMs = ping,
             LocationName = locName,
+            LocationId = locId,
+            LocationConfidence = locConfidence,
             LocationSystem = locSys,
             LocationBody = locBody,
             LocationType = locType,
+            IsTravelling = isTravelling,
+            TravellingToName = travellingToName,
+            TravellingToId = travellingToId,
+            TravellingToSystem = travellingToSys,
             IsArmistice = isArmistice,
             Jurisdiction = jurisdiction,
             ShipName = shipName,

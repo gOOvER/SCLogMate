@@ -388,6 +388,9 @@ public partial class LogParser
     readonly Dictionary<string, DateTime> _seenBlueprints = new(StringComparer.OrdinalIgnoreCase);
     bool _metaComplete;
 
+    /// <summary>Intelligente Zustandsmaschine für Spielerstandort und Quantum-Reisen.</summary>
+    public LocationStateMachine LocationMachine { get; } = new();
+
     /// <summary>Session-Metadaten (Build, Hardware, Charakter, Shard, …).</summary>
     public Dictionary<string, string> Meta { get; } = new();
 
@@ -470,6 +473,7 @@ public partial class LogParser
 
         if (locRes.DisplayName != "—" && !locRes.DisplayName.StartsWith("Im Transit", StringComparison.OrdinalIgnoreCase))
         {
+            LocationMachine.ApplyInventoryRequest(rawLoc, ts);
             LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
             if (locRes.DisplayName != _lastLoc)
             {
@@ -698,11 +702,13 @@ public partial class LogParser
         // Quantum Route-Berechnungen (Destination merken für QT-Ankunft & System-Erkennung)
         if (line.Contains("route to", StringComparison.OrdinalIgnoreCase) || line.Contains("as their destination", StringComparison.OrdinalIgnoreCase))
         {
+            var ts = ParseTs(line);
             var qr = QuantumRouteRegex().Match(line);
             if (qr.Success)
             {
                 _pendingQtDestination = qr.Groups["dest"].Value;
                 var origin = qr.Groups["origin"].Value;
+                LocationMachine.ApplyQuantumRoute(origin, _pendingQtDestination, ts);
                 var resOrigin = Locations.ResolveLocation(origin);
                 if (resOrigin.SystemName is "Stanton" or "Pyro" or "Nyx")
                 {
@@ -716,6 +722,7 @@ public partial class LogParser
                 if (qrs.Success)
                 {
                     _pendingQtDestination = qrs.Groups["dest"].Value;
+                    LocationMachine.ApplyQuantumRoute(null, _pendingQtDestination, ts);
                 }
                 else
                 {
@@ -723,6 +730,7 @@ public partial class LogParser
                     if (qtTarget.Success)
                     {
                         _pendingQtDestination = qtTarget.Groups["dest"].Value;
+                        LocationMachine.ApplyQuantumTarget(_pendingQtDestination, ts);
                     }
                 }
             }
@@ -945,7 +953,9 @@ public partial class LogParser
         // Spawn ins Spiel
         if (line.Contains("[CSessionManager::OnClientSpawned]", StringComparison.Ordinal) && ClientSpawnedRegex().IsMatch(line))
         {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = "Im Spiel gespawnt (Station / Hangar)" };
+            var ts = ParseTs(line);
+            LocationMachine.ApplySpawn(null, ts);
+            return new LogEntry { Time = ts, Kind = EventKind.SessionChange, Detail = "Im Spiel gespawnt (Station / Hangar)" };
         }
 
         // ASOP Terminal Fahrzeugbereitstellung
@@ -1452,6 +1462,7 @@ public partial class LogParser
                     {
                         QuantumDestinations.Add((t, destination));
                     }
+                    LocationMachine.ApplyQuantumArrival(t);
 
                     return new LogEntry
                     {
@@ -1527,8 +1538,10 @@ public partial class LogParser
             var atc = AtcHangarRegex().Match(line);
             if (atc.Success)
             {
+                var ts = ParseTs(line);
                 var hangar = atc.Groups["hangar"].Value.Trim();
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+                LocationMachine.ApplyHangarAssignment(hangar, ts);
+                return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
             }
         }
 

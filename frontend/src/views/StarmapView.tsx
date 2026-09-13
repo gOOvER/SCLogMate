@@ -5,6 +5,7 @@ import {
   QuantumDriveDto,
   QuantumRouteResultDto,
   StarmapResponseDto,
+  HudTelemetry,
 } from '../services/photinoBridge';
 import {
   Navigation,
@@ -12,9 +13,16 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Crosshair,
+  Search,
+  Compass,
 } from 'lucide-react';
 
-export const StarmapView: React.FC = () => {
+interface StarmapViewProps {
+  telemetry?: HudTelemetry;
+}
+
+export const StarmapView: React.FC<StarmapViewProps> = ({ telemetry }) => {
   const [system, setSystem] = useState<'Stanton' | 'Pyro' | 'Nyx'>('Stanton');
   const [objects, setObjects] = useState<StarmapObjectDto[]>([]);
   const [drives, setDrives] = useState<QuantumDriveDto[]>([]);
@@ -23,6 +31,12 @@ export const StarmapView: React.FC = () => {
   const [toId, setToId] = useState<string>('crusader');
   const [selectedDrive, setSelectedDrive] = useState<string>('Atlas');
   const [routeResult, setRouteResult] = useState<QuantumRouteResultDto | null>(null);
+
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Follow-Me Mode
+  const [followMe, setFollowMe] = useState<boolean>(true);
 
   // Layer filters
   const [showStations, setShowStations] = useState<boolean>(true);
@@ -34,17 +48,49 @@ export const StarmapView: React.FC = () => {
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const hasDraggedRef = useRef<boolean>(false);
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
-  // Non-passive wheel listener for smooth zoom without page scroll
+  // Center coordinate reference
+  const center = 300;
+  const scale = 0.65 * zoom;
+
+  // Auto-switch system based on player telemetry if followMe is enabled
+  useEffect(() => {
+    if (!followMe || !telemetry?.locationSystem) return;
+    const sys = telemetry.locationSystem.trim().toLowerCase();
+    if (sys === 'pyro') {
+      if (system !== 'Pyro') setSystem('Pyro');
+    } else if (sys === 'nyx') {
+      if (system !== 'Nyx') setSystem('Nyx');
+    } else if (sys === 'stanton') {
+      if (system !== 'Stanton') setSystem('Stanton');
+    }
+  }, [telemetry?.locationSystem, followMe]);
+
+  // Non-passive wheel listener for smooth zoom-to-cursor
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-      setZoom((z) => Math.min(3.5, Math.max(0.3, z * zoomFactor)));
+      setZoom((prevZoom) => {
+        const nextZoom = Math.min(3.5, Math.max(0.3, prevZoom * zoomFactor));
+        // Keep point under cursor invariant
+        setPan((prevPan) => {
+          const ratio = nextZoom / prevZoom;
+          const newX = mouseX - (mouseX - prevPan.x) * ratio;
+          const newY = mouseY - (mouseY - prevPan.y) * ratio;
+          return { x: newX, y: newY };
+        });
+        return nextZoom;
+      });
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -107,6 +153,78 @@ export const StarmapView: React.FC = () => {
     return objects.find((o) => o.id.toLowerCase() === selectedId.toLowerCase()) || objects[0] || null;
   }, [objects, selectedId]);
 
+  // Resolve player's current location object in the starmap
+  const playerLocationObject = useMemo(() => {
+    if (!telemetry || !objects.length) return null;
+
+    // Match by telemetry.locationId first
+    if (telemetry.locationId) {
+      const byId = objects.find((o) => o.id.toLowerCase() === telemetry.locationId!.toLowerCase());
+      if (byId) return byId;
+    }
+
+    // Match by exact or partial name
+    if (telemetry.locationName && telemetry.locationName !== '—' && telemetry.locationName !== 'Unbekannt') {
+      const cleanName = telemetry.locationName.split('·')[0].trim().toLowerCase();
+      const byName = objects.find(
+        (o) =>
+          o.name.toLowerCase() === cleanName ||
+          o.name.toLowerCase().includes(cleanName) ||
+          cleanName.includes(o.name.toLowerCase())
+      );
+      if (byName) return byName;
+    }
+
+    // Fallback to parent body
+    if (telemetry.locationBody && telemetry.locationBody !== '—') {
+      const cleanBody = telemetry.locationBody.toLowerCase();
+      const byBody = objects.find((o) => o.name.toLowerCase() === cleanBody || o.id.toLowerCase() === cleanBody);
+      if (byBody) return byBody;
+    }
+
+    return null;
+  }, [telemetry, objects]);
+
+  // Resolve player's destination during quantum travel
+  const travelTargetObject = useMemo(() => {
+    if (!telemetry?.isTravelling || !objects.length) return null;
+
+    if (telemetry.travellingToId) {
+      const byId = objects.find((o) => o.id.toLowerCase() === telemetry.travellingToId!.toLowerCase());
+      if (byId) return byId;
+    }
+
+    if (telemetry.travellingToName) {
+      const cleanTarget = telemetry.travellingToName.toLowerCase();
+      return objects.find(
+        (o) =>
+          o.name.toLowerCase() === cleanTarget ||
+          o.name.toLowerCase().includes(cleanTarget) ||
+          cleanTarget.includes(o.name.toLowerCase())
+      ) || null;
+    }
+
+    return null;
+  }, [telemetry, objects]);
+
+  // Center view on player position
+  const centerOnPlayer = () => {
+    if (!playerLocationObject) return;
+    const targetX = center + playerLocationObject.relX * scale;
+    const targetY = center + playerLocationObject.relY * scale;
+    setPan({
+      x: 300 - targetX,
+      y: 300 - targetY,
+    });
+  };
+
+  // Center on player when followMe is engaged and location changes
+  useEffect(() => {
+    if (followMe && playerLocationObject) {
+      centerOnPlayer();
+    }
+  }, [playerLocationObject?.id, followMe]);
+
   // Filtered objects on canvas
   const visibleObjects = useMemo(() => {
     return objects.filter((o) => {
@@ -118,14 +236,38 @@ export const StarmapView: React.FC = () => {
     });
   }, [objects, showStations, showMoons, showLandingZones]);
 
+  // Search matches
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return new Set<string>();
+    const q = searchQuery.toLowerCase().trim();
+    const set = new Set<string>();
+    objects.forEach((o) => {
+      if (
+        o.name.toLowerCase().includes(q) ||
+        o.id.toLowerCase().includes(q) ||
+        o.specialization?.toLowerCase().includes(q) ||
+        o.resources?.toLowerCase().includes(q)
+      ) {
+        set.add(o.id.toLowerCase());
+      }
+    });
+    return set;
+  }, [searchQuery, objects]);
+
   // Mouse pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
+    hasDraggedRef.current = false;
     dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
+    const dx = Math.abs(e.clientX - (dragStartRef.current.x + pan.x));
+    const dy = Math.abs(e.clientY - (dragStartRef.current.y + pan.y));
+    if (dx > 3 || dy > 3) {
+      hasDraggedRef.current = true;
+    }
     setPan({
       x: e.clientX - dragStartRef.current.x,
       y: e.clientY - dragStartRef.current.y,
@@ -139,15 +281,11 @@ export const StarmapView: React.FC = () => {
     setPan({ x: 0, y: 0 });
   };
 
-  // Center coordinate reference
-  const center = 300;
-  const scale = 0.65 * zoom;
-
   return (
     <div className="flex flex-col min-h-full space-y-4 select-none">
       {/* Top Toolbar: System Selector & Quick Filters */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           {/* System switch pills */}
           <div className="flex items-center bg-slate-900/80 p-1 rounded-md border border-slate-800">
             <button
@@ -182,8 +320,38 @@ export const StarmapView: React.FC = () => {
             </button>
           </div>
 
+          {/* Follow-Me Toggle */}
+          <button
+            onClick={() => {
+              const next = !followMe;
+              setFollowMe(next);
+              if (next && playerLocationObject) centerOnPlayer();
+            }}
+            title="Automatisches Zentrieren auf Spielerstandort"
+            className={`px-2.5 py-1 text-xs font-mono rounded border flex items-center gap-1.5 transition cursor-pointer ${
+              followMe
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Crosshair className={`w-3.5 h-3.5 ${followMe ? 'text-emerald-400 animate-spin-slow' : ''}`} />
+            <span>Follow Me</span>
+          </button>
+
+          {/* Quick Search */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Ort / Station / Ressource..."
+              className="bg-slate-900/80 border border-slate-800 text-xs text-slate-200 pl-8 pr-2.5 py-1 rounded w-44 focus:w-56 transition-all focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
+
           {/* Layer toggles */}
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-1">
             <button
               onClick={() => setShowStations(!showStations)}
               className={`px-2.5 py-1 text-[11px] font-mono rounded border transition cursor-pointer ${
@@ -219,6 +387,16 @@ export const StarmapView: React.FC = () => {
 
         {/* View actions: Zoom, Reset, Refresh */}
         <div className="flex items-center gap-2">
+          {playerLocationObject && (
+            <button
+              onClick={centerOnPlayer}
+              title="Auf aktuellen Spielerstandort springen"
+              className="px-2.5 py-1 text-xs font-mono rounded bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/40 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <Compass className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Hier</span>
+            </button>
+          )}
           <button
             onClick={() => setZoom((z) => Math.min(3.5, z + 0.2))}
             title="Vergrößern (oder Mausrad)"
@@ -266,6 +444,13 @@ export const StarmapView: React.FC = () => {
             <defs>
               <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="here-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
                   <feMergeNode in="SourceGraphic" />
@@ -323,7 +508,65 @@ export const StarmapView: React.FC = () => {
                 />
               ))}
 
-            {/* Route Line if calculated */}
+            {/* Live Quantum Travel Vector (drawTravel) */}
+            {telemetry?.isTravelling && playerLocationObject && travelTargetObject && (
+              <g className="map-live-travel pointer-events-none">
+                {(() => {
+                  const x1 = center + playerLocationObject.relX * scale;
+                  const y1 = center + playerLocationObject.relY * scale;
+                  const x2 = center + travelTargetObject.relX * scale;
+                  const y2 = center + travelTargetObject.relY * scale;
+                  return (
+                    <>
+                      {/* Animated vector travel line */}
+                      <line
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="#F59E0B"
+                        strokeWidth="2"
+                        strokeDasharray="8 5"
+                        filter="url(#glow)"
+                        className="animate-pulse"
+                      >
+                        <animate
+                          attributeName="stroke-dashoffset"
+                          values="26;0"
+                          dur="0.85s"
+                          repeatCount="indefinite"
+                        />
+                      </line>
+
+                      {/* Expanding target rings */}
+                      <circle
+                        cx={x2}
+                        cy={y2}
+                        r="14"
+                        fill="none"
+                        stroke="#F59E0B"
+                        strokeWidth="1.5"
+                      >
+                        <animate
+                          attributeName="r"
+                          values="8;24"
+                          dur="1.6s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="0.9;0"
+                          dur="1.6s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                    </>
+                  );
+                })()}
+              </g>
+            )}
+
+            {/* Manual Route Line if calculated */}
             {routeResult &&
               (() => {
                 const fromObj = objects.find((o) => o.id === fromId);
@@ -355,6 +598,7 @@ export const StarmapView: React.FC = () => {
               const isSelected = obj.id.toLowerCase() === selectedId.toLowerCase();
               const isFrom = obj.id.toLowerCase() === fromId.toLowerCase();
               const isTo = obj.id.toLowerCase() === toId.toLowerCase();
+              const isSearchMatch = searchMatches.has(obj.id.toLowerCase());
 
               const r = Math.max(3, (obj.size / 2) * Math.min(1.5, Math.max(0.7, scale)));
 
@@ -364,9 +608,24 @@ export const StarmapView: React.FC = () => {
                   className="cursor-pointer transition-transform"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (hasDraggedRef.current) return;
                     setSelectedId(obj.id);
                   }}
                 >
+                  {/* Search Match Halo */}
+                  {isSearchMatch && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={r + 12}
+                      fill="none"
+                      stroke="#FACC15"
+                      strokeWidth="2"
+                      strokeDasharray="2 2"
+                      filter="url(#glow)"
+                    />
+                  )}
+
                   {/* Selection Ring */}
                   {isSelected && (
                     <circle
@@ -399,8 +658,9 @@ export const StarmapView: React.FC = () => {
                     opacity="0.9"
                   />
 
-                  {/* Label (displayed for planets, stars, and selected) */}
+                  {/* Label (displayed for planets, stars, search matches and selected) */}
                   {(isSelected ||
+                    isSearchMatch ||
                     obj.type.toLowerCase() === 'planet' ||
                     obj.type.toLowerCase() === 'star' ||
                     zoom >= 1.4) && (
@@ -408,10 +668,10 @@ export const StarmapView: React.FC = () => {
                       x={cx}
                       y={cy + r + 11}
                       textAnchor="middle"
-                      fill={isSelected ? '#00F0FF' : '#94A3B8'}
-                      fontSize={isSelected ? '11px' : '9px'}
+                      fill={isSelected ? '#00F0FF' : isSearchMatch ? '#FACC15' : '#94A3B8'}
+                      fontSize={isSelected || isSearchMatch ? '11px' : '9px'}
                       fontFamily="monospace"
-                      fontWeight={isSelected ? 'bold' : 'normal'}
+                      fontWeight={isSelected || isSearchMatch ? 'bold' : 'normal'}
                       pointerEvents="none"
                     >
                       {obj.name}
@@ -420,15 +680,142 @@ export const StarmapView: React.FC = () => {
                 </g>
               );
             })}
+
+            {/* LIVE "YOU ARE HERE" PLAYER MARKER (QuantumWake drawHere port) */}
+            {playerLocationObject && (
+              <g className="map-player-here pointer-events-none" filter="url(#here-glow)">
+                {(() => {
+                  const px = center + playerLocationObject.relX * scale;
+                  const py = center + playerLocationObject.relY * scale;
+                  const ringR = 15;
+
+                  return (
+                    <>
+                      {/* Constant Steady Ring */}
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r={ringR}
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="1.8"
+                      />
+
+                      {/* Expanding Pulse Ring */}
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r={ringR}
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="1.2"
+                      >
+                        <animate
+                          attributeName="r"
+                          values={`${ringR};${ringR + 22}`}
+                          dur="2.2s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="0.8;0"
+                          dur="2.2s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+
+                      {/* Precision Reticle Crosshair Ticks */}
+                      <line
+                        x1={px - ringR - 5}
+                        y1={py}
+                        x2={px + ringR + 5}
+                        y2={py}
+                        stroke="#10B981"
+                        strokeWidth="1.2"
+                        opacity="0.8"
+                      />
+                      <line
+                        x1={px}
+                        y1={py - ringR - 5}
+                        x2={px}
+                        y2={py + ringR + 5}
+                        stroke="#10B981"
+                        strokeWidth="1.2"
+                        opacity="0.8"
+                      />
+
+                      {/* Center Green Core Dot */}
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r="4"
+                        fill="#10B981"
+                      />
+
+                      {/* Angled Leader Line to Label */}
+                      <line
+                        x1={px + ringR * 0.7}
+                        y1={py - ringR * 0.7}
+                        x2={px + ringR + 12}
+                        y2={py - ringR - 12}
+                        stroke="#10B981"
+                        strokeWidth="1.2"
+                      />
+
+                      {/* "YOU ARE HERE" Callout Box */}
+                      <rect
+                        x={px + ringR + 10}
+                        y={py - ringR - 26}
+                        width="92"
+                        height="16"
+                        rx="3"
+                        fill="#064E3B"
+                        stroke="#10B981"
+                        strokeWidth="1"
+                        opacity="0.9"
+                      />
+                      <text
+                        x={px + ringR + 14}
+                        y={py - ringR - 14}
+                        fill="#34D399"
+                        fontSize="9.5px"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                        letterSpacing="0.5px"
+                      >
+                        YOU ARE HERE
+                      </text>
+                    </>
+                  );
+                })()}
+              </g>
+            )}
           </svg>
 
           {/* Quick HUD Overlay at bottom left of canvas */}
-          <div className="absolute bottom-3 left-3 sc-glass px-3 py-1.5 rounded border border-slate-800 text-[11px] font-mono text-slate-400 pointer-events-none">
+          <div className="absolute bottom-3 left-3 sc-glass px-3 py-1.5 rounded border border-slate-800 text-[11px] font-mono text-slate-400 pointer-events-none flex items-center gap-2">
             <span>System: <strong className="text-cyan-400">{system}</strong></span>
-            <span className="mx-2">·</span>
+            <span>·</span>
             <span>Objekte: <strong className="text-slate-200">{visibleObjects.length}</strong></span>
-            <span className="mx-2">·</span>
+            <span>·</span>
             <span>Zoom: <strong className="text-slate-200">{Math.round(zoom * 100)}%</strong></span>
+            {playerLocationObject && (
+              <>
+                <span>·</span>
+                <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  {playerLocationObject.name}
+                </span>
+              </>
+            )}
+            {telemetry?.isTravelling && (
+              <>
+                <span>·</span>
+                <span className="text-amber-400 font-semibold animate-pulse">
+                  ➔ QT nach {telemetry.travellingToName || 'Ziel'}
+                </span>
+              </>
+            )}
           </div>
         </div>
 

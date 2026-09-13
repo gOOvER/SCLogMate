@@ -6,7 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Intelligent Location State Machine & Multi-Signal Fusion (`Core/LocationStateMachine.cs`)**:
+  - Ported QuantumWake's multi-tier `LocationStateMachine` architecture fusing strong signals (local inventory requests = `High`), medium signals (quantum arrival, hangar assignment, armistice zones = `Medium`), and weak signals (client spawned = `Low`).
+  - Added confidence tracking (`None`, `Low`, `Medium`, `High`), in-game vs. menu separation (`SC_Frontend` vs. `SC_Default`), and location change history logging.
+  - Linked `LocationStateMachine` into `LogParser.cs` for automated feed on inventory requests, quantum routes, quantum targets, quantum arrivals, client spawns, hangar assignments, and armistice notifications.
+- **Starmap Coordinate & Canonical ID Linking (`Core/Locations.cs`, `Core/StarmapData.cs`)**:
+  - Added `StarmapId` property to `ResolvedLocation` and implemented `FindStarmapId` resolving in-game location codes to canonical canvas coordinates and object IDs across Stanton, Pyro, and Nyx.
+- **Live Starmap Telemetry & "YOU ARE HERE" Vector Tracking (`StarmapView.tsx`, `PhotinoBridge.cs`)**:
+  - Added animated live pulsing green "YOU ARE HERE" player marker with precision crosshair reticle ticks and leader callout on `StarmapView`.
+  - Added live animated Quantum Travel vector (`map-live-travel`) rendering an amber dashed flight trajectory with moving dash-offset and expanding target pulse rings between player location and jump target during active QT.
+  - Added "Follow Me" mode automatically panning the starmap canvas to keep the player centered as they travel.
+  - Added automatic system switching (`Stanton` / `Pyro` / `Nyx`) synchronized with live player telemetry.
+  - Added non-destructive search highlighting (`Ort / Station / Ressource`) with glowing search rings without hiding unmatching system geometry.
+  - Added cursor-centric wheel zooming keeping the exact coordinate under the mouse cursor fixed.
+
 ### Fixed
+- **Hardcoded Location Fallback in Telemetry (`Core/Photino/PhotinoBridge.cs`)**:
+  - Eliminated the static fallback to `Port Tressler` when no location was visited in memory. Telemetry now reflects the genuine `LocationStateMachine` state, fallback database queries, or cleanly reports "Unbekannt" without false station badges.
 - **Armistice Zone Transition Debounce & Boundary Flap Protection (`Core/LogParser.cs`)**:
   - Added a 4-second hysteresis debounce and state deduplication filter for `Entering Armistice Zone` and `Leaving Armistice Zone` events.
   - Eliminates rapid event log spam caused by Star Citizen netcode/physics jitter when hovering or drifting directly across armistice boundary spheres (e.g. 20+ alternating notifications within 1 second).

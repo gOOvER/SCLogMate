@@ -202,6 +202,13 @@ public static partial class Locations
 
     public static ResolvedLocation ResolveLocation(string rawId)
     {
+        var resolved = ResolveLocationInternal(rawId);
+        resolved.StarmapId = FindStarmapId(resolved);
+        return resolved;
+    }
+
+    private static ResolvedLocation ResolveLocationInternal(string rawId)
+    {
         if (string.IsNullOrWhiteSpace(rawId) || rawId == "—")
             return new ResolvedLocation { RawCode = rawId ?? "", DisplayName = "—", SystemName = ActiveSystem, ParentBody = "—" };
 
@@ -275,6 +282,122 @@ public static partial class Locations
             Type = StarmapObjectType.Outpost,
             IsArmistice = ActiveSystem == "Stanton"
         };
+    }
+
+    /// <summary>
+    /// Ermittelt die ID des korrespondierenden StarmapObject in StarmapData.cs.
+    /// </summary>
+    public static string FindStarmapId(ResolvedLocation loc)
+    {
+        if (string.IsNullOrWhiteSpace(loc.DisplayName) || loc.DisplayName == "—")
+            return "";
+
+        var name = loc.DisplayName;
+
+        // Direkte Namensübereinstimmung mit bekannten IDs
+        if (name.Contains("New Babbage", StringComparison.OrdinalIgnoreCase)) return "newbabbage";
+        if (name.Contains("Lorville", StringComparison.OrdinalIgnoreCase)) return "lorville";
+        if (name.Contains("Orison", StringComparison.OrdinalIgnoreCase)) return "orison";
+        if (name.Contains("Area 18", StringComparison.OrdinalIgnoreCase) || name.Contains("Area18", StringComparison.OrdinalIgnoreCase)) return "area18";
+        if (name.Contains("Area 061", StringComparison.OrdinalIgnoreCase) || name.Contains("Area061", StringComparison.OrdinalIgnoreCase)) return "area061";
+        if (name.Contains("Levski", StringComparison.OrdinalIgnoreCase)) return "levski";
+
+        if (name.Contains("Port Tressler", StringComparison.OrdinalIgnoreCase)) return "porttressler";
+        if (name.Contains("Everus Harbor", StringComparison.OrdinalIgnoreCase)) return "everus";
+        if (name.Contains("Seraphim", StringComparison.OrdinalIgnoreCase)) return "seraphim";
+        if (name.Contains("Baijini", StringComparison.OrdinalIgnoreCase)) return "baijini";
+        if (name.Contains("Grim HEX", StringComparison.OrdinalIgnoreCase) || name.Contains("GrimHEX", StringComparison.OrdinalIgnoreCase)) return "grimhex";
+        if (name.Contains("Kareah", StringComparison.OrdinalIgnoreCase) || name.Contains("SPK", StringComparison.OrdinalIgnoreCase)) return "spk";
+        if (name.Contains("Klescher", StringComparison.OrdinalIgnoreCase)) return "klescher";
+        if (name.Contains("Orinth", StringComparison.OrdinalIgnoreCase)) return "orinth";
+        if (name.Contains("Brio", StringComparison.OrdinalIgnoreCase)) return "brios";
+        if (name.Contains("Samson", StringComparison.OrdinalIgnoreCase)) return "samson";
+        if (name.Contains("Devlin", StringComparison.OrdinalIgnoreCase)) return "devlin";
+
+        // Lagrange Stations HUR-L1..5, CRU-L1..5, ARC-L1..4, MIC-L1..5
+        var upper = name.ToUpperInvariant();
+        for (int i = 1; i <= 5; i++)
+        {
+            if (upper.Contains($"HUR-L{i}") || upper.Contains($"HUR L{i}")) return $"hur_l{i}";
+            if (upper.Contains($"CRU-L{i}") || upper.Contains($"CRU L{i}")) return $"cru_l{i}";
+            if (upper.Contains($"ARC-L{i}") || upper.Contains($"ARC L{i}")) return $"arc_l{i}";
+            if (upper.Contains($"MIC-L{i}") || upper.Contains($"MIC L{i}")) return $"mic_l{i}";
+            if (upper.Contains($"P1-L{i}") || upper.Contains($"P1 L{i}")) return $"p1_l{i}";
+            if (upper.Contains($"P2-L{i}") || upper.Contains($"P2 L{i}")) return $"p2_l{i}";
+            if (upper.Contains($"P3-L{i}") || upper.Contains($"P3 L{i}")) return $"p3_l{i}";
+            if (upper.Contains($"P4-L{i}") || upper.Contains($"P4 L{i}")) return $"p4_l{i}";
+            if (upper.Contains($"P5-L{i}") || upper.Contains($"P5 L{i}")) return $"p5_l{i}";
+            if (upper.Contains($"P6-L{i}") || upper.Contains($"P6 L{i}")) return $"p6_l{i}";
+        }
+
+        // Pyro Stationen
+        if (name.Contains("Checkmate", StringComparison.OrdinalIgnoreCase)) return "checkmate";
+        if (name.Contains("Sunset Mesa", StringComparison.OrdinalIgnoreCase)) return "sunset_mesa";
+        if (name.Contains("Orbituary", StringComparison.OrdinalIgnoreCase)) return "orbituary";
+        if (name.Contains("Starlight", StringComparison.OrdinalIgnoreCase)) return "starlight";
+        if (name.Contains("Gaslight", StringComparison.OrdinalIgnoreCase)) return "gaslight";
+        if (name.Contains("Megiddo", StringComparison.OrdinalIgnoreCase)) return "megiddo";
+        if (name.Contains("Ruin Station", StringComparison.OrdinalIgnoreCase)) return "ruinstation";
+        if (name.Contains("Rustville", StringComparison.OrdinalIgnoreCase)) return "rustville";
+
+        // Nyx Stationen
+        if (name.Contains("Theta", StringComparison.OrdinalIgnoreCase)) return "theta_station";
+        if (name.Contains("BRK-267", StringComparison.OrdinalIgnoreCase) || name.Contains("Breaker", StringComparison.OrdinalIgnoreCase)) return "breaker_267";
+        if (name.Contains("Moraine", StringComparison.OrdinalIgnoreCase)) return "moraine_base";
+
+        // Sprungtore
+        if (name.Contains("Pyro Jump Point", StringComparison.OrdinalIgnoreCase) || name.Contains("Stanton – Pyro", StringComparison.OrdinalIgnoreCase)) return "jp_pyro";
+        if (name.Contains("Nyx Jump Point", StringComparison.OrdinalIgnoreCase) || name.Contains("Stanton – Nyx", StringComparison.OrdinalIgnoreCase)) return "jp_nyx";
+
+        // Himmelskörper / Planeten / Monde
+        if (name.Equals("microTech", StringComparison.OrdinalIgnoreCase)) return "microtech";
+        if (name.Equals("Hurston", StringComparison.OrdinalIgnoreCase)) return "hurston";
+        if (name.Equals("Crusader", StringComparison.OrdinalIgnoreCase)) return "crusader";
+        if (name.Equals("ArcCorp", StringComparison.OrdinalIgnoreCase)) return "arccorp";
+        if (name.Equals("Delamar", StringComparison.OrdinalIgnoreCase)) return "delamar";
+        if (name.Equals("Calliope", StringComparison.OrdinalIgnoreCase)) return "calliope";
+        if (name.Equals("Clio", StringComparison.OrdinalIgnoreCase)) return "clio";
+        if (name.Equals("Euterpe", StringComparison.OrdinalIgnoreCase)) return "euterpe";
+        if (name.Equals("Arial", StringComparison.OrdinalIgnoreCase)) return "arial";
+        if (name.Equals("Aberdeen", StringComparison.OrdinalIgnoreCase)) return "aberdeen";
+        if (name.Equals("Magda", StringComparison.OrdinalIgnoreCase)) return "magda";
+        if (name.Equals("Ita", StringComparison.OrdinalIgnoreCase)) return "ita";
+        if (name.Equals("Cellin", StringComparison.OrdinalIgnoreCase)) return "cellin";
+        if (name.Equals("Daymar", StringComparison.OrdinalIgnoreCase)) return "daymar";
+        if (name.Equals("Yela", StringComparison.OrdinalIgnoreCase)) return "yela";
+        if (name.Equals("Lyria", StringComparison.OrdinalIgnoreCase)) return "lyria";
+        if (name.Equals("Wala", StringComparison.OrdinalIgnoreCase)) return "wala";
+        if (name.Equals("Pyro I", StringComparison.OrdinalIgnoreCase)) return "pyro1";
+        if (name.Contains("Monox", StringComparison.OrdinalIgnoreCase)) return "monox";
+        if (name.Contains("Bloom", StringComparison.OrdinalIgnoreCase)) return "bloom";
+        if (name.Contains("Pyro IV", StringComparison.OrdinalIgnoreCase)) return "pyro4";
+        if (name.Contains("Pyro V", StringComparison.OrdinalIgnoreCase)) return "pyro5";
+        if (name.Contains("Terminus", StringComparison.OrdinalIgnoreCase)) return "terminus";
+
+        // Fallback auf ParentBody falls ParentBody ein Planet/Mond ist
+        if (!string.IsNullOrWhiteSpace(loc.ParentBody) && loc.ParentBody != "—" && loc.ParentBody != loc.SystemName)
+        {
+            var pUpper = loc.ParentBody.ToLowerInvariant();
+            if (pUpper == "microtech") return "microtech";
+            if (pUpper == "hurston") return "hurston";
+            if (pUpper == "crusader") return "crusader";
+            if (pUpper == "arccorp") return "arccorp";
+            if (pUpper == "delamar") return "delamar";
+            if (pUpper == "calliope") return "calliope";
+            if (pUpper == "clio") return "clio";
+            if (pUpper == "euterpe") return "euterpe";
+            if (pUpper == "arial") return "arial";
+            if (pUpper == "aberdeen") return "aberdeen";
+            if (pUpper == "magda") return "magda";
+            if (pUpper == "ita") return "ita";
+            if (pUpper == "cellin") return "cellin";
+            if (pUpper == "daymar") return "daymar";
+            if (pUpper == "yela") return "yela";
+            if (pUpper == "lyria") return "lyria";
+            if (pUpper == "wala") return "wala";
+        }
+
+        return "";
     }
 
     /// <summary>Einfacher String-Fallback für bestehende Aufrufe Locations.Resolve(code).</summary>

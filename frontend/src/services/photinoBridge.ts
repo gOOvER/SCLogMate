@@ -59,9 +59,15 @@ export interface HudTelemetry {
   serverVersion: string;
   serverPingMs?: number | null;
   locationName: string;
+  locationId?: string;
+  locationConfidence?: string;
   locationSystem: string;
   locationBody: string;
   locationType: string;
+  isTravelling?: boolean;
+  travellingToName?: string;
+  travellingToId?: string;
+  travellingToSystem?: string;
   isArmistice: boolean;
   jurisdiction: string;
   shipName: string;
