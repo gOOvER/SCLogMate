@@ -8,13 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - **Consolidated Tools Navigation & Dedicated Popout Editor (`ToolsView.tsx`)**:
-  - Strictly limited top-level navigation to 3 distinct tools (`1. Wartung & Diagnose`, `2. user.cfg Studio`, `3. Steuerungs-Backups (Keybinds)`) to prevent tab clutter.
-  - Replaced dramatic "Tresor" terminology with clean, professional "Backups" across all tabs, pill switchers, and headers (`Steuerungs-Backups`, `user.cfg Backups`).
+  - Strictly limited top-level navigation to 3 clean, concise tool tabs: `Wartung & Diagnose`, `user.cfg Studio`, and strictly `Backups`.
+  - Consolidated all non-user.cfg backup functions into the dedicated `Backups` tab: Keybind profiles (`actionmaps.xml` & `mappings/`), Game.log ZIP exports, cloud synchronization, and rollbacks.
+  - Replaced dramatic "Tresor" terminology with clean, professional "Backups" across all tabs, pill switchers, and headers (`Backups`, `user.cfg Backups`).
   - Nested all `user.cfg` workflows (Live Editor, Visual Tuning Controls, Backups, and Command Reference) within `user.cfg Studio` via compact sub-navigation pills.
   - Added a dedicated Popout / Fullscreen Live-Editor mode (`editorPopout`) providing an expansive, distraction-free editing modal with line counts, hardware presets, copy, snapshot backup, and save controls.
   - Removed outdated "2026" labels across headers and command reference documentation.
 - **Tab Reordering in Tools & Maintenance (`ToolsView.tsx`)**:
-  - Reordered tabs to make `1. Wartung & Diagnose` the default landing tab upon opening the view, followed by `2. user.cfg Studio` and `3. Steuerungs-Backups (Keybinds)`.
+  - Reordered tabs to make `Wartung & Diagnose` the default landing tab upon opening the view, followed by `user.cfg Studio` and `Backups`.
 - **Hardware Telemetry Grid Coherence (`PhotinoBridge.cs`, `photinoBridge.ts`, `ToolsView.tsx`)**:
   - Relocated display resolution metric to the Graphics & Display card (`Grafikkarte & Anzeige`) alongside GPU model, VRAM, and driver version.
   - Dedicated the Storage Drive card (`Installations-Laufwerk`) strictly to drive metrics: drive letter, available free space, and drive type (`Interne SSD / NVMe`).

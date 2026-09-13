@@ -998,7 +998,7 @@ export const ToolsView: React.FC = () => {
           }`}
         >
           <Wrench className="w-4 h-4" />
-          <span>1. Wartung &amp; Diagnose</span>
+          <span>Wartung &amp; Diagnose</span>
         </button>
 
         <button
@@ -1010,7 +1010,7 @@ export const ToolsView: React.FC = () => {
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>2. user.cfg Studio</span>
+          <span>user.cfg Studio</span>
           {status?.configBackups && status.configBackups.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-sky-950 text-sky-400 text-[10px] font-mono border border-sky-800 font-bold">
               {status.configBackups.length}
@@ -1026,8 +1026,8 @@ export const ToolsView: React.FC = () => {
               : 'bg-slate-900/50 hover:bg-slate-800/70 text-slate-400 hover:text-slate-200 border border-transparent'
           }`}
         >
-          <Key className="w-4 h-4" />
-          <span>3. Steuerungs-Backups (Keybinds)</span>
+          <Archive className="w-4 h-4" />
+          <span>Backups</span>
           {status?.keybindItems && status.keybindItems.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
               {status.keybindItems.length}
