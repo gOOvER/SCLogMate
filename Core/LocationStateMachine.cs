@@ -49,8 +49,7 @@ public sealed record LocationChangeRecord(
     bool ViaQuantum);
 
 /// <summary>
-/// Intelligente Zustandsmaschine zur Standort-Rekonstruktion aus schwachen und starken Logsignalen
-/// (inspiriert von der bewährten QuantumWake LocationStateMachine).
+/// Intelligente Zustandsmaschine zur Standort-Rekonstruktion aus schwachen und starken Logsignalen.
 /// </summary>
 public sealed class LocationStateMachine
 {

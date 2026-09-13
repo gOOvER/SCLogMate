@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Intelligent Location State Machine & Multi-Signal Fusion (`Core/LocationStateMachine.cs`)**:
-  - Ported QuantumWake's multi-tier `LocationStateMachine` architecture fusing strong signals (local inventory requests = `High`), medium signals (quantum arrival, hangar assignment, armistice zones = `Medium`), and weak signals (client spawned = `Low`).
+  - Implemented a multi-tier `LocationStateMachine` architecture fusing strong signals (local inventory requests = `High`), medium signals (quantum arrival, hangar assignment, armistice zones = `Medium`), and weak signals (client spawned = `Low`).
   - Added confidence tracking (`None`, `Low`, `Medium`, `High`), in-game vs. menu separation (`SC_Frontend` vs. `SC_Default`), and location change history logging.
   - Linked `LocationStateMachine` into `LogParser.cs` for automated feed on inventory requests, quantum routes, quantum targets, quantum arrivals, client spawns, hangar assignments, and armistice notifications.
 - **Starmap Coordinate & Canonical ID Linking (`Core/Locations.cs`, `Core/StarmapData.cs`)**:
