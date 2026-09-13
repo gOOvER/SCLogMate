@@ -2119,3 +2119,36 @@ class PhotinoBridge {
 }
 
 export const bridge = new PhotinoBridge();
+
+export const FONT_FAMILY_MAP: Record<string, string> = {
+  'Inter': "'Inter', system-ui, -apple-system, sans-serif",
+  'Orbitron': "'Orbitron', 'Rajdhani', sans-serif",
+  'Rajdhani': "'Rajdhani', 'Orbitron', sans-serif",
+  'Roboto': "'Roboto', 'Helvetica Neue', Arial, sans-serif",
+  'JetBrains Mono': "'JetBrains Mono', 'Consolas', monospace",
+  'Segoe UI': "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+  'Consolas': "'Consolas', 'Courier New', Courier, monospace",
+};
+
+export function applyFontFamily(fontName: string) {
+  const cssFont = FONT_FAMILY_MAP[fontName] || fontName || "'Inter', system-ui, sans-serif";
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--font-family-primary', cssFont);
+    document.body.style.fontFamily = cssFont;
+  }
+  if (typeof localStorage !== 'undefined' && fontName) {
+    try {
+      localStorage.setItem('sc_font_family', fontName);
+    } catch {}
+  }
+}
+
+// Immediately apply saved font if available in local storage
+if (typeof localStorage !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('sc_font_family');
+    if (saved) {
+      applyFontFamily(saved);
+    }
+  } catch {}
+}

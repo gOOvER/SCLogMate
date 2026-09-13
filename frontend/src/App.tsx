@@ -7,6 +7,7 @@ import {
   LogEventItem,
   HudTelemetry,
   ScanProgress,
+  applyFontFamily,
 } from './services/photinoBridge';
 import { Sidebar, NavTabId } from './components/Sidebar';
 import { MasterHeader } from './components/MasterHeader';
@@ -101,14 +102,18 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusRes, sessionsRes, whRes, hudRes, eventsRes, haulsRes] = await Promise.all([
+      const [statusRes, sessionsRes, whRes, hudRes, eventsRes, haulsRes, settingsRes] = await Promise.all([
         bridge.sendRequest<AppStatus>('get_status'),
         bridge.sendRequest<SessionSummary[]>('get_sessions'),
         bridge.sendRequest<{ locations: any[] }>('get_warehouse'),
         bridge.sendRequest<HudTelemetry>('get_hud'),
         bridge.sendRequest<LogEventItem[]>('get_events', { session: '__live__', limit: 100 }),
         bridge.sendRequest<any[]>('get_mining_hauls'),
+        bridge.sendRequest<any>('get_settings').catch(() => null),
       ]);
+      if (settingsRes?.selectedFontFamily) {
+        applyFontFamily(settingsRes.selectedFontFamily);
+      }
       setStatus(statusRes);
       setSessions(sessionsRes);
       if (eventsRes) setEvents(eventsRes);

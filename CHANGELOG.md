@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Streamlined `OreScannerView` to focus purely on RS radar ping decoding, rock mass signatures, and resource database lookups.
 
 ### Fixed
+- **Font Chooser & Live Typography Preview (`index.html`, `index.css`, `photinoBridge.ts`, `SettingsView.tsx`, `App.tsx`)**:
+  - Fixed font chooser preview in Settings not rendering selected fonts (`Orbitron`, `Rajdhani`, `JetBrains Mono`, `Roboto`) due to missing web font imports in the Chromium WebView environment.
+  - Added Google Fonts CDN imports and CSS variables (`--font-family-primary`) enabling seamless rendering of `Inter`, `Orbitron`, `Rajdhani`, `Roboto`, and `JetBrains Mono`.
+  - Added interactive font selection chips with live typography styling per font and instantaneous real-time UI application via `applyFontFamily`.
+  - Replaced truncated single-line preview with an expansive live typography preview card displaying HUD telemetry headings, descriptive text, currency values, SCU cargo numbers, latency metrics, and glyphs.
+  - Persisted user-selected font in `localStorage` for instant zero-flicker startup application before backend RPC completion.
 - **Hardcoded Location Fallback in Telemetry (`Core/Photino/PhotinoBridge.cs`)**:
   - Eliminated the static fallback to `Port Tressler` when no location was visited in memory. Telemetry now reflects the genuine `LocationStateMachine` state, fallback database queries, or cleanly reports "Unbekannt" without false station badges.
 - **Armistice Zone Transition Debounce & Boundary Flap Protection (`Core/LogParser.cs`)**:

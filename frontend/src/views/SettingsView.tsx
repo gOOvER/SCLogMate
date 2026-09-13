@@ -31,6 +31,8 @@ import {
   ScanRegionDto,
   OcrRegionsConfig,
   OcrTestResult,
+  applyFontFamily,
+  FONT_FAMILY_MAP,
 } from '../services/photinoBridge';
 
 export const SettingsView: React.FC = () => {
@@ -281,6 +283,9 @@ export const SettingsView: React.FC = () => {
       const data = await bridge.send<SettingsDto>('get_settings');
       if (data) {
         setSettings(data);
+        if (data.selectedFontFamily) {
+          applyFontFamily(data.selectedFontFamily);
+        }
         setTimeout(() => {
           isLoadedRef.current = true;
         }, 150);
@@ -690,32 +695,121 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* 2. Erscheinungsbild & Schriftart (Font Chooser) */}
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <FileText className="w-4 h-4" />
-                <span>ERSCHEINUNGSBILD & SCHRIFTART (FONT CHOOSER)</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Passe die primäre Schriftart der Benutzeroberfläche an deine Vorlieben an.
-              </p>
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                  <FileText className="w-4 h-4" />
+                  <span>ERSCHEINUNGSBILD & SCHRIFTART (FONT CHOOSER)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Wähle die primäre Schriftart der gesamten Benutzeroberfläche. Die Vorschau und die App aktualisieren sich in Echtzeit.
+                </p>
+              </div>
+              <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[11px] font-mono bg-sky-950/80 text-sky-300 border border-sky-800/60">
+                Aktiv: {settings.selectedFontFamily || 'Inter'}
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            {/* Quick Selection Buttons styled in their respective fonts */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+              {[
+                { id: 'Inter', name: 'Inter', category: 'Modern Sans' },
+                { id: 'Orbitron', name: 'Orbitron', category: 'Sci-Fi HUD' },
+                { id: 'Rajdhani', name: 'Rajdhani', category: 'Cyber Tech' },
+                { id: 'JetBrains Mono', name: 'JetBrains', category: 'Dev Monospace' },
+                { id: 'Roboto', name: 'Roboto', category: 'Clean Sans' },
+                { id: 'Segoe UI', name: 'Segoe UI', category: 'Windows OS' },
+                { id: 'Consolas', name: 'Consolas', category: 'Terminal' },
+              ].map((f) => {
+                const isSelected = (settings.selectedFontFamily || 'Inter') === f.id;
+                const fontCss = FONT_FAMILY_MAP[f.id] || f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      setSettings({ ...settings, selectedFontFamily: f.id });
+                      applyFontFamily(f.id);
+                    }}
+                    style={{ fontFamily: fontCss }}
+                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[64px] ${
+                      isSelected
+                        ? 'bg-sky-500/20 border-sky-400 text-sky-200 shadow-md shadow-sky-950/50 ring-1 ring-sky-400/50'
+                        : 'bg-slate-950/70 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60'
+                    }`}
+                  >
+                    <span className="text-sm font-semibold tracking-wide leading-tight">{f.name}</span>
+                    <span className="text-[10px] text-slate-400 tracking-normal mt-1 font-sans">{f.category}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Fallback Dropdown Select */}
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="text-slate-400 shrink-0">Oder per Dropdown:</span>
               <select
                 value={settings.selectedFontFamily || 'Inter'}
-                onChange={(e) => setSettings({ ...settings, selectedFontFamily: e.target.value })}
-                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSettings({ ...settings, selectedFontFamily: val });
+                  applyFontFamily(val);
+                }}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 max-w-xs"
               >
-                <option value="Inter">Inter (Standard Modern)</option>
-                <option value="Orbitron">Orbitron (Sci-Fi Cockpit)</option>
-                <option value="Rajdhani">Rajdhani (Cyber Tech)</option>
-                <option value="Segoe UI">Segoe UI (Windows Native)</option>
-                <option value="Roboto">Roboto (Clean Sans)</option>
-                <option value="Consolas">Consolas (Monospace)</option>
+                <option value="Inter" style={{ fontFamily: FONT_FAMILY_MAP['Inter'] }}>Inter (Standard Modern)</option>
+                <option value="Orbitron" style={{ fontFamily: FONT_FAMILY_MAP['Orbitron'] }}>Orbitron (Sci-Fi Cockpit)</option>
+                <option value="Rajdhani" style={{ fontFamily: FONT_FAMILY_MAP['Rajdhani'] }}>Rajdhani (Cyber Tech)</option>
+                <option value="JetBrains Mono" style={{ fontFamily: FONT_FAMILY_MAP['JetBrains Mono'] }}>JetBrains Mono (Monospace)</option>
+                <option value="Roboto" style={{ fontFamily: FONT_FAMILY_MAP['Roboto'] }}>Roboto (Clean Sans)</option>
+                <option value="Segoe UI" style={{ fontFamily: FONT_FAMILY_MAP['Segoe UI'] }}>Segoe UI (Windows Native)</option>
+                <option value="Consolas" style={{ fontFamily: FONT_FAMILY_MAP['Consolas'] }}>Consolas (Monospace)</option>
               </select>
-              <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-300 truncate" style={{ fontFamily: settings.selectedFontFamily || 'Inter' }}>
-                Vorschau: Star Citizen Live Log Companion 0123456789 (aUEC · Saldo · ⬡ Baupläne)
+            </div>
+
+            {/* Comprehensive Live Typography Preview Box */}
+            <div
+              className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-200 space-y-2.5 transition-all duration-200 shadow-inner"
+              style={{ fontFamily: FONT_FAMILY_MAP[settings.selectedFontFamily || 'Inter'] || settings.selectedFontFamily || 'sans-serif' }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-sky-400 tracking-wider uppercase">
+                    VORSCHAU: {settings.selectedFontFamily || 'Inter'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500">Live-Rendering</span>
+              </div>
+
+              {/* HUD / Cockpit Heading */}
+              <div className="text-base font-bold text-slate-100 tracking-wide">
+                STAR CITIZEN TELEMETRIE // STANTON-SEKTOR // CRU-L1
+              </div>
+
+              {/* Normal reading text */}
+              <div className="text-xs text-slate-300 leading-relaxed">
+                Der Live-Companion überwacht Schiffs-Transaktionen, Frachtgut-Preise, Raffinerie-Jobs und Team-Kommunikation.
+              </div>
+
+              {/* Numerics, Currency, SCU and Glyphs */}
+              <div className="pt-1 flex flex-wrap items-center gap-3 text-xs">
+                <span className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-semibold">
+                  +1.450.000 aUEC
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 text-amber-300 font-semibold">
+                  32 SCU Quantainium
+                </span>
+                <span className="px-2 py-0.5 rounded bg-sky-950/60 border border-sky-800/60 text-sky-300">
+                  Ping: 24 ms
+                </span>
+                <span className="text-slate-400">
+                  Ziffern: 0123456789
+                </span>
+                <span className="text-slate-400">
+                  Symbole: ⬡ Baupläne · ✦ UEX · 🛡️ Schild 100% · ⚡ Quantum
+                </span>
               </div>
             </div>
           </div>
