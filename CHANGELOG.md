@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added non-destructive search highlighting (`Ort / Station / Ressource`) with glowing search rings without hiding unmatching system geometry.
   - Added cursor-centric wheel zooming keeping the exact coordinate under the mouse cursor fixed.
 
+### Removed
+- **Redundant Refinery & Haul Tracker Tab in RS Radar (`OreScannerView.tsx`)**:
+  - Removed duplicate "Raffinerie-Aufträge & Mining-Haul-Tracker" tab from the Ore Scanner view since all haul tracking, OCR scanning, yield calculation, and station bonuses are already consolidated in the dedicated Refinery view (`RefineryView.tsx`).
+  - Streamlined `OreScannerView` to focus purely on RS radar ping decoding, rock mass signatures, and resource database lookups.
+
 ### Fixed
 - **Hardcoded Location Fallback in Telemetry (`Core/Photino/PhotinoBridge.cs`)**:
   - Eliminated the static fallback to `Port Tressler` when no location was visited in memory. Telemetry now reflects the genuine `LocationStateMachine` state, fallback database queries, or cleanly reports "Unbekannt" without false station badges.
