@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Changed
+- **Interactive Template & Preset Preview Modal (`ToolsView.tsx`)**:
+  - Added an interactive `Vorlagen-Vorschau` modal accessible from both the Live-Editor and Popout mode via the new `Vorlagen-Vorschau` button.
+  - Allows inspecting all 4 configuration presets (`Hardware-Empfehlung`, `High FPS / E-Sport`, `Grafik & Immersion`, `60 FPS Cap`) before applying them.
+  - Displays key metric highlights (FPS cap, VSync, Texture Stream Pool, CGF Pool, HDR, SSDO), full commented code in monospace, instant clipboard copy, and 1-click actions to either apply via non-destructive merge or load as a clean template.
+  - Supports quick dismissal via `ESC` key or close button.
 - **Dynamic Hardware-Based Preset & Recommendation Engine (`ToolsView.tsx`)**:
   - Replaced the static "5800X3D & RTX 5070" preset button with an intelligent, dynamic **Hardware-Empfehlung** feature.
   - Automatically detects the user's hardware from telemetry (`status.cpuModel`, `status.gpuModel`, `status.gpuVramMb`, `status.totalRamGb`) and calculates tailored values for `r_TexturesStreamPoolSize` (e.g., 8192 MB for 12GB GPUs, 10240-12288 MB for 16GB+ GPUs) and `e_StreamCgfPoolSize` (based on system RAM).

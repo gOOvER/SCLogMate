@@ -36,6 +36,7 @@ import {
   Maximize2,
   Minimize2,
   X,
+  Eye,
 } from 'lucide-react';
 import { bridge, ToolsStatusDto, ConfigBackupItemDto, KeybindBackupItemDto } from '../services/photinoBridge';
 
@@ -172,6 +173,139 @@ pl_pit.forceSoftwareCursor = 0
 g_language = german_(germany)
 g_languageAudio = english`;
 };
+
+export const TEMPLATE_ESPORT = `Con_Restricted = 0
+
+-- Star Citizen - High FPS & E-Sport Profil
+-- Fokus auf minimale Latenz, maximale Bildrate und G-Sync/FreeSync
+
+-- Performance & Multithreading
+r_multithreaded = 1
+
+-- FPS Limit, VSync & GPU-Sync (Minimale Latenz)
+sys_maxfps = 165
+r_VSync = 0
+r_enable_full_gpu_sync = 0
+r_FullscreenWindow = 1
+r_BorderlessWindow = 1
+
+-- Streaming & VRAM
+r_TexturesStreaming = 1
+r_TexturesStreamPoolSize = 8192
+e_StreamCgfPoolSize = 4096
+
+-- Grafik-Reduktion für maximale Klarheit & FPS
+r_MotionBlur = 0
+r_ssdo = 0
+e_ParticlesQuality = 2
+r_DetailDistance = 18
+
+-- Shader & Stotter-Prävention
+r_shadersasyncactivation = 1
+r_GsmCache = 1
+
+-- HUD / Debug
+r_DisplayInfo = 1
+pl_pit.forceSoftwareCursor = 0`;
+
+export const TEMPLATE_QUALITY = `Con_Restricted = 0
+
+-- Star Citizen - Maximale Grafik & Immersion
+-- Fokus auf beste Optik, hohe Detaildistanz und lebendige Effekte
+
+-- Performance & Multithreading
+r_multithreaded = 1
+
+-- Bildwiederholrate & Sync
+sys_maxfps = 0
+r_VSync = 1
+r_FullscreenWindow = 1
+r_BorderlessWindow = 1
+
+-- Maximaler Textur- & Geometrie-Puffer
+r_TexturesStreaming = 1
+r_TexturesStreamPoolSize = 12288
+e_StreamCgfPoolSize = 6144
+
+-- Hohe Grafikdetails & Umgebungsverdeckung
+r_ssdo = 2
+e_ParticlesQuality = 3
+r_DetailDistance = 25
+r_MotionBlur = 0
+
+-- Native HDR Unterstützung
+r_HDRDisplayOutput = 1
+r_HDRDisplayMaxNits = 1000
+r_HDRDisplayRefWhite = 200
+r_HDRDisplayDeviceLimits = 1
+
+-- Shader-Aktivierung & Cache
+r_shadersasyncactivation = 1
+r_GsmCache = 1
+r_DisplayInfo = 0`;
+
+export const TEMPLATE_MINIMAL = `Con_Restricted = 0
+
+-- Star Citizen - 60 FPS Cap / Einsteiger
+-- Stabilisiert die Bildrate auf 60 FPS und schont Hardware & Temperaturen
+
+-- Performance
+r_multithreaded = 1
+
+-- Festes 60 FPS Limit
+sys_maxfps = 60
+r_VSync = 0
+r_enable_full_gpu_sync = 0
+
+-- Konservative Streaming-Puffer (Für 6-8GB VRAM & 16GB RAM)
+r_TexturesStreaming = 1
+r_TexturesStreamPoolSize = 4096
+e_StreamCgfPoolSize = 2048
+
+-- Moderate Detailstufen
+e_ParticlesQuality = 2
+r_DetailDistance = 18
+r_MotionBlur = 0
+r_ssdo = 1
+
+-- Stotter-Schutz
+r_shadersasyncactivation = 1
+r_GsmCache = 1
+r_DisplayInfo = 1`;
+
+export function getTemplateContent(
+  type: 'hardware_auto' | 'esport' | 'quality' | 'minimal',
+  status: ToolsStatusDto | null
+): string {
+  if (type === 'hardware_auto') return generateHardwarePreset(status);
+  if (type === 'esport') return TEMPLATE_ESPORT;
+  if (type === 'quality') return TEMPLATE_QUALITY;
+  return TEMPLATE_MINIMAL;
+}
+
+export function getPreviewHighlights(
+  type: 'hardware_auto' | 'esport' | 'quality' | 'minimal',
+  rec: HardwareRecommendation
+): string[] {
+  if (type === 'hardware_auto') {
+    return [
+      '160 FPS Cap',
+      'VSync: Aus',
+      `StreamPool: ${rec.vramPool} MB (${rec.vramLabel})`,
+      `CGF: ${rec.cgfPool} MB`,
+      'HDR: 1000 Nits',
+      'Multithreading: Ein',
+      'DE UI / EN Audio',
+    ];
+  }
+  if (type === 'esport') {
+    return ['165 FPS Cap', 'VSync: Aus', 'Low GPU-Sync: Aus', 'StreamPool: 8192 MB', 'DisplayInfo: 1', 'MotionBlur: Aus', 'SSDO: Aus'];
+  }
+  if (type === 'quality') {
+    return ['Unbegrenzt FPS', 'VSync: Ein', 'StreamPool: 12288 MB', 'CGF: 6144 MB', 'SSDO: Level 2', 'DetailDist: 25', 'HDR: 1000 Nits'];
+  }
+  return ['60 FPS Cap', 'VSync: Aus', 'StreamPool: 4096 MB', 'CGF: 2048 MB', 'DetailDist: 18', 'DisplayInfo: 1'];
+}
 
 export interface CfgDocEntry {
   category: string;
@@ -441,7 +575,19 @@ export const ToolsView: React.FC = () => {
 
   const [status, setStatus] = useState<ToolsStatusDto | null>(null);
   const hwRec = useMemo(() => getHardwareRecommendation(status), [status]);
+  const [previewPreset, setPreviewPreset] = useState<'hardware_auto' | 'esport' | 'quality' | 'minimal' | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (previewPreset) setPreviewPreset(null);
+        else if (editorPopout) setEditorPopout(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewPreset, editorPopout]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [cfgContent, setCfgContent] = useState('');
   const [copied, setCopied] = useState(false);
@@ -627,17 +773,18 @@ export const ToolsView: React.FC = () => {
   };
 
   const applyPreset = (type: 'hardware_auto' | '5800x3d_5070' | 'esport' | 'quality' | 'minimal', replaceAll: boolean = false) => {
-    if (type === 'hardware_auto' || type === '5800x3d_5070') {
-      const rec = getHardwareRecommendation(status);
-      const template = generateHardwarePreset(status);
+    const canonicalType = (type === '5800x3d_5070' ? 'hardware_auto' : type) as 'hardware_auto' | 'esport' | 'quality' | 'minimal';
+    const rec = getHardwareRecommendation(status);
 
-      if (replaceAll || !cfgContent.trim()) {
-        setCfgContent(template);
-        parseCfgContent(template);
-        showToast(`⭐ Hardware-Empfehlung (${rec.badge}) als saubere Vorlage geladen!`);
-        return;
-      }
+    if (replaceAll || !cfgContent.trim()) {
+      const template = getTemplateContent(canonicalType, status);
+      setCfgContent(template);
+      parseCfgContent(template);
+      showToast(`Vorlage (${canonicalType === 'hardware_auto' ? rec.badge : canonicalType}) komplett geladen!`);
+      return;
+    }
 
+    if (canonicalType === 'hardware_auto') {
       const updates: Record<string, string | number> = {
         Con_Restricted: 0,
         r_multithreaded: 1,
@@ -675,7 +822,7 @@ export const ToolsView: React.FC = () => {
 
     let updates: Record<string, string | number> = {};
 
-    if (type === 'esport') {
+    if (canonicalType === 'esport') {
       updates = {
         Con_Restricted: 0,
         r_multithreaded: 1,
@@ -689,8 +836,8 @@ export const ToolsView: React.FC = () => {
         r_FullscreenWindow: 1,
         r_BorderlessWindow: 1,
       };
-      showToast('Profil "High FPS / E-Sport" eingefügt (Merge)');
-    } else if (type === 'quality') {
+      showToast('Profil "High FPS / E-Sport" per Merge übernommen');
+    } else if (canonicalType === 'quality') {
       updates = {
         Con_Restricted: 0,
         r_multithreaded: 1,
@@ -703,7 +850,7 @@ export const ToolsView: React.FC = () => {
         e_ParticlesQuality: 3,
         r_DetailDistance: 25,
       };
-      showToast('Profil "Grafik & Immersion" eingefügt (Merge)');
+      showToast('Profil "Grafik & Immersion" per Merge übernommen');
     } else {
       updates = {
         Con_Restricted: 0,
@@ -714,7 +861,7 @@ export const ToolsView: React.FC = () => {
         r_DisplayInfo: 1,
         e_StreamCgfPoolSize: 2048,
       };
-      showToast('Profil "Minimal / Einsteiger-PC" eingefügt (Merge)');
+      showToast('Profil "Minimal / 60 FPS" per Merge übernommen');
     }
 
     setCfgContent((prev) => {
@@ -1262,6 +1409,15 @@ export const ToolsView: React.FC = () => {
                     title="60 FPS Cap, 4GB StreamPool"
                   >
                     💻 60 FPS Cap
+                  </button>
+
+                  <button
+                    onClick={() => setPreviewPreset('hardware_auto')}
+                    className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-amber-300 hover:text-white text-xs font-bold border border-amber-500/30 transition cursor-pointer"
+                    title="Vorlagen-Vorschau öffnen und alle Profile im Detail ansehen"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Vorlagen-Vorschau</span>
                   </button>
                 </div>
               </div>
@@ -2683,6 +2839,15 @@ export const ToolsView: React.FC = () => {
                 </div>
 
                 <button
+                  onClick={() => setPreviewPreset('hardware_auto')}
+                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white text-xs font-semibold border border-amber-500/30 transition cursor-pointer"
+                  title="Vorlagen-Vorschau öffnen"
+                >
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Vorschau</span>
+                </button>
+
+                <button
                   onClick={copyToClipboard}
                   className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer"
                 >
@@ -2758,6 +2923,168 @@ export const ToolsView: React.FC = () => {
               >
                 Fertig &amp; Schließen ✕
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          VORLAGEN-VORSCHAU MODAL
+          ══════════════════════════════════════════════════════════════ */}
+      {previewPreset && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md p-3 sm:p-6 flex items-center justify-center animate-in fade-in duration-150">
+          <div className="w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide">
+                    VORLAGEN-VORSCHAU &amp; DETAILS
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Prüfe die genauen Befehle und Werte, bevor du sie in deine user.cfg übernimmst.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setPreviewPreset(null)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                title="Vorschau schließen [ESC]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Template Switcher Tabs inside Preview */}
+            <div className="flex items-center space-x-2 p-3 bg-slate-950/50 border-b border-slate-800 overflow-x-auto">
+              <button
+                onClick={() => setPreviewPreset('hardware_auto')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  previewPreset === 'hardware_auto'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Rocket className="w-3.5 h-3.5 text-amber-400" />
+                <span>⭐ Hardware-Empfehlung</span>
+                {hwRec.badge && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-500/30">
+                    {hwRec.badge}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setPreviewPreset('esport')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  previewPreset === 'esport'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-sky-400" />
+                <span>⚡ High FPS / E-Sport</span>
+              </button>
+
+              <button
+                onClick={() => setPreviewPreset('quality')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  previewPreset === 'quality'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5 text-purple-400" />
+                <span>🎨 Grafik &amp; Immersion</span>
+              </button>
+
+              <button
+                onClick={() => setPreviewPreset('minimal')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  previewPreset === 'minimal'
+                    ? 'bg-slate-800 text-slate-200 border border-slate-600 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Monitor className="w-3.5 h-3.5 text-slate-400" />
+                <span>💻 60 FPS Cap</span>
+              </button>
+            </div>
+
+            {/* Template Highlights Bar */}
+            <div className="px-4 py-2.5 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400 text-[11px] font-semibold">Schlüsselwerte:</span>
+                {getPreviewHighlights(previewPreset, hwRec).map((h, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/80 text-slate-200 font-mono text-[11px]"
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+              <span className="text-[11px] text-slate-500 font-mono">
+                {getTemplateContent(previewPreset, status).split('\n').length} Zeilen
+              </span>
+            </div>
+
+            {/* Code Box */}
+            <div className="flex-1 p-4 bg-slate-950 overflow-y-auto font-mono text-xs max-h-[50vh]">
+              <pre className="text-sky-100/90 leading-relaxed select-text whitespace-pre font-mono">
+                {getTemplateContent(previewPreset, status)}
+              </pre>
+            </div>
+
+            {/* Modal Footer / Action Buttons */}
+            <div className="p-4 border-t border-slate-800 bg-slate-950/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-2 text-xs text-slate-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-slate-300 text-[11px]">
+                  <strong>Tipp:</strong> „Per Merge übernehmen“ behält deine eigenen manuellen Befehle &amp; Kommentare bei.
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getTemplateContent(previewPreset, status));
+                    showToast('Vorlage in Zwischenablage kopiert!');
+                  }}
+                  className="flex items-center space-x-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Kopieren</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    applyPreset(previewPreset, false);
+                    setPreviewPreset(null);
+                  }}
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow-md shadow-sky-600/20 cursor-pointer"
+                  title="Übernimmt die Vorlagenwerte und lässt eigene Zeilen intakt"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Per Merge übernehmen</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    applyPreset(previewPreset, true);
+                    setPreviewPreset(null);
+                  }}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md shadow-amber-600/20 cursor-pointer"
+                  title="Ersetzt den aktuellen Editor-Inhalt komplett durch diese Vorlage"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Als Template laden</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
