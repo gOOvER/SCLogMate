@@ -1027,7 +1027,7 @@ export const ToolsView: React.FC = () => {
           }`}
         >
           <Key className="w-4 h-4" />
-          <span>3. Steuerungs-Tresor (Keybinds)</span>
+          <span>3. Steuerungs-Backups (Keybinds)</span>
           {status?.keybindItems && status.keybindItems.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
               {status.keybindItems.length}
@@ -1077,7 +1077,7 @@ export const ToolsView: React.FC = () => {
                 }`}
               >
                 <Archive className="w-3.5 h-3.5" />
-                <span>💾 Backup-Tresor ({status?.configBackups?.length || 0})</span>
+                <span>💾 Backups ({status?.configBackups?.length || 0})</span>
               </button>
 
               <button
@@ -1276,7 +1276,7 @@ export const ToolsView: React.FC = () => {
                       onClick={() => setCfgView('backups')}
                       className="text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
                     >
-                      Zum Backup-Tresor ({status?.configBackups?.length || 0}) →
+                      Zu den Backups ({status?.configBackups?.length || 0}) →
                     </button>
                   </div>
                 </div>
@@ -1989,7 +1989,7 @@ export const ToolsView: React.FC = () => {
                     <div>
                       <div className="flex items-center space-x-2.5">
                         <h2 className="text-base font-bold text-white tracking-wide">
-                          USER.CFG BACKUP-TRESOR &amp; 1-KLICK ROLLBACK
+                          USER.CFG BACKUPS &amp; 1-KLICK ROLLBACK
                         </h2>
                         <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-bold">
                           {status?.configBackups?.length || 0} Snapshots
@@ -2432,7 +2432,7 @@ export const ToolsView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-purple-300 tracking-wider">
-                    STEUERUNGS-TRESOR (ACTIONMAPS.XML &amp; MAPPINGS)
+                    STEUERUNGS-BACKUPS (ACTIONMAPS.XML &amp; MAPPINGS)
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     Sichert Joystick-, HOTAS-, HOSAS- und Tastaturbelegungen vor Spiel-Patches
@@ -2645,7 +2645,7 @@ export const ToolsView: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="text-slate-300">
-                  100% geschützt: Vor jedem Speichern wird automatisch ein Snapshot im Backup-Tresor gesichert.
+                  100% geschützt: Vor jedem Speichern wird automatisch ein Backup-Snapshot gesichert.
                 </span>
               </div>
               <button
