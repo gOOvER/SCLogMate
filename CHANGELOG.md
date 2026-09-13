@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Armistice Zone Transition Debounce & Boundary Flap Protection (`Core/LogParser.cs`)**:
+  - Added a 4-second hysteresis debounce and state deduplication filter for `Entering Armistice Zone` and `Leaving Armistice Zone` events.
+  - Eliminates rapid event log spam caused by Star Citizen netcode/physics jitter when hovering or drifting directly across armistice boundary spheres (e.g. 20+ alternating notifications within 1 second).
 - **Refinery Kiosk OCR Duration & Order Parsing (`Core/Ocr/RefineryParser.cs`, `Core/Photino/PhotinoBridge.cs`, `RefineryView.tsx`)**:
   - Fixed a critical regex bug in `RefineryParser.TimeRemainingTextRegex` where purely optional groups matched empty string at position 0, permanently preventing remaining duration extraction (`02h 45m`, `1h 30m`, `45m`).
   - Implemented unified `DurationRegex` supporting days, hours, minutes, seconds, and clock notation (`1d 04h 30m`, `02h 45m`, `45m 20s`, `01:23:45`, `02:15`).

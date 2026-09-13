@@ -514,6 +514,9 @@ public partial class LogParser
     public int ExpiredPendingTransfers { get; private set; }
 
     private DateTime? _lastSeenTime;
+    private bool? _lastArmisticeActive;
+    private DateTime _lastArmisticeChangeTime = DateTime.MinValue;
+    private const double ArmisticeDebounceSeconds = 4.0;
 
     public LogEntry? Feed(string line)
     {
@@ -992,7 +995,16 @@ public partial class LogParser
                     text.StartsWith("Betreten einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
                     text.StartsWith("Schutzzone betreten", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Schutzzone aktiv (Waffen blockiert)" };
+                    var ts = ParseTs(line);
+                    // Entprellung / Hysterese-Schutz gegen Randzonen-Flackern:
+                    // Wenn der Status bereits aktiv ist oder der letzte Wechsel weniger als 4s her ist, Event verwerfen.
+                    if (_lastArmisticeActive == true || (ts - _lastArmisticeChangeTime).TotalSeconds < ArmisticeDebounceSeconds)
+                    {
+                        return null;
+                    }
+                    _lastArmisticeActive = true;
+                    _lastArmisticeChangeTime = ts;
+                    return new LogEntry { Time = ts, Kind = EventKind.Jurisdiction, Detail = "🟢 Schutzzone aktiv (Waffen blockiert)" };
                 }
 
                 // 2. Armistice / Schutzzone verlassen
@@ -1000,7 +1012,16 @@ public partial class LogParser
                     text.StartsWith("Verlassen einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
                     text.StartsWith("Schutzzone verlassen", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🔴 Schutzzone verlassen (Waffen scharf)" };
+                    var ts = ParseTs(line);
+                    // Entprellung / Hysterese-Schutz gegen Randzonen-Flackern:
+                    // Wenn der Status bereits inaktiv ist oder der letzte Wechsel weniger als 4s her ist, Event verwerfen.
+                    if (_lastArmisticeActive == false || (ts - _lastArmisticeChangeTime).TotalSeconds < ArmisticeDebounceSeconds)
+                    {
+                        return null;
+                    }
+                    _lastArmisticeActive = false;
+                    _lastArmisticeChangeTime = ts;
+                    return new LogEntry { Time = ts, Kind = EventKind.Jurisdiction, Detail = "🔴 Schutzzone verlassen (Waffen scharf)" };
                 }
 
                 // 3. Jurisdiktion / Rechtssystem
