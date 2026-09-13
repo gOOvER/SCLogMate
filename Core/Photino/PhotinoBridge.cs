@@ -808,8 +808,20 @@ public class SettingsDto
     [JsonPropertyName("toastRefineryEnabled")] public bool ToastRefineryEnabled { get; set; } = true;
     [JsonPropertyName("toastElevatorEnabled")] public bool ToastElevatorEnabled { get; set; } = true;
     [JsonPropertyName("toastShipDestructionEnabled")] public bool ToastShipDestructionEnabled { get; set; } = true;
+    [JsonPropertyName("auroraInstalled")] public bool AuroraInstalled { get; set; }
+    [JsonPropertyName("auroraPath")] public string? AuroraPath { get; set; }
+    [JsonPropertyName("auroraCustomPath")] public string? AuroraCustomPath { get; set; }
     [JsonPropertyName("auroraIntegrationEnabled")] public bool AuroraIntegrationEnabled { get; set; } = true;
     [JsonPropertyName("auroraVolume")] public int AuroraVolume { get; set; } = 40;
+    [JsonPropertyName("auroraShipGreetings")] public bool AuroraShipGreetings { get; set; } = true;
+    [JsonPropertyName("auroraBlueprints")] public bool AuroraBlueprints { get; set; } = true;
+    [JsonPropertyName("auroraSafetyZones")] public bool AuroraSafetyZones { get; set; } = true;
+    [JsonPropertyName("auroraRestrictedZones")] public bool AuroraRestrictedZones { get; set; } = true;
+    [JsonPropertyName("auroraMonitoredSpace")] public bool AuroraMonitoredSpace { get; set; } = true;
+    [JsonPropertyName("auroraJurisdictions")] public bool AuroraJurisdictions { get; set; } = true;
+    [JsonPropertyName("auroraQuantumArrival")] public bool AuroraQuantumArrival { get; set; } = true;
+    [JsonPropertyName("auroraPlayerDeath")] public bool AuroraPlayerDeath { get; set; } = true;
+    [JsonPropertyName("auroraServerErrors")] public bool AuroraServerErrors { get; set; } = true;
     [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
     [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
@@ -982,6 +994,15 @@ public class PhotinoBridge
         var s = Settings.Load();
         _auroraService.IsEnabled = s.AuroraIntegrationEnabled;
         _auroraService.Volume = s.AuroraVolume;
+        _auroraService.ShipGreetingsEnabled = s.AuroraShipGreetings;
+        _auroraService.BlueprintsEnabled = s.AuroraBlueprints;
+        _auroraService.SafetyZonesEnabled = s.AuroraSafetyZones;
+        _auroraService.RestrictedZonesEnabled = s.AuroraRestrictedZones;
+        _auroraService.MonitoredSpaceEnabled = s.AuroraMonitoredSpace;
+        _auroraService.JurisdictionsEnabled = s.AuroraJurisdictions;
+        _auroraService.QuantumArrivalEnabled = s.AuroraQuantumArrival;
+        _auroraService.PlayerDeathEnabled = s.AuroraPlayerDeath;
+        _auroraService.ServerErrorsEnabled = s.AuroraServerErrors;
         I18n.Instance.SetLanguage(s.AppLanguage ?? "Auto");
         _currentLogPath = s.LogPath ?? PathFinder.FindBest();
         Localization.Hint(_currentLogPath);
@@ -1400,6 +1421,11 @@ public class PhotinoBridge
                         }
                     }
                     SendResponse(req.Id, "open_external_url_response", new { ok = true });
+                    break;
+
+                case "play_aurora_test_sound":
+                    _auroraService.PlayTestSound();
+                    SendResponse(req.Id, "play_aurora_test_sound_response", new { ok = true });
                     break;
 
                 case "get_status":
@@ -5044,8 +5070,20 @@ public class PhotinoBridge
             ToastRefineryEnabled = s.ToastRefineryEnabled,
             ToastElevatorEnabled = s.ToastElevatorEnabled,
             ToastShipDestructionEnabled = s.ToastShipDestructionEnabled,
+            AuroraInstalled = _auroraService.IsInstalled,
+            AuroraPath = _auroraService.AuroraDirectory ?? "Nicht installiert",
+            AuroraCustomPath = s.AuroraCustomPath,
             AuroraIntegrationEnabled = s.AuroraIntegrationEnabled,
             AuroraVolume = s.AuroraVolume,
+            AuroraShipGreetings = s.AuroraShipGreetings,
+            AuroraBlueprints = s.AuroraBlueprints,
+            AuroraSafetyZones = s.AuroraSafetyZones,
+            AuroraRestrictedZones = s.AuroraRestrictedZones,
+            AuroraMonitoredSpace = s.AuroraMonitoredSpace,
+            AuroraJurisdictions = s.AuroraJurisdictions,
+            AuroraQuantumArrival = s.AuroraQuantumArrival,
+            AuroraPlayerDeath = s.AuroraPlayerDeath,
+            AuroraServerErrors = s.AuroraServerErrors,
             RsTargetAlertEnabled = s.RsTargetAlertEnabled,
             RsTargetSoundEnabled = s.RsTargetSoundEnabled,
             WalletRegion = s.WalletRegion,
@@ -5095,8 +5133,28 @@ public class PhotinoBridge
         s.ToastShipDestructionEnabled = dto.ToastShipDestructionEnabled;
         s.AuroraIntegrationEnabled = dto.AuroraIntegrationEnabled;
         s.AuroraVolume = dto.AuroraVolume;
+        s.AuroraCustomPath = dto.AuroraCustomPath;
+        s.AuroraShipGreetings = dto.AuroraShipGreetings;
+        s.AuroraBlueprints = dto.AuroraBlueprints;
+        s.AuroraSafetyZones = dto.AuroraSafetyZones;
+        s.AuroraRestrictedZones = dto.AuroraRestrictedZones;
+        s.AuroraMonitoredSpace = dto.AuroraMonitoredSpace;
+        s.AuroraJurisdictions = dto.AuroraJurisdictions;
+        s.AuroraQuantumArrival = dto.AuroraQuantumArrival;
+        s.AuroraPlayerDeath = dto.AuroraPlayerDeath;
+        s.AuroraServerErrors = dto.AuroraServerErrors;
+
         _auroraService.IsEnabled = dto.AuroraIntegrationEnabled;
         _auroraService.Volume = dto.AuroraVolume;
+        _auroraService.ShipGreetingsEnabled = dto.AuroraShipGreetings;
+        _auroraService.BlueprintsEnabled = dto.AuroraBlueprints;
+        _auroraService.SafetyZonesEnabled = dto.AuroraSafetyZones;
+        _auroraService.RestrictedZonesEnabled = dto.AuroraRestrictedZones;
+        _auroraService.MonitoredSpaceEnabled = dto.AuroraMonitoredSpace;
+        _auroraService.JurisdictionsEnabled = dto.AuroraJurisdictions;
+        _auroraService.QuantumArrivalEnabled = dto.AuroraQuantumArrival;
+        _auroraService.PlayerDeathEnabled = dto.AuroraPlayerDeath;
+        _auroraService.ServerErrorsEnabled = dto.AuroraServerErrors;
         s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
         s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
         s.WalletRegion = dto.WalletRegion;

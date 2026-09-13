@@ -24,6 +24,10 @@ import {
   Clock,
   Radar,
   MessageSquare,
+  Play,
+  ShoppingCart,
+  ExternalLink,
+  Mic,
 } from 'lucide-react';
 import {
   bridge,
@@ -52,8 +56,20 @@ export const SettingsView: React.FC = () => {
     toastRefineryEnabled: true,
     toastElevatorEnabled: true,
     toastShipDestructionEnabled: true,
+    auroraInstalled: true,
+    auroraPath: '',
+    auroraCustomPath: '',
     auroraIntegrationEnabled: true,
     auroraVolume: 40,
+    auroraShipGreetings: true,
+    auroraBlueprints: true,
+    auroraSafetyZones: true,
+    auroraRestrictedZones: true,
+    auroraMonitoredSpace: true,
+    auroraJurisdictions: true,
+    auroraQuantumArrival: true,
+    auroraPlayerDeath: true,
+    auroraServerErrors: true,
     rsTargetAlertEnabled: true,
     rsTargetSoundEnabled: true,
     wipeFilterEnabled: false,
@@ -73,6 +89,23 @@ export const SettingsView: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const isLoadedRef = useRef(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | null>(null);
+  const [simulateAuroraNotInstalled, setSimulateAuroraNotInstalled] = useState<boolean>(false);
+  const [isPlayingAuroraTest, setIsPlayingAuroraTest] = useState<boolean>(false);
+
+  const handlePlayAuroraTestSound = async () => {
+    try {
+      setIsPlayingAuroraTest(true);
+      await bridge.send('play_aurora_test_sound');
+      setTimeout(() => setIsPlayingAuroraTest(false), 2000);
+    } catch (err) {
+      console.error('Play test sound failed', err);
+      setIsPlayingAuroraTest(false);
+    }
+  };
+
+  const handleOpenGumroad = () => {
+    bridge.send('open_external_url', { url: 'https://3415383443272.gumroad.com/l/yzpmoa' });
+  };
 
   const [dbDiag, setDbDiag] = useState<any>(null);
   const [isCheckingDb, setIsCheckingDb] = useState(false);
@@ -1814,67 +1847,309 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 4: Aurora & Audio */}
-      {activeSubTab === 'audio' && (
-        <div className="space-y-6">
-          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-5">
-            <div>
-              <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-                <Volume2 className="w-4 h-4" />
-                <span>AURORA SPRACHASSISTENT & VOICE INTEGRATION</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Akustisches Co-Piloten-Feedback für Quantensprünge, Missionsbelohnungen und Gefahren.
-              </p>
-            </div>
+      {/* Tab 4: VoiceAttack & Aurora Log-Wächter */}
+      {activeSubTab === 'audio' && (() => {
+        const isInstalled = (settings.auroraInstalled ?? false) && !simulateAuroraNotInstalled;
+        const showPurchaseBanner = !isInstalled && settings.appLanguage !== 'en-US';
 
-            <div className="space-y-4">
-              <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg bg-slate-950/60 border border-slate-800">
-                <input
-                  type="checkbox"
-                  checked={settings.auroraIntegrationEnabled}
-                  onChange={(e) =>
-                    setSettings({ ...settings, auroraIntegrationEnabled: e.target.checked })
-                  }
-                  className="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
-                />
+        return (
+          <div className="space-y-5">
+            {/* 1. Erkennung & Status Banner */}
+            <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-white">Aurora Sprachausgabe aktivieren</div>
-                  <div className="text-[11px] text-slate-400">
-                    Sprachmeldungen über Windows SAPI / Neural TTS abspielen
+                  <h2 className="text-sm font-bold text-sky-400 flex items-center space-x-2">
+                    <Mic className="w-4 h-4 text-sky-400" />
+                    <span>VOICEATTACK &amp; AURORA LOG-WÄCHTER INTEGRATION</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Nativer Audio-Begleiter für Star Citizen Live-Events. Greift rein lesend auf das VoiceAttack Aurora Log-Wächter Profil zu.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-3 shrink-0">
+                  {settings.debugMode && (
+                    <label className="flex items-center space-x-1.5 text-xs text-slate-400 cursor-pointer bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800 hover:border-slate-700 transition">
+                      <input
+                        type="checkbox"
+                        checked={simulateAuroraNotInstalled}
+                        onChange={(e) => setSimulateAuroraNotInstalled(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                      />
+                      <span>🧪 'Nicht installiert' simulieren</span>
+                    </label>
+                  )}
+
+                  {isInstalled ? (
+                    <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-emerald-950/80 border border-emerald-800/80 text-emerald-400 text-xs font-bold shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Profil Gefunden &amp; Bereit</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 text-xs font-bold">
+                      <span className="w-2 h-2 rounded-full bg-slate-500" />
+                      <span>Nicht Gefunden</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Installations-Pfad Infobox */}
+              <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center space-x-2.5 overflow-hidden">
+                  <Folder className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="truncate">
+                    <div className="text-[10px] text-slate-400">Installations-Pfad (Dokumente / OneDrive)</div>
+                    <div className="font-mono text-slate-200 text-[11px] truncate">
+                      {settings.auroraPath || 'Nicht installiert'}
+                    </div>
                   </div>
                 </div>
-              </label>
+                {!isInstalled && (
+                  <div className="text-[11px] text-rose-400 font-medium shrink-0">
+                    Ordner 'VoiceAttack\Aurora Log-Wächter' nicht gefunden (Integration deaktiviert)
+                  </div>
+                )}
+              </div>
 
-              <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-300">Aurora Lautstärke:</span>
-                  <span className="text-xs font-mono text-sky-400 font-bold">
+              {/* Gumroad Kauf-Banner */}
+              {showPurchaseBanner && (
+                <div className="p-4 rounded-lg bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-950 border border-amber-600/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-amber-950/20">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                      <ShoppingCart className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-amber-200">Aurora Log-Wächter Profil nicht installiert</div>
+                      <div className="text-xs text-slate-300 mt-0.5">
+                        Erhalte das vollständige VoiceAttack-Paket mit über 150 personalisierten Audio-Sprachausgaben für Schiffe, Zonen &amp; Spielereignisse.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenGumroad}
+                    className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md hover:shadow-amber-600/30 transition flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
+                  >
+                    <span>🛍️</span>
+                    <span>Aurora auf Gumroad ansehen</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Hauptschalter & Audio-Einstellungen */}
+            <div className={`p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 transition-opacity ${isInstalled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                {/* Checkbox Aktiv */}
+                <div className="lg:col-span-4">
+                  <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition">
+                    <input
+                      type="checkbox"
+                      checked={settings.auroraIntegrationEnabled}
+                      onChange={(e) =>
+                        setSettings({ ...settings, auroraIntegrationEnabled: e.target.checked })
+                      }
+                      className="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white">Audio-Begleiter Aktiv</div>
+                      <div className="text-[10px] text-slate-400">Sprachausgabe für Live-Log-Events</div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Slider Lautstärke */}
+                <div className="lg:col-span-5 flex items-center space-x-3 p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                  <span className="text-xs text-slate-400 shrink-0 font-medium">Lautstärke:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={settings.auroraVolume}
+                    onChange={(e) =>
+                      setSettings({ ...settings, auroraVolume: parseInt(e.target.value, 10) })
+                    }
+                    className="w-full accent-sky-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-mono font-bold text-sky-400 w-10 text-right shrink-0">
                     {settings.auroraVolume}%
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={settings.auroraVolume}
-                  onChange={(e) =>
-                    setSettings({ ...settings, auroraVolume: parseInt(e.target.value, 10) })
-                  }
-                  className="w-full accent-sky-500 cursor-pointer"
-                />
+
+                {/* Test Audio Button */}
+                <div className="lg:col-span-3">
+                  <button
+                    type="button"
+                    onClick={handlePlayAuroraTestSound}
+                    disabled={isPlayingAuroraTest}
+                    className="w-full py-3 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-sky-950/50"
+                  >
+                    <Play className={`w-3.5 h-3.5 ${isPlayingAuroraTest ? 'animate-spin' : ''}`} />
+                    <span>{isPlayingAuroraTest ? 'Spielt Audio...' : '▶ Test-Audio'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Kategorie-Auswahl */}
+            <div className={`p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4 transition-opacity ${isInstalled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h2 className="text-xs font-bold text-sky-400 flex items-center space-x-2 tracking-wider">
+                  <span>🎛️</span>
+                  <span>AKTIVE SPRACH-KATEGORIEN</span>
+                </h2>
+                <span className="text-[11px] text-emerald-400 italic">
+                  Schutzzonen auf Stationen werden automatisch stummgeschaltet
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {/* Spalte 1 */}
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraShipGreetings ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraShipGreetings: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🚀 Schiffsbegrüßungen</div>
+                    <div className="text-[10px] text-slate-400">73 Schiffsklassen</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraBlueprints ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraBlueprints: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">📜 Baupläne</div>
+                    <div className="text-[10px] text-slate-400">Crafting-Baupläne</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraSafetyZones ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraSafetyZones: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🛡️ Sicherheitszonen</div>
+                    <div className="text-[10px] text-slate-400">Armistice Zone (im Raum)</div>
+                  </div>
+                </label>
+
+                {/* Spalte 2 */}
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraRestrictedZones ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraRestrictedZones: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">⛔ Sperrzonen</div>
+                    <div className="text-[10px] text-slate-400">Sperrgebiet / Privat</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraMonitoredSpace ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraMonitoredSpace: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">📡 Überwachter Raum</div>
+                    <div className="text-[10px] text-slate-400">Comm-Array</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraJurisdictions ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraJurisdictions: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🏛️ Hoheitsgebiete</div>
+                    <div className="text-[10px] text-slate-400">UEE, Hurston, etc.</div>
+                  </div>
+                </label>
+
+                {/* Spalte 3 */}
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraQuantumArrival ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraQuantumArrival: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🌌 Quantenreise</div>
+                    <div className="text-[10px] text-slate-400">Sprungziel-Ankunft</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraPlayerDeath ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraPlayerDeath: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">💀 Notfall / Tod</div>
+                    <div className="text-[10px] text-slate-400">Spielertod / Med-Bett</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraServerErrors ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraServerErrors: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">⚠️ Serverfehler (30k)</div>
+                    <div className="text-[10px] text-slate-400">Verbindungsabbruch</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 4. Radar & Sensor Audio */}
+            <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+              <div>
+                <h2 className="text-xs font-bold text-sky-400 flex items-center space-x-2 tracking-wider">
+                  <Radar className="w-4 h-4 text-sky-400" />
+                  <span>RADAR &amp; SENSOR AUDIO (RS-RADAR PING &amp; TARGETS)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Akustische Rückmeldungen bei erfolgreichen Radar-Pings und Warnungen bei wertvollen Erz-Clustern.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <label className="flex items-start space-x-3 p-3 rounded-lg bg-slate-950/60 border border-slate-800 cursor-pointer">
+                <label className="flex items-start space-x-3 p-3 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
                   <input
                     type="checkbox"
                     checked={settings.rsTargetAlertEnabled}
                     onChange={(e) =>
                       setSettings({ ...settings, rsTargetAlertEnabled: e.target.checked })
                     }
-                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                   />
                   <div>
                     <div className="font-semibold text-white">RS Target Alert</div>
@@ -1884,14 +2159,14 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </label>
 
-                <label className="flex items-start space-x-3 p-3 rounded-lg bg-slate-950/60 border border-slate-800 cursor-pointer">
+                <label className="flex items-start space-x-3 p-3 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
                   <input
                     type="checkbox"
                     checked={settings.rsTargetSoundEnabled}
                     onChange={(e) =>
                       setSettings({ ...settings, rsTargetSoundEnabled: e.target.checked })
                     }
-                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800"
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                   />
                   <div>
                     <div className="font-semibold text-white">Radar Sonar-Ping Sound</div>
@@ -1903,8 +2178,8 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Tab 5: UEX Corp */}
       {activeSubTab === 'uex' && (

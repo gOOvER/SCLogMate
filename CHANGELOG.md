@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **VoiceAttack & Aurora Log-Wächter Settings Suite (`SettingsView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Restored full VoiceAttack & Aurora Log-Wächter management interface matching the desktop release design.
+  - Added installation detection banner with auto-path resolution (`Documents` / `OneDrive`), real-time profile status badges, and debug-mode installation simulation toggle.
+  - Added full audio controls with master toggle, smooth volume slider (0-100%), and interactive test audio playback button (`play_aurora_test_sound`).
+  - Added granular active speech category toggles across all 9 event groups: Ship Greetings (73 ship classes), Blueprints, Safety Zones, Restricted Zones, Monitored Space (Comm-Array), Jurisdictions, Quantum Arrival, Player Emergency / Death, and Server Disconnections (30k).
+  - Integrated direct purchase banner for users missing the profile pack with external store link integration.
 - **Multi-Crew & Ship Channel Tracking (`Core/ShipChannel.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`)**:
   - Implemented robust ship communication channel parser extracting ship names, ship owners, and aboard crew members across both English and German log formats.
   - Distinguishes player boarding own ship vs. player boarding another pilot's ship (`ChannelMoment.YouBoarded`).
