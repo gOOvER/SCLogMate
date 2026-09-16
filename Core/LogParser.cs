@@ -1308,7 +1308,7 @@ public partial class LogParser
                             Kind = EventKind.Inventory,
                             Amount = 1,
                             Detail = $"{locInfo.Name}: +1 {resolved.Name}",
-                            Ship = locInfo.Name,
+                            Ship = null,
                             ItemRef = cls
                         };
                     }
@@ -1327,7 +1327,7 @@ public partial class LogParser
                             Kind = EventKind.Inventory,
                             Amount = -1,
                             Detail = $"{locInfo.Name}: -1 {resolved.Name}",
-                            Ship = locInfo.Name,
+                            Ship = null,
                             ItemRef = cls
                         };
                     }
@@ -1357,7 +1357,7 @@ public partial class LogParser
                         Kind = EventKind.Inventory,
                         Amount = 1,
                         Detail = $"{locInfo.Name}: +1 {resolved.Name}",
-                        Ship = locInfo.Name,
+                        Ship = null,
                         ItemRef = cls
                     };
                 }
@@ -1398,7 +1398,7 @@ public partial class LogParser
                         Kind = EventKind.Inventory,
                         Amount = -1,
                         Detail = $"{locInfo.Name}: -1 {resolved.Name} (Missionsabgabe Frachtaufzug)",
-                        Ship = locInfo.Name,
+                        Ship = null,
                         ItemRef = info.ItemClass
                     };
                 }
@@ -1415,7 +1415,7 @@ public partial class LogParser
                 Time = ts,
                 Kind = EventKind.Refinery,
                 Detail = $"{locInfo.Name}: Material zur Veredelung abgegeben",
-                Ship = locInfo.Name
+                Ship = null
             };
         }
 
@@ -1441,7 +1441,7 @@ public partial class LogParser
                         Kind = EventKind.Inventory,
                         Amount = 1,
                         Detail = $"{locInfo.Name}: +1 {resolved.Name}",
-                        Ship = locInfo.Name,
+                        Ship = null,
                         ItemRef = cls
                     };
                 }
@@ -1466,7 +1466,7 @@ public partial class LogParser
                         Kind = EventKind.Inventory,
                         Amount = -count,
                         Detail = $"Frachtaufzug: {countStr} angefordert ({locInfo.Name})",
-                        Ship = locInfo.Name
+                        Ship = null
                     };
                 }
             }
@@ -1687,8 +1687,14 @@ public partial class LogParser
             if (ic.Success)
             {
                 var rawShip = ic.Groups["ship"].Value;
-                var ship = !string.IsNullOrEmpty(rawShip) ? Ships.Prettify(rawShip) : "Schiff";
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"Versicherungs-Claim: {ship}", Ship = ship };
+                if (!string.IsNullOrEmpty(rawShip) &&
+                    !rawShip.Equals("entitlementURN", StringComparison.OrdinalIgnoreCase) &&
+                    !rawShip.Contains("entitlement", StringComparison.OrdinalIgnoreCase) &&
+                    !rawShip.Equals("requestId", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ship = Ships.Prettify(rawShip);
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = $"Versicherungs-Claim: {ship}", Ship = ship };
+                }
             }
         }
 
@@ -1802,21 +1808,58 @@ public partial class LogParser
                 long reward = 0;
                 if (isComplete)
                 {
-                    if (cat != null && cat.BaseReward > 0)
+                    lock (_stateLock)
                     {
-                        reward = cat.BaseReward;
+                        // 1. Zuerst aktiven Auftrag in _contracts mit bekanntem Reward prüfen
+                        string? targetKey = null;
+                        if (_contracts.ContainsKey(mId)) targetKey = mId;
+                        else
+                        {
+                            targetKey = _contracts.Keys.FirstOrDefault(k =>
+                                _contracts[k].Outcome == ContractOutcome.InProgress &&
+                                (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                                 normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                        }
+
+                        if (targetKey != null && _contracts.TryGetValue(targetKey, out var existingContract) && existingContract.Reward > 0)
+                        {
+                            reward = existingContract.Reward;
+                        }
                     }
-                    else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
+
+                    // 2. In der Datenbank nach gescannten aktiven Aufträgen suchen
+                    if (reward <= 0)
                     {
-                        reward = 21250;
+                        var activeDbContracts = Database.GetActiveContracts();
+                        var dbMatch = activeDbContracts.FirstOrDefault(c =>
+                            !string.IsNullOrEmpty(c.Title) &&
+                            (!string.IsNullOrEmpty(normTitle) && c.Title.ToLowerInvariant().Contains(normTitle) ||
+                             normTitle.Contains(c.Title.ToLowerInvariant())));
+                        if (dbMatch != null && dbMatch.Reward > 0)
+                        {
+                            reward = dbMatch.Reward;
+                        }
                     }
-                    else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
+
+                    // 3. Fallback auf Missions-Katalog oder Heuristik
+                    if (reward <= 0)
                     {
-                        reward = 32000;
-                    }
-                    else
-                    {
-                        reward = 25000; // Standard aUEC für Belohnungs-Events, damit kein 0-Betrag angezeigt wird
+                        if (cat != null && cat.BaseReward > 0)
+                        {
+                            reward = cat.BaseReward;
+                        }
+                        else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reward = 21250;
+                        }
+                        else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reward = 32000;
+                        }
+                        else
+                        {
+                            reward = 25000; // Standard aUEC für Belohnungs-Events
+                        }
                     }
 
                     lock (_stateLock)
@@ -1839,7 +1882,7 @@ public partial class LogParser
                                 Outcome = ContractOutcome.Completed,
                                 CompletedAt = existing.CompletedAt ?? ParseTs(line),
                                 StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
-                                Reward = reward > 0 ? reward : existing.Reward
+                                Reward = existing.Reward > 0 ? existing.Reward : reward
                             };
                         }
                         else

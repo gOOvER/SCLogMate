@@ -96,7 +96,21 @@ export const EventsView: React.FC<EventsViewProps> = ({
     if (activeSession !== '__live__') return;
 
     const unbindLog = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
-      setEvents((prev) => [newEvent, ...prev.slice(0, limit - 1)]);
+      setEvents((prev) => {
+        if (
+          prev.some(
+            (x) =>
+              x.id === newEvent.id ||
+              (x.timestamp === newEvent.timestamp &&
+                (x.kind || x.category) === (newEvent.kind || newEvent.category) &&
+                x.description === newEvent.description &&
+                x.amount === newEvent.amount)
+          )
+        ) {
+          return prev;
+        }
+        return [newEvent, ...prev.slice(0, limit - 1)];
+      });
     });
 
     const unbindLiveLoaded = bridge.on<LogEventItem[]>('LIVE_EVENTS_LOADED', (loadedEvents) => {
@@ -177,9 +191,17 @@ export const EventsView: React.FC<EventsViewProps> = ({
     return new Intl.NumberFormat('de-DE').format(val);
   };
 
-  // Sorted and filtered events
+  // Sorted and filtered events (deduplicated)
   const displayEvents = useMemo(() => {
-    return [...events].sort((a, b) => {
+    const seen = new Set<string>();
+    const unique = events.filter((e) => {
+      const key = `${e.timestamp || ''}|${e.kind || e.category || ''}|${e.title || ''}|${e.description || ''}|${e.amount ?? 0}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return unique.sort((a, b) => {
       let cmp = 0;
       switch (sortCol) {
         case 'timestamp':

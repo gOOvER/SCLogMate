@@ -248,12 +248,53 @@ public static class FleetCatalog
     private static readonly KeyValuePair<string, ShipCatalogEntry>[] SortedCatalog =
         Catalog.OrderByDescending(kv => kv.Key.Length).ToArray();
 
+    public static bool IsValidShipName(string? shipName)
+    {
+        if (string.IsNullOrWhiteSpace(shipName)) return false;
+        var s = shipName.Trim();
+        if (s.Equals("entitlementURN", StringComparison.OrdinalIgnoreCase) ||
+            s.Contains("entitlement", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("requestId", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Hangar", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Lager", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Inventory", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("—", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("--", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("INVALID_LOCATION_ID", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (s.Equals("Levski", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Area 18", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Area18", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("New Babbage", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("NewBabbage", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Lorville", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Orison", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Everus Harbor", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Baijini Point", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Port Tressler", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Seraphim Station", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (s.Contains("Station", StringComparison.OrdinalIgnoreCase) ||
+            s.Contains("Jump Point", StringComparison.OrdinalIgnoreCase) ||
+            s.Contains("Harbor", StringComparison.OrdinalIgnoreCase) ||
+            s.Contains("Outpost", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return true;
+    }
+
     public static ShipCatalogEntry Lookup(string shipName)
     {
         if (string.IsNullOrWhiteSpace(shipName))
             return new("Unbekannt", "Unbekannt", "SC", "#58A6FF", "Raumschiff", 1_500_000, 50, "6 Monate");
 
         var clean = shipName.Trim();
+
+        // Standorte, Stationen und URNs sind keine Schiffe
+        if (!IsValidShipName(clean))
+            return new("Unbekannt", "Unbekannt", "SC", "#58A6FF", "Nicht-Schiff", 0, 0, "—");
 
         // 1. Exakter O(1) Match
         if (Catalog.TryGetValue(clean, out var exact))

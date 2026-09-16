@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Hangar & Fleet False Ship Entries (`Core/FleetCatalog.cs`, `Core/Database.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`)**:
+  - Fixed locations, stations, landing zones (e.g. Levski, Area 18), and raw log tokens (e.g. `entitlementURN`) erroneously appearing as ships with dozens of recorded flights in Hangar / Fleet management.
+  - Corrected inventory movements (`FillUnstowRequest`, warehouse moves) and refinery job events to no longer assign local station/location names to the `Ship` attribute.
+  - Fixed `InsuranceClaimRegex` in `LogParser.cs` extracting the raw parameter keyword `entitlementURN` instead of actual ship names from CWallet insurance claim logs.
+  - Added strict ship validation helper `FleetCatalog.IsValidShipName()` rejecting cities, stations, jump points, outpost locations, and metadata tokens.
+  - Restricted `Database.GetFleetStats()` to genuine vehicle events (`kind IN ('Vehicle', 'Quantum', 'ShipLoss')`).
+  - Added SQLite schema migration v24 cleaning up historical non-ship location entries from `events.ship` and `fleet_user_ships`.
+- **Contract Completion Reward Accuracy (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`)**:
+  - Fixed contract payouts constantly defaulting to 27,000 aUEC by adding detailed salvage and clean-up mission definitions with tier-specific reward values (Very Small to Massive, 10,000 aUEC up to 250,000 aUEC).
+  - Upgraded catalog fuzzy matching to prioritize specific longer titles over short generic fallbacks.
+  - Prioritized OCR-scanned and tracked contract rewards during contract completion events over generic catalog approximations.
+  - Added intelligent wallet delta reconciliation in `PhotinoBridge` linking positive mobiGlas OCR balance jumps (<45s) directly with completed contracts to avoid fragmented ledger entries.
+- **Duplicate Log Events Prevention (`EventsView.tsx`, `App.tsx`, `PhotinoBridge.cs`, `Core/Database.cs`)**:
+  - Fixed duplicate log event entries appearing in the Events view caused by a race condition between initial SQLite cache fallback and concurrent `LogTailer` replay of `Game.log`.
+  - Added deduplication guards to backend `_liveEvents` cache and `GetEvents` fallback.
+  - Made `Database.InsertCustomEvent` idempotent to prevent duplicate records in SQLite.
+  - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
+
 ### Added
 - **UEX Corp API 2.0 Integration Suite (`SettingsView.tsx`, `PhotinoBridge.cs`, `UexApiClient.cs`)**:
   - Restored full UEX Corp API 2.0 management suite matching the desktop release design.

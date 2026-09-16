@@ -58,13 +58,37 @@ public static class MissionCatalog
         var rawNorm = Normalize(rawTitle);
         if (rawNorm.Length < 3) return null;
 
-        // 1. Substring / Contains Match
+        // 1. Substring / Contains Match - Bevorzuge den längsten und spezifischsten Match!
+        MissionInfo? bestSubMatch = null;
+        int bestSubScore = 0;
+
         foreach (var m in _catalog)
         {
             var mNorm = Normalize(m.Title);
-            if (mNorm.Length >= 5 && (rawNorm.Contains(mNorm) || mNorm.Contains(rawNorm)))
-                return m;
+            if (mNorm.Length < 4) continue;
+
+            if (rawNorm.Contains(mNorm))
+            {
+                // rawTitle enthält den Titel des Katalogs (z.B. "salvage job large" enthält "salvage job large" oder "salvage job")
+                int score = mNorm.Length * 2;
+                if (score > bestSubScore)
+                {
+                    bestSubScore = score;
+                    bestSubMatch = m;
+                }
+            }
+            else if (mNorm.Contains(rawNorm))
+            {
+                int score = rawNorm.Length;
+                if (score > bestSubScore)
+                {
+                    bestSubScore = score;
+                    bestSubMatch = m;
+                }
+            }
         }
+
+        if (bestSubMatch != null) return bestSubMatch;
 
         // 2. Token Overlap Match (mindestens 2 gemeinsame Wörter mit >= 4 Zeichen)
         var rawTokens = rawNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 4).ToHashSet();
@@ -850,6 +874,193 @@ public static class MissionCatalog
             ReputationGain = 300,
             StarSystems = "Nyx",
             Description = "Sichere wertvolle Komponenten und Hüllenteile von einem aufgegebenen Schiffswrack."
+        });
+
+        // ── REGULÄRE & SPEZIFISCHE BERGUNGS-AUFTRÄGE (SALVAGE CONTRACTS) ─────
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_vsmall",
+            Title = "Salvage Job: Very Small",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 10000,
+            ReputationGain = 120,
+            StarSystems = "Stanton & Pyro",
+            Description = "Bergungsauftrag an einem leichten Kleinschiffwrack (z.B. Pisces, Merlin, Aurora)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_small",
+            Title = "Salvage Job: Small",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 20000,
+            ReputationGain = 200,
+            StarSystems = "Stanton & Pyro",
+            Description = "Standard-Bergungsauftrag für ein kleineres Schiff (z.B. Arrow, Gladius, Cutlass)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_medium",
+            Title = "Salvage Job: Medium",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 50000,
+            ReputationGain = 350,
+            StarSystems = "Stanton & Pyro",
+            Description = "Mittlerer Bergungsauftrag für Transporter oder Mehrzweckschiffe (z.B. Freelancer, Connie)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_large",
+            Title = "Salvage Job: Large",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 90000,
+            ReputationGain = 600,
+            StarSystems = "Stanton & Pyro",
+            Description = "Großer Bergungsauftrag für Großraum- und Industrieschiffe (z.B. Caterpillar, Starfarer, Hercules)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_vlarge",
+            Title = "Salvage Job: Very Large",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 150000,
+            ReputationGain = 900,
+            StarSystems = "Stanton & Pyro",
+            Description = "Sehr großer Bergungsauftrag an schweren Kampfschiffen (z.B. Hammerhead, Carrack, 890 Jump)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_job_massive",
+            Title = "Salvage Job: Massive",
+            Contractor = "Salvage Guild",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 250000,
+            ReputationGain = 1500,
+            StarSystems = "Stanton & Pyro",
+            Description = "Kapitaler Bergungsauftrag an Großkampfschiffen (z.B. 890 Jump, Idris, Javelin)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_claim_small",
+            Title = "Salvage Claim: Small",
+            Contractor = "Salvage Broker",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 20000,
+            ReputationGain = 200,
+            StarSystems = "Stanton",
+            Description = "Offizieller Bergungsanspruch für ein kleines Wrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_claim_medium",
+            Title = "Salvage Claim: Medium",
+            Contractor = "Salvage Broker",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 50000,
+            ReputationGain = 350,
+            StarSystems = "Stanton",
+            Description = "Offizieller Bergungsanspruch für ein mittleres Wrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_claim_large",
+            Title = "Salvage Claim: Large",
+            Contractor = "Salvage Broker",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 90000,
+            ReputationGain = 600,
+            StarSystems = "Stanton",
+            Description = "Offizieller Bergungsanspruch für ein großes Frachter- oder Tankschiffwrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_claim_vlarge",
+            Title = "Salvage Claim: Very Large",
+            Contractor = "Salvage Broker",
+            Faction = "Civilian",
+            MissionType = "Bergung",
+            BaseReward = 150000,
+            ReputationGain = 900,
+            StarSystems = "Stanton",
+            Description = "Offizieller Bergungsanspruch für ein sehr großes Wrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_cleanup_black",
+            Title = "Clean-up: In the Black",
+            Contractor = "Unverified",
+            Faction = "Underworld",
+            MissionType = "Bergung",
+            BaseReward = 80000,
+            ReputationGain = 500,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Beseitige Beweise und zerlege das Schiffswrack vor dem Eintreffen der Sicherheitskräfte."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_illegal_small",
+            Title = "Illegal Salvage: Small",
+            Contractor = "Unverified",
+            Faction = "Underworld",
+            MissionType = "Bergung",
+            BaseReward = 30000,
+            ReputationGain = 250,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Unverifizierter Bergungsauftrag ohne offizielle Bergbaulizenz."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_illegal_medium",
+            Title = "Illegal Salvage: Medium",
+            Contractor = "Unverified",
+            Faction = "Underworld",
+            MissionType = "Bergung",
+            BaseReward = 60000,
+            ReputationGain = 400,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Unverifizierte Bergung eines mittleren Wracks in Sperrgebieten."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_illegal_large",
+            Title = "Illegal Salvage: Large",
+            Contractor = "Unverified",
+            Faction = "Underworld",
+            MissionType = "Bergung",
+            BaseReward = 120000,
+            ReputationGain = 750,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Unverifizierte Bergung eines schweren Wracks unter Umgehung von UEE-Zöllen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_illegal_hammerhead",
+            Title = "Illegal Salvage: Hammerhead",
+            Contractor = "Unverified",
+            Faction = "Underworld",
+            MissionType = "Bergung",
+            BaseReward = 250000,
+            ReputationGain = 1200,
+            IsIllegal = true,
+            StarSystems = "Stanton & Pyro",
+            Description = "Illegale Komplett-Ausschlachtung einer abgeschossenen Hammerhead."
         });
         Add(new MissionInfo
         {

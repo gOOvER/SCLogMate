@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 23; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 24; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 35; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -562,6 +562,38 @@ public static class Database
             Exec(db, "PRAGMA user_version = 23;");
             dbSchemaVersion = 23;
             Logger.Log("DB Schema: Migration auf v23 (sessions play_time, menu_time & crew) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 24)
+        {
+            try
+            {
+                Exec(db, @"
+                    -- 1. Standorte und Nicht-Schiffe aus events.ship entfernen
+                    UPDATE events SET ship = NULL WHERE kind = 'Inventory';
+                    UPDATE events SET ship = NULL WHERE ship = 'entitlementURN' OR ship LIKE '%entitlement%';
+                    UPDATE events SET ship = NULL WHERE ship IN (
+                        'Levski', 'Area 18', 'Area18', 'New Babbage', 'NewBabbage', 'Lorville', 'Orison', 
+                        'Everus Harbor', 'Baijini Point', 'Port Tressler', 'Seraphim Station', 
+                        'Hangar', '—', '--', 'INVALID_LOCATION_ID'
+                    );
+                    UPDATE events SET ship = NULL WHERE ship LIKE '%Station%' OR ship LIKE '%Jump Point%' OR ship LIKE '%Harbor%' OR ship LIKE '%Outpost%';
+
+                    -- 2. Fehlplatzierte Standorte aus den benutzerdefinierten Flottenschiffen entfernen
+                    DELETE FROM fleet_user_ships WHERE name IN (
+                        'entitlementURN', 'Levski', 'Area 18', 'Area18', 'New Babbage', 'NewBabbage', 'Lorville', 'Orison', 
+                        'Everus Harbor', 'Baijini Point', 'Port Tressler', 'Seraphim Station', 
+                        'Hangar', '—', '--'
+                    ) OR name LIKE '%entitlement%' OR name LIKE '%Station%' OR name LIKE '%Jump Point%' OR name LIKE '%Harbor%' OR name LIKE '%Outpost%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v24 (Bereinigung von Standorten & entitlementURN)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 24;");
+            dbSchemaVersion = 24;
+            Logger.Log("DB Schema: Migration auf v24 (Bereinigung von Standorten & entitlementURN aus Flotten-Events) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -1475,7 +1507,17 @@ public static class Database
                     COUNT(CASE WHEN kind = 'ShipLoss' THEN 1 END) as losses,
                     MAX(time) as last_time
                 FROM events 
-                WHERE ship IS NOT NULL AND trim(ship) != '' AND ship != '—' AND time >= $since
+                WHERE ship IS NOT NULL 
+                  AND trim(ship) != '' 
+                  AND ship != '—' 
+                  AND ship != '--'
+                  AND kind IN ('Vehicle', 'Quantum', 'ShipLoss')
+                  AND ship NOT IN ('entitlementURN', 'Levski', 'Area 18', 'Area18', 'New Babbage', 'NewBabbage', 'Lorville', 'Orison', 'Everus Harbor', 'Baijini Point', 'Port Tressler', 'Seraphim Station', 'Hangar')
+                  AND ship NOT LIKE '%Station%' 
+                  AND ship NOT LIKE '%Jump Point%'
+                  AND ship NOT LIKE '%Harbor%'
+                  AND ship NOT LIKE '%entitlement%'
+                  AND time >= $since
                 GROUP BY ship
                 ORDER BY MAX(time) DESC";
             c.Parameters.AddWithValue("$since", since.Value.ToString("o", CultureInfo.InvariantCulture));
@@ -1490,7 +1532,16 @@ public static class Database
                     COUNT(CASE WHEN kind = 'ShipLoss' THEN 1 END) as losses,
                     MAX(time) as last_time
                 FROM events 
-                WHERE ship IS NOT NULL AND trim(ship) != '' AND ship != '—'
+                WHERE ship IS NOT NULL 
+                  AND trim(ship) != '' 
+                  AND ship != '—'
+                  AND ship != '--'
+                  AND kind IN ('Vehicle', 'Quantum', 'ShipLoss')
+                  AND ship NOT IN ('entitlementURN', 'Levski', 'Area 18', 'Area18', 'New Babbage', 'NewBabbage', 'Lorville', 'Orison', 'Everus Harbor', 'Baijini Point', 'Port Tressler', 'Seraphim Station', 'Hangar')
+                  AND ship NOT LIKE '%Station%' 
+                  AND ship NOT LIKE '%Jump Point%'
+                  AND ship NOT LIKE '%Harbor%'
+                  AND ship NOT LIKE '%entitlement%'
                 GROUP BY ship
                 ORDER BY MAX(time) DESC";
         }
@@ -1784,7 +1835,12 @@ public static class Database
                 using var db = new SqliteConnection(Conn);
                 db.Open();
                 using var cmd = db.CreateCommand();
-                cmd.CommandText = "INSERT INTO events(session,time,kind,amount,detail,ship) VALUES($s,$t,$k,$a,$d,$sh);";
+                cmd.CommandText = @"
+                    INSERT INTO events(session,time,kind,amount,detail,ship) 
+                    SELECT $s,$t,$k,$a,$d,$sh
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM events WHERE session = $s AND time = $t AND kind = $k AND detail = $d LIMIT 1
+                    );";
                 cmd.Parameters.AddWithValue("$s", session);
                 cmd.Parameters.AddWithValue("$t", time.ToString("o", CultureInfo.InvariantCulture));
                 cmd.Parameters.AddWithValue("$k", kind.ToString());

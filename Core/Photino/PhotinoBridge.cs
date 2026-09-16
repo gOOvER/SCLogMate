@@ -1113,32 +1113,87 @@ public class PhotinoBridge
         {
             if (unloggedDiff > 0)
             {
-                // Einnahme (mobiGlas Saldo-Zunahme, z.B. Missions-Belohnung, Verkauf, Transfer)
-                string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (+{unloggedDiff:N0} aUEC Gutschrift)";
-                Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, unloggedDiff, detail, ship);
-
-                var dto = new LogEventDto
+                // Prüfen, ob vor wenigen Sekunden (<45s) eine Missionsbelohnung einging, deren Betrag durch den OCR-Saldo präzisiert werden kann
+                bool reconciledWithMission = false;
+                try
                 {
-                    Id = Guid.NewGuid().ToString("N"),
-                    Timestamp = DateTime.Now.ToString("HH:mm:ss"),
-                    Category = "wallet",
-                    Kind = EventKind.TransferIn.ToString(),
-                    KindText = "Einnahme (mobiGlas)",
-                    Icon = "💰",
-                    Title = "Einnahme (mobiGlas)",
-                    Description = detail,
-                    Amount = unloggedDiff,
-                    Ship = ship,
-                    RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: +{unloggedDiff:N0} aUEC)"
-                };
+                    using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
+                    db.Open();
+                    using var cmdCheck = db.CreateCommand();
+                    cmdCheck.CommandText = @"
+                        SELECT rowid, amount, detail
+                        FROM events
+                        WHERE kind = 'MissionReward'
+                          AND time >= @cutoff
+                        ORDER BY time DESC
+                        LIMIT 1;";
+                    cmdCheck.Parameters.AddWithValue("@cutoff", nowUtc.AddSeconds(-45).ToString("o", CultureInfo.InvariantCulture));
+                    using var r = cmdCheck.ExecuteReader();
+                    if (r.Read())
+                    {
+                        var rowId = r.GetInt64(0);
+                        var oldMissionAmt = r.GetInt64(1);
+                        var oldDetail = r.GetString(2);
+                        r.Close();
 
-                lock (_liveEventsLock)
+                        // Missionsevent auf den echten, durch mobiGlas bestätigten Gesamtbetrag anheben
+                        long updatedAmt = oldMissionAmt + unloggedDiff;
+                        using var cmdUpd = db.CreateCommand();
+                        cmdUpd.CommandText = "UPDATE events SET amount = @newAmt, detail = @newDetail WHERE rowid = @rowId;";
+                        cmdUpd.Parameters.AddWithValue("@newAmt", updatedAmt);
+                        cmdUpd.Parameters.AddWithValue("@newDetail", $"{oldDetail} (+{updatedAmt:N0} aUEC)");
+                        cmdUpd.Parameters.AddWithValue("@rowId", rowId);
+                        cmdUpd.ExecuteNonQuery();
+
+                        reconciledWithMission = true;
+                        Logger.Log($"OnBalanceCaptured: Missionsbelohnung (rowid={rowId}) von {oldMissionAmt:N0} auf {updatedAmt:N0} aUEC angepasst (OCR-Delta +{unloggedDiff:N0}).");
+
+                        lock (_liveEventsLock)
+                        {
+                            var liveEv = _liveEvents.FirstOrDefault(e => e.Kind == EventKind.MissionReward.ToString());
+                            if (liveEv != null)
+                            {
+                                liveEv.Amount = updatedAmt;
+                                liveEv.Description = $"{oldDetail} (+{updatedAmt:N0} aUEC)";
+                                Broadcast("LOG_EVENT", liveEv);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
                 {
-                    _liveEvents.Insert(0, dto);
-                    if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                    Logger.Error("OnBalanceCaptured.ReconcileMission", ex);
                 }
 
-                Broadcast("LOG_EVENT", dto);
+                if (!reconciledWithMission)
+                {
+                    // Einnahme (mobiGlas Saldo-Zunahme, z.B. Missions-Belohnung, Verkauf, Transfer)
+                    string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (+{unloggedDiff:N0} aUEC Gutschrift)";
+                    Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, unloggedDiff, detail, ship);
+
+                    var dto = new LogEventDto
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        Timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                        Category = "wallet",
+                        Kind = EventKind.TransferIn.ToString(),
+                        KindText = "Einnahme (mobiGlas)",
+                        Icon = "💰",
+                        Title = "Einnahme (mobiGlas)",
+                        Description = detail,
+                        Amount = unloggedDiff,
+                        Ship = ship,
+                        RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: +{unloggedDiff:N0} aUEC)"
+                    };
+
+                    lock (_liveEventsLock)
+                    {
+                        _liveEvents.Insert(0, dto);
+                        if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                    }
+
+                    Broadcast("LOG_EVENT", dto);
+                }
             }
             else
             {
@@ -3553,7 +3608,7 @@ public class PhotinoBridge
 
                         foreach (var e in dbEvents.OrderBy(x => x.Time))
                         {
-                            _liveEvents.Insert(0, new LogEventDto
+                            var dto = new LogEventDto
                             {
                                 Id = Guid.NewGuid().ToString("N"),
                                 Timestamp = e.Time.ToLocalTime().ToString("HH:mm:ss"),
@@ -3566,7 +3621,18 @@ public class PhotinoBridge
                                 Amount = e.Amount != 0 ? e.Amount : null,
                                 Ship = CleanEventShip(e.Ship, e.Kind),
                                 RawText = e.Detail ?? "",
-                            });
+                            };
+
+                            bool exists = _liveEvents.Any(x =>
+                                x.Timestamp == dto.Timestamp &&
+                                x.Kind == dto.Kind &&
+                                x.Description == dto.Description &&
+                                x.Amount == dto.Amount);
+
+                            if (!exists)
+                            {
+                                _liveEvents.Insert(0, dto);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -3877,13 +3943,15 @@ public class PhotinoBridge
         var stats = Database.GetFleetStats();
         var customData = Database.GetAllFleetCustomData();
 
-        // 1. Grouping by canonical ship name from catalog
+        // 1. Grouping by canonical ship name from catalog (nur echte Schiffe)
         var groupedStats = stats
+            .Where(s => FleetCatalog.IsValidShipName(s.Ship))
             .GroupBy(s =>
             {
                 var cat = FleetCatalog.Lookup(s.Ship);
                 return cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : s.Ship;
             })
+            .Where(g => FleetCatalog.IsValidShipName(g.Key))
             .Select(g => new Database.DbShipStat(
                 Ship: g.Key,
                 FlightCount: g.Sum(x => x.FlightCount),
@@ -3946,6 +4014,7 @@ public class PhotinoBridge
         // Add manually added ships in customData that haven't been flown yet
         foreach (var (shipName, cd) in customData)
         {
+            if (!FleetCatalog.IsValidShipName(shipName)) continue;
             var cat = FleetCatalog.Lookup(shipName);
             var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : shipName;
 
@@ -5542,10 +5611,19 @@ public class PhotinoBridge
 
             lock (_liveEventsLock)
             {
-                _liveEvents.Insert(0, dto);
-                if (_liveEvents.Count > 1000)
+                bool exists = _liveEvents.Any(x =>
+                    x.Timestamp == dto.Timestamp &&
+                    x.Kind == dto.Kind &&
+                    x.Description == dto.Description &&
+                    x.Amount == dto.Amount);
+
+                if (!exists)
                 {
-                    _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                    _liveEvents.Insert(0, dto);
+                    if (_liveEvents.Count > 1000)
+                    {
+                        _liveEvents.RemoveAt(_liveEvents.Count - 1);
+                    }
                 }
             }
 
@@ -5645,12 +5723,9 @@ public class PhotinoBridge
     private static string? CleanEventShip(string? ship, EventKind kind)
     {
         if (string.IsNullOrWhiteSpace(ship)) return null;
-        if (kind == EventKind.Hangar) return null;
+        if (kind == EventKind.Hangar || kind == EventKind.Inventory || kind == EventKind.Refinery) return null;
         var s = ship.Trim();
-        if (s.Equals("Levski", StringComparison.OrdinalIgnoreCase) ||
-            s.Equals("Hangar", StringComparison.OrdinalIgnoreCase) ||
-            s.Equals("—", StringComparison.OrdinalIgnoreCase) ||
-            s.Equals("--", StringComparison.OrdinalIgnoreCase))
+        if (!FleetCatalog.IsValidShipName(s))
             return null;
         return Ships.Prettify(s);
     }

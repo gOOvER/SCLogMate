@@ -137,7 +137,21 @@ export const App: React.FC = () => {
 
     // Subscribe to live events from C# backend
     const unbindLog = bridge.on<LogEventItem>('LOG_EVENT', (newEvent) => {
-      setEvents((prev) => [newEvent, ...prev.slice(0, 99)]);
+      setEvents((prev) => {
+        if (
+          prev.some(
+            (x) =>
+              x.id === newEvent.id ||
+              (x.timestamp === newEvent.timestamp &&
+                (x.kind || x.category) === (newEvent.kind || newEvent.category) &&
+                x.description === newEvent.description &&
+                x.amount === newEvent.amount)
+          )
+        ) {
+          return prev;
+        }
+        return [newEvent, ...prev.slice(0, 99)];
+      });
     });
 
     const unbindLiveLoaded = bridge.on<LogEventItem[]>('LIVE_EVENTS_LOADED', (loadedEvents) => {
