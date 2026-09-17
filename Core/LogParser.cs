@@ -961,12 +961,19 @@ public partial class LogParser
                     Confirmed = true
                 });
 
+                bool isAutoLoadSell = line.Contains("autoLoading[1]", StringComparison.OrdinalIgnoreCase);
+                if (isAutoLoadSell)
+                {
+                    var boxes = AutoLoadTracker.ParseCargoBoxData(line);
+                    AutoLoadTracker.Instance.RegisterAutoLoad(ts, "Verkauf", shop, ware, qty, boxes);
+                }
+
                 return new LogEntry
                 {
                     Time = ts,
                     Kind = EventKind.Trade,
                     Amount = amt,
-                    Detail = $"{ware} ×{qty} SCU  · {shop}"
+                    Detail = $"{ware} ×{qty} SCU  · {shop}" + (isAutoLoadSell ? " (Auto-Load)" : "")
                 };
             }
         }
@@ -1010,12 +1017,19 @@ public partial class LogParser
                     Confirmed = true
                 });
 
+                bool isAutoLoadBuy = line.Contains("autoLoading[1]", StringComparison.OrdinalIgnoreCase);
+                if (isAutoLoadBuy)
+                {
+                    var boxes = AutoLoadTracker.ParseCargoBoxData(line);
+                    AutoLoadTracker.Instance.RegisterAutoLoad(ts, "Kauf", shop, ware, scu, boxes);
+                }
+
                 return new LogEntry
                 {
                     Time = ts,
                     Kind = EventKind.Trade,
                     Amount = -price,
-                    Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)"
+                    Detail = $"{ware} ×{scu} SCU  · {shop} (Kauf)" + (isAutoLoadBuy ? " (Auto-Load)" : "")
                 };
             }
         }

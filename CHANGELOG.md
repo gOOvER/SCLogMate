@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Auto-Load Estimator & Freight Elevator Timer (`Core/AutoLoadTracker.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`, `MarketView.tsx`, `Sidebar.tsx`)**:
+  - Implemented automatic cargo loading and freight elevator timer tracking matching Star Citizen empirical mechanics (72s base dispatch time + 1.2s to 10.8s per container size from 1 to 32 SCU).
+  - Added real-time log event extraction from `SShopCommodityBuyRequest` and `SShopCommoditySellRequest` capturing `autoLoading[1]` and detailed crate composition (`boxSize` and `unitAmount`).
+  - Added persistent active timer state in `%APPDATA%\SCLogMate\autoload_active.json` surviving application restarts with automatic 2-hour staleness expiration.
+  - Added live countdown banner in the Market view with real-time animated progress bars, shop/location tags, detailed box breakdown chips, and manual discard actions.
+  - Added interactive sidebar notification badge displaying active loading jobs count with real-time updates and native desktop completion notifications.
 - **UEX Corp API 2.0 Integration Suite (`SettingsView.tsx`, `PhotinoBridge.cs`, `UexApiClient.cs`)**:
   - Restored full UEX Corp API 2.0 management suite matching the desktop release design.
   - Added dedicated UEX documentation quick-link button opening official documentation (`https://uexcorp.space/api/documentation`).

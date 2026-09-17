@@ -36,7 +36,7 @@ import { DbUpdateModal } from './components/DbUpdateModal';
 import { UpdateModal } from './components/UpdateModal';
 import { WikiDossierModal } from './components/WikiDossierModal';
 import { HardDrive } from 'lucide-react';
-import { UpdateInfoDto, WikiInfo } from './services/photinoBridge';
+import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto } from './services/photinoBridge';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
@@ -50,6 +50,7 @@ export const App: React.FC = () => {
   const [events, setEvents] = useState<LogEventItem[]>([]);
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
   const [refineryCount, setRefineryCount] = useState<number>(0);
+  const [autoLoadCount, setAutoLoadCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
@@ -102,7 +103,7 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusRes, sessionsRes, whRes, hudRes, eventsRes, haulsRes, settingsRes] = await Promise.all([
+      const [statusRes, sessionsRes, whRes, hudRes, eventsRes, haulsRes, settingsRes, autoLoadsRes] = await Promise.all([
         bridge.sendRequest<AppStatus>('get_status'),
         bridge.sendRequest<SessionSummary[]>('get_sessions'),
         bridge.sendRequest<{ locations: any[] }>('get_warehouse'),
@@ -110,6 +111,7 @@ export const App: React.FC = () => {
         bridge.sendRequest<LogEventItem[]>('get_events', { session: '__live__', limit: 100 }),
         bridge.sendRequest<any[]>('get_mining_hauls'),
         bridge.sendRequest<any>('get_settings').catch(() => null),
+        bridge.sendRequest<AutoLoadEntryDto[]>('get_autoload_entries').catch(() => []),
       ]);
       if (settingsRes?.selectedFontFamily) {
         applyFontFamily(settingsRes.selectedFontFamily);
@@ -124,6 +126,9 @@ export const App: React.FC = () => {
       }
       if (haulsRes && Array.isArray(haulsRes)) {
         setRefineryCount(haulsRes.filter((h: any) => h.status === 'Refining').length);
+      }
+      if (autoLoadsRes && Array.isArray(autoLoadsRes)) {
+        setAutoLoadCount(autoLoadsRes.length);
       }
     } catch (err) {
       console.error('Failed to load initial data:', err);
@@ -198,6 +203,21 @@ export const App: React.FC = () => {
       }
     });
 
+    const unbindAutoLoad = bridge.on<AutoLoadEntryDto[]>('AUTOLOAD_UPDATED', (entries) => {
+      if (Array.isArray(entries)) {
+        setAutoLoadCount(entries.length);
+      }
+    });
+
+    const unbindAutoLoadDone = bridge.on('AUTOLOAD_COMPLETED', () => {
+      bridge
+        .sendRequest<AutoLoadEntryDto[]>('get_autoload_entries')
+        .then((res) => {
+          setAutoLoadCount(res?.length || 0);
+        })
+        .catch(() => {});
+    });
+
     // Keyboard shortcut Alt + H to toggle HUD collapse
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 'h' || e.key === 'H')) {
@@ -221,6 +241,8 @@ export const App: React.FC = () => {
       unbindWh();
       unbindScan();
       unbindUpdate();
+      unbindAutoLoad();
+      unbindAutoLoadDone();
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('open-wiki-dossier', onOpenWikiEvent);
     };
@@ -282,6 +304,7 @@ export const App: React.FC = () => {
         warehouseCount={warehouseTotal > 0 ? warehouseTotal : undefined}
         liveEventCount={events.length > 0 ? events.length : undefined}
         refineryCount={refineryCount > 0 ? refineryCount : undefined}
+        autoLoadCount={autoLoadCount > 0 ? autoLoadCount : undefined}
       />
 
       {/* Main App Container */}

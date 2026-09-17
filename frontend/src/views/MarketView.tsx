@@ -4,6 +4,7 @@ import {
   MarketCommodityDto,
   TradeRouteDto,
   SalvagePriceSummaryDto,
+  AutoLoadEntryDto,
 } from '../services/photinoBridge';
 import {
   TrendingUp,
@@ -12,6 +13,10 @@ import {
   Search,
   ArrowRight,
   Ship,
+  Clock,
+  PackageCheck,
+  Trash2,
+  Box,
 } from 'lucide-react';
 
 export const MarketView: React.FC = () => {
@@ -19,6 +24,7 @@ export const MarketView: React.FC = () => {
   const [commodities, setCommodities] = useState<MarketCommodityDto[]>([]);
   const [tradeRoutes, setTradeRoutes] = useState<TradeRouteDto[]>([]);
   const [salvagePrices, setSalvagePrices] = useState<SalvagePriceSummaryDto[]>([]);
+  const [autoLoads, setAutoLoads] = useState<AutoLoadEntryDto[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState<boolean>(false);
 
   const [search, setSearch] = useState<string>('');
@@ -58,9 +64,69 @@ export const MarketView: React.FC = () => {
     }
   };
 
+  const fetchAutoLoads = async () => {
+    try {
+      const res = await bridge.sendRequest<AutoLoadEntryDto[]>('get_autoload_entries');
+      setAutoLoads(res || []);
+    } catch (err) {
+      console.error('Failed to load autoload entries:', err);
+    }
+  };
+
+  const handleDiscardAutoLoad = async (id: string) => {
+    try {
+      const res = await bridge.sendRequest<AutoLoadEntryDto[]>('discard_autoload_entry', { id });
+      setAutoLoads(res || []);
+    } catch (err) {
+      console.error('Failed to discard autoload entry:', err);
+    }
+  };
+
+  const formatTimeRemaining = (seconds: number) => {
+    if (seconds <= 0) return 'Fertig verladen!';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     fetchMarket();
     fetchSmartRoutes();
+    fetchAutoLoads();
+
+    const unbindAutoLoad = bridge.on<AutoLoadEntryDto[]>('AUTOLOAD_UPDATED', (entries) => {
+      if (Array.isArray(entries)) {
+        setAutoLoads(entries);
+      }
+    });
+
+    const unbindAutoLoadCompleted = bridge.on('AUTOLOAD_COMPLETED', () => {
+      fetchAutoLoads();
+    });
+
+    const interval = setInterval(() => {
+      setAutoLoads((prev) => {
+        if (prev.length === 0) return prev;
+        return prev.map((e) => {
+          const rem = Math.max(0, e.remainingSeconds - 1);
+          const el = e.elapsedSeconds + 1;
+          const pred = e.predictedSeconds || 1;
+          const pct = Math.min(100, Math.round((el / pred) * 100));
+          return {
+            ...e,
+            remainingSeconds: rem,
+            elapsedSeconds: el,
+            progressPercent: pct,
+          };
+        });
+      });
+    }, 1000);
+
+    return () => {
+      unbindAutoLoad();
+      unbindAutoLoadCompleted();
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -113,6 +179,85 @@ export const MarketView: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full space-y-3 select-none">
+      {/* ══ Auto-Load Frachtaufzug Live-Timer ══ */}
+      {autoLoads.length > 0 && (
+        <div className="flex flex-col space-y-2 p-3 rounded-lg border border-cyan-500/40 bg-[#030914]/90 shadow-[0_0_15px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-cyan-300">
+              <Clock className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span>Laufende Frachtaufzug-Verladungen (Auto-Load)</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-900/60 text-cyan-200 border border-cyan-800/60">
+                {autoLoads.length} aktiv
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-400">
+              Star Citizen Frachtaufzug Timer
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+            {autoLoads.map((al) => {
+              const isFinished = al.remainingSeconds <= 0;
+              return (
+                <div
+                  key={al.id}
+                  className="flex flex-col justify-between p-2.5 rounded bg-[#02050c] border border-cyan-900/50 hover:border-cyan-700/60 transition space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-white truncate">
+                        <Box className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">{al.commodityName}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-normal">
+                          {al.kind}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+                        {al.shopName} · {al.totalScu} SCU ({al.boxCount} Kisten)
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDiscardAutoLoad(al.id)}
+                      title="Timer verwerfen"
+                      className="text-slate-500 hover:text-rose-400 p-1 rounded transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-mono">
+                      <span className={isFinished ? 'text-emerald-400 font-bold flex items-center gap-1' : 'text-cyan-300'}>
+                        {isFinished ? (
+                          <>
+                            <PackageCheck className="w-3 h-3 text-emerald-400" />
+                            Abholbereit!
+                          </>
+                        ) : (
+                          `${formatTimeRemaining(al.remainingSeconds)} verbleibend`
+                        )}
+                      </span>
+                      <span className="text-slate-400">{Math.round(al.progressPercent)}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-cyan-950">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          isFinished
+                            ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                            : 'bg-gradient-to-r from-cyan-500 to-emerald-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, al.progressPercent))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ══ 1. Saubere Haupt-Tabs ══ */}
       <div className="flex items-center gap-2 border-b border-cyan-950/80 pb-2">
         <button

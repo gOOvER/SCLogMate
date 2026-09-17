@@ -903,6 +903,21 @@ public class LogStatusDto
     [JsonPropertyName("schemaVersion")] public int SchemaVersion { get; set; }
 }
 
+public class AutoLoadEntryDto
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("startUtc")] public string StartUtc { get; set; } = "";
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+    [JsonPropertyName("shopName")] public string ShopName { get; set; } = "";
+    [JsonPropertyName("commodityName")] public string CommodityName { get; set; } = "";
+    [JsonPropertyName("totalScu")] public int TotalScu { get; set; }
+    [JsonPropertyName("boxCount")] public int BoxCount { get; set; }
+    [JsonPropertyName("predictedSeconds")] public int? PredictedSeconds { get; set; }
+    [JsonPropertyName("elapsedSeconds")] public double ElapsedSeconds { get; set; }
+    [JsonPropertyName("remainingSeconds")] public double RemainingSeconds { get; set; }
+    [JsonPropertyName("progressPercent")] public double ProgressPercent { get; set; }
+}
+
 public class ScanProgressDto
 {
     [JsonPropertyName("current")] public int Current { get; set; }
@@ -1063,6 +1078,50 @@ public class PhotinoBridge
             catch (Exception ex)
             {
                 Logger.Error("CitizenService.ProfileResolved", ex);
+            }
+        };
+
+        AutoLoadTracker.Instance.EntriesChanged += () =>
+        {
+            try
+            {
+                if (_isWebviewReady)
+                {
+                    Broadcast("AUTOLOAD_UPDATED", GetAutoLoadEntries());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AutoLoadTracker.EntriesChanged", ex);
+            }
+        };
+
+        AutoLoadTracker.Instance.AutoLoadCompleted += entry =>
+        {
+            try
+            {
+                var s = Settings.Load();
+                if (s.ToastEnabled)
+                {
+                    _toastOverlay.ShowToast("📦", "FRACHTAUFZUG BEREIT", $"{entry.TotalScu} SCU {entry.CommodityName}", $"{entry.ShopName} fertig verladen!", 0x0000D0FFu);
+                }
+
+                if (_isWebviewReady)
+                {
+                    Broadcast("AUTOLOAD_COMPLETED", new
+                    {
+                        id = entry.Id,
+                        title = "Frachtaufzug bereit",
+                        message = $"{entry.TotalScu} SCU {entry.CommodityName} ({entry.Kind}) fertig geladen ({entry.ShopName})",
+                        shop = entry.ShopName,
+                        scu = entry.TotalScu,
+                        commodity = entry.CommodityName
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AutoLoadTracker.AutoLoadCompleted", ex);
             }
         };
     }
@@ -1525,6 +1584,22 @@ public class PhotinoBridge
                         if (req.Payload.Value.TryGetProperty("offset", out var offProp)) offset = offProp.GetInt32();
                     }
                     SendResponse(req.Id, "events_response", GetEvents(session, category, search, limit, offset));
+                    break;
+
+                case "get_autoload_entries":
+                    SendResponse(req.Id, "autoload_entries_response", GetAutoLoadEntries());
+                    break;
+
+                case "discard_autoload_entry":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("id", out var aidProp))
+                    {
+                        var aid = aidProp.GetString();
+                        if (!string.IsNullOrEmpty(aid))
+                        {
+                            AutoLoadTracker.Instance.DiscardEntry(aid);
+                        }
+                    }
+                    SendResponse(req.Id, "discard_autoload_entry_response", GetAutoLoadEntries());
                     break;
 
                 case "get_finance":
@@ -5573,10 +5648,49 @@ public class PhotinoBridge
             {
                 Broadcast("mining_hauls_response", GetMiningHaulsData());
             }
+
+            AutoLoadTracker.Instance.CheckCompletion();
         }
         catch (Exception ex)
         {
             Logger.Error("CheckRefineryCompletions", ex);
+        }
+    }
+
+    private List<AutoLoadEntryDto> GetAutoLoadEntries()
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            AutoLoadTracker.Instance.CheckCompletion();
+            var entries = AutoLoadTracker.Instance.GetActiveEntries();
+            return entries.Select(e =>
+            {
+                double elapsed = e.ElapsedSeconds(now);
+                double remaining = e.RemainingSeconds(now);
+                double pred = e.PredictedSeconds ?? 1;
+                double progress = Math.Clamp((elapsed / pred) * 100.0, 0, 100);
+
+                return new AutoLoadEntryDto
+                {
+                    Id = e.Id,
+                    StartUtc = e.StartUtc.ToString("o"),
+                    Kind = e.Kind,
+                    ShopName = e.ShopName,
+                    CommodityName = e.CommodityName,
+                    TotalScu = e.TotalScu,
+                    BoxCount = e.Boxes.Sum(b => b.UnitAmount),
+                    PredictedSeconds = e.PredictedSeconds,
+                    ElapsedSeconds = Math.Round(elapsed, 1),
+                    RemainingSeconds = Math.Round(remaining, 1),
+                    ProgressPercent = Math.Round(progress, 1)
+                };
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.GetAutoLoadEntries", ex);
+            return new List<AutoLoadEntryDto>();
         }
     }
 

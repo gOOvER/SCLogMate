@@ -63,6 +63,7 @@ interface SidebarProps {
   warehouseCount?: number;
   liveEventCount?: number;
   refineryCount?: number;
+  autoLoadCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -73,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   warehouseCount,
   liveEventCount,
   refineryCount,
+  autoLoadCount,
 }) => {
   const navGroups: NavGroup[] = [
     {
@@ -98,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Flotte & Inventar',
       items: [
-        { id: 'market', label: 'Markt', icon: ShoppingBag },
+        { id: 'market', label: 'Markt', icon: ShoppingBag, badge: autoLoadCount },
         { id: 'fleet', label: 'Flotte', icon: Rocket },
         { id: 'wiki', label: 'Wiki Explorer', icon: BookOpen },
         { id: 'warehouse', label: 'Warenlager', icon: Box, badge: warehouseCount },

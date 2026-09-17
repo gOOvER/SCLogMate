@@ -2130,6 +2130,20 @@ class PhotinoBridge {
   }
 }
 
+export interface AutoLoadEntryDto {
+  id: string;
+  startUtc: string;
+  kind: string;
+  shopName: string;
+  commodityName: string;
+  totalScu: number;
+  boxCount: number;
+  predictedSeconds?: number | null;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  progressPercent: number;
+}
+
 export const bridge = new PhotinoBridge();
 
 export const FONT_FAMILY_MAP: Record<string, string> = {
