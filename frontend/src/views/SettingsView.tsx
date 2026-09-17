@@ -40,6 +40,7 @@ import {
   OcrTestResult,
   applyFontFamily,
   FONT_FAMILY_MAP,
+  CommunityStatusDto,
 } from '../services/photinoBridge';
 
 export const SettingsView: React.FC = () => {
@@ -94,6 +95,8 @@ export const SettingsView: React.FC = () => {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | null>(null);
   const [simulateAuroraNotInstalled, setSimulateAuroraNotInstalled] = useState<boolean>(false);
   const [isPlayingAuroraTest, setIsPlayingAuroraTest] = useState<boolean>(false);
+  const [communityStatus, setCommunityStatus] = useState<CommunityStatusDto | null>(null);
+  const [isSyncingCommunity, setIsSyncingCommunity] = useState<boolean>(false);
 
   const handlePlayAuroraTestSound = async () => {
     try {
@@ -535,6 +538,45 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const loadCommunityStatus = async () => {
+    try {
+      const status = await bridge.getCommunityStatus();
+      setCommunityStatus(status);
+    } catch (err) {
+      console.error('Failed to load community status:', err);
+    }
+  };
+
+  const handleSyncCommunityData = async () => {
+    try {
+      setIsSyncingCommunity(true);
+      showToast('Lade scunpacked-data herunter und erstelle Digests (kann kurz dauern)...');
+      const res = await bridge.syncCommunityData();
+      if (res?.success) {
+        showToast(`✓ ${res.message}`);
+      } else {
+        showToast(res?.message || 'Fehler beim Synchronisieren');
+      }
+      await loadCommunityStatus();
+    } catch (err: any) {
+      console.error('Sync community data failed:', err);
+      showToast(`Fehler: ${err?.message || err}`);
+    } finally {
+      setIsSyncingCommunity(false);
+    }
+  };
+
+  const handleClearCommunityData = async () => {
+    try {
+      await bridge.clearCommunityData();
+      showToast('✓ Lokaler scunpacked-data Cache geleert.');
+      await loadCommunityStatus();
+    } catch (err) {
+      console.error('Clear community data failed:', err);
+      showToast('Fehler beim Leeren des Caches');
+    }
+  };
+
   const handleVacuum = async () => {
     try {
       setIsCheckingDb(true);
@@ -653,8 +695,9 @@ export const SettingsView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (activeSubTab === 'database' && !dbDiag) {
-      loadDbDiag();
+    if (activeSubTab === 'database') {
+      if (!dbDiag) loadDbDiag();
+      loadCommunityStatus();
     }
   }, [activeSubTab]);
 
@@ -2443,6 +2486,133 @@ export const SettingsView: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
                 <span>📄 Debug-Log öffnen</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card: scunpacked-data Community-Datenbank */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-cyan-900/60 space-y-5 shadow-lg shadow-cyan-950/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-cyan-400 flex items-center space-x-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <span>STARCITIZENWIKI / SCUNPACKED-DATA COMMUNITY-DATENBANK</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Vollständiger Datensatz für Waren, Terminals, Schiffs-Hardpoints, Waffen-Ballistik, Crafting-Baupläne und Starmap-Koordinaten direkt aus den Star Citizen Spieldateien.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {communityStatus?.isEnabled ? (
+                  communityStatus?.isStale ? (
+                    <span className="px-2.5 py-1 rounded bg-amber-950/80 border border-amber-500/50 text-amber-300 font-mono text-[11px] font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      Update empfohlen
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-mono text-[11px] font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      Aktiv &amp; Gecacht
+                    </span>
+                  )
+                ) : (
+                  <span className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-400 font-mono text-[11px] font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-600" />
+                    Nicht heruntergeladen
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Status-Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-slate-400">Dump / Patch:</div>
+                <div className="text-sm font-bold text-cyan-300 mt-0.5 truncate" title={communityStatus?.dump || 'Nicht geladen'}>
+                  {communityStatus?.dump || 'Nicht geladen'}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-slate-400">Game Build:</div>
+                <div className="text-sm font-bold text-sky-400 mt-0.5">
+                  {communityStatus?.gameBuild ? `Build ${communityStatus.gameBuild}` : 'Aus Log'}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-slate-400">Zuletzt aktualisiert:</div>
+                <div className="text-sm font-bold text-slate-200 mt-0.5">
+                  {communityStatus?.fetchedAt || '—'}
+                </div>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-slate-400">Datensätze:</div>
+                <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                  {communityStatus?.isEnabled
+                    ? `${communityStatus.commoditiesCount} Waren · ${communityStatus.shipsCount} Schiffe`
+                    : 'Statische Basis'}
+                </div>
+              </div>
+            </div>
+
+            {/* Detail-Statistiken bei aktivem Cache */}
+            {communityStatus?.isEnabled && (
+              <div className="p-3.5 rounded-lg bg-slate-950/70 border border-slate-800/80 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs font-mono">
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase">Waren &amp; Güter</div>
+                  <div className="text-sm font-bold text-cyan-400">{communityStatus.commoditiesCount.toLocaleString('de-DE')}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase">Schiffe &amp; Vehikel</div>
+                  <div className="text-sm font-bold text-sky-400">{communityStatus.shipsCount.toLocaleString('de-DE')}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase">Ausrüstung / Items</div>
+                  <div className="text-sm font-bold text-amber-400">{communityStatus.itemsCount.toLocaleString('de-DE')}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase">Schiffskomponenten</div>
+                  <div className="text-sm font-bold text-indigo-400">{communityStatus.partsCount.toLocaleString('de-DE')}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase">Crafting-Baupläne</div>
+                  <div className="text-sm font-bold text-purple-400">{communityStatus.blueprintsCount.toLocaleString('de-DE')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Aktionen */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={handleSyncCommunityData}
+                  disabled={isSyncingCommunity}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-950/50 cursor-pointer disabled:opacity-50"
+                  title="Lädt die 11 JSON-Dateien von scunpacked-data herunter und erstellt die High-Speed Cache-Dateien"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncingCommunity ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingCommunity ? 'Synchronisiere scunpacked-data...' : '🔄 scunpacked-data jetzt synchronisieren'}</span>
+                </button>
+
+                {communityStatus?.isEnabled && (
+                  <button
+                    onClick={handleClearCommunityData}
+                    disabled={isSyncingCommunity}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-300 text-xs font-semibold border border-rose-900/60 transition cursor-pointer disabled:opacity-50"
+                    title="Löscht den lokalen Cache (%APPDATA%\\SCLogMate\\community)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Cache leeren</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => bridge.openExternalUrl('https://github.com/StarCitizenWiki/scunpacked-data')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-cyan-300 text-xs font-medium border border-slate-800 transition cursor-pointer"
+                title="StarCitizenWiki / scunpacked-data Repository auf GitHub öffnen"
+              >
+                <span>GitHub Repository</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

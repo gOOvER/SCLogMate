@@ -405,6 +405,20 @@ export interface StarmapObjectDto {
   relY: number;
 }
 
+export interface CommunityStatusDto {
+  isEnabled: boolean;
+  commoditiesCount: number;
+  shipsCount: number;
+  itemsCount: number;
+  blueprintsCount: number;
+  partsCount: number;
+  dump?: string | null;
+  dumpBuild?: string | null;
+  fetchedAt?: string | null;
+  isStale?: boolean;
+  gameBuild?: string | null;
+}
+
 export interface QuantumDriveDto {
   name: string;
   sizeClass: string;
@@ -1260,9 +1274,49 @@ class PhotinoBridge {
     return this.sendRequest<{ summary: string }>('get_sanitized_diagnostic_summary');
   }
 
+  public getCommunityStatus(): Promise<CommunityStatusDto> {
+    return this.sendRequest<CommunityStatusDto>('get_community_status');
+  }
+
+  public syncCommunityData(): Promise<{ success: boolean; message: string; count: number; dump?: string; dumpBuild?: string; fetchedAt?: string }> {
+    return this.sendRequest('sync_community_data');
+  }
+
+  public clearCommunityData(): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest('clear_community_data');
+  }
+
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'get_community_status':
+        return {
+          isEnabled: true,
+          commoditiesCount: 754,
+          shipsCount: 184,
+          itemsCount: 5210,
+          blueprintsCount: 240,
+          partsCount: 1640,
+          dump: '4.10.0-LIVE.12519617',
+          dumpBuild: '12519617',
+          fetchedAt: '17.09.2026 20:00:00',
+          isStale: false,
+          gameBuild: '12519617'
+        } as CommunityStatusDto;
+
+      case 'sync_community_data':
+        return {
+          success: true,
+          message: 'scunpacked-data erfolgreich synchronisiert (754 Waren, 184 Schiffe, 1640 Komponenten).',
+          count: 754,
+          dump: '4.10.0-LIVE.12519617',
+          dumpBuild: '12519617',
+          fetchedAt: '17.09.2026 20:00:00'
+        };
+
+      case 'clear_community_data':
+        return { success: true };
+
       case 'evaluate_ship_pips':
         return {
           pipCount: 1,

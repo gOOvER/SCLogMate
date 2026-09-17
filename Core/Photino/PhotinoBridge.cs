@@ -2070,6 +2070,82 @@ public class PhotinoBridge
                         break;
                     }
 
+                case "get_community_status":
+                    {
+                        var comm = SCLogMate.Core.Community.CommunityData.Instance;
+                        string? activeBuild = null;
+                        if (!string.IsNullOrEmpty(_activeSessionName) && _sessionMetaCache.TryGetValue(_activeSessionName, out var sm))
+                        {
+                            activeBuild = SCLogMate.Core.Community.CommunityData.BuildIn(sm.Version);
+                        }
+
+                        bool isStale = false;
+                        if (comm.IsEnabled && activeBuild != null && comm.DumpBuild != null)
+                        {
+                            isStale = string.Compare(comm.DumpBuild, activeBuild, StringComparison.OrdinalIgnoreCase) < 0;
+                        }
+
+                        SendResponse(req.Id, "get_community_status_response", new
+                        {
+                            isEnabled = comm.IsEnabled,
+                            commoditiesCount = comm.CommoditiesCount,
+                            shipsCount = comm.ShipsCount,
+                            itemsCount = comm.ItemsCount,
+                            blueprintsCount = comm.BlueprintsCount,
+                            partsCount = comm.PartsCount,
+                            dump = comm.Dump,
+                            dumpBuild = comm.DumpBuild,
+                            fetchedAt = comm.FetchedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                            isStale = isStale,
+                            gameBuild = activeBuild
+                        });
+                        break;
+                    }
+
+                case "sync_community_data":
+                    {
+                        try
+                        {
+                            var comm = SCLogMate.Core.Community.CommunityData.Instance;
+                            var count = await comm.EnableAsync();
+                            SendResponse(req.Id, "sync_community_data_response", new
+                            {
+                                success = true,
+                                message = $"scunpacked-data erfolgreich synchronisiert ({count} Waren, {comm.ShipsCount} Schiffe, {comm.PartsCount} Komponenten).",
+                                count = count,
+                                dump = comm.Dump,
+                                dumpBuild = comm.DumpBuild,
+                                fetchedAt = comm.FetchedAt?.ToString("yyyy-MM-dd HH:mm:ss")
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("SyncCommunityData", ex);
+                            SendResponse(req.Id, "sync_community_data_response", new
+                            {
+                                success = false,
+                                message = $"Fehler beim Herunterladen von scunpacked-data: {ex.Message}"
+                            });
+                        }
+                        break;
+                    }
+
+                case "clear_community_data":
+                    {
+                        try
+                        {
+                            var comm = SCLogMate.Core.Community.CommunityData.Instance;
+                            comm.Disable();
+                            SendResponse(req.Id, "clear_community_data_response", new { success = true });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("ClearCommunityData", ex);
+                            SendResponse(req.Id, "clear_community_data_response", new { success = false, error = ex.Message });
+                        }
+                        break;
+                    }
+
                 case "get_missions":
                     SendResponse(req.Id, "missions_response", GetMissionsData());
                     break;

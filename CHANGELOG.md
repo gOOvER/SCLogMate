@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **StarCitizenWiki / scunpacked-data Dynamic Community Data Engine (`Core/Community/CommunityData.cs`, `PhotinoBridge.cs`, `PipsAnalyzer.cs`, `photinoBridge.ts`, `SettingsView.tsx`)**:
+  - Ported the full dynamic `CommunityData` subsystem from QuantumWake into SCLogMate, establishing an automated ingestion and digestion pipeline directly from [StarCitizenWiki/scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data).
+  - Downloads and digests all 11 core data files (`ships.json`, `ship-items.json`, `commodities.json`, `commodity_trade_locations.json`, `fps-items.json`, `blueprints.json`, `resources.json`, `locations.json`, `starmap.json`, `starmap_positions.json`, `manufacturers.json`) into high-speed local caches in `%APPDATA%\SCLogMate\community\digest-*.json`.
+  - Enables sub-100ms cold startup loading of over 750 commodities, 180+ ships and vehicles, 5,000+ weapons and armor items, 1,600+ ship components, and crafting blueprints entirely offline.
+  - Added dynamic game build and patch version tracking, matching GitHub commit dump stamps (e.g. `4.10.0-LIVE.12519617`) against active `Game.log` build numbers to notify pilots when dataset updates are available.
+  - Connected `PipsAnalyzer` ballistics to `CommunityData`: automatically looks up exact in-game projectile muzzle velocities (`Ammunition.Speed`) across all fitted ship weapons dynamically from raw game dumps.
+  - Added dedicated **Community-Datenbank** management card in Settings (under Database & Diagnostics) displaying live cache state, patch build stamps, record counters, a 1-click update synchronizer (`sync_community_data`), and cache cleanup options.
 - **Side-by-Side Ship Comparison Modal (`ShipCompareModal.tsx`, `FleetView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
   - Implemented interactive side-by-side ship comparison interface allowing pilots to benchmark any two ships from their hangar or the full universe catalog.
   - Displays comprehensive comparative metrics: cargo volume (SCU) and maximum container size clearance, pad size constraints, cargo access types (rear ramp, elevator), planetary landing capability, dimensions (L × W × H), mass, crew requirements, and quantum fuel capacity.

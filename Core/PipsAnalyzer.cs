@@ -151,9 +151,32 @@ public static partial class PipsAnalyzer
         if (direct != null) return direct;
 
         // 2. Enthält Modellname (z. B. "Panther" in "CF-337 Panther Laser Repeater")
-        return KnownGuns.FirstOrDefault(g =>
+        var containsMatch = KnownGuns.FirstOrDefault(g =>
             s.Contains(g.Model, StringComparison.OrdinalIgnoreCase) ||
             g.Name.Contains(s, StringComparison.OrdinalIgnoreCase));
+        if (containsMatch != null) return containsMatch;
+
+        // 3. Dynamischer Lookup in CommunityData (scunpacked-data) falls aktiv
+        if (SCLogMate.Core.Community.CommunityData.Instance.IsEnabled)
+        {
+            var commSpeed = SCLogMate.Core.Community.CommunityData.Instance.FindWeaponSpeed(s);
+            if (commSpeed.HasValue && commSpeed.Value > 0)
+            {
+                var part = SCLogMate.Core.Community.CommunityData.Instance.FindPart(s);
+                return new GunBallistics(
+                    part?.Name ?? s,
+                    part?.Class ?? s,
+                    part?.Size ?? 1,
+                    commSpeed.Value,
+                    part?.Weapon?.Dps ?? 0,
+                    part?.Weapon?.Alpha ?? 0,
+                    part?.Weapon?.RateOfFire ?? 0,
+                    part?.Weapon?.DpsByType.Keys.FirstOrDefault() ?? "Energy"
+                );
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
