@@ -918,6 +918,31 @@ public class AutoLoadEntryDto
     [JsonPropertyName("progressPercent")] public double ProgressPercent { get; set; }
 }
 
+public class ContainerPickDto
+{
+    [JsonPropertyName("scu")] public int Scu { get; set; }
+    [JsonPropertyName("count")] public int Count { get; set; }
+    [JsonPropertyName("unitFee")] public long UnitFee { get; set; }
+    [JsonPropertyName("totalFee")] public long TotalFee { get; set; }
+    [JsonPropertyName("unitTimeSeconds")] public double UnitTimeSeconds { get; set; }
+    [JsonPropertyName("totalTimeSeconds")] public double TotalTimeSeconds { get; set; }
+}
+
+public class ContainerPlanDto
+{
+    [JsonPropertyName("targetScu")] public int TargetScu { get; set; }
+    [JsonPropertyName("totalScu")] public int TotalScu { get; set; }
+    [JsonPropertyName("shortfallScu")] public int ShortfallScu { get; set; }
+    [JsonPropertyName("picks")] public List<ContainerPickDto> Picks { get; set; } = new();
+    [JsonPropertyName("minContainerScu")] public int MinContainerScu { get; set; }
+    [JsonPropertyName("maxContainerScu")] public int MaxContainerScu { get; set; }
+    [JsonPropertyName("totalBoxCount")] public int TotalBoxCount { get; set; }
+    [JsonPropertyName("totalAutoLoadFee")] public long TotalAutoLoadFee { get; set; }
+    [JsonPropertyName("totalEstimatedSeconds")] public int TotalEstimatedSeconds { get; set; }
+    [JsonPropertyName("hitsTarget")] public bool HitsTarget { get; set; }
+    [JsonPropertyName("isEmpty")] public bool IsEmpty { get; set; }
+}
+
 public class ScanProgressDto
 {
     [JsonPropertyName("current")] public int Current { get; set; }
@@ -1600,6 +1625,22 @@ public class PhotinoBridge
                         }
                     }
                     SendResponse(req.Id, "discard_autoload_entry_response", GetAutoLoadEntries());
+                    break;
+
+                case "plan_containers":
+                    int planTargetScu = 0;
+                    int planShipMaxScu = 32;
+                    string? planSizes = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("targetScu", out var tProp) && tProp.TryGetInt32(out var tVal))
+                            planTargetScu = tVal;
+                        if (req.Payload.Value.TryGetProperty("shipMaxContainerScu", out var mProp) && mProp.TryGetInt32(out var mVal))
+                            planShipMaxScu = mVal;
+                        if (req.Payload.Value.TryGetProperty("containerSizes", out var sProp))
+                            planSizes = sProp.GetString();
+                    }
+                    SendResponse(req.Id, "plan_containers_response", PlanContainers(planTargetScu, planShipMaxScu, planSizes));
                     break;
 
                 case "get_finance":
@@ -5691,6 +5732,53 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.GetAutoLoadEntries", ex);
             return new List<AutoLoadEntryDto>();
+        }
+    }
+
+    private ContainerPlanDto PlanContainers(int targetScu, int shipMaxContainerScu, string? containerSizes)
+    {
+        try
+        {
+            var plan = ContainerPlanner.Plan(containerSizes, shipMaxContainerScu, targetScu);
+            if (plan == null)
+            {
+                return new ContainerPlanDto
+                {
+                    TargetScu = targetScu,
+                    TotalScu = 0,
+                    ShortfallScu = targetScu,
+                    HitsTarget = false,
+                    IsEmpty = true
+                };
+            }
+
+            return new ContainerPlanDto
+            {
+                TargetScu = plan.TargetScu,
+                TotalScu = plan.TotalScu,
+                ShortfallScu = plan.ShortfallScu,
+                MinContainerScu = plan.MinContainerScu,
+                MaxContainerScu = plan.MaxContainerScu,
+                TotalBoxCount = plan.TotalBoxCount,
+                TotalAutoLoadFee = plan.TotalAutoLoadFee,
+                TotalEstimatedSeconds = plan.TotalEstimatedSeconds,
+                HitsTarget = plan.HitsTarget,
+                IsEmpty = plan.IsEmpty,
+                Picks = plan.Picks.Select(p => new ContainerPickDto
+                {
+                    Scu = p.Scu,
+                    Count = p.Count,
+                    UnitFee = p.UnitFee,
+                    TotalFee = p.TotalFee,
+                    UnitTimeSeconds = p.UnitTimeSeconds,
+                    TotalTimeSeconds = p.TotalTimeSeconds
+                }).ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.PlanContainers", ex);
+            return new ContainerPlanDto { TargetScu = targetScu, TotalScu = 0, ShortfallScu = targetScu, IsEmpty = true };
         }
     }
 

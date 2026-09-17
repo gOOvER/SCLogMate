@@ -2144,6 +2144,29 @@ export interface AutoLoadEntryDto {
   progressPercent: number;
 }
 
+export interface ContainerPickDto {
+  scu: number;
+  count: number;
+  unitFee: number;
+  totalFee: number;
+  unitTimeSeconds: number;
+  totalTimeSeconds: number;
+}
+
+export interface ContainerPlanDto {
+  targetScu: number;
+  totalScu: number;
+  shortfallScu: number;
+  picks: ContainerPickDto[];
+  minContainerScu: number;
+  maxContainerScu: number;
+  totalBoxCount: number;
+  totalAutoLoadFee: number;
+  totalEstimatedSeconds: number;
+  hitsTarget: boolean;
+  isEmpty: boolean;
+}
+
 export const bridge = new PhotinoBridge();
 
 export const FONT_FAMILY_MAP: Record<string, string> = {

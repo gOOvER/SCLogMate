@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Container Planner & Box Sizing DP Optimization (`Core/ContainerPlanner.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
+  - Implemented exact bounded Dynamic Programming (coin change) solver to optimize cargo crate purchase assortments at kiosks.
+  - Automatically maximizes filled SCU capacity without exceeding ship hold while minimizing total crate count (reducing loading fees and duration).
+  - Integrated Star Citizen's datamined per-crate auto-load fee ladder (1 SCU: 30 aUEC up to 32 SCU: 680 aUEC) and crate handling durations (1.2s to 10.8s).
+  - Added dedicated interactive "Container-Planer" tab in Market view featuring quick-select presets for popular freight ships (C2, Cat, Taurus, Freelancer MAX, Cutlass Black, Hull A, Hull C) with automatic grid box size limits.
+  - Added kiosk terminal menu presets (All 1–32 SCU, Mining Outposts 1–8 SCU, Scrapyards 8–32 SCU, Cargo Distribution Centers 16–32 SCU, and Custom).
+  - Added rich KPI dashboard displaying exact volume load vs target, shortfall warnings for impossible exact fills, minimum box count, total fee calculations, and detailed visual crate breakdown cards with fee and handling metrics.
 - **Auto-Load Estimator & Freight Elevator Timer (`Core/AutoLoadTracker.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`, `MarketView.tsx`, `Sidebar.tsx`)**:
   - Implemented automatic cargo loading and freight elevator timer tracking matching Star Citizen empirical mechanics (72s base dispatch time + 1.2s to 10.8s per container size from 1 to 32 SCU).
   - Added real-time log event extraction from `SShopCommodityBuyRequest` and `SShopCommoditySellRequest` capturing `autoLoading[1]` and detailed crate composition (`boxSize` and `unitAmount`).

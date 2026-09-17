@@ -5,6 +5,7 @@ import {
   TradeRouteDto,
   SalvagePriceSummaryDto,
   AutoLoadEntryDto,
+  ContainerPlanDto,
 } from '../services/photinoBridge';
 import {
   TrendingUp,
@@ -17,15 +18,27 @@ import {
   PackageCheck,
   Trash2,
   Box,
+  Layers,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
 } from 'lucide-react';
 
 export const MarketView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'routes' | 'salvage' | 'calculator'>('routes');
+  const [activeTab, setActiveTab] = useState<'routes' | 'containers' | 'salvage' | 'calculator'>('routes');
   const [commodities, setCommodities] = useState<MarketCommodityDto[]>([]);
   const [tradeRoutes, setTradeRoutes] = useState<TradeRouteDto[]>([]);
   const [salvagePrices, setSalvagePrices] = useState<SalvagePriceSummaryDto[]>([]);
   const [autoLoads, setAutoLoads] = useState<AutoLoadEntryDto[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState<boolean>(false);
+
+  // Container Planner State
+  const [containerTargetScu, setContainerTargetScu] = useState<number>(696);
+  const [shipMaxGridScu, setShipMaxGridScu] = useState<number>(32);
+  const [kioskPreset, setKioskPreset] = useState<string>('all');
+  const [customSizes, setCustomSizes] = useState<string>('1,2,4,8,16,24,32');
+  const [containerPlan, setContainerPlan] = useState<ContainerPlanDto | null>(null);
+  const [isPlanningContainers, setIsPlanningContainers] = useState<boolean>(false);
 
   const [search, setSearch] = useState<string>('');
   const [selectedCommodityName, setSelectedCommodityName] = useState<string>('Laranite');
@@ -89,6 +102,32 @@ export const MarketView: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const fetchContainerPlan = async (target: number, maxScu: number, sizes: string) => {
+    try {
+      setIsPlanningContainers(true);
+      const res = await bridge.sendRequest<ContainerPlanDto>('plan_containers', {
+        targetScu: target,
+        shipMaxContainerScu: maxScu,
+        containerSizes: sizes,
+      });
+      setContainerPlan(res || null);
+    } catch (err) {
+      console.error('Failed to plan containers:', err);
+    } finally {
+      setIsPlanningContainers(false);
+    }
+  };
+
+  const applyKioskPreset = (preset: string) => {
+    setKioskPreset(preset);
+    let sizes = '1,2,4,8,16,24,32';
+    if (preset === 'mining') sizes = '1,2,4,8';
+    else if (preset === 'scrap') sizes = '8,16,24,32';
+    else if (preset === 'distro') sizes = '16,24,32';
+    else if (preset === 'heavy') sizes = '24,32';
+    setCustomSizes(sizes);
+  };
+
   useEffect(() => {
     fetchMarket();
     fetchSmartRoutes();
@@ -132,6 +171,10 @@ export const MarketView: React.FC = () => {
   useEffect(() => {
     fetchSmartRoutes();
   }, [cargoScu, maxBudgetAuec, routeSystemFilter]);
+
+  useEffect(() => {
+    fetchContainerPlan(containerTargetScu, shipMaxGridScu, customSizes);
+  }, [containerTargetScu, shipMaxGridScu, customSizes]);
 
   const selectedCommodity = useMemo(() => {
     return commodities.find((c) => c.name === selectedCommodityName) || commodities[0] || null;
@@ -275,6 +318,18 @@ export const MarketView: React.FC = () => {
               {tradeRoutes.length}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('containers')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-bold rounded transition cursor-pointer ${
+            activeTab === 'containers'
+              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+              : 'text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Container-Planer</span>
         </button>
 
         <button
@@ -491,7 +546,331 @@ export const MarketView: React.FC = () => {
         </div>
       )}
 
-      {/* ══ TAB 2: SALVAGE & SCHROTT-BESTPREISE ══ */}
+      {/* ══ TAB 2: CONTAINER PLANER & KISTENOPTIMIERUNG ══ */}
+      {activeTab === 'containers' && (
+        <div className="flex-1 flex flex-col space-y-3 overflow-y-auto pr-1 font-mono">
+          {/* Header Banner */}
+          <div className="sc-glass rounded-lg p-3.5 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider">
+                      Container-Planer & Kistengrößen-Optimierung
+                    </h2>
+                    {isPlanningContainers && (
+                      <span className="text-[10px] text-cyan-400 animate-pulse font-normal">
+                        Berechne...
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Berechnet die ideale Kistenaufteilung, minimiert Ladezeiten und ermittelt Star Citizen Frachtaufzug-Gebühren (Bounded DP)
+                  </div>
+                </div>
+              </div>
+
+              {/* Schnellauswahl Schiffe */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-[10px] text-slate-500 mr-1 flex items-center gap-1">
+                  <Ship className="w-3 h-3 text-cyan-400" /> Schiff:
+                </span>
+                {[
+                  { label: 'C2', scu: 696, maxBox: 32 },
+                  { label: 'Cat', scu: 576, maxBox: 32 },
+                  { label: 'Taurus', scu: 174, maxBox: 32 },
+                  { label: 'MAX', scu: 120, maxBox: 32 },
+                  { label: 'Cutlass', scu: 46, maxBox: 16 },
+                  { label: 'Hull A', scu: 64, maxBox: 16 },
+                  { label: 'Hull C', scu: 4608, maxBox: 32 },
+                ].map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => {
+                      setContainerTargetScu(s.scu);
+                      setShipMaxGridScu(s.maxBox);
+                    }}
+                    className={`px-2 py-0.5 text-[10px] rounded transition cursor-pointer border ${
+                      containerTargetScu === s.scu && shipMaxGridScu === s.maxBox
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/60 font-bold shadow-[0_0_8px_rgba(6,182,212,0.2)]'
+                        : 'bg-[#030814] border-cyan-950 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {s.label} ({s.scu})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Steuerung & Filter */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-cyan-950/80 text-xs">
+              {/* 1. Zielkapazität (Target SCU) */}
+              <div className="p-2.5 rounded bg-[#030814] border border-cyan-950 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Zielvolumen (SCU)</span>
+                  <span className="text-cyan-400 font-bold text-xs">{containerTargetScu} SCU</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={containerTargetScu}
+                    onChange={(e) => setContainerTargetScu(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="bg-[#02050c] border border-cyan-900/60 rounded px-2 py-1 text-slate-100 text-xs w-24 font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                  <input
+                    type="range"
+                    min="1"
+                    max="1000"
+                    value={Math.min(1000, containerTargetScu)}
+                    onChange={(e) => setContainerTargetScu(parseInt(e.target.value, 10))}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Maximales Kistengitter des Schiffs */}
+              <div className="p-2.5 rounded bg-[#030814] border border-cyan-950 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Schiffs-Gitterlimit</span>
+                  <span className="text-slate-300 font-bold text-xs">Max. {shipMaxGridScu} SCU Kiste</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {[2, 8, 16, 24, 32].map((sz) => (
+                    <button
+                      key={sz}
+                      onClick={() => setShipMaxGridScu(sz)}
+                      className={`flex-1 py-1 text-[10px] rounded transition cursor-pointer border ${
+                        shipMaxGridScu === sz
+                          ? 'bg-cyan-900/50 text-cyan-300 border-cyan-500 font-bold'
+                          : 'bg-[#02050c] border-cyan-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {sz} SCU
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Kiosk Terminal Crate Menu */}
+              <div className="p-2.5 rounded bg-[#030814] border border-cyan-950 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Terminal-Angebot</span>
+                  <span className="text-cyan-400 text-[10px] truncate max-w-[120px]" title={customSizes}>
+                    [{customSizes}]
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {[
+                    { id: 'all', label: 'Alle (1–32)' },
+                    { id: 'mining', label: 'Minen (1–8)' },
+                    { id: 'scrap', label: 'Schrott (8–32)' },
+                    { id: 'distro', label: 'Distro (16–32)' },
+                  ].map((kp) => (
+                    <button
+                      key={kp.id}
+                      onClick={() => applyKioskPreset(kp.id)}
+                      className={`px-2 py-0.5 text-[10px] rounded transition cursor-pointer border ${
+                        kioskPreset === kp.id
+                          ? 'bg-cyan-900/50 text-cyan-300 border-cyan-500 font-bold'
+                          : 'bg-[#02050c] border-cyan-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {kp.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ KPI / Ergebnis-Karten ══ */}
+          {containerPlan && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {/* Ladevolumen & Erfüllungsgrad */}
+              <div className="sc-glass rounded-lg p-3 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-1">
+                <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase">
+                  <span>Geladenes Volumen</span>
+                  {containerPlan.hitsTarget ? (
+                    <span className="text-emerald-400 flex items-center gap-1 text-[9px] font-bold">
+                      <CheckCircle2 className="w-3 h-3" /> 100% Exakt
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 flex items-center gap-1 text-[9px] font-bold">
+                      <AlertTriangle className="w-3 h-3" /> Shortfall: {containerPlan.shortfallScu} SCU
+                    </span>
+                  )}
+                </div>
+                <div className="text-lg font-bold text-slate-100 flex items-baseline gap-1">
+                  <span>{containerPlan.totalScu}</span>
+                  <span className="text-xs text-slate-400 font-normal">/ {containerPlan.targetScu} SCU</span>
+                </div>
+                <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${
+                      containerPlan.hitsTarget ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}
+                    style={{ width: `${Math.min(100, (containerPlan.totalScu / containerPlan.targetScu) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Minimale Kistenanzahl */}
+              <div className="sc-glass rounded-lg p-3 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-1">
+                <div className="text-slate-500 text-[10px] uppercase">Optimale Kistenanzahl</div>
+                <div className="text-lg font-bold text-cyan-300 flex items-baseline gap-1.5">
+                  <Box className="w-4 h-4 text-cyan-400 inline" />
+                  <span>{containerPlan.totalBoxCount} Kisten</span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Minimal mögliche Anzahl (reduziert Gebühr & Handling)
+                </div>
+              </div>
+
+              {/* Frachtaufzug-Gebühr */}
+              <div className="sc-glass rounded-lg p-3 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-1">
+                <div className="text-slate-500 text-[10px] uppercase">Auto-Load Gebühr</div>
+                <div className="text-lg font-bold text-amber-300">
+                  {containerPlan.totalAutoLoadFee.toLocaleString('de-DE')} aUEC
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Staffelpreise: 1 SCU (30) bis 32 SCU (680 aUEC)
+                </div>
+              </div>
+
+              {/* Geschätzte Verladezeit */}
+              <div className="sc-glass rounded-lg p-3 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-1">
+                <div className="text-slate-500 text-[10px] uppercase">Geschätzte Verladezeit</div>
+                <div className="text-lg font-bold text-emerald-300 flex items-baseline gap-1.5">
+                  <Clock className="w-4 h-4 text-emerald-400 inline" />
+                  <span>
+                    {Math.floor(containerPlan.totalEstimatedSeconds / 60)}m {containerPlan.totalEstimatedSeconds % 60}s
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  72s Dispatch + ~{Math.round(containerPlan.totalEstimatedSeconds - 72)}s Kistenhandling
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══ Hinweise & Warnungen ══ */}
+          {containerPlan && containerPlan.shortfallScu > 0 && (
+            <div className="p-3 rounded bg-amber-950/20 border border-amber-500/40 flex items-start gap-2 text-xs">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-amber-300">
+                  Kapazitätslücke (Shortfall): {containerPlan.shortfallScu} SCU können mit diesem Terminal-Menü nicht geladen werden
+                </div>
+                <div className="text-[11px] text-slate-300 mt-0.5">
+                  Die kleinste am Terminal verfügbare Kiste beträgt {containerPlan.minContainerScu} SCU. Um Überfüllung zu vermeiden, werden exakt {containerPlan.totalScu} SCU gekauft und {containerPlan.shortfallScu} SCU Frachtraum verbleiben leer.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {containerPlan && containerPlan.maxContainerScu < shipMaxGridScu && (
+            <div className="p-3 rounded bg-cyan-950/20 border border-cyan-500/40 flex items-start gap-2 text-xs">
+              <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-cyan-300">
+                  Terminal-Limitierung: Kiosk bietet maximal {containerPlan.maxContainerScu} SCU Kisten
+                </div>
+                <div className="text-[11px] text-slate-300 mt-0.5">
+                  Dein Schiff unterstützt Kistengrößen bis zu {shipMaxGridScu} SCU. Da das Terminal nur bis zu {containerPlan.maxContainerScu} SCU anbietet, sind mehr Einzelkisten erforderlich, was die Verladezeit und Gebühr leicht erhöht.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══ Kisten-Aufschlüsselung (Crate Picks) ══ */}
+          {containerPlan && containerPlan.picks.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-300">
+                <span className="font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Box className="w-4 h-4 text-cyan-400" />
+                  Optimale Kistenauswahl ({containerPlan.picks.length} Posten)
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Kiosk-Einkaufsliste für Frachtterminals
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {containerPlan.picks.map((pick) => {
+                  const pct = Math.round(((pick.scu * pick.count) / containerPlan.totalScu) * 100);
+                  return (
+                    <div
+                      key={pick.scu}
+                      className="sc-glass rounded-lg p-3.5 border border-cyan-900/60 bg-[#040914]/90 hover:border-cyan-500/60 transition sc-hud-corner flex flex-col justify-between space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded bg-cyan-950/80 border border-cyan-500/40 flex flex-col items-center justify-center font-bold text-cyan-300">
+                            <span className="text-sm leading-none">{pick.scu}</span>
+                            <span className="text-[8px] text-slate-400 leading-none">SCU</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">
+                              {pick.count} × {pick.scu} SCU Container
+                            </div>
+                            <div className="text-[10px] text-cyan-400 font-semibold">
+                              = {pick.scu * pick.count} SCU ({pct}% der Ladung)
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800/80 border border-slate-700 text-slate-300 font-bold">
+                          {pick.count} Stück
+                        </span>
+                      </div>
+
+                      {/* Details: Gebühr und Dauer */}
+                      <div className="p-2 rounded bg-[#02050c] border border-cyan-950 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase">Auto-Load Gebühr</div>
+                          <div className="text-slate-200 font-bold mt-0.5">
+                            {pick.totalFee.toLocaleString('de-DE')} aUEC
+                          </div>
+                          <div className="text-[9px] text-slate-400">
+                            {pick.unitFee} aUEC / Kiste
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[9px] text-slate-500 uppercase">Handlingdauer</div>
+                          <div className="text-emerald-400 font-bold mt-0.5">
+                            {pick.totalTimeSeconds.toFixed(1)} s
+                          </div>
+                          <div className="text-[9px] text-slate-400">
+                            {pick.unitTimeSeconds}s / Kiste
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Visual Load Share Bar */}
+                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="sc-glass rounded-lg p-10 text-center text-slate-400 text-xs border border-cyan-950">
+              Keine Kistenkombination für die gewählten Parameter möglich.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ TAB 3: SALVAGE & SCHROTT-BESTPREISE ══ */}
       {activeTab === 'salvage' && (
         <div className="flex-1 flex flex-col space-y-3 overflow-y-auto pr-1">
           <div className="sc-glass rounded-lg p-3.5 border border-amber-500/30 bg-amber-950/10 sc-hud-corner font-mono text-xs">
