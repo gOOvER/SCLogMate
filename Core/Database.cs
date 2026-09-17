@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 24; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 25; // Erhöhen bei Tabellen- oder Spalten-Änderungen
     public const int CurrentParserVersion = 35; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -594,6 +594,29 @@ public static class Database
             Exec(db, "PRAGMA user_version = 24;");
             dbSchemaVersion = 24;
             Logger.Log("DB Schema: Migration auf v24 (Bereinigung von Standorten & entitlementURN aus Flotten-Events) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 25)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS learned_blueprints (
+                        name TEXT PRIMARY KEY,
+                        source TEXT NOT NULL DEFAULT 'SCMDB',
+                        learned_at TEXT NOT NULL,
+                        notes TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_learned_blueprints_source ON learned_blueprints(source);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v25 (learned_blueprints)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 25;");
+            dbSchemaVersion = 25;
+            Logger.Log("DB Schema: Migration auf v25 (learned_blueprints für SCMDB Import & manuelle Baupläne) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -1344,17 +1367,91 @@ public static class Database
         return list;
     }
 
-    /// <summary>Eindeutige erhaltene Baupläne über alle Sessions.</summary>
+    /// <summary>Eindeutige erhaltene Baupläne über alle Sessions sowie SCMDB/manuelle Einträge.</summary>
     public static List<string> DistinctBlueprints()
     {
         var list = new List<string>();
         using var db = new SqliteConnection(Conn);
         db.Open();
         using var c = db.CreateCommand();
-        c.CommandText = "SELECT DISTINCT detail FROM events WHERE kind='Blueprint' ORDER BY detail";
+        c.CommandText = @"
+            SELECT DISTINCT detail FROM events WHERE kind='Blueprint' AND detail IS NOT NULL AND detail != ''
+            UNION
+            SELECT name FROM learned_blueprints WHERE name IS NOT NULL AND name != ''
+            ORDER BY 1";
         using var r = c.ExecuteReader();
         while (r.Read()) if (!r.IsDBNull(0)) list.Add(r.GetString(0));
         return list;
+    }
+
+    /// <summary>Fügt eine Liste von Bauplänen als erlernt hinzu (z. B. aus SCMDB-Import).</summary>
+    public static int AddLearnedBlueprints(IEnumerable<string> names, string source = "SCMDB")
+    {
+        EnsureInitialized();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var tx = db.BeginTransaction();
+        var nowStr = DateTime.UtcNow.ToString("o");
+        int inserted = 0;
+        using var cmd = db.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "INSERT OR IGNORE INTO learned_blueprints(name, source, learned_at) VALUES(@name, @source, @learned_at);";
+        var pName = cmd.Parameters.Add("@name", SqliteType.Text);
+        var pSource = cmd.Parameters.Add("@source", SqliteType.Text);
+        var pLearnedAt = cmd.Parameters.Add("@learned_at", SqliteType.Text);
+        pSource.Value = source;
+        pLearnedAt.Value = nowStr;
+
+        foreach (var name in names)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            pName.Value = name.Trim();
+            inserted += cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+        return inserted;
+    }
+
+    /// <summary>Setzt oder entfernt den Erlernt-Status eines einzelnen Bauplans.</summary>
+    public static void SetLearnedBlueprint(string name, bool isLearned, string source = "Manual")
+    {
+        EnsureInitialized();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        if (isLearned)
+        {
+            cmd.CommandText = "INSERT OR REPLACE INTO learned_blueprints(name, source, learned_at) VALUES(@name, @source, @learned_at);";
+            cmd.Parameters.AddWithValue("@name", name.Trim());
+            cmd.Parameters.AddWithValue("@source", source);
+            cmd.Parameters.AddWithValue("@learned_at", DateTime.UtcNow.ToString("o"));
+        }
+        else
+        {
+            cmd.CommandText = "DELETE FROM learned_blueprints WHERE name = @name;";
+            cmd.Parameters.AddWithValue("@name", name.Trim());
+        }
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Liefert alle erlernten Baupläne aus der Tabelle learned_blueprints.</summary>
+    public static Dictionary<string, (DateTime LearnedAt, string Source)> GetLearnedBlueprintsDetails()
+    {
+        EnsureInitialized();
+        var dict = new Dictionary<string, (DateTime, string)>(StringComparer.OrdinalIgnoreCase);
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT name, learned_at, source FROM learned_blueprints";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            var name = r.GetString(0);
+            DateTime.TryParse(r.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt);
+            var src = r.IsDBNull(2) ? "SCMDB" : r.GetString(2);
+            dict[name] = (dt, src);
+        }
+        return dict;
     }
 
     /// <summary>Alle erhaltenen Bauplan-Events mit Zeitstempel über alle Sessions.</summary>

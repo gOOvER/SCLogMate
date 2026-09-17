@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **SCMDB Blueprint Sync & Org Network Coverage Gap Analysis (`Core/ScmdbService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `BlueprintsView.tsx`)**:
+  - Implemented headless SCMDB (scmdb.net) v3 JSON export parser and add-only import planner with safe 5 MB file size guards and error resilience against malformed or missing attributes.
+  - Added robust canonical name resolution fuzzy-mapping raw SCMDB names against the 400+ blueprints in the Star Citizen catalog.
+  - Added SQLite schema migration v25 introducing the `learned_blueprints` table to permanently persist imported and manually marked blueprint ownership across log archive re-indexes.
+  - Implemented SCMDB v3 JSON exporter generating compliant blueprint inventories ready for upload to scmdb.net or sharing with org members.
+  - Added direct interactive blueprint toggling on catalog cards allowing pilots to mark blueprints as learned or missing with optimistic UI updates.
+  - Built comprehensive "Netzwerk & Org-Abdeckung" analytical dashboard calculating category coverage, rarity distributions, craft specialization progression (Gunsmith, Armorsmith, Ship Systems Engineer, Extreme Hazard Outfitter, Field Munitions), and top 12 priority strategic gaps with unlock mission requirements and resource bills.
 - **SC Trade Tools (SCT) Dual-Source Integration & Outlier Filtering (`Core/SctMarketService.cs`, `Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
   - Implemented crowdsourced price integration with SC Trade Tools (SCT) and headless price reconciliation against UEXcorp commodity market prices.
   - Added robust outlier rejection algorithm (`SctOutlierFilter`) computing per-commodity median prices (with MinSamples=4) and dropping mistyped or spoofed entries exceeding 4.0× the median in either direction.

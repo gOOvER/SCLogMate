@@ -292,6 +292,80 @@ export interface BlueprintDto {
   unlockInfo: string;
   isLearned: boolean;
   learnedDate?: string;
+  source?: string;
+}
+
+export interface CategoryCoverage {
+  name: string;
+  icon: string;
+  total: number;
+  learned: number;
+  percent: number;
+}
+
+export interface RarityCoverage {
+  rarity: string;
+  color: string;
+  total: number;
+  learned: number;
+  percent: number;
+}
+
+export interface BlueprintGapItem {
+  id: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  rarity: string;
+  rarityColor: string;
+  unlockInfo: string;
+  requiredMaterials: string;
+}
+
+export interface SpecializationProgress {
+  title: string;
+  role: string;
+  icon: string;
+  total: number;
+  learned: number;
+  percent: number;
+  focus: string;
+}
+
+export interface BlueprintCoverageReport {
+  total: number;
+  learned: number;
+  missing: number;
+  percent: number;
+  categories: CategoryCoverage[];
+  rarities: RarityCoverage[];
+  topGaps: BlueprintGapItem[];
+  specializations: SpecializationProgress[];
+}
+
+export interface ScmdbImportResult {
+  success: boolean;
+  error?: string;
+  toImport: string[];
+  toImportCount: number;
+  alreadyOwnedCount: number;
+  unrecognized: string[];
+  unrecognizedCount: number;
+  skippedNotCompleted: number;
+  malformed: number;
+  missionCount: number;
+  version: number;
+  exportedAt?: string;
+  newerVersion: boolean;
+  applied: boolean;
+  newlyImportedCount: number;
+}
+
+export interface ScmdbExportResult {
+  success: boolean;
+  json: string;
+  learnedCount: number;
+  totalCount: number;
 }
 
 export interface LoadoutSlotDto {
@@ -1597,6 +1671,94 @@ class PhotinoBridge {
             isLearned: false,
           },
         ] as BlueprintDto[];
+
+      case 'get_blueprint_coverage':
+        return {
+          total: 420,
+          learned: 185,
+          missing: 235,
+          percent: 44.0,
+          categories: [
+            { name: 'Waffen', icon: '⚔', total: 120, learned: 65, percent: 54.2 },
+            { name: 'Rüstung', icon: '🛡', total: 150, learned: 70, percent: 46.7 },
+            { name: 'Komponenten', icon: '⚙', total: 80, learned: 28, percent: 35.0 },
+            { name: 'Munition', icon: '🔋', total: 40, learned: 15, percent: 37.5 },
+            { name: 'Werkzeuge', icon: '🔧', total: 30, learned: 7, percent: 23.3 },
+          ],
+          rarities: [
+            { rarity: 'Legendär', color: '#F59E0B', total: 18, learned: 4, percent: 22.2 },
+            { rarity: 'Episch', color: '#A855F7', total: 64, learned: 28, percent: 43.8 },
+            { rarity: 'Selten', color: '#38BDF8', total: 140, learned: 72, percent: 51.4 },
+            { rarity: 'Gewöhnlich', color: '#94A3B8', total: 198, learned: 81, percent: 40.9 },
+          ],
+          topGaps: [
+            {
+              id: 'bp_atlas',
+              name: 'Atlas Quantum Drive',
+              category: 'Komponenten',
+              subCategory: 'Quantum-Antrieb',
+              rarity: 'Selten',
+              rarityColor: '#38BDF8',
+              unlockInfo: 'HUR-L1 & CRU-L1 Platinum Bay Wreck Salvage',
+              requiredMaterials: '0.04 SCU Quantanium · 0.08 SCU Superconductors',
+            },
+            {
+              id: 'bp_novikov',
+              name: 'Novikov Exploration Core',
+              category: 'Rüstung',
+              subCategory: 'Torso',
+              rarity: 'Legendär',
+              rarityColor: '#F59E0B',
+              unlockInfo: 'Pyro Contested Zone Executive Loot Crate',
+              requiredMaterials: '0.06 SCU Laranite · 0.04 SCU Hadanite',
+            },
+            {
+              id: 'bp_fr76',
+              name: 'FR-76 Shield Generator',
+              category: 'Komponenten',
+              subCategory: 'Schildgenerator',
+              rarity: 'Episch',
+              rarityColor: '#A855F7',
+              unlockInfo: 'VHRT Bounty Hunter Loot Drop',
+              requiredMaterials: '0.08 SCU Copper · 0.05 SCU Gold',
+            },
+          ],
+          specializations: [
+            { title: 'Waffenschmied', role: 'Gunsmith', icon: '⚔️', total: 120, learned: 65, percent: 54.2, focus: 'Handfeuerwaffen & Bordwaffen' },
+            { title: 'Rüstungsmeister', role: 'Armorsmith', icon: '🛡️', total: 150, learned: 70, percent: 46.7, focus: 'Schwere Kampfpanzerungen & Helme' },
+            { title: 'Schiffs-Ingenieur', role: 'Engineer', icon: '⚙️', total: 80, learned: 28, percent: 35.0, focus: 'Quantum Drives & Schilde' },
+            { title: 'Überlebens-Experte', role: 'Survival', icon: '🌋', total: 24, learned: 8, percent: 33.3, focus: 'Novikov & Pembroke Spezialrüstungen' },
+          ],
+        } as BlueprintCoverageReport;
+
+      case 'import_scmdb_json':
+        return {
+          success: true,
+          toImport: ['Yubarev Pistol', 'Scalpel Sniper Rifle'],
+          toImportCount: 2,
+          alreadyOwnedCount: 5,
+          unrecognized: [],
+          unrecognizedCount: 0,
+          skippedNotCompleted: 2,
+          malformed: 0,
+          missionCount: 1,
+          version: 3,
+          exportedAt: '2026-09-17T12:00:00Z',
+          newerVersion: false,
+          applied: true,
+          newlyImportedCount: 2,
+        } as ScmdbImportResult;
+
+      case 'export_scmdb_json':
+        return {
+          success: true,
+          json: JSON.stringify({ version: 3, blueprints: [] }, null, 2),
+          learnedCount: 185,
+          totalCount: 420,
+        } as ScmdbExportResult;
+
+      case 'toggle_blueprint_learned':
+        return { success: true, name: (payload as any)?.name, isLearned: (payload as any)?.isLearned };
 
       case 'get_loadout':
         return [

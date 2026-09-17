@@ -517,6 +517,9 @@ public class BlueprintDto
 
     [JsonPropertyName("learnedDate")]
     public string? LearnedDate { get; set; }
+
+    [JsonPropertyName("source")]
+    public string? Source { get; set; }
 }
 
 public class LoadoutSlotDto
@@ -1943,6 +1946,90 @@ public class PhotinoBridge
 
                 case "get_blueprints":
                     SendResponse(req.Id, "blueprints_response", GetBlueprintsData());
+                    break;
+
+                case "get_blueprint_coverage":
+                    var covCatalog = GetPopulatedBlueprintCatalog();
+                    var report = ScmdbService.AnalyzeCoverage(covCatalog);
+                    SendResponse(req.Id, "blueprint_coverage_response", report);
+                    break;
+
+                case "import_scmdb_json":
+                    string scmdbJson = "";
+                    bool applyImport = true;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("json", out var jsonProp)) scmdbJson = jsonProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("apply", out var applyProp)) applyImport = applyProp.GetBoolean();
+                    }
+
+                    var parseResult = ScmdbExportParser.Parse(scmdbJson);
+                    if (!parseResult.Success)
+                    {
+                        SendResponse(req.Id, "import_scmdb_response", new
+                        {
+                            success = false,
+                            error = parseResult.Error
+                        });
+                        break;
+                    }
+
+                    var allOwned = Database.DistinctBlueprints();
+                    var importPlan = ScmdbImportPlan.Build(parseResult.CompletedNames, allOwned, ScmdbService.ResolveBlueprintName);
+
+                    int newlyImported = 0;
+                    if (applyImport && importPlan.ToImport.Count > 0)
+                    {
+                        newlyImported = Database.AddLearnedBlueprints(importPlan.ToImport, "SCMDB");
+                        Broadcast("blueprints_response", GetBlueprintsData());
+                    }
+
+                    SendResponse(req.Id, "import_scmdb_response", new
+                    {
+                        success = true,
+                        toImport = importPlan.ToImport,
+                        toImportCount = importPlan.ToImport.Count,
+                        alreadyOwnedCount = importPlan.AlreadyOwned.Count,
+                        unrecognized = importPlan.Unrecognized,
+                        unrecognizedCount = importPlan.Unrecognized.Count,
+                        skippedNotCompleted = parseResult.SkippedNotCompleted,
+                        malformed = parseResult.MalformedEntries,
+                        missionCount = parseResult.MissionCount,
+                        version = parseResult.Version,
+                        exportedAt = parseResult.ExportedAt,
+                        newerVersion = parseResult.NewerVersion,
+                        applied = applyImport,
+                        newlyImportedCount = newlyImported
+                    });
+                    break;
+
+                case "export_scmdb_json":
+                    var expCatalog = GetPopulatedBlueprintCatalog();
+                    var exportedJson = ScmdbService.GenerateScmdbExport(expCatalog);
+                    SendResponse(req.Id, "export_scmdb_response", new
+                    {
+                        success = true,
+                        json = exportedJson,
+                        learnedCount = expCatalog.Count(x => x.IsLearned),
+                        totalCount = expCatalog.Count
+                    });
+                    break;
+
+                case "toggle_blueprint_learned":
+                    string bpNameToToggle = "";
+                    bool bpLearnedTarget = false;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("name", out var bpNameProp)) bpNameToToggle = bpNameProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("isLearned", out var bpLearnedProp)) bpLearnedTarget = bpLearnedProp.GetBoolean();
+                    }
+
+                    if (!string.IsNullOrEmpty(bpNameToToggle))
+                    {
+                        Database.SetLearnedBlueprint(bpNameToToggle, bpLearnedTarget, "Manuell");
+                        Broadcast("blueprints_response", GetBlueprintsData());
+                    }
+                    SendResponse(req.Id, "toggle_blueprint_response", new { success = true, name = bpNameToToggle, isLearned = bpLearnedTarget });
                     break;
 
                 case "get_loadout":
@@ -4439,30 +4526,65 @@ public class PhotinoBridge
         }).ToList();
     }
 
-    private List<BlueprintDto> GetBlueprintsData()
+    private List<BlueprintItem> GetPopulatedBlueprintCatalog()
     {
         Database.EnsureInitialized();
         var catalog = BlueprintCatalog.CreateFreshCatalog();
         var learnedDistinct = new HashSet<string>(Database.DistinctBlueprints(), StringComparer.OrdinalIgnoreCase);
 
         var events = Database.AllBlueprintEvents();
-        var learnedDates = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        var learnedInfo = new Dictionary<string, (DateTime Time, string Source)>(StringComparer.OrdinalIgnoreCase);
         foreach (var ev in events)
         {
-            if (!string.IsNullOrEmpty(ev.Detail) && !learnedDates.ContainsKey(ev.Detail))
+            if (!string.IsNullOrEmpty(ev.Detail) && !learnedInfo.ContainsKey(ev.Detail))
             {
-                learnedDates[ev.Detail] = ev.Time;
+                learnedInfo[ev.Detail] = (ev.Time, "Game.log");
             }
         }
+
+        var customLearned = Database.GetLearnedBlueprintsDetails();
+        foreach (var kvp in customLearned)
+        {
+            if (!learnedInfo.ContainsKey(kvp.Key))
+            {
+                learnedInfo[kvp.Key] = (kvp.Value.LearnedAt, kvp.Value.Source);
+            }
+        }
+
+        foreach (var b in catalog)
+        {
+            var norm = BlueprintCatalog.NormalizeBlueprintName(b.Name);
+            bool isLearned = learnedDistinct.Contains(b.Name) || 
+                             learnedDistinct.Contains(norm) ||
+                             learnedInfo.ContainsKey(b.Name) || 
+                             learnedInfo.ContainsKey(norm);
+
+            b.IsLearned = isLearned;
+            if (learnedInfo.TryGetValue(b.Name, out var info) || (norm != null && learnedInfo.TryGetValue(norm, out info)))
+            {
+                b.LearnedAt = info.Time;
+            }
+        }
+
+        return catalog;
+    }
+
+    private List<BlueprintDto> GetBlueprintsData()
+    {
+        var catalog = GetPopulatedBlueprintCatalog();
+        var customLearned = Database.GetLearnedBlueprintsDetails();
 
         var result = new List<BlueprintDto>();
         foreach (var b in catalog)
         {
-            bool isLearned = learnedDistinct.Contains(b.Name) || learnedDates.ContainsKey(b.Name);
-            string? dateStr = null;
-            if (learnedDates.TryGetValue(b.Name, out var dt))
+            string? dateStr = b.LearnedAt.HasValue
+                ? b.LearnedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                : null;
+
+            string source = "Game.log";
+            if (customLearned.TryGetValue(b.Name, out var cInfo))
             {
-                dateStr = dt.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+                source = cInfo.Source;
             }
 
             result.Add(new BlueprintDto
@@ -4474,8 +4596,9 @@ public class PhotinoBridge
                 Rarity = b.Rarity,
                 RequiredMaterials = b.RequiredMaterials,
                 UnlockInfo = b.UnlockInfo,
-                IsLearned = isLearned,
+                IsLearned = b.IsLearned,
                 LearnedDate = dateStr,
+                Source = b.IsLearned ? source : null
             });
         }
 
