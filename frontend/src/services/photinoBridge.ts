@@ -473,6 +473,12 @@ export interface TradeRouteDto {
   investmentAuec: number;
   totalProfitAuec: number;
   riskLevel: string;
+  distanceGm: number;
+  profitPerGm: number;
+  boxCount: number;
+  autoLoadFee: number;
+  autoLoadSeconds: number;
+  boxBreakdown: string;
 }
 
 export interface SalvagePriceSummaryDto {

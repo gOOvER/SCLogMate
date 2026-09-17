@@ -2012,13 +2012,21 @@ public class PhotinoBridge
                     int holdScu = 696;
                     long maxCap = 20000000;
                     string? tradeSys = null;
+                    string? originLocation = null;
+                    string? rankMode = "Profit";
+                    string? demandFilter = "Any";
+                    int shipMaxBoxScu = 32;
                     if (req.Payload.HasValue)
                     {
                         if (req.Payload.Value.TryGetProperty("cargoHoldScu", out var hsProp)) holdScu = hsProp.GetInt32();
                         if (req.Payload.Value.TryGetProperty("maxCapitalAuec", out var capProp)) maxCap = capProp.GetInt64();
                         if (req.Payload.Value.TryGetProperty("system", out var tradeSysProp)) tradeSys = tradeSysProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("originLocation", out var oProp)) originLocation = oProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("rankMode", out var rkProp)) rankMode = rkProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("demandFilter", out var dfProp)) demandFilter = dfProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("shipMaxBoxScu", out var routeMbProp)) shipMaxBoxScu = routeMbProp.GetInt32();
                     }
-                    var routes = await TradeRouteOptimizer.CalculateBestRoutesAsync(holdScu, maxCap, tradeSys);
+                    var routes = await TradeRouteOptimizer.CalculateBestRoutesAsync(holdScu, maxCap, tradeSys, originLocation, rankMode, demandFilter, shipMaxBoxScu);
                     SendResponse(req.Id, "smart_trade_routes_response", routes);
                     break;
 

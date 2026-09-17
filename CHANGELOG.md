@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Multi-Variable Trade & Hauling Route Optimizer (`Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
+  - Implemented multi-variable route ranking engine supporting 4 sorting modes: Max Net Profit, Margin per SCU, Profit per Gigameter travel distance (`ProfitPerGm`), and Return on Investment (`ROI %`).
+  - Added astronomical distance matrix estimating straight-line quantum flight distance in Gigameters (Gm) between planetary bodies, moon systems, and jump gates.
+  - Added origin location filtering ("FROM HERE" anchor) to restrict buy legs to the player's current station or planetary system (Crusader, Hurston, ArcCorp, microTech, Pyro).
+  - Integrated dynamic Container Planning into route cards, calculating crate count breakdowns, auto-load dispatch durations, and freight elevator fees directly alongside financial projections.
 - **Executive Hangar Contested Zone Tracker (`Core/ExecHangarCycle.cs`, `Core/Settings.cs`, `PhotinoBridge.cs`, `PlacesView.tsx`)**:
   - Implemented deterministic offline cycle mathematics for Pyro's Executive Hangar (PYAM-EXHANG-0-1) Contested Zone (65m 0.093s open, 120m 0.173s closed, 185m 0.266s cycle calibrated against community benchmarks).
   - Added physical 5-light status indicator simulation accurately mirroring in-game door lights (5 down to 1 extinguishing every 12m during open; charging 0 to 4 every 24m during closed; active 5-minute tail warning).

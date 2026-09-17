@@ -21,6 +21,12 @@ public class TradeRouteDto
     [JsonPropertyName("investmentAuec")] public long InvestmentAuec { get; set; }
     [JsonPropertyName("totalProfitAuec")] public long TotalProfitAuec { get; set; }
     [JsonPropertyName("riskLevel")] public string RiskLevel { get; set; } = "Sicher"; // Sicher, Mittel, Hoch
+    [JsonPropertyName("distanceGm")] public double DistanceGm { get; set; }
+    [JsonPropertyName("profitPerGm")] public double ProfitPerGm { get; set; }
+    [JsonPropertyName("boxCount")] public int BoxCount { get; set; }
+    [JsonPropertyName("autoLoadFee")] public long AutoLoadFee { get; set; }
+    [JsonPropertyName("autoLoadSeconds")] public int AutoLoadSeconds { get; set; }
+    [JsonPropertyName("boxBreakdown")] public string BoxBreakdown { get; set; } = "";
 }
 
 public class SalvagePriceSummaryDto
@@ -38,7 +44,11 @@ public static class TradeRouteOptimizer
     public static async Task<List<TradeRouteDto>> CalculateBestRoutesAsync(
         int cargoHoldScu = 696,
         long maxCapitalAuec = 20000000,
-        string? filterSystem = null)
+        string? filterSystem = null,
+        string? originLocation = null,
+        string? rankMode = "Profit",
+        string? demandFilter = "Any",
+        int shipMaxBoxScu = 32)
     {
         await UexApiClient.FetchCommodityPricesAsync();
         var prices = UexApiClient.GetAllCommodityPrices();
@@ -54,12 +64,17 @@ public static class TradeRouteOptimizer
             int affordableScu = (int)Math.Min(cargoHoldScu, maxCapitalAuec / p.BestBuy);
             if (affordableScu <= 0) continue;
 
-            long investment = (long)p.BestBuy * affordableScu;
-            long profit = (long)marginPerScu * affordableScu;
-            double roi = investment > 0 ? ((double)profit / investment) * 100 : 0;
-
             string origin = !string.IsNullOrEmpty(p.BestBuyTerminal) ? p.BestBuyTerminal : "Stanton Außenposten";
             string destination = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD / Handelszentrum";
+
+            // Origin Anchor Filter (z.B. "FROM HERE" bzw. spezifischer Ort)
+            if (!string.IsNullOrWhiteSpace(originLocation) && !originLocation.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!origin.Contains(originLocation, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
 
             string sys = "Stanton";
             if (origin.Contains("Pyro", StringComparison.OrdinalIgnoreCase) || destination.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
@@ -72,15 +87,30 @@ public static class TradeRouteOptimizer
                 continue;
             }
 
+            // Distanz & Profit/Gm ermitteln
+            double distGm = EstimateDistanceGm(origin, destination);
+
+            // Container Planning für diese Route berechnen
+            var plan = ContainerPlanner.Plan(null, shipMaxBoxScu, affordableScu);
+            int actualScu = plan?.TotalScu ?? affordableScu;
+            long investment = (long)p.BestBuy * actualScu;
+            long profit = (long)marginPerScu * actualScu;
+            double roi = investment > 0 ? ((double)profit / investment) * 100 : 0;
+            double profitPerGm = distGm > 0 ? Math.Round((double)profit / distGm, 0) : profit;
+
             string risk = "Sicher";
             if (sys == "Pyro" || origin.Contains("Grim", StringComparison.OrdinalIgnoreCase) || destination.Contains("Grim", StringComparison.OrdinalIgnoreCase) || origin.Contains("Jumptown", StringComparison.OrdinalIgnoreCase))
             {
                 risk = "Hoch";
             }
-            else if (origin.Contains("Mining", StringComparison.OrdinalIgnoreCase) || destination.Contains("Scrap", StringComparison.OrdinalIgnoreCase))
+            else if (origin.Contains("Mining", StringComparison.OrdinalIgnoreCase) || destination.Contains("Scrap", StringComparison.OrdinalIgnoreCase) || origin.Contains("Brio", StringComparison.OrdinalIgnoreCase))
             {
                 risk = "Mittel";
             }
+
+            string boxBreakdown = plan != null
+                ? string.Join(", ", plan.Picks.Select(pk => $"{pk.Count}× {pk.Scu} SCU"))
+                : $"{actualScu} SCU";
 
             routes.Add(new TradeRouteDto
             {
@@ -93,14 +123,29 @@ public static class TradeRouteOptimizer
                 SellPricePerScu = (double)Math.Round(p.BestSell, 0),
                 ProfitPerScu = (double)Math.Round(marginPerScu, 0),
                 RoiPercent = Math.Round(roi, 1),
-                MaxScu = affordableScu,
+                MaxScu = actualScu,
                 InvestmentAuec = investment,
                 TotalProfitAuec = profit,
-                RiskLevel = risk
+                RiskLevel = risk,
+                DistanceGm = distGm,
+                ProfitPerGm = profitPerGm,
+                BoxCount = plan?.TotalBoxCount ?? 0,
+                AutoLoadFee = plan?.TotalAutoLoadFee ?? 0,
+                AutoLoadSeconds = plan?.TotalEstimatedSeconds ?? 0,
+                BoxBreakdown = boxBreakdown
             });
         }
 
-        return routes.OrderByDescending(r => r.TotalProfitAuec).Take(25).ToList();
+        // Multi-Variable Ranking (Profit, ProfitPerScu, ProfitPerGm, Roi)
+        var ordered = (rankMode?.ToLowerInvariant()) switch
+        {
+            "profitperscu" => routes.OrderByDescending(r => r.ProfitPerScu).ThenByDescending(r => r.TotalProfitAuec),
+            "profitpergm" => routes.OrderByDescending(r => r.ProfitPerGm).ThenByDescending(r => r.TotalProfitAuec),
+            "roi" => routes.OrderByDescending(r => r.RoiPercent).ThenByDescending(r => r.TotalProfitAuec),
+            _ => routes.OrderByDescending(r => r.TotalProfitAuec)
+        };
+
+        return ordered.Take(25).ToList();
     }
 
     public static async Task<List<SalvagePriceSummaryDto>> GetSalvagePricesAsync()
@@ -119,23 +164,83 @@ public static class TradeRouteOptimizer
             "Bexalite"
         };
 
-        var list = new List<SalvagePriceSummaryDto>();
+        var result = new List<SalvagePriceSummaryDto>();
         foreach (var mat in salvageMaterials)
         {
             if (prices.TryGetValue(mat, out var p))
             {
-                list.Add(new SalvagePriceSummaryDto
+                string sys = "Stanton";
+                if (!string.IsNullOrEmpty(p.BestSellTerminal) && p.BestSellTerminal.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
                 {
-                    MaterialName = p.CommodityName,
-                    Category = (p.CommodityName.Contains("Material") || p.CommodityName == "Scrap") ? "Salvage / Scrapper" : "Mining / Erz",
-                    BestSellLocation = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD / City Trade Center",
+                    sys = "Pyro";
+                }
+
+                result.Add(new SalvagePriceSummaryDto
+                {
+                    MaterialName = mat,
+                    Category = mat.Contains("Material") || mat == "Scrap" ? "Salvage" : "Erz",
+                    BestSellLocation = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD",
                     BestSellPricePerScu = (double)Math.Round(p.BestSell, 0),
-                    AvgSellPricePerScu = (double)(p.AvgSell > 0 ? p.AvgSell : Math.Round(p.BestSell * 0.95m, 0)),
-                    System = p.BestSellTerminal?.Contains("Pyro") == true ? "Pyro" : "Stanton"
+                    AvgSellPricePerScu = (double)Math.Round(p.AvgSell, 0),
+                    System = sys
                 });
             }
         }
 
-        return list;
+        return result;
+    }
+
+    /// <summary>
+    /// Schätzt die gerade astronomische Distanz zwischen Start- und Zielterminal in Gigametern (Gm).
+    /// Berücksichtigt Himmelskörper, Stationen und intersystemische Sprungtore.
+    /// </summary>
+    private static double EstimateDistanceGm(string origin, string destination)
+    {
+        if (string.Equals(origin, destination, StringComparison.OrdinalIgnoreCase))
+            return 0.0;
+
+        string oBody = ResolveBody(origin);
+        string dBody = ResolveBody(destination);
+
+        // Identischer Himmelskörper / Mond / Orbit (z.B. Daymar -> Orison / Seraphim)
+        if (string.Equals(oBody, dBody, StringComparison.OrdinalIgnoreCase))
+            return 0.2;
+
+        // Intersystemisch (Stanton <-> Pyro)
+        bool oPyro = origin.Contains("Pyro", StringComparison.OrdinalIgnoreCase);
+        bool dPyro = destination.Contains("Pyro", StringComparison.OrdinalIgnoreCase);
+        if (oPyro != dPyro)
+            return 580.0; // Jump Point Transit Distanz
+
+        if (oPyro && dPyro)
+            return 35.0; // Durchschnitt Pyro intern
+
+        // Stanton Planet-zu-Planet Distanzmatrix (in Gm)
+        return (oBody, dBody) switch
+        {
+            ("Hurston", "Crusader") or ("Crusader", "Hurston") => 31.8,
+            ("Hurston", "ArcCorp") or ("ArcCorp", "Hurston") => 22.4,
+            ("Hurston", "microTech") or ("microTech", "Hurston") => 45.1,
+            ("Crusader", "ArcCorp") or ("ArcCorp", "Crusader") => 42.6,
+            ("Crusader", "microTech") or ("microTech", "Crusader") => 57.9,
+            ("ArcCorp", "microTech") or ("microTech", "ArcCorp") => 38.2,
+            _ => 28.5 // Fallback Durchschnitt
+        };
+    }
+
+    private static string ResolveBody(string location)
+    {
+        var s = location.ToLowerInvariant();
+        if (s.Contains("hurston") || s.Contains("lorville") || s.Contains("everus") || s.Contains("arial") || s.Contains("aberdeen") || s.Contains("magda") || s.Contains("ita") || s.Contains("hur-l"))
+            return "Hurston";
+        if (s.Contains("crusader") || s.Contains("orison") || s.Contains("seraphim") || s.Contains("daymar") || s.Contains("cellin") || s.Contains("yela") || s.Contains("cru-l"))
+            return "Crusader";
+        if (s.Contains("arccorp") || s.Contains("area 18") || s.Contains("area18") || s.Contains("baijini") || s.Contains("lyria") || s.Contains("wala") || s.Contains("arc-l"))
+            return "ArcCorp";
+        if (s.Contains("microtech") || s.Contains("new babbage") || s.Contains("tressler") || s.Contains("calliope") || s.Contains("clio") || s.Contains("euterpe") || s.Contains("mic-l"))
+            return "microTech";
+        if (s.Contains("pyro") || s.Contains("ruin") || s.Contains("pyam") || s.Contains("checkmate") || s.Contains("monox"))
+            return "Pyro";
+        return "Stanton";
     }
 }

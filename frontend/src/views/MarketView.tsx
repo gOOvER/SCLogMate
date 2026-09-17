@@ -45,6 +45,8 @@ export const MarketView: React.FC = () => {
   const [cargoScu, setCargoScu] = useState<number>(696); // Default: C2 Hercules
   const [maxBudgetAuec, setMaxBudgetAuec] = useState<number>(15000000);
   const [routeSystemFilter, setRouteSystemFilter] = useState<string>('all');
+  const [routeRankMode, setRouteRankMode] = useState<'Profit' | 'ProfitPerScu' | 'ProfitPerGm' | 'Roi'>('Profit');
+  const [routeOriginFilter, setRouteOriginFilter] = useState<string>('all');
 
   const fetchMarket = async () => {
     try {
@@ -65,6 +67,9 @@ export const MarketView: React.FC = () => {
         cargoHoldScu: cargoScu,
         maxCapitalAuec: maxBudgetAuec,
         system: routeSystemFilter,
+        originLocation: routeOriginFilter,
+        rankMode: routeRankMode,
+        shipMaxBoxScu: 32,
       });
       setTradeRoutes(res || []);
 
@@ -170,7 +175,7 @@ export const MarketView: React.FC = () => {
 
   useEffect(() => {
     fetchSmartRoutes();
-  }, [cargoScu, maxBudgetAuec, routeSystemFilter]);
+  }, [cargoScu, maxBudgetAuec, routeSystemFilter, routeOriginFilter, routeRankMode]);
 
   useEffect(() => {
     fetchContainerPlan(containerTargetScu, shipMaxGridScu, customSizes);
@@ -439,6 +444,54 @@ export const MarketView: React.FC = () => {
                 <option value={999999999}>Unbegrenzt</option>
               </select>
             </div>
+
+            {/* Ranking-Modus & Startort Filter */}
+            <div className="w-full pt-2 border-t border-cyan-950/60 flex flex-wrap items-center justify-between gap-2">
+              {/* Ranking Modus */}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-[10px] uppercase tracking-wider">Sortierung:</span>
+                <div className="flex items-center gap-1 bg-[#030814] p-0.5 rounded border border-cyan-950">
+                  {[
+                    { id: 'Profit', label: 'Max. Gewinn' },
+                    { id: 'ProfitPerScu', label: 'Marge / SCU' },
+                    { id: 'ProfitPerGm', label: 'Ertrag / Gm (Distanz)' },
+                    { id: 'Roi', label: 'ROI %' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setRouteRankMode(m.id as any)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                        routeRankMode === m.id
+                          ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-600/60 shadow-[0_0_6px_rgba(16,185,129,0.3)]'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Startort Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-[10px] uppercase tracking-wider">Startort:</span>
+                <div className="flex items-center gap-1 bg-[#030814] p-0.5 rounded border border-cyan-950">
+                  {['all', 'Crusader', 'Hurston', 'ArcCorp', 'microTech', 'Pyro'].map((hub) => (
+                    <button
+                      key={hub}
+                      onClick={() => setRouteOriginFilter(hub)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                        routeOriginFilter === hub
+                          ? 'bg-cyan-900/70 text-cyan-300 border border-cyan-700/60'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {hub === 'all' ? 'Alle Startorte' : hub}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Routen-Karten / Liste */}
@@ -536,6 +589,21 @@ export const MarketView: React.FC = () => {
                           +{r.totalProfitAuec.toLocaleString('de-DE')} aUEC
                           <span className="text-[10px] text-emerald-500 font-normal ml-1">({r.roiPercent}%)</span>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Distanz & Frachtaufzug-Kennzahlen */}
+                    <div className="mt-2 pt-2 border-t border-cyan-950/60 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <span className="text-cyan-300 font-semibold bg-cyan-950/60 border border-cyan-900 px-1.5 py-0.2 rounded">
+                          ~{r.distanceGm} Gm Distanz
+                        </span>
+                        <span className="text-slate-300">
+                          +{r.profitPerGm?.toLocaleString('de-DE')} aUEC / Gm
+                        </span>
+                      </div>
+                      <div className="text-slate-400 truncate max-w-[55%]" title={r.boxBreakdown}>
+                        📦 {r.boxCount} Kisten ({r.boxBreakdown})
                       </div>
                     </div>
                   </div>
