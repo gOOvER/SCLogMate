@@ -2061,6 +2061,16 @@ public class PhotinoBridge
                     SendResponse(req.Id, "evaluate_cargo_constraints_response", evalResult);
                     break;
 
+                case "get_sct_market_status":
+                    await SctMarketService.FetchSctPricesAsync();
+                    SendResponse(req.Id, "sct_market_status_response", new
+                    {
+                        totalListings = SctMarketService.TotalListingsCount,
+                        droppedOutliers = SctMarketService.DroppedOutliersCount,
+                        lastFetchedUtc = SctMarketService.LastFetchedUtc
+                    });
+                    break;
+
                 case "get_combat_analytics":
                     string? combatSession = null;
                     if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var csProp))

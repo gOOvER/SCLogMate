@@ -9,6 +9,7 @@ import {
   LoadingDockDto,
   CargoShipDefDto,
   ShipConstraintEvaluationDto,
+  SctMarketStatusDto,
 } from '../services/photinoBridge';
 import {
   TrendingUp,
@@ -53,6 +54,9 @@ export const MarketView: React.FC = () => {
   const [evalBoxScu, setEvalBoxScu] = useState<number>(32);
   const [constraintResult, setConstraintResult] = useState<ShipConstraintEvaluationDto | null>(null);
   const [isEvaluatingConstraint, setIsEvaluatingConstraint] = useState<boolean>(false);
+
+  // SCT Dual-Source Status
+  const [sctStatus, setSctStatus] = useState<SctMarketStatusDto | null>(null);
 
   // Container Planner State
   const [containerTargetScu, setContainerTargetScu] = useState<number>(696);
@@ -192,11 +196,21 @@ export const MarketView: React.FC = () => {
     }
   };
 
+  const fetchSctStatus = async () => {
+    try {
+      const res = await bridge.sendRequest<SctMarketStatusDto>('get_sct_market_status');
+      if (res) setSctStatus(res);
+    } catch (err) {
+      console.error('Failed to get SCT market status:', err);
+    }
+  };
+
   useEffect(() => {
     fetchMarket();
     fetchSmartRoutes();
     fetchAutoLoads();
     fetchCargoConstraints();
+    fetchSctStatus();
 
     const unbindAutoLoad = bridge.on<AutoLoadEntryDto[]>('AUTOLOAD_UPDATED', (entries) => {
       if (Array.isArray(entries)) {
@@ -465,6 +479,21 @@ export const MarketView: React.FC = () => {
           <ShoppingBag className="w-3.5 h-3.5 text-cyan-400" />
           <span>Warenrechner</span>
         </button>
+
+        {/* SCT Dual-Source Status Badge */}
+        {sctStatus && (
+          <div className="ml-auto hidden lg:flex items-center gap-2 text-[10px] font-mono text-slate-400 bg-[#02050c] px-2.5 py-1 rounded border border-cyan-950">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Dual-Source: <strong>UEXcorp + SC Trade Tools</strong></span>
+            <span className="text-slate-600">|</span>
+            <span className="text-emerald-400">{sctStatus.totalListings} Notierungen</span>
+            {sctStatus.droppedOutliers > 0 && (
+              <span className="text-amber-400" title={`${sctStatus.droppedOutliers} unplausible Ausreißer-Preise per Median-Filter gefiltert`}>
+                ({sctStatus.droppedOutliers} Ausreißer gefiltert)
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ══ TAB 1: SMARTE HANDELSROUTEN ══ */}
@@ -636,17 +665,33 @@ export const MarketView: React.FC = () => {
                           </div>
                         </div>
 
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
-                            r.riskLevel === 'Sicher'
-                              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-                              : r.riskLevel === 'Mittel'
-                              ? 'bg-amber-950/60 text-amber-300 border-amber-800/60'
-                              : 'bg-rose-950/60 text-rose-300 border-rose-800/60'
-                          }`}
-                        >
-                          {r.riskLevel}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {r.priceBadge && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase cursor-help ${
+                                r.priceState === 'Corroborated'
+                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/80 shadow-[0_0_6px_rgba(16,185,129,0.2)]'
+                                  : r.priceState === 'Disagree'
+                                  ? 'bg-amber-950/80 text-amber-300 border-amber-600/80'
+                                  : 'bg-slate-900 text-slate-300 border-slate-700'
+                              }`}
+                              title={r.priceBadgeTooltip || ''}
+                            >
+                              {r.priceBadge}
+                            </span>
+                          )}
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
+                              r.riskLevel === 'Sicher'
+                                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
+                                : r.riskLevel === 'Mittel'
+                                ? 'bg-amber-950/60 text-amber-300 border-amber-800/60'
+                                : 'bg-rose-950/60 text-rose-300 border-rose-800/60'
+                            }`}
+                          >
+                            {r.riskLevel}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Stationen: Einkauf -> Verkauf */}
@@ -665,7 +710,14 @@ export const MarketView: React.FC = () => {
                             )}
                           </div>
                           <div className="text-slate-200 font-bold truncate" title={r.origin}>{r.origin}</div>
-                          <div className="text-[10px] text-cyan-400">{r.buyPricePerScu.toLocaleString('de-DE')} aUEC / SCU</div>
+                          <div className="text-[10px] text-cyan-400">
+                            {r.buyPricePerScu.toLocaleString('de-DE')} aUEC / SCU
+                            {r.sctBuyPrice && (
+                              <span className="text-[9px] text-slate-400 font-normal ml-1" title="SC Trade Tools Preis">
+                                (SCT: {r.sctBuyPrice.toLocaleString('de-DE')})
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <ArrowRight className="w-4 h-4 text-cyan-400 shrink-0 mx-2" />
@@ -684,7 +736,14 @@ export const MarketView: React.FC = () => {
                             <span className="text-[10px] text-slate-500 uppercase font-semibold">Verkauf:</span>
                           </div>
                           <div className="text-slate-200 font-bold truncate" title={r.destination}>{r.destination}</div>
-                          <div className="text-[10px] text-emerald-400">{r.sellPricePerScu.toLocaleString('de-DE')} aUEC / SCU</div>
+                          <div className="text-[10px] text-emerald-400">
+                            {r.sellPricePerScu.toLocaleString('de-DE')} aUEC / SCU
+                            {r.sctSellPrice && (
+                              <span className="text-[9px] text-slate-400 font-normal ml-1" title="SC Trade Tools Preis">
+                                (SCT: {r.sctSellPrice.toLocaleString('de-DE')})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1481,9 +1540,16 @@ export const MarketView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-100 text-xs">{s.materialName}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-900 text-cyan-300 uppercase">
-                      {s.system}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {s.priceBadge && (
+                        <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-bold">
+                          {s.priceBadge}
+                        </span>
+                      )}
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-900 text-cyan-300 uppercase">
+                        {s.system}
+                      </span>
+                    </div>
                   </div>
                   <div className="text-[10px] text-slate-500 mt-0.5">{s.category}</div>
 

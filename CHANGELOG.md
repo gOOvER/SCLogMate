@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **SC Trade Tools (SCT) Dual-Source Integration & Outlier Filtering (`Core/SctMarketService.cs`, `Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
+  - Implemented crowdsourced price integration with SC Trade Tools (SCT) and headless price reconciliation against UEXcorp commodity market prices.
+  - Added robust outlier rejection algorithm (`SctOutlierFilter`) computing per-commodity median prices (with MinSamples=4) and dropping mistyped or spoofed entries exceeding 4.0× the median in either direction.
+  - Implemented dual-source validation logic categorizing prices as `Corroborated` (both sources agree within 3% and are younger than 48h), `Disagree` (diverging with exact percentage difference), `UexOnly`, or `SctOnly`.
+  - Added dual-source verification badges (`✓ BESTÄTIGT`, `± ABWEICHUNG`) and real-time SCT price comparisons on trade route cards and salvage market tables.
+  - Added live market status indicator displaying total synchronized crowd listings and outlier counts in the Market view tab header.
 - **Loading Dock & Cargo Ship Constraints Catalog (`Core/CargoConstraints.cs`, `Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
   - Embedded the full directory of 28 verified Star Citizen Loading Dock amenity sites (Stanton and Pyro Jump Gate stations, LEO orbital stations, and Lagrange rest stops) with automatic loading elevator and docking collar validation.
   - Implemented comprehensive cargo ship constraints catalog covering pad requirements (XS, S, M, L, Capital), maximum container size clearances (2, 4, 8, 16, 24, 32 SCU), cargo access types (ramps, belly elevators, spindle grids), and special hull restrictions (e.g. Hull C spindle requiring station docking collars and forbidding loaded planetary landings).

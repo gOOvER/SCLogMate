@@ -482,6 +482,11 @@ export interface TradeRouteDto {
   originHasDock?: boolean;
   destinationHasDock?: boolean;
   dockWarning?: string | null;
+  priceBadge?: string | null;
+  priceBadgeTooltip?: string | null;
+  priceState?: string;
+  sctBuyPrice?: number | null;
+  sctSellPrice?: number | null;
 }
 
 export interface LoadingDockDto {
@@ -517,6 +522,12 @@ export interface ShipConstraintEvaluationDto {
   notices: string[];
 }
 
+export interface SctMarketStatusDto {
+  totalListings: number;
+  droppedOutliers: number;
+  lastFetchedUtc: string;
+}
+
 export interface SalvagePriceSummaryDto {
   materialName: string;
   category: string;
@@ -524,6 +535,8 @@ export interface SalvagePriceSummaryDto {
   bestSellPricePerScu: number;
   avgSellPricePerScu: number;
   system: string;
+  priceBadge?: string | null;
+  priceState?: string;
 }
 
 export interface CombatCategoryStatDto {

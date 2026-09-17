@@ -30,6 +30,11 @@ public class TradeRouteDto
     [JsonPropertyName("originHasDock")] public bool OriginHasDock { get; set; }
     [JsonPropertyName("destinationHasDock")] public bool DestinationHasDock { get; set; }
     [JsonPropertyName("dockWarning")] public string? DockWarning { get; set; }
+    [JsonPropertyName("priceBadge")] public string? PriceBadge { get; set; }
+    [JsonPropertyName("priceBadgeTooltip")] public string? PriceBadgeTooltip { get; set; }
+    [JsonPropertyName("priceState")] public string PriceState { get; set; } = "UexOnly";
+    [JsonPropertyName("sctBuyPrice")] public double? SctBuyPrice { get; set; }
+    [JsonPropertyName("sctSellPrice")] public double? SctSellPrice { get; set; }
 }
 
 public class SalvagePriceSummaryDto
@@ -40,6 +45,8 @@ public class SalvagePriceSummaryDto
     [JsonPropertyName("bestSellPricePerScu")] public double BestSellPricePerScu { get; set; }
     [JsonPropertyName("avgSellPricePerScu")] public double AvgSellPricePerScu { get; set; }
     [JsonPropertyName("system")] public string System { get; set; } = "Stanton";
+    [JsonPropertyName("priceBadge")] public string? PriceBadge { get; set; }
+    [JsonPropertyName("priceState")] public string PriceState { get; set; } = "UexOnly";
 }
 
 public static class TradeRouteOptimizer
@@ -54,6 +61,7 @@ public static class TradeRouteOptimizer
         int shipMaxBoxScu = 32)
     {
         await UexApiClient.FetchCommodityPricesAsync();
+        await SctMarketService.FetchSctPricesAsync();
         var prices = UexApiClient.GetAllCommodityPrices();
         var routes = new List<TradeRouteDto>();
 
@@ -71,7 +79,7 @@ public static class TradeRouteOptimizer
             string destination = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD / Handelszentrum";
 
             // Origin Anchor Filter (z.B. "FROM HERE" bzw. spezifischer Ort)
-            if (!string.IsNullOrWhiteSpace(originLocation) && !originLocation.Equals("all", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(originLocation) && !originLocation.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
                 if (!origin.Contains(originLocation, StringComparison.OrdinalIgnoreCase))
                 {
@@ -85,21 +93,28 @@ public static class TradeRouteOptimizer
                 sys = "Pyro";
             }
 
-            if (!string.IsNullOrEmpty(filterSystem) && filterSystem != "all" && !sys.Equals(filterSystem, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(filterSystem) && !filterSystem.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                if (!sys.Equals(filterSystem, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
             }
 
-            // Distanz & Profit/Gm ermitteln
-            double distGm = EstimateDistanceGm(origin, destination);
+            // Demand Filter
+            if (demandFilter == "High" && p.BestSell < 500) continue;
 
-            // Container Planning für diese Route berechnen
-            var plan = ContainerPlanner.Plan(null, shipMaxBoxScu, affordableScu);
-            int actualScu = plan?.TotalScu ?? affordableScu;
-            long investment = (long)p.BestBuy * actualScu;
-            long profit = (long)marginPerScu * actualScu;
+            long investment = (long)(affordableScu * p.BestBuy);
+            long profit = (long)(affordableScu * marginPerScu);
             double roi = investment > 0 ? ((double)profit / investment) * 100 : 0;
-            double profitPerGm = distGm > 0 ? Math.Round((double)profit / distGm, 0) : profit;
+
+            // Box Sizing & Gebühren via ContainerPlanner berechnen
+            int actualScu = affordableScu;
+            ContainerPlan? plan = ContainerPlanner.Plan("1,2,4,8,16,24,32", shipMaxBoxScu, actualScu);
+
+            // Distanzschätzung (Gigameter)
+            double distGm = EstimateDistanceGm(origin, destination);
+            double profitPerGm = distGm > 0 ? Math.Round(profit / distGm, 0) : profit;
 
             string risk = "Sicher";
             if (sys == "Pyro" || origin.Contains("Grim", StringComparison.OrdinalIgnoreCase) || destination.Contains("Grim", StringComparison.OrdinalIgnoreCase) || origin.Contains("Jumptown", StringComparison.OrdinalIgnoreCase))
@@ -131,6 +146,34 @@ public static class TradeRouteOptimizer
                 dockWarning = "Zielort ohne Loading Dock (kein Auto-Load am Außenposten)";
             }
 
+            // Dual-Source Abgleich mit SC Trade Tools (SCT)
+            var buyRec = SctMarketService.ReconcilePrice(p.CommodityName, (double)p.BestBuy, "buy", p.LastReportedAt?.UtcDateTime);
+            var sellRec = SctMarketService.ReconcilePrice(p.CommodityName, (double)p.BestSell, "sell", p.LastReportedAt?.UtcDateTime);
+
+            string priceState = "UexOnly";
+            string? priceBadge = null;
+            string? priceBadgeTooltip = null;
+
+            if (buyRec.State == "Corroborated" && sellRec.State == "Corroborated")
+            {
+                priceState = "Corroborated";
+                priceBadge = "✓ BESTÄTIGT (2 QUELLEN)";
+                priceBadgeTooltip = "Einkaufs- und Verkaufspreis wurden unabhängig durch SC Trade Tools bestätigt (≤3% Differenz).";
+            }
+            else if (buyRec.State == "Disagree" || sellRec.State == "Disagree")
+            {
+                priceState = "Disagree";
+                double maxDiff = Math.Max(buyRec.DisagreePct, sellRec.DisagreePct);
+                priceBadge = $"±{maxDiff}% ABWEICHUNG";
+                priceBadgeTooltip = $"UEXcorp und SC Trade Tools weichen um {maxDiff}% voneinander ab. Berechnungen basieren auf UEXcorp.";
+            }
+            else if (buyRec.State == "Corroborated" || sellRec.State == "Corroborated")
+            {
+                priceState = "Corroborated";
+                priceBadge = "✓ TEILW. BESTÄTIGT";
+                priceBadgeTooltip = "Ein Handelspreis wurde durch SC Trade Tools bestätigt.";
+            }
+
             routes.Add(new TradeRouteDto
             {
                 Id = $"{p.CommodityName}_{origin}_{destination}".Replace(" ", "_"),
@@ -154,7 +197,12 @@ public static class TradeRouteOptimizer
                 BoxBreakdown = boxBreakdown,
                 OriginHasDock = originHasDock,
                 DestinationHasDock = destHasDock,
-                DockWarning = dockWarning
+                DockWarning = dockWarning,
+                PriceState = priceState,
+                PriceBadge = priceBadge,
+                PriceBadgeTooltip = priceBadgeTooltip,
+                SctBuyPrice = buyRec.SctPrice,
+                SctSellPrice = sellRec.SctPrice
             });
         }
 
@@ -173,6 +221,7 @@ public static class TradeRouteOptimizer
     public static async Task<List<SalvagePriceSummaryDto>> GetSalvagePricesAsync()
     {
         await UexApiClient.FetchCommodityPricesAsync();
+        await SctMarketService.FetchSctPricesAsync();
         var prices = UexApiClient.GetAllCommodityPrices();
         var salvageMaterials = new[]
         {
@@ -197,19 +246,23 @@ public static class TradeRouteOptimizer
                     sys = "Pyro";
                 }
 
+                var rec = SctMarketService.ReconcilePrice(mat, (double)p.BestSell, "sell");
+
                 result.Add(new SalvagePriceSummaryDto
                 {
                     MaterialName = mat,
-                    Category = mat.Contains("Material") || mat == "Scrap" ? "Salvage" : "Erz",
-                    BestSellLocation = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD",
-                    BestSellPricePerScu = (double)Math.Round(p.BestSell, 0),
-                    AvgSellPricePerScu = (double)Math.Round(p.AvgSell, 0),
-                    System = sys
+                    Category = "Salvage",
+                    BestSellLocation = !string.IsNullOrEmpty(p.BestSellTerminal) ? p.BestSellTerminal : "TDD / Verwertungszentrum",
+                    BestSellPricePerScu = (double)p.BestSell,
+                    AvgSellPricePerScu = (double)p.AvgSell,
+                    System = sys,
+                    PriceBadge = rec.BadgeText,
+                    PriceState = rec.State
                 });
             }
         }
 
-        return result;
+        return result.OrderByDescending(s => s.BestSellPricePerScu).ToList();
     }
 
     /// <summary>
