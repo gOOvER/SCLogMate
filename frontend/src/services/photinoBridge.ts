@@ -479,6 +479,42 @@ export interface TradeRouteDto {
   autoLoadFee: number;
   autoLoadSeconds: number;
   boxBreakdown: string;
+  originHasDock?: boolean;
+  destinationHasDock?: boolean;
+  dockWarning?: string | null;
+}
+
+export interface LoadingDockDto {
+  starmapId: string;
+  code: string;
+  displayName: string;
+  system: string;
+  body: string;
+  hasExternalCollar: boolean;
+  supportsAutoLoad: boolean;
+}
+
+export interface CargoShipDefDto {
+  id: string;
+  name: string;
+  manufacturer: string;
+  totalScu: number;
+  maxContainerScu: number;
+  padSize: string;
+  requiresDockingCollar: boolean;
+  canLandPlanetside: boolean;
+  cargoAccessType: string;
+  notes: string;
+}
+
+export interface ShipConstraintEvaluationDto {
+  isCompatible: boolean;
+  originHasDock: boolean;
+  destinationHasDock: boolean;
+  shipFound: boolean;
+  ship?: CargoShipDefDto;
+  warnings: string[];
+  notices: string[];
 }
 
 export interface SalvagePriceSummaryDto {

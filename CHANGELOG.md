@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Loading Dock & Cargo Ship Constraints Catalog (`Core/CargoConstraints.cs`, `Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
+  - Embedded the full directory of 28 verified Star Citizen Loading Dock amenity sites (Stanton and Pyro Jump Gate stations, LEO orbital stations, and Lagrange rest stops) with automatic loading elevator and docking collar validation.
+  - Implemented comprehensive cargo ship constraints catalog covering pad requirements (XS, S, M, L, Capital), maximum container size clearances (2, 4, 8, 16, 24, 32 SCU), cargo access types (ramps, belly elevators, spindle grids), and special hull restrictions (e.g. Hull C spindle requiring station docking collars and forbidding loaded planetary landings).
+  - Added real-time constraint validation engine (`evaluate_cargo_constraints`) evaluating route feasibility against ship capacity, door box limits, and terminal loading dock amenities.
+  - Added dedicated "Schiffe & Docks" tab in Market view featuring an interactive route validator, searchable ship constraints catalog, and complete 28 Loading Docks directory.
+  - Enhanced Trade Route cards with instant visual dock badges (`⚓ Dock` vs `Außenposten`) and contextual restriction warnings (e.g. auto-load unavailable at outposts).
 - **Multi-Variable Trade & Hauling Route Optimizer (`Core/TradeRouteOptimizer.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
   - Implemented multi-variable route ranking engine supporting 4 sorting modes: Max Net Profit, Margin per SCU, Profit per Gigameter travel distance (`ProfitPerGm`), and Return on Investment (`ROI %`).
   - Added astronomical distance matrix estimating straight-line quantum flight distance in Gigameters (Gm) between planetary bodies, moon systems, and jump gates.

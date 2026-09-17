@@ -6,6 +6,9 @@ import {
   SalvagePriceSummaryDto,
   AutoLoadEntryDto,
   ContainerPlanDto,
+  LoadingDockDto,
+  CargoShipDefDto,
+  ShipConstraintEvaluationDto,
 } from '../services/photinoBridge';
 import {
   TrendingUp,
@@ -22,15 +25,34 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  Anchor,
+  Shield,
 } from 'lucide-react';
 
 export const MarketView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'routes' | 'containers' | 'salvage' | 'calculator'>('routes');
+  const [activeTab, setActiveTab] = useState<'routes' | 'containers' | 'constraints' | 'salvage' | 'calculator'>('routes');
   const [commodities, setCommodities] = useState<MarketCommodityDto[]>([]);
   const [tradeRoutes, setTradeRoutes] = useState<TradeRouteDto[]>([]);
   const [salvagePrices, setSalvagePrices] = useState<SalvagePriceSummaryDto[]>([]);
   const [autoLoads, setAutoLoads] = useState<AutoLoadEntryDto[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState<boolean>(false);
+
+  // Cargo Constraints & Loading Docks State
+  const [cargoShips, setCargoShips] = useState<CargoShipDefDto[]>([]);
+  const [loadingDocks, setLoadingDocks] = useState<LoadingDockDto[]>([]);
+  const [padFilter, setPadFilter] = useState<string>('all');
+  const [maxBoxFilter, setMaxBoxFilter] = useState<string>('all');
+  const [shipSearch, setShipSearch] = useState<string>('');
+  const [dockSystemFilter, setDockSystemFilter] = useState<string>('all');
+
+  // Interactive Live Constraint Checker
+  const [evalShipId, setEvalShipId] = useState<string>('crus-c2-hercules');
+  const [evalOrigin, setEvalOrigin] = useState<string>('Everus Harbor');
+  const [evalDest, setEvalDest] = useState<string>('Shubin Mining Facility SCD-1');
+  const [evalScu, setEvalScu] = useState<number>(696);
+  const [evalBoxScu, setEvalBoxScu] = useState<number>(32);
+  const [constraintResult, setConstraintResult] = useState<ShipConstraintEvaluationDto | null>(null);
+  const [isEvaluatingConstraint, setIsEvaluatingConstraint] = useState<boolean>(false);
 
   // Container Planner State
   const [containerTargetScu, setContainerTargetScu] = useState<number>(696);
@@ -133,10 +155,48 @@ export const MarketView: React.FC = () => {
     setCustomSizes(sizes);
   };
 
+  const fetchCargoConstraints = async () => {
+    try {
+      const [ships, docks] = await Promise.all([
+        bridge.sendRequest<CargoShipDefDto[]>('get_cargo_ships'),
+        bridge.sendRequest<LoadingDockDto[]>('get_loading_docks'),
+      ]);
+      if (ships) setCargoShips(ships);
+      if (docks) setLoadingDocks(docks);
+    } catch (err) {
+      console.error('Failed to load cargo constraints:', err);
+    }
+  };
+
+  const evaluateShipConstraints = async (
+    shipId: string,
+    origin: string,
+    dest: string,
+    scu: number,
+    boxScu: number
+  ) => {
+    try {
+      setIsEvaluatingConstraint(true);
+      const res = await bridge.sendRequest<ShipConstraintEvaluationDto>('evaluate_cargo_constraints', {
+        shipId,
+        origin,
+        destination: dest,
+        requiredScu: scu,
+        containerScu: boxScu,
+      });
+      setConstraintResult(res);
+    } catch (err) {
+      console.error('Failed to evaluate ship constraints:', err);
+    } finally {
+      setIsEvaluatingConstraint(false);
+    }
+  };
+
   useEffect(() => {
     fetchMarket();
     fetchSmartRoutes();
     fetchAutoLoads();
+    fetchCargoConstraints();
 
     const unbindAutoLoad = bridge.on<AutoLoadEntryDto[]>('AUTOLOAD_UPDATED', (entries) => {
       if (Array.isArray(entries)) {
@@ -181,6 +241,10 @@ export const MarketView: React.FC = () => {
     fetchContainerPlan(containerTargetScu, shipMaxGridScu, customSizes);
   }, [containerTargetScu, shipMaxGridScu, customSizes]);
 
+  useEffect(() => {
+    evaluateShipConstraints(evalShipId, evalOrigin, evalDest, evalScu, evalBoxScu);
+  }, [evalShipId, evalOrigin, evalDest, evalScu, evalBoxScu]);
+
   const selectedCommodity = useMemo(() => {
     return commodities.find((c) => c.name === selectedCommodityName) || commodities[0] || null;
   }, [commodities, selectedCommodityName]);
@@ -216,6 +280,25 @@ export const MarketView: React.FC = () => {
       return true;
     });
   }, [commodities, search]);
+
+  const filteredShips = useMemo(() => {
+    return cargoShips.filter((s) => {
+      if (padFilter !== 'all' && s.padSize.toLowerCase() !== padFilter.toLowerCase()) return false;
+      if (maxBoxFilter !== 'all' && s.maxContainerScu !== parseInt(maxBoxFilter, 10)) return false;
+      if (shipSearch.trim()) {
+        const q = shipSearch.toLowerCase();
+        return s.name.toLowerCase().includes(q) || s.manufacturer.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [cargoShips, padFilter, maxBoxFilter, shipSearch]);
+
+  const filteredDocks = useMemo(() => {
+    return loadingDocks.filter((d) => {
+      if (dockSystemFilter !== 'all' && d.system.toLowerCase() !== dockSystemFilter.toLowerCase()) return false;
+      return true;
+    });
+  }, [loadingDocks, dockSystemFilter]);
 
   const shipPresets = [
     { label: 'C2', scu: 696 },
@@ -335,6 +418,23 @@ export const MarketView: React.FC = () => {
         >
           <Layers className="w-3.5 h-3.5 text-cyan-400" />
           <span>Container-Planer</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('constraints')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-bold rounded transition cursor-pointer ${
+            activeTab === 'constraints'
+              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/70 shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+              : 'text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Anchor className="w-3.5 h-3.5 text-blue-400" />
+          <span>Schiffe & Docks</span>
+          {cargoShips.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] bg-blue-900/60 text-blue-200">
+              {cargoShips.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -552,7 +652,18 @@ export const MarketView: React.FC = () => {
                       {/* Stationen: Einkauf -> Verkauf */}
                       <div className="mt-2.5 p-2 rounded bg-[#030814] border border-cyan-950 flex items-center justify-between text-xs font-mono">
                         <div className="truncate max-w-[45%]">
-                          <div className="text-[10px] text-slate-500 uppercase font-semibold">Einkauf:</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Einkauf:</span>
+                            {r.originHasDock ? (
+                              <span className="px-1 py-0.2 rounded text-[9px] bg-cyan-950/80 text-cyan-300 border border-cyan-800/80">
+                                ⚓ Dock
+                              </span>
+                            ) : (
+                              <span className="px-1 py-0.2 rounded text-[9px] bg-slate-900 text-slate-400 border border-slate-800">
+                                Außenposten
+                              </span>
+                            )}
+                          </div>
                           <div className="text-slate-200 font-bold truncate" title={r.origin}>{r.origin}</div>
                           <div className="text-[10px] text-cyan-400">{r.buyPricePerScu.toLocaleString('de-DE')} aUEC / SCU</div>
                         </div>
@@ -560,11 +671,30 @@ export const MarketView: React.FC = () => {
                         <ArrowRight className="w-4 h-4 text-cyan-400 shrink-0 mx-2" />
 
                         <div className="text-right truncate max-w-[45%]">
-                          <div className="text-[10px] text-slate-500 uppercase font-semibold">Verkauf:</div>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {r.destinationHasDock ? (
+                              <span className="px-1 py-0.2 rounded text-[9px] bg-cyan-950/80 text-cyan-300 border border-cyan-800/80">
+                                ⚓ Dock
+                              </span>
+                            ) : (
+                              <span className="px-1 py-0.2 rounded text-[9px] bg-slate-900 text-slate-400 border border-slate-800">
+                                Außenposten
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Verkauf:</span>
+                          </div>
                           <div className="text-slate-200 font-bold truncate" title={r.destination}>{r.destination}</div>
                           <div className="text-[10px] text-emerald-400">{r.sellPricePerScu.toLocaleString('de-DE')} aUEC / SCU</div>
                         </div>
                       </div>
+
+                      {/* Dock Restriktions-Hinweis */}
+                      {r.dockWarning && (
+                        <div className="mt-1.5 px-2 py-1 rounded bg-amber-950/30 border border-amber-900/40 text-[10px] font-mono text-amber-300 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className="truncate">{r.dockWarning}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Finanz-Kennzahlen */}
@@ -938,7 +1068,395 @@ export const MarketView: React.FC = () => {
         </div>
       )}
 
-      {/* ══ TAB 3: SALVAGE & SCHROTT-BESTPREISE ══ */}
+      {/* ══ TAB: SCHIFFE & LOADING-DOCK RESTRIKTIONEN ══ */}
+      {activeTab === 'constraints' && (
+        <div className="flex-1 flex flex-col space-y-3 overflow-y-auto pr-1 font-mono">
+          {/* Header Banner */}
+          <div className="sc-glass rounded-lg p-3.5 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Anchor className="w-4 h-4 text-blue-400" />
+                <div>
+                  <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider">
+                    Frachtschiff- & Loading-Dock Restriktionskatalog
+                  </h2>
+                  <div className="text-[10px] text-slate-400">
+                    Hangar- und Padgrößen, Tür-/Spindel-Clearance, 28 Loading Docks & automatische Kompatibilitätsprüfung
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ 1. Interaktive Live-Kompatibilitätsprüfung ══ */}
+          <div className="sc-glass rounded-lg p-3.5 border border-cyan-900/60 bg-[#030814]/95 sc-hud-corner space-y-3">
+            <div className="flex items-center justify-between border-b border-cyan-950/80 pb-2">
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                Live Routen- & Schiffs-Kompatibilitäts-Check
+              </span>
+              {isEvaluatingConstraint && (
+                <span className="text-[10px] text-cyan-400 animate-pulse">Prüfe Parameter...</span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              {/* Schiffs-Auswahl */}
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-semibold block mb-1">
+                  Schiff wählen:
+                </label>
+                <select
+                  value={evalShipId}
+                  onChange={(e) => setEvalShipId(e.target.value)}
+                  className="w-full bg-[#02050c] border border-cyan-950 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                >
+                  {cargoShips.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.totalScu} SCU · Max {s.maxContainerScu} SCU · Pad {s.padSize})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Startort */}
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-semibold block mb-1">
+                  Startort (Einkauf / Abholung):
+                </label>
+                <input
+                  type="text"
+                  value={evalOrigin}
+                  onChange={(e) => setEvalOrigin(e.target.value)}
+                  placeholder="z.B. Everus Harbor oder Shubin..."
+                  className="w-full bg-[#02050c] border border-cyan-950 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                />
+                <div className="flex gap-1 mt-1">
+                  {['Everus Harbor', 'Seraphim', 'Mining Area'].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setEvalOrigin(p)}
+                      className="text-[9px] px-1 py-0.2 rounded bg-slate-900 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Zielort */}
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-semibold block mb-1">
+                  Zielort (Verkauf / Lieferung):
+                </label>
+                <input
+                  type="text"
+                  value={evalDest}
+                  onChange={(e) => setEvalDest(e.target.value)}
+                  placeholder="z.B. Port Tressler oder Brio's..."
+                  className="w-full bg-[#02050c] border border-cyan-950 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                />
+                <div className="flex gap-1 mt-1">
+                  {['Port Tressler', 'Baijini Point', "Brio's"].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setEvalDest(p)}
+                      className="text-[9px] px-1 py-0.2 rounded bg-slate-900 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ladungsvolumen & Containergröße */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-slate-400 uppercase font-semibold">
+                    SCU & Kistengröße:
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={evalScu}
+                    onChange={(e) => setEvalScu(parseInt(e.target.value, 10) || 0)}
+                    className="w-1/2 bg-[#02050c] border border-cyan-950 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                  <select
+                    value={evalBoxScu}
+                    onChange={(e) => setEvalBoxScu(parseInt(e.target.value, 10))}
+                    className="w-1/2 bg-[#02050c] border border-cyan-950 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  >
+                    {[1, 2, 4, 8, 16, 24, 32].map((b) => (
+                      <option key={b} value={b}>
+                        {b} SCU Box
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Prüfergebnis Banner */}
+            {constraintResult && (
+              <div
+                className={`p-3 rounded-lg border flex flex-col space-y-2 ${
+                  constraintResult.isCompatible
+                    ? 'bg-emerald-950/20 border-emerald-800/60'
+                    : 'bg-rose-950/30 border-rose-800/70'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {constraintResult.isCompatible ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    )}
+                    <span
+                      className={`text-xs font-bold uppercase tracking-wider ${
+                        constraintResult.isCompatible ? 'text-emerald-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {constraintResult.isCompatible
+                        ? 'Vollständig kompatibel — Route ohne Restriktionen fliegbar'
+                        : 'Einschränkungen / Konflikte festgestellt!'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        constraintResult.originHasDock
+                          ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      Start: {constraintResult.originHasDock ? '⚓ Loading Dock' : 'Außenposten'}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        constraintResult.destinationHasDock
+                          ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      Ziel: {constraintResult.destinationHasDock ? '⚓ Loading Dock' : 'Außenposten'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Warnings */}
+                {constraintResult.warnings.length > 0 && (
+                  <div className="space-y-1">
+                    {constraintResult.warnings.map((w, i) => (
+                      <div key={i} className="text-[11px] text-rose-300 flex items-start gap-1.5">
+                        <span className="text-rose-400 font-bold">✕</span>
+                        <span>{w}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Notices */}
+                {constraintResult.notices.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-cyan-950/40">
+                    {constraintResult.notices.map((n, i) => (
+                      <div key={i} className="text-[10px] text-slate-400 flex items-start gap-1.5">
+                        <Info className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+                        <span>{n}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ══ 2. Schiffs-Katalog & Spezifikationen ══ */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Ship className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold uppercase tracking-wider text-slate-200">
+                  Frachtschiffe & Pad-/Tür-Clearance ({filteredShips.length})
+                </span>
+              </div>
+
+              {/* Filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={shipSearch}
+                  onChange={(e) => setShipSearch(e.target.value)}
+                  placeholder="Schiff suchen..."
+                  className="bg-[#02050c] border border-cyan-950 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-36"
+                />
+
+                {/* Pad Filter */}
+                <div className="flex items-center gap-1 bg-[#02050c] p-0.5 rounded border border-cyan-950">
+                  <span className="text-[9px] text-slate-500 uppercase px-1">Pad:</span>
+                  {['all', 'XS', 'S', 'M', 'L', 'Capital'].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPadFilter(p)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        padFilter === p
+                          ? 'bg-cyan-900/60 text-cyan-300 font-bold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {p === 'all' ? 'Alle' : p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Max Box Filter */}
+                <div className="flex items-center gap-1 bg-[#02050c] p-0.5 rounded border border-cyan-950">
+                  <span className="text-[9px] text-slate-500 uppercase px-1">Max Box:</span>
+                  {['all', '32', '24', '16', '8', '4', '2'].map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setMaxBoxFilter(b)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        maxBoxFilter === b
+                          ? 'bg-emerald-900/60 text-emerald-300 font-bold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {b === 'all' ? 'Alle' : `${b} SCU`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Schiffs-Karten Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+              {filteredShips.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => {
+                    setEvalShipId(s.id);
+                    setEvalScu(s.totalScu);
+                    setEvalBoxScu(s.maxContainerScu);
+                  }}
+                  className={`sc-glass rounded-lg p-3 border transition cursor-pointer flex flex-col justify-between ${
+                    evalShipId === s.id
+                      ? 'border-cyan-500 bg-cyan-950/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                      : 'border-cyan-950/80 bg-[#040914]/90 hover:border-cyan-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-1">
+                      <div>
+                        <div className="text-xs font-bold text-slate-100">{s.name}</div>
+                        <div className="text-[10px] text-slate-400">{s.manufacturer}</div>
+                      </div>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] bg-cyan-950 border border-cyan-900 text-cyan-300 font-bold">
+                        Pad {s.padSize}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-2 p-2 rounded bg-[#02050c] border border-cyan-950 text-xs">
+                      <div>
+                        <div className="text-[9px] text-slate-500 uppercase">Frachtraum</div>
+                        <div className="text-sm font-bold text-white">{s.totalScu} SCU</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-slate-500 uppercase">Max. Kistengröße</div>
+                        <div className="text-sm font-bold text-emerald-400">{s.maxContainerScu} SCU</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-[10px] text-slate-400">
+                      <span className="text-slate-500">Zugang: </span>
+                      <span className="text-slate-300 font-semibold">{s.cargoAccessType}</span>
+                    </div>
+
+                    <p className="mt-1 text-[10px] text-slate-400 line-clamp-2" title={s.notes}>
+                      {s.notes}
+                    </p>
+                  </div>
+
+                  <div className="mt-2 pt-1.5 border-t border-cyan-950 flex items-center justify-between text-[9px]">
+                    {s.requiresDockingCollar ? (
+                      <span className="text-rose-400 font-semibold flex items-center gap-1">
+                        ⚠️ Erfordert Docking Collar
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">✓ Planetenlandung möglich</span>
+                    )}
+                    <span className="text-cyan-400 hover:underline">Prüfen &rarr;</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ══ 3. Die 28 Loading-Dock Stationen ══ */}
+          <div className="sc-glass rounded-lg p-3.5 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Anchor className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold uppercase tracking-wider text-slate-200">
+                  Die 28 verifizierten Loading-Dock Stationen ({filteredDocks.length})
+                </span>
+              </div>
+
+              {/* System Filter */}
+              <div className="flex items-center gap-1 bg-[#02050c] p-0.5 rounded border border-cyan-950">
+                <span className="text-[9px] text-slate-500 uppercase px-1">System:</span>
+                {['all', 'Stanton', 'Pyro', 'Nyx'].map((sys) => (
+                  <button
+                    key={sys}
+                    onClick={() => setDockSystemFilter(sys)}
+                    className={`px-2 py-0.5 rounded text-[10px] ${
+                      dockSystemFilter === sys
+                        ? 'bg-cyan-900/60 text-cyan-300 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {sys === 'all' ? 'Alle Systeme' : sys}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+              {filteredDocks.map((d) => (
+                <div
+                  key={d.code}
+                  onClick={() => setEvalDest(d.displayName)}
+                  className="p-2 rounded bg-[#02050c] border border-cyan-950/80 hover:border-cyan-800 transition cursor-pointer flex flex-col justify-between text-xs"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-200 truncate" title={d.displayName}>
+                        {d.displayName}
+                      </span>
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-900">
+                        {d.system}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Orbit / Sektor: <strong className="text-slate-300">{d.body}</strong>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-1 border-t border-cyan-950/60 flex items-center justify-between text-[9px] text-emerald-400">
+                    <span>✓ Auto-Load Lift</span>
+                    <span>✓ Docking Collar</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB 4: SALVAGE & SCHROTT-BESTPREISE ══ */}
       {activeTab === 'salvage' && (
         <div className="flex-1 flex flex-col space-y-3 overflow-y-auto pr-1">
           <div className="sc-glass rounded-lg p-3.5 border border-amber-500/30 bg-amber-950/10 sc-hud-corner font-mono text-xs">

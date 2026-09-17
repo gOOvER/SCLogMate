@@ -27,6 +27,9 @@ public class TradeRouteDto
     [JsonPropertyName("autoLoadFee")] public long AutoLoadFee { get; set; }
     [JsonPropertyName("autoLoadSeconds")] public int AutoLoadSeconds { get; set; }
     [JsonPropertyName("boxBreakdown")] public string BoxBreakdown { get; set; } = "";
+    [JsonPropertyName("originHasDock")] public bool OriginHasDock { get; set; }
+    [JsonPropertyName("destinationHasDock")] public bool DestinationHasDock { get; set; }
+    [JsonPropertyName("dockWarning")] public string? DockWarning { get; set; }
 }
 
 public class SalvagePriceSummaryDto
@@ -112,6 +115,22 @@ public static class TradeRouteOptimizer
                 ? string.Join(", ", plan.Picks.Select(pk => $"{pk.Count}× {pk.Scu} SCU"))
                 : $"{actualScu} SCU";
 
+            bool originHasDock = CargoConstraints.HasLoadingDock(origin);
+            bool destHasDock = CargoConstraints.HasLoadingDock(destination);
+            string? dockWarning = null;
+            if (!originHasDock && !destHasDock)
+            {
+                dockWarning = "Kein Loading Dock (nur Standard-Lift / manuelle Verladung)";
+            }
+            else if (!originHasDock)
+            {
+                dockWarning = "Startort ohne Loading Dock (kein Auto-Load am Außenposten)";
+            }
+            else if (!destHasDock)
+            {
+                dockWarning = "Zielort ohne Loading Dock (kein Auto-Load am Außenposten)";
+            }
+
             routes.Add(new TradeRouteDto
             {
                 Id = $"{p.CommodityName}_{origin}_{destination}".Replace(" ", "_"),
@@ -132,7 +151,10 @@ public static class TradeRouteOptimizer
                 BoxCount = plan?.TotalBoxCount ?? 0,
                 AutoLoadFee = plan?.TotalAutoLoadFee ?? 0,
                 AutoLoadSeconds = plan?.TotalEstimatedSeconds ?? 0,
-                BoxBreakdown = boxBreakdown
+                BoxBreakdown = boxBreakdown,
+                OriginHasDock = originHasDock,
+                DestinationHasDock = destHasDock,
+                DockWarning = dockWarning
             });
         }
 

@@ -2035,6 +2035,32 @@ public class PhotinoBridge
                     SendResponse(req.Id, "salvage_prices_response", salvagePrices);
                     break;
 
+                case "get_cargo_ships":
+                    SendResponse(req.Id, "cargo_ships_response", CargoConstraints.Ships);
+                    break;
+
+                case "get_loading_docks":
+                    SendResponse(req.Id, "loading_docks_response", CargoConstraints.LoadingDocks);
+                    break;
+
+                case "evaluate_cargo_constraints":
+                    string? evalShip = null;
+                    string evalOrigin = "";
+                    string evalDest = "";
+                    int evalReqScu = 0;
+                    int evalBoxScu = 0;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("shipId", out var esProp)) evalShip = esProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("origin", out var eoProp)) evalOrigin = eoProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("destination", out var edProp)) evalDest = edProp.GetString() ?? "";
+                        if (req.Payload.Value.TryGetProperty("requiredScu", out var erProp)) evalReqScu = erProp.GetInt32();
+                        if (req.Payload.Value.TryGetProperty("containerScu", out var ecProp)) evalBoxScu = ecProp.GetInt32();
+                    }
+                    var evalResult = CargoConstraints.EvaluateRoute(evalShip, evalOrigin, evalDest, evalReqScu, evalBoxScu);
+                    SendResponse(req.Id, "evaluate_cargo_constraints_response", evalResult);
+                    break;
+
                 case "get_combat_analytics":
                     string? combatSession = null;
                     if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("session", out var csProp))
