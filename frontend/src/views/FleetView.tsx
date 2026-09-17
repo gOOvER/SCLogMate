@@ -892,17 +892,19 @@ export const FleetView: React.FC = () => {
       )}
 
       {/* ══ MODAL: SCHIFFS-VERGLEICH ══ */}
-      <ShipCompareModal
-        isOpen={isCompareModalOpen}
-        onClose={() => setIsCompareModalOpen(false)}
-        initialShipA={compareShipA}
-        initialShipB={compareShipB}
-        fleetShips={ships}
-        catalog={fleetData?.catalog || []}
-        onOpenWikiDossier={(sName) => {
-          window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: sName }));
-        }}
-      />
+      {isCompareModalOpen && (
+        <ShipCompareModal
+          isOpen={isCompareModalOpen}
+          onClose={() => setIsCompareModalOpen(false)}
+          initialShipA={compareShipA}
+          initialShipB={compareShipB}
+          fleetShips={ships}
+          catalog={fleetData?.catalog || []}
+          onOpenWikiDossier={(sName) => {
+            window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: sName }));
+          }}
+        />
+      )}
     </div>
   );
 };

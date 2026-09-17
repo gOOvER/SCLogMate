@@ -29,17 +29,32 @@ public sealed record SpeedPipGroup(
     double CombinedAlpha
 );
 
+public sealed record GunVelocityInfo(
+    string GunName,
+    double SpeedMps,
+    string AmmoType,
+    string Category
+);
+
 /// <summary>
 /// Analyse-Ergebnis der Vorhaltepunkte (Pips) für ein Schiffsloadout.
 /// </summary>
 public sealed record PipsEvaluationResult(
-    int PipsCount,
-    string Status,             // Synchronized (1), Mismatched (2+), NoGuns (0)
-    string StatusBadge,        // "1 Pip · Synchronisiert 🟢", "2 Pips · Geteilt 🟡"
-    string Description,
-    double TotalPilotDps,
-    double TotalAlphaDamage,
-    IReadOnlyList<SpeedPipGroup> Groups
+    int PipCount,
+    bool IsSynchronized,
+    IReadOnlyList<double> SpeedsMps,
+    double SpeedSpreadMps,
+    string Rating,
+    string SummaryBadge,
+    string Advice,
+    IReadOnlyList<GunVelocityInfo> Guns,
+    double TotalPilotDps = 0,
+    double TotalAlphaDamage = 0,
+    int PipsCount = 0,
+    string Status = "",
+    string StatusBadge = "",
+    string Description = "",
+    IReadOnlyList<SpeedPipGroup>? Groups = null
 );
 
 /// <summary>
@@ -229,13 +244,28 @@ public static partial class PipsAnalyzer
             description = $"Kritisch: Waffen sind über {pipsCount} unterschiedliche Geschwindigkeiten verteilt. Zielgenaues Feuern im Dogfight ist kaum möglich.";
         }
 
+        var speedsList = groups.Select(g => g.SpeedMps).ToList();
+        double speedSpread = speedsList.Count > 1 ? (speedsList.Max() - speedsList.Min()) : 0;
+        bool isSync = pipsCount == 1;
+        string rating = isSync ? "Perfect" : (pipsCount == 2 ? "Compatible" : "SplitPips");
+        string summaryBadge = isSync ? $"1 Pip ({speedsList[0]:N0} m/s)" : $"{pipsCount} Pips ({string.Join(" / ", speedsList.Select(s => $"{s:N0}"))} m/s)";
+        var gunVelocities = resolvedGuns.Select(g => new GunVelocityInfo(g.Name, g.AmmoSpeed, g.DamageType, g.DamageType)).ToList();
+
         return new PipsEvaluationResult(
+            PipCount: pipsCount,
+            IsSynchronized: isSync,
+            SpeedsMps: speedsList,
+            SpeedSpreadMps: speedSpread,
+            Rating: rating,
+            SummaryBadge: summaryBadge,
+            Advice: description,
+            Guns: gunVelocities,
+            TotalPilotDps: totalDps,
+            TotalAlphaDamage: totalAlpha,
             PipsCount: pipsCount,
             Status: status,
             StatusBadge: badge,
             Description: description,
-            TotalPilotDps: totalDps,
-            TotalAlphaDamage: totalAlpha,
             Groups: groups
         );
     }
@@ -299,12 +329,20 @@ public static partial class PipsAnalyzer
 
     private static PipsEvaluationResult EmptyResult() =>
         new(
+            PipCount: 0,
+            IsSynchronized: false,
+            SpeedsMps: Array.Empty<double>(),
+            SpeedSpreadMps: 0,
+            Rating: "NoGuns",
+            SummaryBadge: "Keine Waffen",
+            Advice: "Keine Pilotengeschütze für die Ballistik-Analyse erfasst.",
+            Guns: Array.Empty<GunVelocityInfo>(),
+            TotalPilotDps: 0,
+            TotalAlphaDamage: 0,
             PipsCount: 0,
             Status: "NoGuns",
             StatusBadge: "Keine Waffen",
             Description: "Keine Pilotengeschütze für die Ballistik-Analyse erfasst.",
-            TotalPilotDps: 0,
-            TotalAlphaDamage: 0,
             Groups: Array.Empty<SpeedPipGroup>()
         );
 

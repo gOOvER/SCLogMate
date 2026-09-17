@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Hangar View Blank Screen Fix (`Core/PipsAnalyzer.cs`, `PipsAnalyzerBadge.tsx`, `ShipCompareModal.tsx`, `FleetView.tsx`)**:
+  - Fixed a critical JavaScript runtime exception causing `FleetView` to unmount and render a blank white screen upon entering the Hangar view.
+  - Aligned backend `PipsEvaluationResult` C# record properties (`PipCount`, `IsSynchronized`, `SpeedsMps`, `SpeedSpreadMps`, `Rating`, `SummaryBadge`, `Advice`, `Guns`) with frontend expectations so camelCase serialization matches TypeScript types directly.
+  - Hardened `PipsAnalyzerBadge` and `ShipCompareModal` with defensive array validations (`Array.isArray(speedsMps)`) and safe null checks for `storeLocations` and ship names.
+  - Deferred rendering of `ShipCompareModal` until explicitly opened to prevent premature state evaluation during initial fleet loading.
 - **Star Citizen 4.10 Log Compatibility & Ship Channel Parser Fix (`Core/ShipChannel.cs`, `Core/LogParser.cs`, `Core/Database.cs`)**:
   - Fixed a critical defect where `ShipChannel.Tail()` checked `StartsWith(prefix)` against full raw log lines, causing all ship channel boarding notifications to be silently skipped.
   - Added support for ship channel exit notifications (`You have left the channel '...'`, `You have left channel '...'`, and German localization variants) and introduced `ChannelMoment.YouLeft` to accurately track ship sorties and pilot seat departures.

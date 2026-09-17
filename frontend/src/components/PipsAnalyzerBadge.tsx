@@ -16,12 +16,14 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  if (!pipsResult || pipsResult.rating === 'NoGuns') {
+  if (!pipsResult || pipsResult.rating === 'NoGuns' || (pipsResult.pipCount ?? 0) === 0) {
     return null;
   }
 
-  const isSync = pipsResult.isSynchronized;
-  const pipCount = pipsResult.pipCount;
+  const isSync = Boolean(pipsResult.isSynchronized || pipsResult.pipCount === 1);
+  const pipCount = pipsResult.pipCount ?? 1;
+  const speeds = Array.isArray(pipsResult.speedsMps) ? pipsResult.speedsMps : [];
+  const guns = Array.isArray(pipsResult.guns) ? pipsResult.guns : [];
 
   // Colors & Badges based on QuantumWake & SCLeadPips logic
   const bgClass = isSync
@@ -42,7 +44,7 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
       : pipsResult.summaryBadge || '1 Pip · Synchr.'
     : compact
     ? `${pipCount} Pips`
-    : `${pipCount} Pips · Geteilt`;
+    : pipsResult.summaryBadge || `${pipCount} Pips · Geteilt`;
 
   return (
     <div
@@ -52,7 +54,7 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
     >
       <div
         className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium transition-all duration-150 cursor-help ${bgClass}`}
-        title={!showTooltip ? pipsResult.advice : undefined}
+        title={!showTooltip ? pipsResult.advice || pipsResult.summaryBadge : undefined}
       >
         <span className={`w-2 h-2 rounded-full shrink-0 animate-pulse ${dotClass}`} />
         <span>{label}</span>
@@ -75,15 +77,17 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
             </span>
           </div>
 
-          <p className="text-[11px] text-slate-300 leading-relaxed mb-2.5">
-            {pipsResult.advice}
-          </p>
+          {pipsResult.advice && (
+            <p className="text-[11px] text-slate-300 leading-relaxed mb-2.5">
+              {pipsResult.advice}
+            </p>
+          )}
 
-          {pipsResult.speedsMps.length > 0 && (
+          {speeds.length > 0 && (
             <div className="space-y-1 text-[10px] font-mono">
               <div className="text-slate-400 font-sans text-[10px] mb-0.5">Projektil-Geschwindigkeiten:</div>
               <div className="flex flex-wrap gap-1">
-                {pipsResult.speedsMps.map((s, idx) => (
+                {speeds.map((s, idx) => (
                   <span
                     key={idx}
                     className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-cyan-300"
@@ -95,10 +99,10 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
             </div>
           )}
 
-          {pipsResult.guns && pipsResult.guns.length > 0 && (
+          {guns.length > 0 && (
             <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
               <div className="text-slate-400 font-sans text-[10px]">Erkannte Bewaffnung:</div>
-              {pipsResult.guns.map((g, idx) => (
+              {guns.map((g, idx) => (
                 <div key={idx} className="flex items-center justify-between text-[10px] text-slate-300">
                   <span className="truncate max-w-[170px]" title={g.gunName}>
                     {g.gunName}

@@ -30,18 +30,20 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
   // Available ship options (unique by normalized name)
   const shipOptions = useMemo(() => {
     const map = new Map<string, { name: string; manufacturer: string; inHangar: boolean }>();
-    fleetShips.forEach((s) => {
+    (fleetShips || []).forEach((s) => {
+      if (!s?.name) return;
       map.set(s.name.toLowerCase(), {
         name: s.name,
-        manufacturer: s.manufacturer,
-        inHangar: s.isInHangar,
+        manufacturer: s.manufacturer || '',
+        inHangar: Boolean(s.isInHangar),
       });
     });
-    catalog.forEach((c) => {
+    (catalog || []).forEach((c) => {
+      if (!c?.name) return;
       if (!map.has(c.name.toLowerCase())) {
         map.set(c.name.toLowerCase(), {
           name: c.name,
-          manufacturer: c.manufacturer,
+          manufacturer: c.manufacturer || '',
           inHangar: false,
         });
       }
@@ -53,11 +55,11 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
     });
   }, [fleetShips, catalog]);
 
-  const defaultShipA = initialShipA || fleetShips[0]?.name || catalog[0]?.name || 'Cutlass Black';
+  const defaultShipA = initialShipA || fleetShips?.[0]?.name || catalog?.[0]?.name || 'Cutlass Black';
   const defaultShipB =
     initialShipB ||
-    fleetShips.find((s) => s.name.toLowerCase() !== defaultShipA.toLowerCase())?.name ||
-    catalog.find((c) => c.name.toLowerCase() !== defaultShipA.toLowerCase())?.name ||
+    fleetShips?.find((s) => s?.name && s.name.toLowerCase() !== defaultShipA.toLowerCase())?.name ||
+    catalog?.find((c) => c?.name && c.name.toLowerCase() !== defaultShipA.toLowerCase())?.name ||
     'Freelancer';
 
   const [shipA, setShipA] = useState<string>(defaultShipA);
@@ -340,9 +342,9 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
 
                     <div className="space-y-1.5 pt-1">
                       <div className="text-[11px] font-semibold text-slate-300">
-                        Verfügbare Stationen ({sideA.storeLocations.length}):
+                        Verfügbare Stationen ({(sideA.storeLocations || []).length}):
                       </div>
-                      {sideA.storeLocations.length === 0 ? (
+                      {(!sideA.storeLocations || sideA.storeLocations.length === 0) ? (
                         <div className="text-xs text-slate-500 italic">
                           Keine In-Game Händlerdaten hinterlegt.
                         </div>
@@ -385,9 +387,9 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
 
                     <div className="space-y-1.5 pt-1">
                       <div className="text-[11px] font-semibold text-slate-300">
-                        Verfügbare Stationen ({sideB.storeLocations.length}):
+                        Verfügbare Stationen ({(sideB.storeLocations || []).length}):
                       </div>
-                      {sideB.storeLocations.length === 0 ? (
+                      {(!sideB.storeLocations || sideB.storeLocations.length === 0) ? (
                         <div className="text-xs text-slate-500 italic">
                           Keine In-Game Händlerdaten hinterlegt.
                         </div>
