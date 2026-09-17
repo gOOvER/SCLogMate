@@ -2136,7 +2136,7 @@ public partial class MainViewModel : ObservableObject
     public string IncomeTotalText => FinanceIncomeTotalText;
     public string SpendTotalText => FinanceSpendTotalText;
 
-    // Interaktives Sci-Fi Finanz-Diagramm (QuantumWake-Stil)
+    // Interaktives Sci-Fi Finanz-Diagramm
     public ObservableCollection<FinanceTimelinePoint> FinanceChartPoints { get; } = new();
 
     int _selectedFinanceChartMode = 0;

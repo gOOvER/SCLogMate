@@ -11,7 +11,7 @@ using SCLogMate.Models;
 namespace SCLogMate.Views;
 
 /// <summary>
-/// Interaktives Sci-Fi Vektor-Diagramm im Stil von QuantumWake.
+/// Interaktives Sci-Fi Vektor-Diagramm.
 /// Unterstützt kumulierte Zeitreihen (Einnahmen vs. Ausgaben mit Gradient-Flächen),
 /// Netto-Gewinnverlauf sowie Cashflow-Balken mit Maus-Hover und mobiGlas-Tooltips.
 /// </summary>

@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **StarCitizenWiki / scunpacked-data Dynamic Community Data Engine (`Core/Community/CommunityData.cs`, `PhotinoBridge.cs`, `PipsAnalyzer.cs`, `photinoBridge.ts`, `SettingsView.tsx`)**:
-  - Ported the full dynamic `CommunityData` subsystem from QuantumWake into SCLogMate, establishing an automated ingestion and digestion pipeline directly from [StarCitizenWiki/scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data).
+  - Implemented the full dynamic `CommunityData` subsystem, establishing an automated ingestion and digestion pipeline directly from [StarCitizenWiki/scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data).
   - Downloads and digests all 11 core data files (`ships.json`, `ship-items.json`, `commodities.json`, `commodity_trade_locations.json`, `fps-items.json`, `blueprints.json`, `resources.json`, `locations.json`, `starmap.json`, `starmap_positions.json`, `manufacturers.json`) into high-speed local caches in `%APPDATA%\SCLogMate\community\digest-*.json`.
   - Enables sub-100ms cold startup loading of over 750 commodities, 180+ ships and vehicles, 5,000+ weapons and armor items, 1,600+ ship components, and crafting blueprints entirely offline.
   - Added dynamic game build and patch version tracking, matching GitHub commit dump stamps (e.g. `4.10.0-LIVE.12519617`) against active `Game.log` build numbers to notify pilots when dataset updates are available.
@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrates direct in-game vendor pricing and rental rates across all universe dealerships (New Deal, Astro Armada, etc.) with advantage highlights and quick swap (`⇄`).
   - Added personal flight telemetry comparison contrasting sorties flown, quantum jumps completed, loss counts, and last recorded flight dates for each hull.
 - **Weapon Ballistics & Lead-Pips Analyzer (`Core/PipsAnalyzer.cs`, `PipsAnalyzerBadge.tsx`, `FleetView.tsx`, `PhotinoBridge.cs`)**:
-  - Implemented Star Citizen projectile muzzle velocity analyzer based on QuantumWake v0.13 mechanics, computing distinct targeting lead pips calculated by the game's HUD.
+  - Implemented Star Citizen projectile muzzle velocity analyzer, computing distinct targeting lead pips calculated by the game's HUD.
   - Automatically verifies whether pilot weapons share identical projectile velocity (e.g. 1,480 m/s for laser repeaters or 1,332 m/s for ballistic gatlings) resulting in a single synchronized reticle (`1 Pip`), or produce split lead pips (`2+ Pips`) where aim is divided and weapon groups miss.
   - Added visual `PipsAnalyzerBadge` with real-time status pills (Synchronized, Split Pips) and detailed hover flyouts breaking down equipped gun types, projectile speeds, velocity spreads, and tactical outfitting advice.
 - **Privacy Masking & Sanitized Diagnostic Reports (`Core/DiagnosticsRedactor.cs`, `SettingsView.tsx`, `PhotinoBridge.cs`)**:

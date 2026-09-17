@@ -681,7 +681,7 @@ export const StarmapView: React.FC<StarmapViewProps> = ({ telemetry }) => {
               );
             })}
 
-            {/* LIVE "YOU ARE HERE" PLAYER MARKER (QuantumWake drawHere port) */}
+            {/* LIVE "YOU ARE HERE" PLAYER MARKER */}
             {playerLocationObject && (
               <g className="map-player-here pointer-events-none" filter="url(#here-glow)">
                 {(() => {

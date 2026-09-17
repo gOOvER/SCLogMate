@@ -148,7 +148,7 @@ public sealed class WalletCapture : IDisposable
                     Logger.Log($"OCR Grab {grab}: '{bestText?.Trim()}' -> {val:N0} aUEC");
 
                     // Cross-Grab Bestätigung: Derselbe Wert muss 2× im Burst gelesen werden,
-                    // um OCR-Fehllesungen auszuschließen (NexusApp-Muster).
+                    // um OCR-Fehllesungen auszuschließen.
                     if (seen.Contains(val))
                     {
                         Finish("confirmed");

@@ -39,7 +39,7 @@ public sealed record ShipConstraintEvaluationResult(
 );
 
 /// <summary>
-/// Das Register aller 28 verifizierten Loading-Dock-Stationen (NexusApp / DataCore Referenz)
+/// Das Register aller 28 verifizierten Loading-Dock-Stationen (DataCore Referenz)
 /// und Cargo-Schiff-Restriktionen (Hangar-Größen, Docking-Collars, Max-Container-Größen).
 /// </summary>
 public static class CargoConstraints

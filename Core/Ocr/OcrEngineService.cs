@@ -68,7 +68,7 @@ public sealed class OcrEngineService : IDisposable
         }
     }
 
-    /// <summary>Einfacher OCR-Durchlauf für allgemeinen Text (NexusApp Invert+Kontrast Muster für maximale Geschwindigkeit).</summary>
+    /// <summary>Einfacher OCR-Durchlauf für allgemeinen Text (Invert+Kontrast Muster für maximale Geschwindigkeit).</summary>
     public async Task<string?> RecognizeSinglePassAsync(byte[] bgra, int w, int h, int scale = 1, int padding = 12)
     {
         if (!IsAvailable || _engine == null || bgra.Length == 0)

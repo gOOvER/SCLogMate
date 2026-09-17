@@ -8,7 +8,6 @@ namespace SCLogMate.Core.Ocr;
 /// <summary>
 /// Pollt den Auftragsbereich im 1000ms-Intervall, extrahiert angenommene Aufträge aus dem
 /// "ACCEPTED"-Tab im mobiGlas und meldet neue/aktualisierte Verträge an das ViewModel.
-/// Basiert auf dem bewährten NexusApp-Muster.
 /// </summary>
 public sealed class ContractScanner : IDisposable
 {

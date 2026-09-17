@@ -78,7 +78,7 @@ public sealed partial class RsOcrScanner : IDisposable
         int capX, capY, capW, capH;
         if (region != null && region.IsValid)
         {
-            // Genau die vom Benutzer kalibrierte Region erfassen (NexusApp Standard - keine Verfälschung durch Margins)
+            // Genau die vom Benutzer kalibrierte Region erfassen (keine Verfälschung durch Margins)
             capX = region.X;
             capY = region.Y;
             capW = region.Width;
@@ -438,7 +438,7 @@ public sealed partial class RsOcrScanner : IDisposable
             }
         }
 
-        // Priorität 5: Jeder gültige RS-Kandidat im Bereich 2.000 bis 200.000 (NexusApp Standard)
+        // Priorität 5: Jeder gültige RS-Kandidat im Bereich 2.000 bis 200.000
         // Verhindert, dass ungelistete Signaturen, Wracks oder Ping-Zahlen im Scanbereich ignoriert werden!
         foreach (var cand in orderedCandidates)
         {

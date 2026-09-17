@@ -596,7 +596,7 @@
             </Border>
           </Grid>
 
-          <!-- ══ 2. Interaktives Sci-Fi Vektor-Diagramm (QuantumWake-Stil) ══ -->
+          <!-- ══ 2. Interaktives Sci-Fi Vektor-Diagramm ══ -->
           <Border Classes="card">
             <StackPanel Spacing="10">
               <!-- Chart Header & Controls -->
@@ -2271,7 +2271,7 @@
             </DockPanel>
           </Border>
 
-          <!-- Rechte Spalte: Detail-Inspektor & Session-Analysen (wie QuantumWake) -->
+          <!-- Rechte Spalte: Detail-Inspektor & Session-Analysen -->
           <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="10">
               

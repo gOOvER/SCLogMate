@@ -25,7 +25,7 @@ export const PipsAnalyzerBadge: React.FC<PipsAnalyzerBadgeProps> = ({
   const speeds = Array.isArray(pipsResult.speedsMps) ? pipsResult.speedsMps : [];
   const guns = Array.isArray(pipsResult.guns) ? pipsResult.guns : [];
 
-  // Colors & Badges based on QuantumWake & SCLeadPips logic
+  // Colors & Badges based on projectile speed thresholds
   const bgClass = isSync
     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
     : pipCount === 2
