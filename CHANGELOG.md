@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Star Citizen 4.10 Log Compatibility & Ship Channel Parser Fix (`Core/ShipChannel.cs`, `Core/LogParser.cs`, `Core/Database.cs`)**:
+  - Fixed a critical defect where `ShipChannel.Tail()` checked `StartsWith(prefix)` against full raw log lines, causing all ship channel boarding notifications to be silently skipped.
+  - Added support for ship channel exit notifications (`You have left the channel '...'`, `You have left channel '...'`, and German localization variants) and introduced `ChannelMoment.YouLeft` to accurately track ship sorties and pilot seat departures.
+  - Updated `RefineryLineRegex` to capture Star Citizen 4.10 refinery completion notifications (`A Refinery Work Order has been Completed at <Location>:`) with clean location formatting (`Veredelung fertig (<Location>)`).
+  - Expanded jurisdiction notification parsing to recognize planetary jurisdictions (Hurston Dynamics, Crusader Industries, microTech, ArcCorp, People's Alliance / Nyx, Rough & Ready / Pyro, Green / Pyro, UEE / Stanton) and Comm-Array status transitions (`Entered Monitored Space`, `Exited Monitored Space`).
+  - Enhanced fine payment regex to support optional currency tokens (`aUEC`, `credits`) and trimmed trailing colons from categorized notifications (e.g. `Vehicle Impounded`).
+  - Bumped `CurrentParserVersion` to 36 in `Core/Database.cs` to allow automatic rebuilding and indexing of ship boarding/leaving events and refinery work orders from archived logs.
 - **Hangar & Fleet False Ship Entries (`Core/FleetCatalog.cs`, `Core/Database.cs`, `Core/LogParser.cs`, `PhotinoBridge.cs`)**:
   - Fixed locations, stations, landing zones (e.g. Levski, Area 18), and raw log tokens (e.g. `entitlementURN`) erroneously appearing as ships with dozens of recorded flights in Hangar / Fleet management.
   - Corrected inventory movements (`FillUnstowRequest`, warehouse moves) and refinery job events to no longer assign local station/location names to the `Ship` attribute.
@@ -26,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **RSI Hermes & MISC Hull B Catalog Integration (`Core/FleetCatalog.cs`, `Core/CargoConstraints.cs`)**:
+  - Integrated `RSI Hermes` (medium freighter & gunship, 120 SCU, 32 SCU max container clearance) into `FleetCatalog` and `CargoConstraints`.
+  - Added `MISC Hull B` (medium spindle freighter, 384 SCU, 32 SCU clearance) into `CargoConstraints`.
 - **SCMDB Blueprint Sync & Org Network Coverage Gap Analysis (`Core/ScmdbService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `BlueprintsView.tsx`)**:
   - Implemented headless SCMDB (scmdb.net) v3 JSON export parser and add-only import planner with safe 5 MB file size guards and error resilience against malformed or missing attributes.
   - Added robust canonical name resolution fuzzy-mapping raw SCMDB names against the 400+ blueprints in the Star Citizen catalog.

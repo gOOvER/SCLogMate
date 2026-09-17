@@ -153,6 +153,8 @@ public static class CargoConstraints
         new("rsi-zeus-mk-ii-cl", "Zeus Mk II CL", "Roberts Space Industries", 128, 32, "M", false, true, "Heckrampe & Frachtlift", "Dedizierter Medium-Frachter mit Traktorstrahl"),
         new("argo-raft", "RAFT", "Argo Astronautics", 96, 32, "M", false, true, "3x Externe Frachtcontainer-Klemmen", "Nimmt 3x standardisierte 32 SCU CCT-Container auf"),
         new("misc-hull-a", "Hull A", "MISC", 64, 32, "M", false, true, "Externe Ausfahr-Spindeln", "Kompakter Frachter mit externen Klemmen bis 32 SCU"),
+        new("misc-hull-b", "Hull B", "MISC", 384, 32, "M", false, true, "Externe Ausfahr-Spindeln", "Mittlerer Frachter mit externen Klemmen für bis zu 32 SCU Boxen (384 SCU)"),
+        new("rsi-hermes", "Hermes", "Roberts Space Industries", 120, 32, "M", false, true, "Breite Heckrampe", "Mittlerer Frachter & Allrounder mit Heckrampe für bis zu 32 SCU Container (120 SCU)"),
 
         // 24 SCU Clearance
         new("orig-400i", "400i", "Origin Jumpworks", 42, 24, "M", false, true, "Bauch-Frachtlift", "Maximal 24 SCU Containerhöhe im Bauchaufzug"),

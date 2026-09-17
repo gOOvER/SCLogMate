@@ -224,7 +224,7 @@ public partial class LogParser
     private static partial Regex EquipLootRegex();
 
     // Bußgeld gezahlt (mit Betrag) – echtes aUEC raus, fließt in den Saldo.
-    [GeneratedRegex(@"Added notification ""(?:Strafe gezahlt|Fine paid|Penalty paid|Fined):?\s*(?<amt>[\d.,]+)")]
+    [GeneratedRegex(@"Added notification ""(?:Strafe gezahlt|Fine paid|Penalty paid|Fined):?\s*(?<amt>[\d.,]+)(?:\s*(?:a?UEC|credits))?")]
     private static partial Regex FineLineRegex();
 
     // Begangene Straftat (Crimestat-Verlauf).
@@ -232,7 +232,7 @@ public partial class LogParser
     private static partial Regex CrimeLineRegex();
 
     // Veredelungs-/Refinery-Auftrag abgeschlossen.
-    [GeneratedRegex(@"Added notification ""(?:Ein Auftrag zur Veredelung wurde abgeschlossen|A refining job has completed|Refining order completed|Refinery job complete)(?<txt>[^""]*)")]
+    [GeneratedRegex(@"Added notification ""(?:Ein Auftrag zur Veredelung wurde abgeschlossen|Ein Raffinerie-Arbeitsauftrag wurde abgeschlossen|A refining job has completed|Refining order completed|Refinery job complete|A Refinery Work Order has been Completed)(?<txt>[^""]*)")]
     private static partial Regex RefineryLineRegex();
 
     // Verletzung/Lähmung festgestellt (Schweregrad + Körperteil + Behandlungsstufe).
@@ -1122,6 +1122,17 @@ public partial class LogParser
                         : $"Schiff betreten: {note.Ship} (Eigner: {note.Owner})";
                     return new LogEntry { Time = note.At, Kind = EventKind.Vehicle, Detail = desc, Ship = note.Ship };
                 }
+                else if (note.Moment == ChannelMoment.YouLeft)
+                {
+                    CurrentShipOwner = null;
+                    _currentShipCrew.Clear();
+                    bool isMyShip = string.Equals(note.Owner, LocalHandle, StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase);
+                    string desc = isMyShip
+                        ? $"Eigenes Schiff verlassen: {note.Ship}"
+                        : $"Schiff verlassen: {note.Ship} (Eigner: {note.Owner})";
+                    return new LogEntry { Time = note.At, Kind = EventKind.Vehicle, Detail = desc, Ship = note.Ship };
+                }
                 else if (note.Moment == ChannelMoment.TheyBoarded)
                 {
                     if (!string.IsNullOrEmpty(note.Handle))
@@ -1190,15 +1201,59 @@ public partial class LogParser
                     if (_lastLoc == null || _lastLoc == "—") _lastLoc = "Delamar";
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: People's Alliance (Nyx)" };
                 }
-                if (text.Contains("UEE Jurisdiction", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet der UEE", StringComparison.OrdinalIgnoreCase))
+                if (text.Contains("Hurston Dynamics", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Stanton";
+                    Locations.ActiveSystem = "Stanton";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: Hurston Dynamics (Stanton)" };
+                }
+                if (text.Contains("Crusader Industries", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Stanton";
+                    Locations.ActiveSystem = "Stanton";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: Crusader Industries (Stanton)" };
+                }
+                if (text.Contains("microTech", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Stanton";
+                    Locations.ActiveSystem = "Stanton";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: microTech (Stanton)" };
+                }
+                if (text.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Stanton";
+                    Locations.ActiveSystem = "Stanton";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: ArcCorp (Stanton)" };
+                }
+                if (text.Contains("Rough & Ready", StringComparison.OrdinalIgnoreCase) || text.Contains("Rough and Ready", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Pyro";
+                    Locations.ActiveSystem = "Pyro";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: Rough & Ready (Pyro)" };
+                }
+                if (text.Contains("Rechtsgebiet von Green", StringComparison.OrdinalIgnoreCase) || text.Contains("Green Jurisdiction", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentSystem = "Pyro";
+                    Locations.ActiveSystem = "Pyro";
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: Green (Pyro)" };
+                }
+                if (text.Contains("UEE Jurisdiction", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet der UEE", StringComparison.OrdinalIgnoreCase) || text.Contains("Rechtsgebiet von UEE", StringComparison.OrdinalIgnoreCase))
                 {
                     _currentSystem = "Stanton";
                     Locations.ActiveSystem = "Stanton";
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🏛 Rechtsgebiet: UEE (Stanton)" };
                 }
-                if (text.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) || text.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase))
+                if (text.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) || text.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase) || text.Contains("Unregiert", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = $"🏴 Ungesetzlicher Sektor ({_currentSystem})" };
+                }
+                if (text.Contains("Entered Monitored Space", StringComparison.OrdinalIgnoreCase) || text.Contains("Kontrollierten Raum betreten", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "📡 Überwachter Raum (Comm-Array aktiv)" };
+                }
+                if (text.Contains("Exited Monitored Space", StringComparison.OrdinalIgnoreCase) || text.Contains("Kontrollierten Raum verlassen", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "📡 Unüberwachter Raum (Kein Comm-Array)" };
                 }
                 if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) || text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
                 {
@@ -2387,8 +2442,11 @@ public partial class LogParser
             var rf = RefineryLineRegex().Match(line);
             if (rf.Success)
             {
-                var where = rf.Groups["txt"].Value.Trim().TrimStart('.').Trim().TrimEnd('.');
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Refinery, Detail = where.Length > 0 ? $"Veredelung fertig {where}" : "Veredelung fertig" };
+                var where = rf.Groups["txt"].Value.Trim().Trim(' ', ':', '.');
+                if (where.StartsWith("at ", StringComparison.OrdinalIgnoreCase)) where = where[3..].Trim();
+                else if (where.StartsWith("bei ", StringComparison.OrdinalIgnoreCase) || where.StartsWith("in ", StringComparison.OrdinalIgnoreCase)) where = where[4..].Trim();
+                where = where.TrimEnd(' ', ':');
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Refinery, Detail = where.Length > 0 ? $"Veredelung fertig ({where})" : "Veredelung fertig" };
             }
 
             // Verletzung/Lähmung festgestellt (Körperteil + Behandlungsstufe)
@@ -2420,7 +2478,10 @@ public partial class LogParser
 
                 var kind = Categorize(txt);
                 if (kind != null)
-                    return new LogEntry { Time = ParseTs(line), Kind = kind.Value, Detail = txt };
+                {
+                    var cleanTxt = txt.TrimEnd(' ', ':');
+                    return new LogEntry { Time = ParseTs(line), Kind = kind.Value, Detail = cleanTxt };
+                }
 
                 // Chat / Channel-Meldungen ignorieren
                 if (txt.Contains("left the channel", StringComparison.OrdinalIgnoreCase) || txt.Contains("joined channel", StringComparison.OrdinalIgnoreCase))

@@ -121,6 +121,7 @@ public static class FleetCatalog
         ["Perseus"] = new("Perseus · RSI", "RSI", "RSI", "#60A5FA", "Schweres Kanonenboot (S7)", 25_000_000, 675, "LTI (Lifetime)"),
         ["Arrastra"] = new("Arrastra · RSI", "RSI", "RSI", "#60A5FA", "Industrieller Tiefen-Bergbaukreuzer", 22_000_000, 575, "LTI (Lifetime)"),
         ["Polaris"] = new("Polaris · RSI", "RSI", "RSI", "#60A5FA", "Korvette & Torpedo-Flaggschiff", 55_000_000, 750, "LTI (Lifetime)"),
+        ["Hermes"] = new("Hermes · RSI", "RSI", "RSI", "#60A5FA", "Mittlerer Frachttransporter & Allrounder (120 SCU)", 4_200_000, 160, "LTI (Lifetime)"),
 
         // MISC - Musashi Industrial & Starflight Concern (#A78BFA)
         ["Prospector"] = new("Prospector · MISC", "MISC", "MISC", "#A78BFA", "Industrieller Bergbaulaser (Mining)", 2_850_000, 155, "120 Monate (IAE)"),
