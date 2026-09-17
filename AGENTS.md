@@ -38,12 +38,17 @@ section in the same commit. Use the Keep a Changelog categories:
 
 After making changes, always perform a publish build into `publish/` to verify and produce the ready-to-use release binary. **Before building**, check whether SCLogMate is already running — the build will fail if the exe is locked:
 
+**CRITICAL CPU THROTTLING RULE**: Never build with full unconstrained CPU! Always limit MSBuild to 4 cores (`-m:4`) and lower the process priority to `BelowNormal` so Torsten's system never stutters or lags:
+
 ```powershell
 # Kill running instance if needed (locked exe blocks the build)
 Stop-Process -Name SCLogMate -Force -ErrorAction SilentlyContinue
 
-# Publish build (single-file exe into publish/)
-dotnet publish -c Release -r win-x64 --self-contained true `
+# Set process priority to BelowNormal so system/games/apps stay completely responsive
+[System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = 'BelowNormal'
+
+# Publish build with throttled CPU (-m:4)
+dotnet publish -c Release -r win-x64 --self-contained true -m:4 `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
   -o publish
@@ -90,8 +95,9 @@ reference implementations for preprocessing (scale, invert, contrast, padding).
 
 ## Build
 
-- **Debug**: `dotnet build` — fast iteration
-- **Release/Publish**: `dotnet publish -c Release -r win-x64 --self-contained true -o publish`
+- **CPU Throttling**: Never run builds with unconstrained CPU! Always limit MSBuild with `-m:4` and set PowerShell process priority to `BelowNormal` so the system remains responsive.
+- **Debug**: `dotnet build -m:4` — fast iteration
+- **Release/Publish**: `dotnet publish -c Release -r win-x64 --self-contained true -m:4 -o publish`
 - **Full release**: `.\release.ps1` (builds, signs, tags, creates GitHub release)
 
 The publish output is `publish\SCLogMate.exe` (single-file, self-contained).
