@@ -4,6 +4,7 @@ import {
   PlaceItemDto,
   UserPoiDto,
   CopiedLocationReading,
+  ExecHangarSnapshotDto,
 } from '../services/photinoBridge';
 import {
   Compass,
@@ -16,13 +17,18 @@ import {
   Navigation,
   Crosshair,
   Radio,
+  ShieldAlert,
+  Shield,
+  RotateCcw,
+  Zap,
 } from 'lucide-react';
 
 export const PlacesView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'starmap' | 'pois'>('pois');
+  const [activeTab, setActiveTab] = useState<'starmap' | 'pois' | 'contested'>('pois');
   const [places, setPlaces] = useState<PlaceItemDto[]>([]);
   const [userPois, setUserPois] = useState<UserPoiDto[]>([]);
   const [lastCopiedLoc, setLastCopiedLoc] = useState<CopiedLocationReading | null>(null);
+  const [execHangar, setExecHangar] = useState<ExecHangarSnapshotDto | null>(null);
   const [search, setSearch] = useState<string>('');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -65,10 +71,48 @@ export const PlacesView: React.FC = () => {
     } catch { }
   };
 
+  const fetchExecHangar = async () => {
+    try {
+      const res = await bridge.sendRequest<ExecHangarSnapshotDto>('get_exec_hangar_status');
+      if (res) setExecHangar(res);
+    } catch (err) {
+      console.error('Failed to load exec hangar status:', err);
+    }
+  };
+
+  const handleReanchor = async () => {
+    if (!window.confirm('Executive Hangar jetzt auf diesen Moment neu kalibrieren?\n\nKlicke nur auf Bestätigen im exakten Moment, in dem der Hangar im Spiel öffnet!')) return;
+    try {
+      const res = await bridge.sendRequest<ExecHangarSnapshotDto>('reanchor_exec_hangar');
+      if (res) setExecHangar(res);
+    } catch (err) {
+      console.error('Failed to reanchor:', err);
+    }
+  };
+
+  const handleResetAnchor = async () => {
+    try {
+      const res = await bridge.sendRequest<ExecHangarSnapshotDto>('reset_exec_hangar_anchor');
+      if (res) setExecHangar(res);
+    } catch (err) {
+      console.error('Failed to reset anchor:', err);
+    }
+  };
+
+  const formatClockTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return iso;
+    }
+  };
+
   useEffect(() => {
     fetchPlaces();
     fetchUserPois();
     fetchLastCopied();
+    fetchExecHangar();
 
     // Listen to live /showlocation clipboard events
     const unsub = bridge.on<CopiedLocationReading>('LOCATION_COPIED', (data: CopiedLocationReading) => {
@@ -76,8 +120,33 @@ export const PlacesView: React.FC = () => {
       fetchUserPois(); // Refresh distances to POIs
     });
 
+    const unsubHangar = bridge.on<ExecHangarSnapshotDto>('EXEC_HANGAR_UPDATED', (data) => {
+      if (data) setExecHangar(data);
+    });
+
+    const timer = setInterval(() => {
+      setExecHangar((prev) => {
+        if (!prev) return prev;
+        const newSec = Math.max(0, prev.timeToTransitionSeconds - 1);
+        const mins = Math.floor(newSec / 60);
+        const secs = Math.floor(newSec % 60);
+        const hrs = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        const fmt = hrs >= 1
+          ? `${hrs}h ${remMins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`
+          : `${remMins}m ${secs.toString().padStart(2, '0')}s`;
+        return {
+          ...prev,
+          timeToTransitionSeconds: newSec,
+          formattedCountdown: fmt,
+        };
+      });
+    }, 1000);
+
     return () => {
       unsub();
+      unsubHangar();
+      clearInterval(timer);
     };
   }, []);
 
@@ -299,6 +368,28 @@ export const PlacesView: React.FC = () => {
           >
             <Compass className="w-4 h-4 text-cyan-400" />
             Starmap Orte & Stationen ({places.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('contested')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-mono font-semibold rounded-t cursor-pointer transition ${
+              activeTab === 'contested'
+                ? 'bg-slate-800 text-rose-300 border-b-2 border-rose-400 shadow-[0_2px_8px_rgba(244,63,94,0.2)]'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>Contested Zones & Exec Hangar</span>
+            {execHangar && (
+              <span
+                className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                  execHangar.isOpen
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 shadow-[0_0_6px_#34d399]'
+                    : 'bg-slate-900 text-slate-400 border border-slate-700'
+                }`}
+              >
+                {execHangar.isOpen ? 'OPEN' : 'CLOSED'}
+              </span>
+            )}
           </button>
         </div>
 
@@ -553,6 +644,227 @@ export const PlacesView: React.FC = () => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══ TAB 3: CONTESTED ZONES & EXECUTIVE HANGAR (PYRO) ══ */}
+      {activeTab === 'contested' && (
+        <div className="flex-1 flex flex-col space-y-4 font-mono">
+          {/* Executive Hangar Live Card */}
+          <div className="sc-glass rounded-lg p-4 border border-rose-900/50 bg-[#040814]/90 sc-hud-corner space-y-4 shadow-[0_0_20px_rgba(244,63,94,0.1)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg border ${
+                  execHangar?.isOpen
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 animate-pulse'
+                    : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                }`}>
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                      Pyro Executive Hangar (PYAM-EXHANG-0-1)
+                    </h2>
+                    {execHangar && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${
+                        execHangar.isOpen
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 shadow-[0_0_10px_#34d399]'
+                          : 'bg-slate-900 text-slate-400 border-slate-700'
+                      }`}>
+                        {execHangar.isOpen ? 'Hangar Geöffnet (OPEN)' : 'Hangar Geschlossen (CLOSED)'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Global synchronisierter Pyro Contested Zone Zyklus · 65m Öffnung / 120m Schließung (185m Vollzyklus)
+                  </div>
+                </div>
+              </div>
+
+              {/* Re-Anchor & Reset Controls */}
+              <div className="flex items-center gap-2">
+                {execHangar?.isCustomAnchor && (
+                  <button
+                    onClick={handleResetAnchor}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs transition cursor-pointer"
+                    title="Auf offizielle Patch-Kalibrierung zurücksetzen"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Reset
+                  </button>
+                )}
+                <button
+                  onClick={handleReanchor}
+                  className="flex items-center gap-1 px-3 py-1 rounded bg-rose-950/70 hover:bg-rose-900/90 text-rose-200 border border-rose-600/60 text-xs font-semibold transition cursor-pointer shadow-[0_0_8px_rgba(244,63,94,0.25)]"
+                  title="Zyklus ab genau diesem Moment neu kalibrieren (nur bei sichtbarem Hangar-Öffnen anklicken!)"
+                >
+                  <Zap className="w-3.5 h-3.5 text-rose-400" />
+                  Neu kalibrieren (Re-Anchor)
+                </button>
+              </div>
+            </div>
+
+            {/* Status-Ampel (5 Phasen-Lichter) & Countdown */}
+            {execHangar && (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-3 border-t border-cyan-950/80 items-center">
+                {/* 5 Phasen-Lichter */}
+                <div className="md:col-span-5 p-3 rounded bg-[#02050c] border border-cyan-950/80 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 uppercase font-semibold">Phasen-Lichter (In-Game Ampel)</span>
+                    <span className={execHangar.isOpen ? 'text-emerald-400 font-bold' : 'text-cyan-400 font-bold'}>
+                      {execHangar.greensLit} von 5 aktiv
+                    </span>
+                  </div>
+
+                  {/* 5 Indicator Dots */}
+                  <div className="flex items-center gap-2.5 py-1">
+                    {[0, 1, 2, 3, 4].map((i) => {
+                      const lit = i < execHangar.greensLit;
+                      return (
+                        <div
+                          key={i}
+                          className={`w-5 h-5 rounded-full border transition-all duration-500 flex items-center justify-center ${
+                            lit
+                              ? execHangar.isOpen
+                                ? 'bg-emerald-400 border-emerald-300 shadow-[0_0_10px_#34d399]'
+                                : 'bg-cyan-400 border-cyan-300 shadow-[0_0_8px_#22d3ee]'
+                              : 'bg-slate-950 border-slate-800'
+                          }`}
+                        >
+                          {lit && <div className="w-1.5 h-1.5 rounded-full bg-white/80" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[10px] text-slate-400">
+                    {execHangar.isOpen
+                      ? execHangar.isFinalActiveTail
+                        ? '⚠️ Letzte 5 Minuten! Lichter erloschen, Hangar ist innen noch geöffnet.'
+                        : 'Lichter erlöschen alle 12 Minuten. Ein Licht = ca. 12 Minuten verbleibend.'
+                      : 'Lichter laden alle 24 Minuten auf. 4 Lichter = kurz vor Öffnung.'}
+                  </div>
+                </div>
+
+                {/* Countdown & Zustand */}
+                <div className="md:col-span-4 p-3 rounded bg-[#02050c] border border-cyan-950/80 space-y-1">
+                  <div className="text-slate-500 text-[11px] uppercase">
+                    {execHangar.isOpen ? 'Schließt in:' : 'Öffnet in:'}
+                  </div>
+                  <div className={`text-2xl font-bold tracking-wider ${
+                    execHangar.isOpen ? 'text-emerald-300' : 'text-cyan-300'
+                  }`}>
+                    {execHangar.formattedCountdown}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {execHangar.isOpen
+                      ? `Schließt um ca. ${formatClockTime(execHangar.nextCloseUtc)} Uhr`
+                      : `Öffnet um ca. ${formatClockTime(execHangar.nextOpenUtc)} Uhr`}
+                  </div>
+                </div>
+
+                {/* Nächste Öffnungen & Kalibrierung */}
+                <div className="md:col-span-3 p-3 rounded bg-[#02050c] border border-cyan-950/80 space-y-1.5 text-xs">
+                  <div className="text-slate-500 text-[10px] uppercase">Nächste Öffnungen:</div>
+                  <div className="space-y-1">
+                    {execHangar.upcomingOpensUtc.map((t, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Zyklus #{idx + 1}:</span>
+                        <span className="text-slate-200 font-bold">{formatClockTime(t)} Uhr</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-slate-500 pt-1 border-t border-slate-900">
+                    {execHangar.isCustomAnchor ? 'Benutzer-Anker aktiv' : `Kalibrierung: ${execHangar.calibrationLabel}`}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tactical Contested Zones Directory Cards */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span className="font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-rose-400" />
+                Pyro Contested Zones & Asteroiden-Objekte
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Gefährliche PvP/PvE-Hochsicherheitsgebiete in Pyro
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Card 1: PYAM-EXHANG-0-1 */}
+              <div className="sc-glass rounded-lg p-3.5 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase">PYAM-EXHANG-0-1</span>
+                      <div className="text-[10px] text-cyan-400">Exchange Asteroid Hangar · Pyro Gürtel</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-950/60 text-rose-300 border border-rose-800/60">
+                      EXTREME THREAT
+                    </span>
+                  </div>
+
+                  <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                    Haupt-Executive-Hangar mit rotierender Blast-Tür. Beherbergt seltene Waffen, ballistische Munition und High-Tier Tresor-Loot. Stark umkämpft von Spielern und schwer bewaffneten Fraktionen.
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-cyan-950/80 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 text-[11px]">Quantum-Marker: PYAM-EXHANG</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('PYAM-EXHANG-0-1');
+                      setCopiedId('PYAM-EXHANG-0-1');
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[10px] transition cursor-pointer"
+                  >
+                    {copiedId === 'PYAM-EXHANG-0-1' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copiedId === 'PYAM-EXHANG-0-1' ? 'Kopiert!' : 'Marker kopieren'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: PYAM-SUPVISR-3-4/5 */}
+              <div className="sc-glass rounded-lg p-3.5 border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase">PYAM-SUPVISR-3-4 / 3-5</span>
+                      <div className="text-[10px] text-cyan-400">Supervisor Station & Data Center · Pyro Gürtel</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-950/60 text-amber-300 border border-amber-800/60">
+                      HIGH THREAT
+                    </span>
+                  </div>
+
+                  <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                    Aufsichts- und Datenknotenpunkt mit zwei verbundenen Asteroiden (3-4 & 3-5). Enthält Hacking-Konsolen, Überwachungsterminals und Fraktionsmissionen.
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-cyan-950/80 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 text-[11px]">Quantum-Marker: PYAM-SUPVISR</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('PYAM-SUPVISR-3-4');
+                      setCopiedId('PYAM-SUPVISR-3-4');
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[10px] transition cursor-pointer"
+                  >
+                    {copiedId === 'PYAM-SUPVISR-3-4' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copiedId === 'PYAM-SUPVISR-3-4' ? 'Kopiert!' : 'Marker kopieren'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

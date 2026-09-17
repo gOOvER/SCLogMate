@@ -2167,6 +2167,19 @@ export interface ContainerPlanDto {
   isEmpty: boolean;
 }
 
+export interface ExecHangarSnapshotDto {
+  isOpen: boolean;
+  greensLit: number;
+  isFinalActiveTail: boolean;
+  timeToTransitionSeconds: number;
+  formattedCountdown: string;
+  nextOpenUtc: string;
+  nextCloseUtc: string;
+  upcomingOpensUtc: string[];
+  calibrationLabel: string;
+  isCustomAnchor: boolean;
+}
+
 export const bridge = new PhotinoBridge();
 
 export const FONT_FAMILY_MAP: Record<string, string> = {

@@ -943,6 +943,20 @@ public class ContainerPlanDto
     [JsonPropertyName("isEmpty")] public bool IsEmpty { get; set; }
 }
 
+public class ExecHangarSnapshotDto
+{
+    [JsonPropertyName("isOpen")] public bool IsOpen { get; set; }
+    [JsonPropertyName("greensLit")] public int GreensLit { get; set; }
+    [JsonPropertyName("isFinalActiveTail")] public bool IsFinalActiveTail { get; set; }
+    [JsonPropertyName("timeToTransitionSeconds")] public double TimeToTransitionSeconds { get; set; }
+    [JsonPropertyName("formattedCountdown")] public string FormattedCountdown { get; set; } = "";
+    [JsonPropertyName("nextOpenUtc")] public string NextOpenUtc { get; set; } = "";
+    [JsonPropertyName("nextCloseUtc")] public string NextCloseUtc { get; set; } = "";
+    [JsonPropertyName("upcomingOpensUtc")] public List<string> UpcomingOpensUtc { get; set; } = new();
+    [JsonPropertyName("calibrationLabel")] public string CalibrationLabel { get; set; } = "";
+    [JsonPropertyName("isCustomAnchor")] public bool IsCustomAnchor { get; set; }
+}
+
 public class ScanProgressDto
 {
     [JsonPropertyName("current")] public int Current { get; set; }
@@ -1641,6 +1655,28 @@ public class PhotinoBridge
                             planSizes = sProp.GetString();
                     }
                     SendResponse(req.Id, "plan_containers_response", PlanContainers(planTargetScu, planShipMaxScu, planSizes));
+                    break;
+
+                case "get_exec_hangar_status":
+                    SendResponse(req.Id, "exec_hangar_status_response", GetExecHangarSnapshot());
+                    break;
+
+                case "reanchor_exec_hangar":
+                    var reanchorSettings = Settings.Load();
+                    reanchorSettings.ExecHangarAnchorOverrideUtc = DateTime.UtcNow;
+                    Settings.Save(reanchorSettings);
+                    var reanchoredSnap = GetExecHangarSnapshot();
+                    SendResponse(req.Id, "reanchor_exec_hangar_response", reanchoredSnap);
+                    Broadcast("EXEC_HANGAR_UPDATED", reanchoredSnap);
+                    break;
+
+                case "reset_exec_hangar_anchor":
+                    var resetSettings = Settings.Load();
+                    resetSettings.ExecHangarAnchorOverrideUtc = null;
+                    Settings.Save(resetSettings);
+                    var resetSnap = GetExecHangarSnapshot();
+                    SendResponse(req.Id, "reset_exec_hangar_anchor_response", resetSnap);
+                    Broadcast("EXEC_HANGAR_UPDATED", resetSnap);
                     break;
 
                 case "get_finance":
@@ -5779,6 +5815,33 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.PlanContainers", ex);
             return new ContainerPlanDto { TargetScu = targetScu, TotalScu = 0, ShortfallScu = targetScu, IsEmpty = true };
+        }
+    }
+
+    private ExecHangarSnapshotDto GetExecHangarSnapshot()
+    {
+        try
+        {
+            var settings = Settings.Load();
+            var snapshot = ExecHangarCycle.At(DateTime.UtcNow, settings.ExecHangarAnchorOverrideUtc);
+            return new ExecHangarSnapshotDto
+            {
+                IsOpen = snapshot.IsOpen,
+                GreensLit = snapshot.GreensLit,
+                IsFinalActiveTail = snapshot.IsFinalActiveTail,
+                TimeToTransitionSeconds = Math.Max(0, snapshot.TimeToTransition.TotalSeconds),
+                FormattedCountdown = ExecHangarCycle.FormatCountdown(snapshot.TimeToTransition),
+                NextOpenUtc = snapshot.NextOpenUtc.ToString("o"),
+                NextCloseUtc = snapshot.NextCloseUtc.ToString("o"),
+                UpcomingOpensUtc = snapshot.UpcomingOpensUtc.Select(u => u.ToString("o")).ToList(),
+                CalibrationLabel = snapshot.CalibrationLabel,
+                IsCustomAnchor = snapshot.IsCustomAnchor
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.GetExecHangarSnapshot", ex);
+            return new ExecHangarSnapshotDto();
         }
     }
 

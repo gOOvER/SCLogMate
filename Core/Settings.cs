@@ -127,6 +127,9 @@ public class AppSettings
     /// <summary>Vom Nutzer gewählte Sprache: "Auto", "de", "en".</summary>
     public string AppLanguage { get; set; } = "Auto";
 
+    /// <summary>Optionaler manueller Kalibrierungs-Anker für den Pyro Executive Hangar Zyklus (UTC).</summary>
+    public DateTime? ExecHangarAnchorOverrideUtc { get; set; }
+
     /// <summary>Wipe-Filter aktivieren (ignoriert Events vor dem Stichtag bei Statistiken/Summen).</summary>
     public bool WipeFilterEnabled { get; set; } = false;
 

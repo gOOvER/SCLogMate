@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Executive Hangar Contested Zone Tracker (`Core/ExecHangarCycle.cs`, `Core/Settings.cs`, `PhotinoBridge.cs`, `PlacesView.tsx`)**:
+  - Implemented deterministic offline cycle mathematics for Pyro's Executive Hangar (PYAM-EXHANG-0-1) Contested Zone (65m 0.093s open, 120m 0.173s closed, 185m 0.266s cycle calibrated against community benchmarks).
+  - Added physical 5-light status indicator simulation accurately mirroring in-game door lights (5 down to 1 extinguishing every 12m during open; charging 0 to 4 every 24m during closed; active 5-minute tail warning).
+  - Added local opening schedule calculations reporting next 3 upcoming cycle openings converted to user's local timezone.
+  - Added in-flight user Re-Anchor recalibration and built-in patch calibration reset persisting in `%APPDATA%\SCLogMate\settings.json`.
+  - Added dedicated "Contested Zones & Exec Hangar" tab in Places view featuring real-time ticking countdowns, phase badges, 5-light visual indicator dots, and tactical guides for Pyro contested zone sites (`PYAM-EXHANG-0-1`, `PYAM-SUPVISR-3-4/5`) with one-click GPS clipboard copy.
 - **Container Planner & Box Sizing DP Optimization (`Core/ContainerPlanner.cs`, `PhotinoBridge.cs`, `MarketView.tsx`)**:
   - Implemented exact bounded Dynamic Programming (coin change) solver to optimize cargo crate purchase assortments at kiosks.
   - Automatically maximizes filled SCU capacity without exceeding ship hold while minimizing total crate count (reducing loading fees and duration).
