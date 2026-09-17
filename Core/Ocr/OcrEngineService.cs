@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
@@ -91,6 +92,41 @@ public sealed class OcrEngineService : IDisposable
         finally
         {
             _ocrLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Liest Text aus einer Bilddatei (JPG, PNG) auf der Festplatte ein.
+    /// </summary>
+    public async Task<string?> RecognizeImageFileAsync(string filePath)
+    {
+        if (!IsAvailable || !File.Exists(filePath))
+            return null;
+
+        try
+        {
+            using var fileStream = File.OpenRead(filePath);
+            var randomAccessStream = fileStream.AsRandomAccessStream();
+            var decoder = await BitmapDecoder.CreateAsync(randomAccessStream);
+            using var sBmp = await decoder.GetSoftwareBitmapAsync();
+            using var converted = SoftwareBitmap.Convert(sBmp, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+
+            await _ocrLock.WaitAsync();
+            try
+            {
+                if (_engine == null) return null;
+                var res = await _engine.RecognizeAsync(converted);
+                return FormatOcrLines(res);
+            }
+            finally
+            {
+                _ocrLock.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"RecognizeImageFileAsync: {filePath}", ex);
+            return null;
         }
     }
 

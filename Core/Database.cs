@@ -647,6 +647,15 @@ public static class Database
         return Convert.ToInt32(count ?? 0);
     }
 
+    /// <summary>Liefert die Gesamtzahl aller in der DB gespeicherten Events.</summary>
+    public static int GetTotalEventCount()
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        var count = Scalar(db, "SELECT COUNT(*) FROM events;");
+        return Convert.ToInt32(count ?? 0);
+    }
+
     /// <summary>Prüft, wie viele der übergebenen Logdateien noch nicht in der DB indexiert sind.</summary>
     public static int GetUnindexedCount(IEnumerable<string> logFiles)
     {

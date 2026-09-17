@@ -15,7 +15,11 @@ import {
   Search,
   Coins,
   Warehouse,
+  Camera,
+  Scale,
 } from 'lucide-react';
+import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
+import { ShipCompareModal } from '../components/ShipCompareModal';
 
 export const FleetView: React.FC = () => {
   const [fleetData, setFleetData] = useState<FleetResponseDto | null>(null);
@@ -27,6 +31,15 @@ export const FleetView: React.FC = () => {
   // Modal for "+ Schiff hinzufügen"
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [catalogSearch, setCatalogSearch] = useState<string>('');
+
+  // Comparison modal state
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [compareShipA, setCompareShipA] = useState<string | undefined>(undefined);
+  const [compareShipB, setCompareShipB] = useState<string | undefined>(undefined);
+
+  // Screenshot scan state
+  const [isScanningScreenshot, setIsScanningScreenshot] = useState<boolean>(false);
+  const [screenshotFeedback, setScreenshotFeedback] = useState<string | null>(null);
 
   // Inline pledge editing state
   const [editingPledgeShip, setEditingPledgeShip] = useState<string | null>(null);
@@ -52,8 +65,38 @@ export const FleetView: React.FC = () => {
       if (data) setFleetData(data);
     });
 
-    return () => unsub();
+    const unsubScreenshot = bridge.on<any>('SCREENSHOT_LOADOUT_DETECTED', (res) => {
+      if (res?.success) {
+        setScreenshotFeedback(`✓ Neuer Screenshot: ${res.shipName || 'Schiff'} (${res.components?.length || 0} Komponenten)`);
+        fetchFleet();
+        setTimeout(() => setScreenshotFeedback(null), 6000);
+      }
+    });
+
+    return () => {
+      unsub();
+      unsubScreenshot();
+    };
   }, []);
+
+  const handleScanScreenshot = async () => {
+    setIsScanningScreenshot(true);
+    setScreenshotFeedback(null);
+    try {
+      const res = await bridge.scanScreenshotLoadout();
+      if (res.success) {
+        setScreenshotFeedback(`✓ ${res.shipName || 'Schiff'} erkannt (${res.components.length} Komponenten)`);
+        fetchFleet();
+      } else {
+        setScreenshotFeedback(`✕ ${res.message || 'Kein VLM/Flotten-Screenshot erkannt'}`);
+      }
+    } catch (err: any) {
+      setScreenshotFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
+    } finally {
+      setIsScanningScreenshot(false);
+      setTimeout(() => setScreenshotFeedback(null), 6000);
+    }
+  };
 
   // Actions
   const handleToggleHangar = async (shipName: string) => {
@@ -240,6 +283,41 @@ export const FleetView: React.FC = () => {
               </div>
               <span>Schiff hinzufügen</span>
             </button>
+
+            {/* ⚖️ Schiffe vergleichen */}
+            <button
+              onClick={() => {
+                setCompareShipA(ships[0]?.name);
+                setCompareShipB(ships[1]?.name || fleetData?.catalog[0]?.name);
+                setIsCompareModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#0d1b2a] hover:bg-[#13283f] text-indigo-300 border border-indigo-800/60 hover:border-indigo-500 text-xs font-semibold transition shadow-sm cursor-pointer"
+              title="Zwei Schiffe im Side-by-Side Vergleich gegenüberstellen"
+            >
+              <Scale className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Vergleichen</span>
+            </button>
+
+            {/* 📷 Screenshot Loadout scannen */}
+            <button
+              onClick={handleScanScreenshot}
+              disabled={isScanningScreenshot}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition shadow-sm cursor-pointer border ${
+                isScanningScreenshot
+                  ? 'bg-slate-800 text-slate-400 border-slate-700'
+                  : 'bg-[#0f1f2e] hover:bg-[#172f44] text-emerald-300 border-emerald-800/60 hover:border-emerald-500'
+              }`}
+              title="Neuesten Screenshot scannen und Schiffs-Ausrüstung (VLM / ASOP) erkennen"
+            >
+              <Camera className={`w-3.5 h-3.5 ${isScanningScreenshot ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
+              <span>{isScanningScreenshot ? 'Scanne...' : 'Screenshot OCR'}</span>
+            </button>
+
+            {screenshotFeedback && (
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 animate-fade-in">
+                {screenshotFeedback}
+              </span>
+            )}
           </div>
 
           {/* Right: Telemetry Cluster (WERT, PLEDGE, FLÜGE, QUANTUM) */}
@@ -495,9 +573,12 @@ export const FleetView: React.FC = () => {
                       {/* 2. Schiff & Hersteller */}
                       <td className="py-2.5 px-3">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition text-xs">
-                            {ship.name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition text-xs">
+                              {ship.name}
+                            </span>
+                            <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={true} />
+                          </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span
                               className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border"
@@ -622,6 +703,19 @@ export const FleetView: React.FC = () => {
                       {/* 7. Aktionen */}
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Vergleichen */}
+                          <button
+                            onClick={() => {
+                              setCompareShipA(ship.name);
+                              setCompareShipB(ships.find(s => s.name !== ship.name)?.name || fleetData?.catalog[0]?.name);
+                              setIsCompareModalOpen(true);
+                            }}
+                            className="p-1.5 rounded bg-[#071322] hover:bg-indigo-950/60 border border-[#14263B] hover:border-indigo-700 text-indigo-400 transition cursor-pointer"
+                            title="Dieses Schiff im Side-by-Side Vergleich analysieren"
+                          >
+                            <Scale className="w-3 h-3" />
+                          </button>
+
                           {/* Wiki */}
                           <button
                             onClick={() => {
@@ -796,6 +890,19 @@ export const FleetView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ══ MODAL: SCHIFFS-VERGLEICH ══ */}
+      <ShipCompareModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        initialShipA={compareShipA}
+        initialShipB={compareShipB}
+        fleetShips={ships}
+        catalog={fleetData?.catalog || []}
+        onOpenWikiDossier={(sName) => {
+          window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: sName }));
+        }}
+      />
     </div>
   );
 };

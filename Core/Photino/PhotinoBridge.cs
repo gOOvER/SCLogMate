@@ -378,6 +378,7 @@ public class FleetShipDto
     [JsonPropertyName("insuranceType")] public string InsuranceType { get; set; } = "";
     [JsonPropertyName("acquisitionType")] public string AcquisitionType { get; set; } = "";
     [JsonPropertyName("customNotes")] public string CustomNotes { get; set; } = "";
+    [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
 }
 
 public class CatalogShipDto
@@ -388,6 +389,57 @@ public class CatalogShipDto
     [JsonPropertyName("valueAuec")] public long ValueAuec { get; set; }
     [JsonPropertyName("pledgeUsd")] public int PledgeUsd { get; set; }
     [JsonPropertyName("defaultInsurance")] public string DefaultInsurance { get; set; } = "";
+    [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
+}
+
+public class ShipComparisonSideDto
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("manufacturer")] public string Manufacturer { get; set; } = "";
+    [JsonPropertyName("manufacturerBadge")] public string ManufacturerBadge { get; set; } = "";
+    [JsonPropertyName("manufacturerColor")] public string ManufacturerColor { get; set; } = "";
+    [JsonPropertyName("role")] public string Role { get; set; } = "";
+    [JsonPropertyName("pledgeValueUsd")] public int PledgeValueUsd { get; set; }
+    [JsonPropertyName("estimatedValueAuec")] public long EstimatedValueAuec { get; set; }
+    [JsonPropertyName("defaultInsurance")] public string DefaultInsurance { get; set; } = "";
+    [JsonPropertyName("isInHangar")] public bool IsInHangar { get; set; }
+    [JsonPropertyName("acquisitionType")] public string AcquisitionType { get; set; } = "";
+
+    // Cargo & Pad constraints
+    [JsonPropertyName("padSize")] public string PadSize { get; set; } = "—";
+    [JsonPropertyName("totalScu")] public int TotalScu { get; set; }
+    [JsonPropertyName("maxContainerScu")] public int MaxContainerScu { get; set; }
+    [JsonPropertyName("cargoAccessType")] public string CargoAccessType { get; set; } = "—";
+    [JsonPropertyName("canLandPlanetside")] public bool CanLandPlanetside { get; set; } = true;
+    [JsonPropertyName("requiresDockingCollar")] public bool RequiresDockingCollar { get; set; }
+
+    // Dimensions & Crew (from Wiki)
+    [JsonPropertyName("length")] public double? Length { get; set; }
+    [JsonPropertyName("beam")] public double? Beam { get; set; }
+    [JsonPropertyName("height")] public double? Height { get; set; }
+    [JsonPropertyName("mass")] public double? Mass { get; set; }
+    [JsonPropertyName("crewMin")] public int? CrewMin { get; set; }
+    [JsonPropertyName("crewMax")] public int? CrewMax { get; set; }
+    [JsonPropertyName("quantumFuel")] public double? QuantumFuel { get; set; }
+    [JsonPropertyName("imageUrl")] public string? ImageUrl { get; set; }
+
+    // Flight stats from DB
+    [JsonPropertyName("flightCount")] public int FlightCount { get; set; }
+    [JsonPropertyName("quantumJumps")] public int QuantumJumps { get; set; }
+    [JsonPropertyName("lossCount")] public int LossCount { get; set; }
+    [JsonPropertyName("lastFlown")] public string LastFlown { get; set; } = "—";
+
+    // Pips & Combat
+    [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
+
+    // Stores / Shopping
+    [JsonPropertyName("storeLocations")] public List<WikiStoreLocationDto> StoreLocations { get; set; } = new();
+}
+
+public class ShipComparisonDataDto
+{
+    [JsonPropertyName("shipA")] public ShipComparisonSideDto? ShipA { get; set; }
+    [JsonPropertyName("shipB")] public ShipComparisonSideDto? ShipB { get; set; }
 }
 
 public class FleetResponseDto
@@ -1041,6 +1093,7 @@ public class PhotinoBridge
     private readonly NativeMiniHudOverlay _miniHudOverlay = new();
     private readonly NativeToastOverlay _toastOverlay = new();
     private readonly NativeRsOverlay _rsOverlay = new();
+    private readonly ScreenshotLoadoutWatcher _screenshotWatcher;
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
@@ -1081,6 +1134,20 @@ public class PhotinoBridge
         if (s.ChatOcrEnabled)
         {
             _chatScanner.Start();
+        }
+
+        _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
+        _screenshotWatcher.OnLoadoutDetected += res =>
+        {
+            Broadcast("SCREENSHOT_LOADOUT_DETECTED", res);
+        };
+        try
+        {
+            _screenshotWatcher.StartWatching();
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"ScreenshotWatcher Start: {ex.Message}");
         }
 
         _refineryCheckTimer = new System.Threading.Timer(_ => CheckRefineryCompletions(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
@@ -1875,6 +1942,133 @@ public class PhotinoBridge
                         SendResponse(req.Id, "set_current_ship_response", new { success = true, currentShip = _currentShip });
                     }
                     break;
+
+                case "evaluate_ship_pips":
+                    {
+                        string? shipName = null;
+                        List<string>? guns = null;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("shipName", out var snProp)) shipName = snProp.GetString();
+                            if (req.Payload.Value.TryGetProperty("guns", out var gnProp) && gnProp.ValueKind == JsonValueKind.Array)
+                            {
+                                guns = new List<string>();
+                                foreach (var item in gnProp.EnumerateArray())
+                                {
+                                    var g = item.GetString();
+                                    if (!string.IsNullOrWhiteSpace(g)) guns.Add(g);
+                                }
+                            }
+                        }
+
+                        PipsEvaluationResult pRes;
+                        if (guns != null && guns.Count > 0)
+                        {
+                            pRes = PipsAnalyzer.EvaluateGuns(guns);
+                        }
+                        else
+                        {
+                            pRes = PipsAnalyzer.EvaluateShip(shipName);
+                        }
+                        SendResponse(req.Id, "evaluate_ship_pips_response", pRes);
+                        break;
+                    }
+
+                case "get_ship_comparison_data":
+                    {
+                        string shipA = "";
+                        string shipB = "";
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("shipA", out var aProp)) shipA = aProp.GetString() ?? "";
+                            if (req.Payload.Value.TryGetProperty("shipB", out var bProp)) shipB = bProp.GetString() ?? "";
+                        }
+                        var compData = await GetShipComparisonDataAsync(shipA, shipB);
+                        SendResponse(req.Id, "get_ship_comparison_data_response", compData);
+                        break;
+                    }
+
+                case "scan_screenshot_loadout":
+                    {
+                        string? filePath = null;
+                        if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("filePath", out var fpEl))
+                        {
+                            filePath = fpEl.GetString();
+                        }
+                        if (string.IsNullOrWhiteSpace(filePath))
+                        {
+                            var scFolder = _screenshotWatcher.WatchedFolder ?? ScreenshotLoadoutWatcher.DetectStarCitizenScreenshotFolder();
+                            if (!string.IsNullOrEmpty(scFolder) && Directory.Exists(scFolder))
+                            {
+                                filePath = Directory.GetFiles(scFolder, "*.jpg")
+                                    .Concat(Directory.GetFiles(scFolder, "*.png"))
+                                    .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                                    .FirstOrDefault();
+                            }
+                        }
+
+                        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                        {
+                            SendResponse(req.Id, "scan_screenshot_loadout_response", new ScreenshotLoadoutResult(false, null, null, Array.Empty<ScannedShipComponent>(), null, "Keine Screenshot-Datei gefunden oder ausgewählt."));
+                        }
+                        else
+                        {
+                            var scrLoadoutRes = await _screenshotWatcher.AnalyzeScreenshotAsync(filePath);
+                            SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes);
+                        }
+                        break;
+                    }
+
+                case "toggle_screenshot_watcher":
+                    {
+                        bool scrEnable = true;
+                        string? folder = null;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("enabled", out var enEl)) scrEnable = enEl.GetBoolean();
+                            if (req.Payload.Value.TryGetProperty("folder", out var foEl)) folder = foEl.GetString();
+                        }
+                        if (scrEnable)
+                        {
+                            _screenshotWatcher.StartWatching(folder);
+                        }
+                        else
+                        {
+                            _screenshotWatcher.StopWatching();
+                        }
+                        SendResponse(req.Id, "toggle_screenshot_watcher_response", new { isWatching = _screenshotWatcher.IsWatching, folder = _screenshotWatcher.WatchedFolder });
+                        break;
+                    }
+
+                case "get_sanitized_diagnostic_summary":
+                    {
+                        var appVer = "1.0.0-rc2";
+                        var dbSchemaVer = Database.CurrentSchemaVersion.ToString();
+                        var parserVer = Database.CurrentParserVersion.ToString();
+                        var sessCount = Database.GetSessionCount();
+                        var evtCount = Database.GetTotalEventCount();
+
+                        string? actGameVer = null;
+                        string? actShard = null;
+                        if (!string.IsNullOrEmpty(_activeSessionName) && _sessionMetaCache.TryGetValue(_activeSessionName, out var m))
+                        {
+                            actGameVer = m.Version;
+                            actShard = m.Shard;
+                        }
+
+                        var summary = DiagnosticsRedactor.BuildSanitizedDiagnosticSummary(
+                            appVer,
+                            dbSchemaVer,
+                            parserVer,
+                            sessCount,
+                            evtCount,
+                            actGameVer,
+                            actShard
+                        );
+
+                        SendResponse(req.Id, "get_sanitized_diagnostic_summary_response", new { summary });
+                        break;
+                    }
 
                 case "get_missions":
                     SendResponse(req.Id, "missions_response", GetMissionsData());
@@ -4270,6 +4464,7 @@ public class PhotinoBridge
                 LossCount = stat.LossCount,
                 LastFlown = stat.LastTime.HasValue ? stat.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
                 IsCurrent = isCurrent,
+                PipsResult = PipsAnalyzer.EvaluateShip(canonicalName),
             };
 
             if (customData.TryGetValue(shipDto.Name, out var cd) || customData.TryGetValue(stat.Ship, out cd))
@@ -4327,7 +4522,8 @@ public class PhotinoBridge
                     PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd,
                     InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance,
                     AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : "Pledge Store",
-                    CustomNotes = cd.Notes ?? ""
+                    CustomNotes = cd.Notes ?? "",
+                    PipsResult = PipsAnalyzer.EvaluateShip(canonicalName)
                 });
             }
         }
@@ -4343,6 +4539,7 @@ public class PhotinoBridge
                 ValueAuec = s.EstimatedValueAuec,
                 PledgeUsd = s.PledgeValueUsd,
                 DefaultInsurance = s.DefaultInsurance,
+                PipsResult = PipsAnalyzer.EvaluateShip(s.NormalizedName)
             }).ToList();
 
         var hangarShips = ships.Where(s => s.IsInHangar).ToList();
@@ -4358,6 +4555,81 @@ public class PhotinoBridge
             HangarCount = hangarShips.Count,
             FlownCount = ships.Count,
         };
+    }
+
+    private async Task<ShipComparisonDataDto> GetShipComparisonDataAsync(string? shipAName, string? shipBName)
+    {
+        var result = new ShipComparisonDataDto();
+        if (!string.IsNullOrWhiteSpace(shipAName))
+        {
+            result.ShipA = await BuildShipComparisonSideAsync(shipAName);
+        }
+        if (!string.IsNullOrWhiteSpace(shipBName))
+        {
+            result.ShipB = await BuildShipComparisonSideAsync(shipBName);
+        }
+        return result;
+    }
+
+    private async Task<ShipComparisonSideDto> BuildShipComparisonSideAsync(string rawShipName)
+    {
+        var cat = FleetCatalog.Lookup(rawShipName);
+        var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : rawShipName;
+        var cargo = CargoConstraints.FindShip(canonicalName) ?? CargoConstraints.FindShip(rawShipName);
+        var wiki = await WikiApiClient.LookupAsync(canonicalName, enrichBase64Image: false)
+                ?? await WikiApiClient.LookupAsync(rawShipName, enrichBase64Image: false);
+
+        var stats = Database.GetFleetStats();
+        var stat = stats.FirstOrDefault(s => s.Ship.Equals(canonicalName, StringComparison.OrdinalIgnoreCase) || s.Ship.Equals(rawShipName, StringComparison.OrdinalIgnoreCase));
+
+        var customData = Database.GetAllFleetCustomData();
+        customData.TryGetValue(canonicalName, out var cd);
+        if (cd == null && !string.Equals(canonicalName, rawShipName, StringComparison.OrdinalIgnoreCase))
+        {
+            customData.TryGetValue(rawShipName, out cd);
+        }
+
+        var pips = PipsAnalyzer.EvaluateShip(canonicalName);
+
+        var side = new ShipComparisonSideDto
+        {
+            Name = canonicalName,
+            Manufacturer = !string.IsNullOrEmpty(cat.Manufacturer) ? cat.Manufacturer : (wiki?.Manufacturer ?? "Unbekannt"),
+            ManufacturerBadge = cat.ManufacturerBadge,
+            ManufacturerColor = cat.ManufacturerColor,
+            Role = !string.IsNullOrEmpty(cat.Role) ? cat.Role : (wiki?.Role ?? "Multi-Role"),
+            PledgeValueUsd = cd?.PledgeUsd > 0 ? cd.PledgeUsd : (cat.PledgeValueUsd > 0 ? cat.PledgeValueUsd : 0),
+            EstimatedValueAuec = cat.EstimatedValueAuec,
+            DefaultInsurance = !string.IsNullOrEmpty(cd?.Insurance) ? cd.Insurance : cat.DefaultInsurance,
+            IsInHangar = cd?.InHangar ?? false,
+            AcquisitionType = cd?.Acquisition ?? "Geliehen / Free Fly",
+
+            PadSize = cargo?.PadSize ?? (wiki?.Size ?? "—"),
+            TotalScu = cargo?.TotalScu ?? (int)Math.Round(wiki?.CargoScu ?? 0),
+            MaxContainerScu = cargo?.MaxContainerScu ?? 0,
+            CargoAccessType = cargo?.CargoAccessType ?? "—",
+            CanLandPlanetside = cargo?.CanLandPlanetside ?? true,
+            RequiresDockingCollar = cargo?.RequiresDockingCollar ?? false,
+
+            Length = wiki?.Length,
+            Beam = wiki?.Beam,
+            Height = wiki?.Height,
+            Mass = wiki?.Mass,
+            CrewMin = wiki?.CrewMin,
+            CrewMax = wiki?.CrewMax,
+            QuantumFuel = wiki?.QuantumFuel,
+            ImageUrl = !string.IsNullOrEmpty(wiki?.ThumbnailUrl) ? wiki.ThumbnailUrl : wiki?.ImageUrl,
+
+            FlightCount = stat?.FlightCount ?? 0,
+            QuantumJumps = stat?.QtCount ?? 0,
+            LossCount = stat?.LossCount ?? 0,
+            LastFlown = stat?.LastTime.HasValue == true ? stat.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
+
+            PipsResult = pips,
+            StoreLocations = wiki?.StoreLocations ?? new List<WikiStoreLocationDto>()
+        };
+
+        return side;
     }
 
     private List<FleetStatDto> GetFleetData()

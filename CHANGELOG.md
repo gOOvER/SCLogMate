@@ -33,6 +33,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Side-by-Side Ship Comparison Modal (`ShipCompareModal.tsx`, `FleetView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Implemented interactive side-by-side ship comparison interface allowing pilots to benchmark any two ships from their hangar or the full universe catalog.
+  - Displays comprehensive comparative metrics: cargo volume (SCU) and maximum container size clearance, pad size constraints, cargo access types (rear ramp, elevator), planetary landing capability, dimensions (L × W × H), mass, crew requirements, and quantum fuel capacity.
+  - Integrates direct in-game vendor pricing and rental rates across all universe dealerships (New Deal, Astro Armada, etc.) with advantage highlights and quick swap (`⇄`).
+  - Added personal flight telemetry comparison contrasting sorties flown, quantum jumps completed, loss counts, and last recorded flight dates for each hull.
+- **Weapon Ballistics & Lead-Pips Analyzer (`Core/PipsAnalyzer.cs`, `PipsAnalyzerBadge.tsx`, `FleetView.tsx`, `PhotinoBridge.cs`)**:
+  - Implemented Star Citizen projectile muzzle velocity analyzer based on QuantumWake v0.13 mechanics, computing distinct targeting lead pips calculated by the game's HUD.
+  - Automatically verifies whether pilot weapons share identical projectile velocity (e.g. 1,480 m/s for laser repeaters or 1,332 m/s for ballistic gatlings) resulting in a single synchronized reticle (`1 Pip`), or produce split lead pips (`2+ Pips`) where aim is divided and weapon groups miss.
+  - Added visual `PipsAnalyzerBadge` with real-time status pills (Synchronized, Split Pips) and detailed hover flyouts breaking down equipped gun types, projectile speeds, velocity spreads, and tactical outfitting advice.
+- **Privacy Masking & Sanitized Diagnostic Reports (`Core/DiagnosticsRedactor.cs`, `SettingsView.tsx`, `PhotinoBridge.cs`)**:
+  - Added privacy redactor scrubbing sensitive local machine and user information (Windows username paths `C:\Users\<Name>\...`, AppData, Discord webhooks, auth tokens, external IPv4 addresses) prior to exporting diagnostics.
+  - Added "Anonymisierte Diagnose kopieren" button in Settings generating clean markdown summaries with system specs, DB schema versions, and game version ready for Discord support and GitHub issue reporting without leaking private credentials.
+- **Screenshot Loadout OCR & Background Watcher (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Ocr/OcrEngineService.cs`, `FleetView.tsx`, `PhotinoBridge.cs`)**:
+  - Added Windows Media OCR image decoder (`RecognizeImageFileAsync`) analyzing static image files from disk.
+  - Implemented `ScreenshotLoadoutWatcher` with automated `FileSystemWatcher` monitoring Star Citizen's `LIVE\ScreenShots` directory.
+  - Automatically parses mobiGlas VLM and ASOP Fleet Manager screenshots to extract recognized ship hulls, liveries/paints, and installed components (shields, coolers, quantum drives, power plants, weapons).
+  - Added manual "Screenshot OCR" trigger button in `FleetView` with live feedback banners and instant hangar synchronization.
 - **RSI Hermes & MISC Hull B Catalog Integration (`Core/FleetCatalog.cs`, `Core/CargoConstraints.cs`)**:
   - Integrated `RSI Hermes` (medium freighter & gunship, 120 SCU, 32 SCU max container clearance) into `FleetCatalog` and `CargoConstraints`.
   - Added `MISC Hull B` (medium spindle freighter, 384 SCU, 32 SCU clearance) into `CargoConstraints`.

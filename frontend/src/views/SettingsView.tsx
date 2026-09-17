@@ -30,6 +30,7 @@ import {
   EyeOff,
   Key,
   Trash2,
+  Copy,
 } from 'lucide-react';
 import {
   bridge,
@@ -514,6 +515,23 @@ export const SettingsView: React.FC = () => {
       showToast('✓ [DEBUG] Debug-Logdatei geleert.');
     } catch (err) {
       showToast('Fehler beim Leeren des Logs');
+    }
+  };
+
+  const [copiedDiag, setCopiedDiag] = useState(false);
+
+  const handleCopySanitizedDiagnostics = async () => {
+    try {
+      const res = await bridge.getSanitizedDiagnosticSummary();
+      if (res?.summary) {
+        await navigator.clipboard.writeText(res.summary);
+        setCopiedDiag(true);
+        showToast('✓ Anonymisierte System-Diagnose in Zwischenablage kopiert!');
+        setTimeout(() => setCopiedDiag(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to copy sanitized diagnostics:', err);
+      showToast('Fehler beim Kopieren der Diagnose');
     }
   };
 
@@ -2541,6 +2559,14 @@ export const SettingsView: React.FC = () => {
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Debug-Logdatei leeren</span>
+              </button>
+              <button
+                onClick={handleCopySanitizedDiagnostics}
+                className="px-4 py-2.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold border border-emerald-500/40 transition flex items-center space-x-2 cursor-pointer"
+                title="Kopiert eine datenschutzbereinigte Diagnose-Zusammenfassung (ohne private Benutzernamen, Tokens oder IP-Adressen) in die Zwischenablage"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedDiag ? '✓ Diagnose kopiert!' : '🛡️ Anonymisierte Diagnose kopieren'}</span>
               </button>
             </div>
           </div>

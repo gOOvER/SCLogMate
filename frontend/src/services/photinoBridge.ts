@@ -221,6 +221,7 @@ export interface FleetShipDto {
   insuranceType: string;
   acquisitionType: string;
   customNotes: string;
+  pipsResult?: PipsEvaluationResult;
 }
 
 export interface CatalogShipDto {
@@ -230,6 +231,7 @@ export interface CatalogShipDto {
   valueAuec: number;
   pledgeUsd: number;
   defaultInsurance: string;
+  pipsResult?: PipsEvaluationResult;
 }
 
 export interface FleetResponseDto {
@@ -986,6 +988,77 @@ export interface WikiInfo {
   storeLocations: WikiStoreLocation[];
 }
 
+export interface GunVelocityInfo {
+  gunName: string;
+  speedMps: number;
+  ammoType: string;
+  category: string;
+}
+
+export interface PipsEvaluationResult {
+  pipCount: number;
+  isSynchronized: boolean;
+  speedsMps: number[];
+  speedSpreadMps: number;
+  rating: 'Perfect' | 'Compatible' | 'SplitPips' | 'NoGuns';
+  summaryBadge: string;
+  advice: string;
+  guns: GunVelocityInfo[];
+}
+
+export interface ScannedShipComponent {
+  slotType: string;
+  slotLabel: string;
+  componentName: string;
+}
+
+export interface ScreenshotLoadoutResult {
+  success: boolean;
+  shipName?: string;
+  livery?: string;
+  components: ScannedShipComponent[];
+  sourceFile?: string;
+  message?: string;
+}
+
+export interface ShipComparisonSideDto {
+  name: string;
+  manufacturer: string;
+  manufacturerBadge: string;
+  manufacturerColor: string;
+  role: string;
+  pledgeValueUsd: number;
+  estimatedValueAuec: number;
+  defaultInsurance: string;
+  isInHangar: boolean;
+  acquisitionType: string;
+  padSize: string;
+  totalScu: number;
+  maxContainerScu: number;
+  cargoAccessType: string;
+  canLandPlanetside: boolean;
+  requiresDockingCollar: boolean;
+  length?: number | null;
+  beam?: number | null;
+  height?: number | null;
+  mass?: number | null;
+  crewMin?: number | null;
+  crewMax?: number | null;
+  quantumFuel?: number | null;
+  imageUrl?: string | null;
+  flightCount: number;
+  quantumJumps: number;
+  lossCount: number;
+  lastFlown: string;
+  pipsResult?: PipsEvaluationResult | null;
+  storeLocations: WikiStoreLocation[];
+}
+
+export interface ShipComparisonDataDto {
+  shipA?: ShipComparisonSideDto | null;
+  shipB?: ShipComparisonSideDto | null;
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -1167,9 +1240,152 @@ class PhotinoBridge {
     return this.sendRequest<{ markdown: string }>('export_player_report', params);
   }
 
+  public evaluateShipPips(shipName?: string, guns?: string[]): Promise<PipsEvaluationResult> {
+    return this.sendRequest<PipsEvaluationResult>('evaluate_ship_pips', { shipName, guns });
+  }
+
+  public getShipComparisonData(shipA: string, shipB: string): Promise<ShipComparisonDataDto> {
+    return this.sendRequest<ShipComparisonDataDto>('get_ship_comparison_data', { shipA, shipB });
+  }
+
+  public scanScreenshotLoadout(filePath?: string): Promise<ScreenshotLoadoutResult> {
+    return this.sendRequest<ScreenshotLoadoutResult>('scan_screenshot_loadout', { filePath });
+  }
+
+  public toggleScreenshotWatcher(enabled: boolean, folder?: string): Promise<{ isWatching: boolean; folder?: string }> {
+    return this.sendRequest<{ isWatching: boolean; folder?: string }>('toggle_screenshot_watcher', { enabled, folder });
+  }
+
+  public getSanitizedDiagnosticSummary(): Promise<{ summary: string }> {
+    return this.sendRequest<{ summary: string }>('get_sanitized_diagnostic_summary');
+  }
+
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'evaluate_ship_pips':
+        return {
+          pipCount: 1,
+          isSynchronized: true,
+          speedsMps: [1480],
+          speedSpreadMps: 0,
+          rating: 'Perfect',
+          summaryBadge: '1 Pip (1480 m/s)',
+          advice: 'Ausgezeichnet! Alle Bordwaffen teilen sich denselben Vorhaltepunkt.',
+          guns: [
+            { gunName: 'CF-337 Panther Repeater', speedMps: 1480, ammoType: 'Laser Repeater', category: 'Energy' },
+            { gunName: 'CF-337 Panther Repeater', speedMps: 1480, ammoType: 'Laser Repeater', category: 'Energy' }
+          ]
+        } as PipsEvaluationResult;
+
+      case 'get_ship_comparison_data':
+        return {
+          shipA: {
+            name: payload?.shipA || 'Cutlass Black',
+            manufacturer: 'Drake Interplanetary',
+            manufacturerBadge: 'DRAK',
+            manufacturerColor: '#4ade80',
+            role: 'Medium Fighter / Medium Freight',
+            pledgeValueUsd: 110,
+            estimatedValueAuec: 2110000,
+            defaultInsurance: 'LTI (Lifetime)',
+            isInHangar: true,
+            acquisitionType: 'Pledge Store',
+            padSize: 'Medium',
+            totalScu: 46,
+            maxContainerScu: 32,
+            cargoAccessType: 'Heckrampe',
+            canLandPlanetside: true,
+            requiresDockingCollar: false,
+            length: 29,
+            beam: 26,
+            height: 10,
+            mass: 226000,
+            crewMin: 1,
+            crewMax: 2,
+            quantumFuel: 2500,
+            imageUrl: null,
+            flightCount: 14,
+            quantumJumps: 38,
+            lossCount: 2,
+            lastFlown: '16.09.2026 21:30',
+            pipsResult: {
+              pipCount: 1,
+              isSynchronized: true,
+              speedsMps: [1480],
+              speedSpreadMps: 0,
+              rating: 'Perfect',
+              summaryBadge: '1 Pip (1480 m/s)',
+              advice: 'Synchronisierte Laser-Repeater.',
+              guns: []
+            },
+            storeLocations: [
+              { storeName: 'New Deal', location: 'Lorville · Hurston', priceAuec: 2110000, rentPrice1dAuec: 42000 }
+            ]
+          } as ShipComparisonSideDto,
+          shipB: {
+            name: payload?.shipB || 'Freelancer',
+            manufacturer: 'MISC',
+            manufacturerBadge: 'MISC',
+            manufacturerColor: '#38bdf8',
+            role: 'Freighter',
+            pledgeValueUsd: 110,
+            estimatedValueAuec: 2350000,
+            defaultInsurance: '120M',
+            isInHangar: false,
+            acquisitionType: 'Geliehen / Free Fly',
+            padSize: 'Medium',
+            totalScu: 66,
+            maxContainerScu: 32,
+            cargoAccessType: 'Heckrampe',
+            canLandPlanetside: true,
+            requiresDockingCollar: true,
+            length: 38,
+            beam: 23.5,
+            height: 9.5,
+            mass: 220000,
+            crewMin: 1,
+            crewMax: 4,
+            quantumFuel: 3000,
+            imageUrl: null,
+            flightCount: 4,
+            quantumJumps: 11,
+            lossCount: 0,
+            lastFlown: '12.09.2026 19:15',
+            pipsResult: {
+              pipCount: 1,
+              isSynchronized: true,
+              speedsMps: [1400],
+              speedSpreadMps: 0,
+              rating: 'Perfect',
+              summaryBadge: '1 Pip (1400 m/s)',
+              advice: 'Synchronisierte Ballistik-Kanonen.',
+              guns: []
+            },
+            storeLocations: [
+              { storeName: 'Astro Armada', location: 'Area18 · ArcCorp', priceAuec: 2350000, rentPrice1dAuec: 47000 }
+            ]
+          } as ShipComparisonSideDto
+        } as ShipComparisonDataDto;
+
+      case 'scan_screenshot_loadout':
+        return {
+          success: true,
+          shipName: 'Cutlass Black',
+          livery: 'Coalition Paint',
+          components: [
+            { slotType: 'Weapon', slotLabel: 'Pilot Hardpoint 1', componentName: 'CF-337 Panther' },
+            { slotType: 'Weapon', slotLabel: 'Pilot Hardpoint 2', componentName: 'CF-337 Panther' },
+            { slotType: 'Shield', slotLabel: 'Shield 1', componentName: 'FR-66' },
+            { slotType: 'QuantumDrive', slotLabel: 'Quantum Drive', componentName: 'Atlas' }
+          ],
+          message: 'Loadout erfolgreich aus Screenshot erkannt!'
+        } as ScreenshotLoadoutResult;
+
+      case 'get_sanitized_diagnostic_summary':
+        return {
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.0.0-rc2\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+        };
       case 'get_chat_messages':
         return [
           {
