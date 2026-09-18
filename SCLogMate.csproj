@@ -13,9 +13,11 @@
     <Product>SCLogMate</Product>
     <Title>SCLogMate</Title>
     <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
-    <Version>1.0.0-rc2</Version>
+    <Version>1.0.0-rc3</Version>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/gOOvER/SCLogMate</PackageProjectUrl>
     <ApplicationIcon>SCLogMate.ico</ApplicationIcon>
     <!-- Single-File Publishing (alles in einer einzigen kompakten .exe) -->
     <PublishSingleFile>true</PublishSingleFile>

@@ -1449,7 +1449,7 @@ class PhotinoBridge {
 
       case 'get_sanitized_diagnostic_summary':
         return {
-          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.0.0-rc2\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.0.0-rc3\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
         };
       case 'get_chat_messages':
         return [
@@ -1530,8 +1530,8 @@ class PhotinoBridge {
       case 'check_update':
         return {
           updateAvailable: false,
-          currentVersion: 'v1.0.0-rc2',
-          newVersion: 'v1.0.0-rc2',
+          currentVersion: 'v1.0.0-rc3',
+          newVersion: 'v1.0.0-rc3',
           releaseNotes: '',
           htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
         } as UpdateInfoDto;

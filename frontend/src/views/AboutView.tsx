@@ -24,7 +24,7 @@ export const AboutView: React.FC = () => {
       if (res && res.updateAvailable) {
         setUpdateStatusMsg(`Update ${res.newVersion} verfügbar!`);
       } else {
-        setUpdateStatusMsg(`SCLogMate ist auf dem neuesten Stand (${res?.currentVersion || 'v1.0.0-rc2'}).`);
+        setUpdateStatusMsg(`SCLogMate ist auf dem neuesten Stand (${res?.currentVersion || 'v1.0.0-rc3'}).`);
       }
     } catch (e) {
       setUpdateStatusMsg('Fehler bei der Update-Prüfung');
@@ -49,7 +49,7 @@ export const AboutView: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-black text-white tracking-wider">SCLogMate</h1>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-sky-950 text-sky-400 border border-sky-800">
-                  v1.0.0-rc2
+                  v1.0.0-rc3
                 </span>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
                   LIVE COMPANION
@@ -230,7 +230,7 @@ export const AboutView: React.FC = () => {
           </div>
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80">
             <div className="text-slate-400">Lizenz</div>
-            <div className="font-bold text-white mt-1">GPL-3.0 / Freie Software</div>
+            <div className="font-bold text-white mt-1">GNU AGPLv3 (ab RC3)</div>
           </div>
         </div>
       </div>

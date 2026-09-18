@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Made `Database.InsertCustomEvent` idempotent to prevent duplicate records in SQLite.
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
+### Changed
+- **License Migration to GNU Affero General Public License v3 (`LICENSE`, `README.md`, `SCLogMate.csproj`, `package.json`, `AboutView.tsx`)**:
+  - Re-licensed SCLogMate under the **GNU Affero General Public License v3.0 (AGPL-3.0-or-later)** starting from version **v1.0.0-rc3**, reflecting the complete architectural rewrite, native .NET 10 migration, Photino.NET desktop engine, and community data subsystems.
+  - Retained historical MIT License attribution for early foundation versions up to **v1.0.0-rc2**.
+  - Updated repository `LICENSE` file, `README.md` license badges and English/German disclaimer sections, NuGet `PackageLicenseExpression` in `SCLogMate.csproj`, and the in-app About information modal.
+- **Version Bump to `v1.0.0-rc3` (`SCLogMate.csproj`, `package.json`, `AboutView.tsx`, `photinoBridge.ts`)**:
+  - Bumped project release version to `1.0.0-rc3` across build configurations and user interface metadata.
+
 ### Added
 - **Interactive Ship Loadout & Livery Inspection Modal (`ShipLoadoutModal.tsx`, `FleetView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
   - Added a dedicated `ShipLoadoutModal` allowing pilots to inspect installed components (pilot hardpoints, shield generators, quantum drives, power plants, coolers) and active liveries/paints for each hull.

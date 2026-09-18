@@ -5,8 +5,7 @@
 [![VirusTotal Clean](https://img.shields.io/badge/VirusTotal-Clean%20(0%2F70)-34D399?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/search/SCLogMate)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows&logoColor=white)](https://github.com/gOOvER/SCLogMate/releases)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Star Citizen](https://img.shields.io/badge/Star%20Citizen-4.x%20PU%20Ready-F59E0B)](https://robertsspaceindustries.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-6E7681.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL_3.0-blue.svg)](LICENSE)
 
 [🇬🇧 English](#-english) &nbsp;|&nbsp; [🇩🇪 Deutsch](#-deutsch)
 
@@ -128,6 +127,17 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ---
 
+## 📜 Disclaimer & License (English)
+
+This is an unofficial, community-made tool and is **not affiliated with** Cloud Imperium Games (CIG) or Roberts Space Industries (RSI).
+
+- Historically based on [SCLogReader](https://github.com/miwidot/SCLogReader) by **miwidot** (versions up to v1.0.0-rc2 under MIT License).
+- Starting from version **v1.0.0-rc3** (complete architectural rewrite & major overhaul), licensed under the **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
+- Game data powered by [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
+- Trade telemetry powered by [UEX Corp](https://uexcorp.space).
+
+---
+
 <br/>
 
 ---
@@ -232,12 +242,11 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
 
 ---
 
-## 📜 Disclaimer & Lizenz
+## 📜 Disclaimer & Lizenz (Deutsch)
 
 Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
 
-- Basiert auf dem Originalprojekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot**.
+- Basiert historisch auf dem Projekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
+- Ab Version **v1.0.0-rc3** (vollständiger Architektur-Rewrite & Systemüberarbeitung) lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
 - Externe Spieldaten via [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
 - Externe Handelsdaten via [UEX Corp](https://uexcorp.space).
-
-Lizenziert unter der [MIT-Lizenz](LICENSE).
