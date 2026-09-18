@@ -1080,6 +1080,158 @@ export interface ShipComparisonDataDto {
   shipB?: ShipComparisonSideDto | null;
 }
 
+// -------------------------------------------------------------
+// Mining & Rock-Cracking DTOs
+// -------------------------------------------------------------
+export interface MiningModifiersDto {
+  instability: number;
+  windowSize: number;
+  resistance: number;
+  shatterDamage: number;
+  clusterFactor: number;
+  windowRate: number;
+  catastrophicRate: number;
+}
+
+export interface MiningLaserDto {
+  id: string;
+  name: string;
+  size: number;
+  power: number;
+  extractionPower: number;
+  filterModifier: number;
+  throttleMinimum: number;
+  slots: number;
+  manufacturer: string;
+  modifiers: MiningModifiersDto;
+  description: string;
+}
+
+export interface MiningModuleDto {
+  id: string;
+  name: string;
+  type: string;
+  powerMultiplier: number;
+  extractionMultiplier: number;
+  charges: number;
+  lifetimeSeconds: number;
+  modifiers: MiningModifiersDto;
+  description: string;
+}
+
+export interface MiningGadgetDto {
+  id: string;
+  name: string;
+  modifiers: MiningModifiersDto;
+  description: string;
+}
+
+export interface RockPresetDto {
+  name: string;
+  mineral: string;
+  massKg: number;
+  resistance: number;
+  instability: number;
+}
+
+export interface MiningEquipmentResponseDto {
+  lasers: MiningLaserDto[];
+  modules: MiningModuleDto[];
+  gadgets: MiningGadgetDto[];
+  presets: RockPresetDto[];
+}
+
+export interface LaserAlternativeDto {
+  laserId: string;
+  name: string;
+  power: number;
+  powerDelivered: number;
+  ratio: number;
+  verdict: 'solo' | 'gadget' | 'crew' | 'none';
+  maxCrackableMassKg: number;
+  effectiveResistancePercent: number;
+}
+
+export interface CrackVerdictResultDto {
+  powerDelivered: number;
+  powerRequired: number;
+  ratio: number;
+  verdict: 'solo' | 'gadget' | 'crew' | 'none';
+  verdictTitle: string;
+  verdictBadge: string;
+  verdictColor: string;
+  effectiveResistancePercent: number;
+  effectiveInstabilityPercent: number;
+  windowPercent: number;
+  maxCrackableMassKg: number;
+  energyCapacity: number;
+  energyDecayPerSecond: number;
+  notes: string[];
+  alternatives: LaserAlternativeDto[];
+}
+
+export interface LaserHeadSelectionDto {
+  laserId: string;
+  moduleIds?: string[];
+}
+
+export interface RockCrackRequestDto {
+  massKg: number;
+  resistancePercent: number;
+  instabilityPercent: number;
+  mineralName?: string;
+  heads: LaserHeadSelectionDto[];
+  gadgetId?: string;
+}
+
+// -------------------------------------------------------------
+// Cargo-Fit & Grid Packer DTOs
+// -------------------------------------------------------------
+export interface PlacedCrateDto {
+  scu: number;
+  x: number;
+  y: number;
+  z: number;
+  dimX: number;
+  dimY: number;
+  dimZ: number;
+}
+
+export interface GridPackingResultDto {
+  gridName: string;
+  gridWidthCells: number;
+  gridLengthCells: number;
+  gridHeightCells: number;
+  capacityScu: number;
+  usedScu: number;
+  freeScu: number;
+  placedCrates: PlacedCrateDto[];
+}
+
+export interface FleetFitMatchDto {
+  shipName: string;
+  fits: boolean;
+  totalCapacityScu: number;
+  placedScu: number;
+  freeScu: number;
+  statusBadge: string;
+  statusColor: string;
+  notes?: string | null;
+}
+
+export interface CargoFitResultDto {
+  fits: boolean;
+  shipName: string;
+  requestedTotalScu: number;
+  totalCapacityScu: number;
+  totalPlacedScu: number;
+  remainingFreeScu: number;
+  leftoverCrates: Record<string, number>;
+  rejectionReasons: string[];
+  grids: GridPackingResultDto[];
+  compatibleFleetShips: FleetFitMatchDto[];
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -1295,6 +1447,18 @@ class PhotinoBridge {
 
   public clearCommunityData(): Promise<{ success: boolean; error?: string }> {
     return this.sendRequest('clear_community_data');
+  }
+
+  public getMiningEquipment(): Promise<MiningEquipmentResponseDto> {
+    return this.sendRequest<MiningEquipmentResponseDto>('get_mining_equipment');
+  }
+
+  public calculateRockCrack(req: RockCrackRequestDto): Promise<CrackVerdictResultDto> {
+    return this.sendRequest<CrackVerdictResultDto>('calculate_rock_crack', req);
+  }
+
+  public calculateCargoFit(shipName: string, crates: Record<number, number>): Promise<CargoFitResultDto> {
+    return this.sendRequest<CargoFitResultDto>('calculate_cargo_fit', { shipName, crates });
   }
 
   // Mock implementation for browser-only development
@@ -2625,6 +2789,84 @@ class PhotinoBridge {
             msrp: 600,
           }
         ] as WikiInfo[];
+
+      case 'get_mining_equipment':
+        return {
+          lasers: [
+            { id: 'helix_s1', name: 'Helix I', size: 1, power: 3900, extractionPower: 480, filterModifier: 0, throttleMinimum: 0.15, slots: 2, manufacturer: 'Thermyte', modifiers: { instability: -25, windowSize: -20, resistance: -30, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'High-power laser capable of cracking high-mass solo deposits.' },
+            { id: 'arbor_mh1', name: 'Arbor MH1', size: 1, power: 2340, extractionPower: 390, filterModifier: 0, throttleMinimum: 0.1, slots: 1, manufacturer: 'Shubin Interstellar', modifiers: { instability: 0, windowSize: 0, resistance: 0, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Standard balanced Prospector factory mining head.' },
+            { id: 'klein_s1', name: 'Klein-S1', size: 1, power: 3120, extractionPower: 440, filterModifier: 0, throttleMinimum: 0.1, slots: 2, manufacturer: 'Shubin Interstellar', modifiers: { instability: 10, windowSize: 20, resistance: 10, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Higher wattage with an enlarged optimal charge window.' },
+            { id: 'lancet_mh1', name: 'Lancet MH1', size: 1, power: 1800, extractionPower: 320, filterModifier: 0, throttleMinimum: 0.05, slots: 3, manufacturer: 'Greycat Industrial', modifiers: { instability: -75, windowSize: 40, resistance: -20, shatterDamage: -50, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Precision laser with maximum stability for volatile Quantanium.' }
+          ],
+          modules: [
+            { id: 'mod_focus3', name: 'Focus III', type: 'passive', powerMultiplier: 1.0, extractionMultiplier: 1.0, charges: 0, lifetimeSeconds: 0, modifiers: { instability: -25, windowSize: 20, resistance: 0, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Significantly widens optimal charge window.' },
+            { id: 'mod_surge', name: 'Surge', type: 'active', powerMultiplier: 1.5, extractionMultiplier: 1.0, charges: 5, lifetimeSeconds: 7.0, modifiers: { instability: 20, windowSize: 0, resistance: -10, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Active power burst: +50% fracture power for 7 seconds.' },
+            { id: 'mod_brand', name: 'Brand', type: 'passive', powerMultiplier: 1.15, extractionMultiplier: 1.0, charges: 0, lifetimeSeconds: 0, modifiers: { instability: 10, windowSize: 0, resistance: 0, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Increases continuous fracture beam power by 15%.' }
+          ],
+          gadgets: [
+            { id: 'gadget_boremax', name: 'BoreMax', modifiers: { instability: 10, windowSize: 15, resistance: -25, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Attaches to rock to reduce resistance by -25%.' },
+            { id: 'gadget_optimax', name: 'OptiMax', modifiers: { instability: -20, windowSize: 35, resistance: -10, shatterDamage: 0, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Widens the optimal charge zone and calms instability.' },
+            { id: 'gadget_waveshift', name: 'WaveShift', modifiers: { instability: 0, windowSize: 0, resistance: -35, shatterDamage: -20, clusterFactor: 0, windowRate: 0, catastrophicRate: 0 }, description: 'Massive resistance reduction (-35%) for ultra-dense rocks.' }
+          ],
+          presets: [
+            { name: 'Quantanium Asteroid (Extrem)', mineral: 'Quantanium', massKg: 5200, resistance: 72, instability: 78 },
+            { name: 'Beryll Brocken (Mittel)', mineral: 'Beryl', massKg: 8500, resistance: 45, instability: 40 },
+            { name: 'Gold Ader (Standard)', mineral: 'Gold', massKg: 6000, resistance: 55, instability: 50 }
+          ]
+        } as MiningEquipmentResponseDto;
+
+      case 'calculate_rock_crack':
+        const mass = payload?.massKg || 5000;
+        const res = payload?.resistancePercent || 50;
+        const reqP = Math.round(0.36 * mass);
+        const delP = Math.round(3900 * (1 - res / 100));
+        const rRatio = reqP > 0 ? delP / reqP : 1.0;
+        return {
+          powerDelivered: delP,
+          powerRequired: reqP,
+          ratio: Math.round(rRatio * 1000) / 1000,
+          verdict: rRatio >= 1.15 ? 'solo' : rRatio >= 0.70 ? 'gadget' : 'crew',
+          verdictTitle: rRatio >= 1.15 ? 'Solo machbar' : rRatio >= 0.70 ? 'Gadget / Modul nötig' : 'Multi-Crew erforderlich',
+          verdictBadge: rRatio >= 1.15 ? 'SOLO BRECHBAR ✓' : rRatio >= 0.70 ? 'GADGET EMPFOHLEN ⚡' : 'ZU SCHWER FÜR SOLO ✖',
+          verdictColor: rRatio >= 1.15 ? '#10B981' : rRatio >= 0.70 ? '#F59E0B' : '#EF4444',
+          effectiveResistancePercent: res,
+          effectiveInstabilityPercent: payload?.instabilityPercent || 40,
+          windowPercent: 12.0,
+          maxCrackableMassKg: Math.round(delP / (0.36 * 1.15)),
+          energyCapacity: mass * 10,
+          energyDecayPerSecond: mass * 0.2,
+          notes: ['Laser leistet ausreichend Watt für diesen Gesteinsbrocken.'],
+          alternatives: []
+        } as CrackVerdictResultDto;
+
+      case 'calculate_cargo_fit':
+        const cMap = payload?.crates || { 32: 2, 16: 2 };
+        const reqScu = Object.entries(cMap).reduce((s, [k, v]) => s + Number(k) * Number(v), 0);
+        return {
+          fits: true,
+          shipName: payload?.shipName || 'Crusader C2 Hercules',
+          requestedTotalScu: reqScu,
+          totalCapacityScu: 696,
+          totalPlacedScu: reqScu,
+          remainingFreeScu: Math.max(0, 696 - reqScu),
+          leftoverCrates: {},
+          rejectionReasons: [],
+          grids: [
+            {
+              gridName: 'Main Deck Front',
+              gridWidthCells: 6,
+              gridLengthCells: 24,
+              gridHeightCells: 4,
+              capacityScu: 480,
+              usedScu: reqScu,
+              freeScu: 480 - reqScu,
+              placedCrates: []
+            }
+          ],
+          compatibleFleetShips: [
+            { shipName: 'Crusader C2 Hercules', fits: true, totalCapacityScu: 696, placedScu: reqScu, freeScu: 696 - reqScu, statusBadge: 'PASST PERFEKT ✓', statusColor: '#10B981' }
+          ]
+        } as CargoFitResultDto;
     }
   }
 }

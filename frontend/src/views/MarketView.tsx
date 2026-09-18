@@ -28,10 +28,15 @@ import {
   Info,
   Anchor,
   Shield,
+  Package,
 } from 'lucide-react';
+import { CargoFitModal } from '../components/CargoFitModal';
 
 export const MarketView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'routes' | 'containers' | 'constraints' | 'salvage' | 'calculator'>('routes');
+  const [isCargoFitOpen, setIsCargoFitOpen] = useState<boolean>(false);
+  const [cargoFitShip, setCargoFitShip] = useState<string>('Crusader C2 Hercules');
+  const [cargoFitCrates, setCargoFitCrates] = useState<Record<number, number>>({ 32: 2, 16: 2 });
   const [commodities, setCommodities] = useState<MarketCommodityDto[]>([]);
   const [tradeRoutes, setTradeRoutes] = useState<TradeRouteDto[]>([]);
   const [salvagePrices, setSalvagePrices] = useState<SalvagePriceSummaryDto[]>([]);
@@ -115,6 +120,21 @@ export const MarketView: React.FC = () => {
     } catch (err) {
       console.error('Failed to load autoload entries:', err);
     }
+  };
+
+  const openCargoFitForRoute = (scu: number) => {
+    const cMap: Record<number, number> = {};
+    let rem = scu;
+    for (const sz of [32, 24, 16, 8, 4, 2, 1]) {
+      if (rem >= sz) {
+        const count = Math.floor(rem / sz);
+        cMap[sz] = count;
+        rem -= count * sz;
+      }
+    }
+    setCargoFitCrates(cMap);
+    setCargoFitShip(cargoScu >= 600 ? 'Crusader C2 Hercules' : cargoScu >= 170 ? 'RSI Constellation Taurus' : 'Drake Cutlass Black');
+    setIsCargoFitOpen(true);
   };
 
   const handleDiscardAutoLoad = async (id: string) => {
@@ -480,6 +500,15 @@ export const MarketView: React.FC = () => {
           <span>Warenrechner</span>
         </button>
 
+        <button
+          onClick={() => setIsCargoFitOpen(true)}
+          className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-bold rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/60 shadow-[0_0_10px_rgba(0,240,255,0.2)] transition cursor-pointer"
+          title="Prüfe physische Kisten-Passung & Gitterplatzierung für Schiffe"
+        >
+          <Package className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Laderaum-Gitterpacker</span>
+        </button>
+
         {/* SCT Dual-Source Status Badge */}
         {sctStatus && (
           <div className="ml-auto hidden lg:flex items-center gap-2 text-[10px] font-mono text-slate-400 bg-[#02050c] px-2.5 py-1 rounded border border-cyan-950">
@@ -795,6 +824,15 @@ export const MarketView: React.FC = () => {
                         📦 {r.boxCount} Kisten ({r.boxBreakdown})
                       </div>
                     </div>
+
+                    {/* Cargo-Fit Button */}
+                    <button
+                      onClick={() => openCargoFitForRoute(r.maxScu || cargoScu)}
+                      className="mt-2 w-full py-1.5 rounded bg-cyan-950/40 hover:bg-cyan-900/60 text-[11px] font-mono text-cyan-300 hover:text-cyan-100 transition flex items-center justify-center gap-1.5 border border-cyan-950 hover:border-cyan-500/50 cursor-pointer"
+                    >
+                      <Package className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Laderaum-Passung prüfen (Cargo-Fit)</span>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1707,6 +1745,16 @@ export const MarketView: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Cargo-Fit 3D/2D Grid Packing Modal */}
+      {isCargoFitOpen && (
+        <CargoFitModal
+          isOpen={isCargoFitOpen}
+          onClose={() => setIsCargoFitOpen(false)}
+          initialShipName={cargoFitShip}
+          initialCrates={cargoFitCrates}
+        />
       )}
     </div>
   );

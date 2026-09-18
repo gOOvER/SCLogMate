@@ -2067,6 +2067,117 @@ public class PhotinoBridge
                         break;
                     }
 
+                case "get_mining_equipment":
+                    {
+                        var miningEquip = new
+                        {
+                            lasers = RockCracking.Lasers,
+                            modules = RockCracking.Modules,
+                            gadgets = RockCracking.Gadgets,
+                            presets = new object[]
+                            {
+                                new { name = "Quantanium Asteroid (Extrem)", mineral = "Quantanium", massKg = 5200.0, resistance = 72.0, instability = 78.0 },
+                                new { name = "Beryll Brocken (Mittel)", mineral = "Beryl", massKg = 8500.0, resistance = 45.0, instability = 40.0 },
+                                new { name = "Gold Ader (Standard)", mineral = "Gold", massKg = 6000.0, resistance = 55.0, instability = 50.0 },
+                                new { name = "Laranite Monolith (Schwer)", mineral = "Laranite", massKg = 7200.0, resistance = 60.0, instability = 55.0 },
+                                new { name = "Eisen / Titan (Leicht / Groß)", mineral = "Iron", massKg = 14000.0, resistance = 22.0, instability = 25.0 }
+                            }
+                        };
+                        SendResponse(req.Id, "get_mining_equipment_response", miningEquip);
+                        break;
+                    }
+
+                case "calculate_rock_crack":
+                    {
+                        double mass = 5000;
+                        double res = 50;
+                        double inst = 40;
+                        string? mineral = null;
+                        string? gadget = null;
+                        var heads = new List<LaserHeadSelection>();
+
+                        if (req.Payload.HasValue)
+                        {
+                            var p = req.Payload.Value;
+                            if (p.TryGetProperty("massKg", out var mProp)) mass = mProp.GetDouble();
+                            if (p.TryGetProperty("resistancePercent", out var rProp)) res = rProp.GetDouble();
+                            if (p.TryGetProperty("instabilityPercent", out var iProp)) inst = iProp.GetDouble();
+                            if (p.TryGetProperty("mineralName", out var mnProp)) mineral = mnProp.GetString();
+                            if (p.TryGetProperty("gadgetId", out var gProp)) gadget = gProp.GetString();
+
+                            if (p.TryGetProperty("heads", out var hProp) && hProp.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var hElem in hProp.EnumerateArray())
+                                {
+                                    string lId = "helix_s1";
+                                    if (hElem.TryGetProperty("laserId", out var lidProp)) lId = lidProp.GetString() ?? "helix_s1";
+                                    var modIds = new List<string>();
+                                    if (hElem.TryGetProperty("moduleIds", out var modsProp) && modsProp.ValueKind == JsonValueKind.Array)
+                                    {
+                                        foreach (var mElem in modsProp.EnumerateArray())
+                                        {
+                                            var mid = mElem.GetString();
+                                            if (!string.IsNullOrEmpty(mid)) modIds.Add(mid);
+                                        }
+                                    }
+                                    heads.Add(new LaserHeadSelection(lId, modIds));
+                                }
+                            }
+                        }
+
+                        if (heads.Count == 0)
+                        {
+                            heads.Add(new LaserHeadSelection("helix_s1", ["mod_focus3"]));
+                        }
+
+                        var rock = new RockScanInput(mass, res, inst, mineral);
+                        var crackResult = RockCracking.Assess(rock, heads, gadget);
+                        SendResponse(req.Id, "calculate_rock_crack_response", crackResult);
+                        break;
+                    }
+
+                case "calculate_cargo_fit":
+                    {
+                        string ship = "Crusader C2 Hercules";
+                        var crates = new Dictionary<int, int>();
+
+                        if (req.Payload.HasValue)
+                        {
+                            var p = req.Payload.Value;
+                            if (p.TryGetProperty("shipName", out var sProp)) ship = sProp.GetString() ?? "Crusader C2 Hercules";
+                            if (p.TryGetProperty("crates", out var cProp) && cProp.ValueKind == JsonValueKind.Object)
+                            {
+                                foreach (var prop in cProp.EnumerateObject())
+                                {
+                                    if (int.TryParse(prop.Name, out int scuSize) && prop.Value.TryGetInt32(out int count))
+                                    {
+                                        if (count > 0) crates[scuSize] = count;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (crates.Count == 0)
+                        {
+                            // Standard default load: 2x 32 SCU + 2x 16 SCU
+                            crates[32] = 2;
+                            crates[16] = 2;
+                        }
+
+                        List<string>? ownedShips = null;
+                        try
+                        {
+                            var fromFlight = Database.GetFleetStats().Select(s => s.Ship);
+                            var fromHangar = Database.GetAllFleetCustomData().Where(kv => kv.Value.InHangar).Select(kv => kv.Key);
+                            ownedShips = fromFlight.Concat(fromHangar).Distinct().ToList();
+                        }
+                        catch { }
+
+                        var fitResult = CargoFit.Pack(ship, crates, ownedShips);
+                        SendResponse(req.Id, "calculate_cargo_fit_response", fitResult);
+                        break;
+                    }
+
                 case "toggle_screenshot_watcher":
                     {
                         bool scrEnable = true;

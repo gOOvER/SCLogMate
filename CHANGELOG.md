@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bumped project release version to `1.0.0-rc3` across build configurations and user interface metadata.
 
 ### Added
+- **Rock-Cracking Mining Calculator ("Can I Crack It?") (`Core/MiningCalculator.cs`, `OreScannerView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Implemented a Star Citizen 4.x rock-cracking fracture power solver in `Core/MiningCalculator.cs` applying the official formula $P_{\text{req}} = 0.36 \times \text{Mass} \times (1 + \text{Instability} \times 0.20)$ and delivered power $P_{\text{del}} = P_{\text{laser}} \times (1 - \text{Resistance}_{\text{eff}})$.
+  - Added comprehensive database of mining lasers (Helix, Arbor, Klein, Lancet, Hofstede, Impact), active/passive modules (Focus III, Surge, Brand, Torpid, Vaux, Stampede), mining gadgets (BoreMax, OptiMax, WaveShift, Sabir, Stalwart), and deposit presets.
+  - Upgraded `OreScannerView.tsx` with a dedicated "Gesteins-Knack-Rechner" tab featuring live sliders, Prospector vs. MOLE multi-head setups, real-time solo/gadget/multi-crew verdict badges, power gauges, and a head-to-head laser comparison table.
+  - Connected the Radar Decoder to the calculator with 1-click preset transfer from scanned RS-signatures into rock parameters.
+- **Physical Cargo-Fit 3D/2D Grid Packing Engine (`Core/CargoFitCalculator.cs`, `CargoFitModal.tsx`, `MarketView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Added physical cargo grid packing calculation in `Core/CargoFitCalculator.cs` with support for standard 1.25m cell coordinates, multi-deck cargo holds, and Star Citizen 32/24/16/8/4/2/1 SCU crate dimensions.
+  - Enforced hull-specific MaxBox height restrictions (e.g. Drake Corsair, Cutlass Black, Spirit C1, Freelancer) rejecting oversized containers that cannot clear cargo bay ceilings.
+  - Implemented `CargoFitModal.tsx` with interactive crate steppers, presets, visual grid placement breakdowns, rejection diagnosis, and automated hangar fleet compatibility check.
+  - Integrated Cargo-Fit directly into `MarketView.tsx` with a top-level launcher and 1-click cargo hold verification on smart trade route recommendations.
 - **Interactive Ship Loadout & Livery Inspection Modal (`ShipLoadoutModal.tsx`, `FleetView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
   - Added a dedicated `ShipLoadoutModal` allowing pilots to inspect installed components (pilot hardpoints, shield generators, quantum drives, power plants, coolers) and active liveries/paints for each hull.
   - Added component and livery indicator badges to fleet table rows with 1-click loadout modal opening.
