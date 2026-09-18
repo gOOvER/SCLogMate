@@ -17,9 +17,12 @@ import {
   Warehouse,
   Camera,
   Scale,
+  Wrench,
+  Palette,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
 import { ShipCompareModal } from '../components/ShipCompareModal';
+import { ShipLoadoutModal } from '../components/ShipLoadoutModal';
 
 export const FleetView: React.FC = () => {
   const [fleetData, setFleetData] = useState<FleetResponseDto | null>(null);
@@ -36,6 +39,10 @@ export const FleetView: React.FC = () => {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
   const [compareShipA, setCompareShipA] = useState<string | undefined>(undefined);
   const [compareShipB, setCompareShipB] = useState<string | undefined>(undefined);
+
+  // Loadout inspection modal state
+  const [isLoadoutModalOpen, setIsLoadoutModalOpen] = useState<boolean>(false);
+  const [selectedLoadoutShip, setSelectedLoadoutShip] = useState<FleetShipDto | null>(null);
 
   // Screenshot scan state
   const [isScanningScreenshot, setIsScanningScreenshot] = useState<boolean>(false);
@@ -595,6 +602,38 @@ export const FleetView: React.FC = () => {
                             </span>
                           </div>
 
+                          {/* Livery / Lackierung & Loadout Button */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {ship.livery && (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[9.5px] font-mono border border-purple-500/40 bg-purple-950/30 text-purple-300 flex items-center gap-1"
+                                title={`Lackierung: ${ship.livery}`}
+                              >
+                                <Palette className="w-2.5 h-2.5 text-purple-400" />
+                                <span className="truncate max-w-[120px]">{ship.livery}</span>
+                              </span>
+                            )}
+
+                            {Array.isArray(ship.components) && ship.components.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedLoadoutShip(ship);
+                                  setIsLoadoutModalOpen(true);
+                                }}
+                                className="px-1.5 py-0.2 rounded text-[9.5px] font-mono border border-cyan-800/60 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 flex items-center gap-1 transition cursor-pointer"
+                                title="Ausrüstung & Komponenten im Detail ansehen"
+                              >
+                                <Wrench className="w-2.5 h-2.5 text-cyan-400" />
+                                <span>{ship.components.length} Ausrüstung</span>
+                                {ship.componentsUpdatedAt && (
+                                  <span className="text-emerald-400 font-bold" title="Aus VLM-Screenshot erfasst">
+                                    ✓
+                                  </span>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
                           {/* Custom Notes inline hint */}
                           {ship.customNotes && !isEditingNotes && (
                             <span
@@ -703,6 +742,18 @@ export const FleetView: React.FC = () => {
                       {/* 7. Aktionen */}
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Ausrüstung & Komponenten */}
+                          <button
+                            onClick={() => {
+                              setSelectedLoadoutShip(ship);
+                              setIsLoadoutModalOpen(true);
+                            }}
+                            className="p-1.5 rounded bg-[#071322] hover:bg-cyan-950/60 border border-[#14263B] hover:border-cyan-700 text-cyan-400 transition cursor-pointer"
+                            title="Ausrüstung, Komponenten & Lackierung im Detail ansehen"
+                          >
+                            <Wrench className="w-3 h-3" />
+                          </button>
+
                           {/* Vergleichen */}
                           <button
                             onClick={() => {
@@ -903,6 +954,16 @@ export const FleetView: React.FC = () => {
           onOpenWikiDossier={(sName) => {
             window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: sName }));
           }}
+        />
+      )}
+
+      {/* ══ MODAL: SCHIFFS-AUSRÜSTUNG & LOADOUT ══ */}
+      {isLoadoutModalOpen && (
+        <ShipLoadoutModal
+          isOpen={isLoadoutModalOpen}
+          onClose={() => setIsLoadoutModalOpen(false)}
+          ship={selectedLoadoutShip}
+          onRefreshFleet={fetchFleet}
         />
       )}
     </div>

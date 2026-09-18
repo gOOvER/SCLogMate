@@ -200,6 +200,24 @@ public static partial class PipsAnalyzer
     };
 
     /// <summary>
+    /// Liefert die bekannten Standard-Waffen für ein Schiff zurück.
+    /// </summary>
+    public static IReadOnlyList<string>? GetStockWeaponsForShip(string? shipName)
+    {
+        if (string.IsNullOrWhiteSpace(shipName)) return null;
+        var clean = Ships.NormalizeModelName(shipName.Split('·')[0].Trim());
+        foreach (var (shipKey, guns) in StockShipWeapons)
+        {
+            if (clean.Contains(shipKey, StringComparison.OrdinalIgnoreCase) ||
+                shipKey.Contains(clean, StringComparison.OrdinalIgnoreCase))
+            {
+                return guns;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Analysiert eine Liste von montierten Waffen und berechnet die Vorhaltepunkte (Pips).
     /// </summary>
     public static PipsEvaluationResult EvaluateGuns(IEnumerable<string>? gunNames)

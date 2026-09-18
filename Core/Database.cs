@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 25; // Erhöhen bei Tabellen- oder Spalten-Änderungen
+    public const int CurrentSchemaVersion = 26; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v26: fleet_user_ships livery & components)
     public const int CurrentParserVersion = 36; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -617,6 +617,23 @@ public static class Database
             Exec(db, "PRAGMA user_version = 25;");
             dbSchemaVersion = 25;
             Logger.Log("DB Schema: Migration auf v25 (learned_blueprints für SCMDB Import & manuelle Baupläne) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 26)
+        {
+            try
+            {
+                try { Exec(db, "ALTER TABLE fleet_user_ships ADD COLUMN livery TEXT;"); } catch { }
+                try { Exec(db, "ALTER TABLE fleet_user_ships ADD COLUMN components_json TEXT;"); } catch { }
+                try { Exec(db, "ALTER TABLE fleet_user_ships ADD COLUMN components_updated_at TEXT;"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v26 (fleet_user_ships livery & components)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 26;");
+            dbSchemaVersion = 26;
+            Logger.Log("DB Schema: Migration auf v26 (fleet_user_ships Lackierung & Komponenten-Speicherung) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2334,9 +2351,19 @@ public static class Database
 
     #endregion
 
-    #region Fleet Custom User Ships (Pledge, Insurance, Notes)
+    #region Fleet Custom User Ships (Pledge, Insurance, Notes, Livery, Components)
 
-    public record DbFleetCustomData(bool InHangar, bool IsPledge, int PledgeUsd, string Insurance, string Acquisition, string Notes);
+    public record DbFleetCustomData(
+        bool InHangar,
+        bool IsPledge,
+        int PledgeUsd,
+        string Insurance,
+        string Acquisition,
+        string Notes,
+        string? Livery = null,
+        string? ComponentsJson = null,
+        string? ComponentsUpdatedAt = null
+    );
 
     public static Dictionary<string, DbFleetCustomData> GetAllFleetCustomData()
     {
@@ -2347,7 +2374,7 @@ public static class Database
             using var db = new SqliteConnection(Conn);
             db.Open();
             using var cmd = db.CreateCommand();
-            cmd.CommandText = "SELECT name, COALESCE(in_hangar, 1), is_pledge, pledge_usd, insurance, acquisition, notes FROM fleet_user_ships;";
+            cmd.CommandText = "SELECT name, COALESCE(in_hangar, 1), is_pledge, pledge_usd, insurance, acquisition, notes, livery, components_json, components_updated_at FROM fleet_user_ships;";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -2358,11 +2385,14 @@ public static class Database
                 var insurance = r.GetString(4);
                 var acq = r.GetString(5);
                 var notes = r.GetString(6);
+                string? livery = r.FieldCount > 7 && !r.IsDBNull(7) ? r.GetString(7) : null;
+                string? compsJson = r.FieldCount > 8 && !r.IsDBNull(8) ? r.GetString(8) : null;
+                string? compsTs = r.FieldCount > 9 && !r.IsDBNull(9) ? r.GetString(9) : null;
 
                 var cat = FleetCatalog.Lookup(rawName);
                 var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : rawName;
 
-                var data = new DbFleetCustomData(inHangar, isPledge, pledgeUsd, insurance, acq, notes);
+                var data = new DbFleetCustomData(inHangar, isPledge, pledgeUsd, insurance, acq, notes, livery, compsJson, compsTs);
 
                 if (dict.TryGetValue(canonicalName, out var existing))
                 {
@@ -2372,7 +2402,11 @@ public static class Database
                     string mergedIns = !string.IsNullOrEmpty(insurance) && insurance != "LTI (Lifetime)" ? insurance : existing.Insurance;
                     string mergedAcq = mergedPledge ? "Pledge Store" : (!string.IsNullOrEmpty(acq) ? acq : existing.Acquisition);
                     string mergedNotes = !string.IsNullOrEmpty(existing.Notes) ? existing.Notes : notes;
-                    dict[canonicalName] = new DbFleetCustomData(mergedHangar, mergedPledge, mergedUsd, mergedIns, mergedAcq, mergedNotes);
+                    string? mergedLivery = !string.IsNullOrEmpty(livery) ? livery : existing.Livery;
+                    string? mergedComps = !string.IsNullOrEmpty(compsJson) ? compsJson : existing.ComponentsJson;
+                    string? mergedTs = !string.IsNullOrEmpty(compsTs) ? compsTs : existing.ComponentsUpdatedAt;
+
+                    dict[canonicalName] = new DbFleetCustomData(mergedHangar, mergedPledge, mergedUsd, mergedIns, mergedAcq, mergedNotes, mergedLivery, mergedComps, mergedTs);
                 }
                 else
                 {
@@ -2441,6 +2475,77 @@ public static class Database
             catch (Exception ex)
             {
                 Logger.Error("SaveFleetShipCustomData", ex);
+            }
+        }
+    }
+
+    public static void SaveFleetShipComponents(string name, string? livery, string componentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var cat = FleetCatalog.Lookup(name);
+        var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : name;
+        var nowStr = DateTime.UtcNow.ToString("o");
+
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO fleet_user_ships(name, in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes, livery, components_json, components_updated_at)
+                    VALUES($n, 1, 1, $u, $i, 'Pledge Store', '', $liv, $comps, $ts)
+                    ON CONFLICT(name) DO UPDATE SET
+                        in_hangar = 1,
+                        livery = CASE WHEN $liv IS NOT NULL AND $liv != '' THEN $liv ELSE fleet_user_ships.livery END,
+                        components_json = $comps,
+                        components_updated_at = $ts;";
+                cmd.Parameters.AddWithValue("$n", canonicalName);
+                cmd.Parameters.AddWithValue("$u", cat.PledgeValueUsd);
+                cmd.Parameters.AddWithValue("$i", cat.DefaultInsurance);
+                cmd.Parameters.AddWithValue("$liv", (object?)livery ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$comps", componentsJson);
+                cmd.Parameters.AddWithValue("$ts", nowStr);
+                cmd.ExecuteNonQuery();
+
+                if (!canonicalName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    using var delCmd = db.CreateCommand();
+                    delCmd.CommandText = "DELETE FROM fleet_user_ships WHERE name = $old;";
+                    delCmd.Parameters.AddWithValue("$old", name);
+                    delCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SaveFleetShipComponents", ex);
+            }
+        }
+    }
+
+    public static void ClearFleetShipComponents(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var cat = FleetCatalog.Lookup(name);
+        var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : name;
+
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = "UPDATE fleet_user_ships SET components_json = NULL, components_updated_at = NULL WHERE name = $n;";
+                cmd.Parameters.AddWithValue("$n", canonicalName);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ClearFleetShipComponents", ex);
             }
         }
     }

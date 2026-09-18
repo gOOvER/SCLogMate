@@ -379,6 +379,9 @@ public class FleetShipDto
     [JsonPropertyName("acquisitionType")] public string AcquisitionType { get; set; } = "";
     [JsonPropertyName("customNotes")] public string CustomNotes { get; set; } = "";
     [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
+    [JsonPropertyName("livery")] public string? Livery { get; set; }
+    [JsonPropertyName("componentsUpdatedAt")] public string? ComponentsUpdatedAt { get; set; }
+    [JsonPropertyName("components")] public List<ScannedShipComponent> Components { get; set; } = new();
 }
 
 public class CatalogShipDto
@@ -390,6 +393,7 @@ public class CatalogShipDto
     [JsonPropertyName("pledgeUsd")] public int PledgeUsd { get; set; }
     [JsonPropertyName("defaultInsurance")] public string DefaultInsurance { get; set; } = "";
     [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
+    [JsonPropertyName("components")] public List<ScannedShipComponent> Components { get; set; } = new();
 }
 
 public class ShipComparisonSideDto
@@ -1139,6 +1143,19 @@ public class PhotinoBridge
         _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
         _screenshotWatcher.OnLoadoutDetected += res =>
         {
+            try
+            {
+                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) && res.Components != null && res.Components.Count > 0)
+                {
+                    var compsJson = JsonSerializer.Serialize(res.Components, JsonOpts);
+                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson);
+                    Broadcast("FLEET_UPDATED", GetFleetResponse());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ScreenshotWatcher.OnLoadoutDetected Save", ex);
+            }
             Broadcast("SCREENSHOT_LOADOUT_DETECTED", res);
         };
         try
@@ -2014,8 +2031,39 @@ public class PhotinoBridge
                         else
                         {
                             var scrLoadoutRes = await _screenshotWatcher.AnalyzeScreenshotAsync(filePath);
+                            if (scrLoadoutRes.Success && !string.IsNullOrWhiteSpace(scrLoadoutRes.ShipName) && scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0)
+                            {
+                                try
+                                {
+                                    var compsJson = JsonSerializer.Serialize(scrLoadoutRes.Components, JsonOpts);
+                                    Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson);
+                                    Broadcast("FLEET_UPDATED", GetFleetResponse());
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error("scan_screenshot_loadout Save", ex);
+                                }
+                            }
                             SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes);
                         }
+                        break;
+                    }
+
+                case "clear_ship_components":
+                    {
+                        if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var cscProp))
+                        {
+                            var sName = cscProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(sName))
+                            {
+                                Database.ClearFleetShipComponents(sName);
+                                var fleetRes = GetFleetResponse();
+                                Broadcast("FLEET_UPDATED", fleetRes);
+                                SendResponse(req.Id, "clear_ship_components_response", fleetRes);
+                                break;
+                            }
+                        }
+                        SendResponse(req.Id, "clear_ship_components_response", GetFleetResponse());
                         break;
                     }
 
@@ -4526,6 +4574,12 @@ public class PhotinoBridge
                  _currentShip.Contains(canonicalName, StringComparison.OrdinalIgnoreCase) ||
                  canonicalName.Contains(_currentShip, StringComparison.OrdinalIgnoreCase));
 
+            customData.TryGetValue(canonicalName, out var cd);
+            if (cd == null) customData.TryGetValue(stat.Ship, out cd);
+
+            var (comps, liv, compsTs) = ResolveShipComponents(canonicalName, cd);
+            var ocrGuns = comps.Where(c => c.SlotType.Equals("Weapon", StringComparison.OrdinalIgnoreCase)).Select(c => c.ComponentName).ToList();
+
             var shipDto = new FleetShipDto
             {
                 Name = canonicalName,
@@ -4540,10 +4594,13 @@ public class PhotinoBridge
                 LossCount = stat.LossCount,
                 LastFlown = stat.LastTime.HasValue ? stat.LastTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—",
                 IsCurrent = isCurrent,
-                PipsResult = PipsAnalyzer.EvaluateShip(canonicalName),
+                PipsResult = ocrGuns.Count > 0 ? PipsAnalyzer.EvaluateGuns(ocrGuns) : PipsAnalyzer.EvaluateShip(canonicalName),
+                Livery = liv,
+                ComponentsUpdatedAt = compsTs,
+                Components = comps,
             };
 
-            if (customData.TryGetValue(shipDto.Name, out var cd) || customData.TryGetValue(stat.Ship, out cd))
+            if (cd != null)
             {
                 shipDto.IsInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
                 shipDto.IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store";
@@ -4579,6 +4636,9 @@ public class PhotinoBridge
                     (_currentShip.Equals(canonicalName, StringComparison.OrdinalIgnoreCase) ||
                      _currentShip.Equals(shipName, StringComparison.OrdinalIgnoreCase));
 
+                var (comps, liv, compsTs) = ResolveShipComponents(canonicalName, cd);
+                var ocrGuns = comps.Where(c => c.SlotType.Equals("Weapon", StringComparison.OrdinalIgnoreCase)).Select(c => c.ComponentName).ToList();
+
                 ships.Add(new FleetShipDto
                 {
                     Name = canonicalName,
@@ -4599,7 +4659,10 @@ public class PhotinoBridge
                     InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance,
                     AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : "Pledge Store",
                     CustomNotes = cd.Notes ?? "",
-                    PipsResult = PipsAnalyzer.EvaluateShip(canonicalName)
+                    PipsResult = ocrGuns.Count > 0 ? PipsAnalyzer.EvaluateGuns(ocrGuns) : PipsAnalyzer.EvaluateShip(canonicalName),
+                    Livery = liv,
+                    ComponentsUpdatedAt = compsTs,
+                    Components = comps
                 });
             }
         }
@@ -4607,15 +4670,20 @@ public class PhotinoBridge
         // Full catalog for "+ Schiff hinzufügen"
         var catalog = FleetCatalog.AllShips
             .OrderBy(s => s.NormalizedName)
-            .Select(s => new CatalogShipDto
+            .Select(s =>
             {
-                Name = s.NormalizedName,
-                Manufacturer = s.Manufacturer,
-                Role = s.Role,
-                ValueAuec = s.EstimatedValueAuec,
-                PledgeUsd = s.PledgeValueUsd,
-                DefaultInsurance = s.DefaultInsurance,
-                PipsResult = PipsAnalyzer.EvaluateShip(s.NormalizedName)
+                var (catComps, _, _) = ResolveShipComponents(s.NormalizedName, null);
+                return new CatalogShipDto
+                {
+                    Name = s.NormalizedName,
+                    Manufacturer = s.Manufacturer,
+                    Role = s.Role,
+                    ValueAuec = s.EstimatedValueAuec,
+                    PledgeUsd = s.PledgeValueUsd,
+                    DefaultInsurance = s.DefaultInsurance,
+                    PipsResult = PipsAnalyzer.EvaluateShip(s.NormalizedName),
+                    Components = catComps
+                };
             }).ToList();
 
         var hangarShips = ships.Where(s => s.IsInHangar).ToList();
@@ -4631,6 +4699,50 @@ public class PhotinoBridge
             HangarCount = hangarShips.Count,
             FlownCount = ships.Count,
         };
+    }
+
+    private static (List<ScannedShipComponent> components, string? livery, string? updatedAt) ResolveShipComponents(string shipName, Database.DbFleetCustomData? cd)
+    {
+        string? livery = cd?.Livery;
+        string? updatedAt = cd?.ComponentsUpdatedAt;
+
+        // 1. Priorität: OCR-gescannte Komponenten aus dem VLM Screenshot
+        if (!string.IsNullOrWhiteSpace(cd?.ComponentsJson))
+        {
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<ScannedShipComponent>>(cd.ComponentsJson, JsonOpts);
+                if (parsed != null && parsed.Count > 0)
+                {
+                    return (parsed, livery, updatedAt);
+                }
+            }
+            catch { }
+        }
+
+        // 2. Standardkomponenten aus PipsAnalyzer StockShipWeapons und PadSize
+        var fallbackList = new List<ScannedShipComponent>();
+        var clean = Ships.NormalizeModelName(shipName);
+        var weapons = PipsAnalyzer.GetStockWeaponsForShip(clean);
+        if (weapons != null && weapons.Count > 0)
+        {
+            for (int i = 0; i < weapons.Count; i++)
+            {
+                fallbackList.Add(new ScannedShipComponent("Weapon", $"Pilotengeschütz {i + 1}", weapons[i]));
+            }
+        }
+
+        var pad = CargoConstraints.FindShip(clean)?.PadSize ?? "S1";
+        string defaultQd = pad switch
+        {
+            "XS" or "S1" or "Small" => "Atlas",
+            "M" or "S2" or "Medium" => "Crossfield",
+            "L" or "S3" or "Large" or "Capital" => "TS-2",
+            _ => "Atlas"
+        };
+        fallbackList.Add(new ScannedShipComponent("QuantumDrive", "Quantum Drive", defaultQd));
+
+        return (fallbackList, livery, updatedAt);
     }
 
     private async Task<ShipComparisonDataDto> GetShipComparisonDataAsync(string? shipAName, string? shipBName)

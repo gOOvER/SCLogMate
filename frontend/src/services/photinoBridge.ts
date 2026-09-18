@@ -222,6 +222,9 @@ export interface FleetShipDto {
   acquisitionType: string;
   customNotes: string;
   pipsResult?: PipsEvaluationResult;
+  livery?: string | null;
+  componentsUpdatedAt?: string | null;
+  components?: ScannedShipComponent[];
 }
 
 export interface CatalogShipDto {
@@ -232,7 +235,11 @@ export interface CatalogShipDto {
   pledgeUsd: number;
   defaultInsurance: string;
   pipsResult?: PipsEvaluationResult;
+  components?: ScannedShipComponent[];
 }
+
+export type ScannedShipComponentDto = ScannedShipComponent;
+export type ScreenshotLoadoutResultDto = ScreenshotLoadoutResult;
 
 export interface FleetResponseDto {
   ships: FleetShipDto[];
@@ -1266,6 +1273,10 @@ class PhotinoBridge {
     return this.sendRequest<ScreenshotLoadoutResult>('scan_screenshot_loadout', { filePath });
   }
 
+  public clearShipComponents(shipName: string): Promise<FleetResponseDto> {
+    return this.sendRequest<FleetResponseDto>('clear_ship_components', { shipName });
+  }
+
   public toggleScreenshotWatcher(enabled: boolean, folder?: string): Promise<{ isWatching: boolean; folder?: string }> {
     return this.sendRequest<{ isWatching: boolean; folder?: string }>('toggle_screenshot_watcher', { enabled, folder });
   }
@@ -1744,6 +1755,7 @@ class PhotinoBridge {
       case 'cycle_ship_insurance':
       case 'update_ship_pledge':
       case 'update_ship_notes':
+      case 'clear_ship_components':
         return {
           ships: [
             {

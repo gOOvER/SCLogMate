@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deterministic deduplication in `EventsView.tsx` (`displayEvents` memo and `LOG_EVENT` subscription) and `App.tsx` state to ensure UI rows are never rendered twice.
 
 ### Added
+- **Interactive Ship Loadout & Livery Inspection Modal (`ShipLoadoutModal.tsx`, `FleetView.tsx`, `PhotinoBridge.cs`, `photinoBridge.ts`)**:
+  - Added a dedicated `ShipLoadoutModal` allowing pilots to inspect installed components (pilot hardpoints, shield generators, quantum drives, power plants, coolers) and active liveries/paints for each hull.
+  - Added component and livery indicator badges to fleet table rows with 1-click loadout modal opening.
+  - Integrated dynamic ballistics & projectile velocity analysis directly into the modal, displaying synchronized lead-pips status and tactical outfitting recommendations.
+  - Implemented the `clear_ship_components` bridge command to quickly revert custom-scanned ship configurations back to Star Citizen stock factory components.
 - **StarCitizenWiki / scunpacked-data Dynamic Community Data Engine (`Core/Community/CommunityData.cs`, `PhotinoBridge.cs`, `PipsAnalyzer.cs`, `photinoBridge.ts`, `SettingsView.tsx`)**:
   - Implemented the full dynamic `CommunityData` subsystem, establishing an automated ingestion and digestion pipeline directly from [StarCitizenWiki/scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data).
   - Downloads and digests all 11 core data files (`ships.json`, `ship-items.json`, `commodities.json`, `commodity_trade_locations.json`, `fps-items.json`, `blueprints.json`, `resources.json`, `locations.json`, `starmap.json`, `starmap_positions.json`, `manufacturers.json`) into high-speed local caches in `%APPDATA%\SCLogMate\community\digest-*.json`.
