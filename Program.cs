@@ -69,8 +69,66 @@ internal static partial class Program
         return;
     }
 
+    [System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
+    private static extern void SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string AppID);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr LoadImage(IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
+
+    private const uint WM_SETICON = 0x0080;
+    private const IntPtr ICON_SMALL = 0;
+    private const IntPtr ICON_BIG = (IntPtr)1;
+    private const uint IMAGE_ICON = 1;
+    private const uint LR_LOADFROMFILE = 0x00000010;
+    private const uint LR_DEFAULTSIZE = 0x00000040;
+
+    private static string EnsureIconFile()
+    {
+        var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate");
+
+        // 1. Direkt neben der Executable
+        var localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.ico");
+        if (File.Exists(localPath)) return localPath;
+
+        // 2. Im Arbeitsverzeichnis
+        if (File.Exists("SCLogMate.ico")) return Path.GetFullPath("SCLogMate.ico");
+
+        // 3. Im AppData-Ordner
+        var appDataIcon = Path.Combine(appDataDir, "SCLogMate.ico");
+        if (File.Exists(appDataIcon)) return appDataIcon;
+
+        // 4. Aus eingebetteten Ressourcen extrahieren, falls auf Platte fehlend
+        try
+        {
+            var asm = typeof(Program).Assembly;
+            var resName = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("SCLogMate.ico", StringComparison.OrdinalIgnoreCase));
+            if (resName != null)
+            {
+                using var stream = asm.GetManifestResourceStream(resName);
+                if (stream != null)
+                {
+                    Directory.CreateDirectory(appDataDir);
+                    using var fs = File.Create(appDataIcon);
+                    stream.CopyTo(fs);
+                    return appDataIcon;
+                }
+            }
+        }
+        catch { }
+
+        return localPath;
+    }
+
     private static void RunPhotinoApp(string[] args)
     {
+        try { SetCurrentProcessExplicitAppUserModelID("SCVerse.SCLogMate"); } catch { }
+
+        var iconPath = EnsureIconFile();
+
         var window = new Photino.NET.PhotinoWindow()
             .SetTitle("SCLogMate — Star Citizen Live Companion")
             .SetUseOsDefaultSize(false)
@@ -80,11 +138,27 @@ internal static partial class Program
 
         try { Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory; } catch { }
 
-        var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.ico");
         if (File.Exists(iconPath))
         {
             try { window.SetIconFile(iconPath); } catch { }
         }
+
+        window.RegisterWindowCreatedHandler((sender, e) =>
+        {
+            try
+            {
+                if (window.WindowHandle != IntPtr.Zero && File.Exists(iconPath))
+                {
+                    IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+                    if (hIconBig != IntPtr.Zero)
+                    {
+                        SendMessage(window.WindowHandle, WM_SETICON, ICON_BIG, hIconBig);
+                        SendMessage(window.WindowHandle, WM_SETICON, ICON_SMALL, hIconBig);
+                    }
+                }
+            }
+            catch { }
+        });
 
         var bridge = new Core.Photino.PhotinoBridge();
         bridge.Initialize(window);

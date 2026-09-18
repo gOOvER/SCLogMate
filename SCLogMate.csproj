@@ -30,9 +30,17 @@
 
   <ItemGroup>
     <AvaloniaResource Include="SCLogMate.ico" />
+    <EmbeddedResource Include="SCLogMate.ico" />
     <EmbeddedResource Include="Data\blueprints.json" />
     <EmbeddedResource Include="Data\seed_data.json" />
     <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="SCLogMate.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

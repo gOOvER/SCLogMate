@@ -45,6 +45,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -m:4 `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
   -o (Join-Path $root 'publish')
 if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen.' }
+Copy-Item (Join-Path $root 'SCLogMate.ico') (Join-Path $root 'publish\SCLogMate.ico') -Force
 $exe = Join-Path $root 'publish\SCLogMate.exe'
 if (-not (Test-Path $exe)) { throw "exe nicht gefunden: $exe" }
 Write-Host ("   gebaut: {0:N1} MB" -f ((Get-Item $exe).Length/1MB)) -ForegroundColor Green
