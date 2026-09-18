@@ -503,10 +503,10 @@ export const MarketView: React.FC = () => {
         <button
           onClick={() => setIsCargoFitOpen(true)}
           className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-bold rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/60 shadow-[0_0_10px_rgba(0,240,255,0.2)] transition cursor-pointer"
-          title="Prüfe physische Kisten-Passung & Gitterplatzierung für Schiffe"
+          title="Prüfe physische Fracht-Passung & Kisten-Stauung für Schiffe"
         >
           <Package className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Laderaum-Gitterpacker</span>
+          <span>Frachtraum-Planer</span>
         </button>
 
         {/* SCT Dual-Source Status Badge */}
@@ -831,7 +831,7 @@ export const MarketView: React.FC = () => {
                       className="mt-2 w-full py-1.5 rounded bg-cyan-950/40 hover:bg-cyan-900/60 text-[11px] font-mono text-cyan-300 hover:text-cyan-100 transition flex items-center justify-center gap-1.5 border border-cyan-950 hover:border-cyan-500/50 cursor-pointer"
                     >
                       <Package className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Laderaum-Passung prüfen (Cargo-Fit)</span>
+                      <span>Frachtraum-Planung (Cargo-Fit)</span>
                     </button>
                   </div>
                 ))}

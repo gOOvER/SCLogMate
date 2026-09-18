@@ -122,7 +122,7 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100 font-mono flex items-center gap-2">
-                Laderaum-Gitterpacker (Cargo-Fit)
+                Frachtraum-Planer (Cargo-Fit)
                 <span className="text-[11px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-normal">
                   Star Citizen 4.x PU
                 </span>
@@ -133,7 +133,7 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
                 )}
               </h2>
               <p className="text-xs text-slate-400 font-mono">
-                Prüft physische Kisten-Passung auf 1.25m Gitterkoordinaten & MaxBox-Höhen
+                Prüft physische Kisten-Stauung auf 1.25m Frachtgitter & MaxBox-Höhen
               </p>
             </div>
           </div>
@@ -343,7 +343,7 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
             <div className="sc-glass p-3 rounded-lg border border-slate-800 space-y-3">
               <h3 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                 <Layers className="w-4 h-4 text-cyan-400" />
-                Laderaum-Gitter & Platzierungen ({fitResult.grids.length} Frachtbereiche)
+                Frachtgitter & Stauung ({fitResult.grids.length} Frachtbereiche)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -359,7 +359,13 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
                     {/* Capacity Bar */}
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300"
+                        className={`h-full transition-all duration-300 ${
+                          grid.usedScu > grid.capacityScu
+                            ? 'bg-rose-500'
+                            : grid.usedScu === grid.capacityScu
+                            ? 'bg-emerald-500'
+                            : 'bg-cyan-500'
+                        }`}
                         style={{ width: `${Math.min(100, (grid.usedScu / grid.capacityScu) * 100)}%` }}
                       />
                     </div>
@@ -367,7 +373,7 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
                     {/* Placed Crates Manifest */}
                     <div className="pt-2 border-t border-slate-800/60">
                       <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">
-                        Plazierte Kisten in diesem Gitter:
+                        Platzierte Kisten in diesem Frachtbereich:
                       </span>
                       {grid.placedCrates.length > 0 ? (
                         <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
