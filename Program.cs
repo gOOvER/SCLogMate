@@ -69,25 +69,136 @@ internal static partial class Program
         return;
     }
 
-    [System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
-    private static extern void SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string AppID);
-
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
     private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
     private static extern IntPtr LoadImage(IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetClassLongPtr", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr SetClassLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetClassLong", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr SetClassLong32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    private static IntPtr SetClassLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        try
+        {
+            return IntPtr.Size == 8
+                ? SetClassLongPtr64(hWnd, nIndex, dwNewLong)
+                : SetClassLong32(hWnd, nIndex, dwNewLong);
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
     private const uint WM_SETICON = 0x0080;
     private const IntPtr ICON_SMALL = 0;
     private const IntPtr ICON_BIG = (IntPtr)1;
     private const uint IMAGE_ICON = 1;
     private const uint LR_LOADFROMFILE = 0x00000010;
-    private const uint LR_DEFAULTSIZE = 0x00000040;
+    private const int GCLP_HICON = -14;
+    private const int GCLP_HICONSM = -34;
+    private const int SM_CXICON = 11;
+    private const int SM_CYICON = 12;
+    private const int SM_CXSMICON = 49;
+    private const int SM_CYSMICON = 50;
+
+    private static void ApplyWindowIcons(IntPtr hWnd, string iconPath)
+    {
+        if (hWnd == IntPtr.Zero || !File.Exists(iconPath)) return;
+        try
+        {
+            int cxBig = GetSystemMetrics(SM_CXICON);
+            int cyBig = GetSystemMetrics(SM_CYICON);
+            int cxSmall = GetSystemMetrics(SM_CXSMICON);
+            int cySmall = GetSystemMetrics(SM_CYSMICON);
+
+            IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, cxBig > 0 ? cxBig : 32, cyBig > 0 ? cyBig : 32, LR_LOADFROMFILE);
+            IntPtr hIconSmall = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, cxSmall > 0 ? cxSmall : 16, cySmall > 0 ? cySmall : 16, LR_LOADFROMFILE);
+
+            if (hIconBig != IntPtr.Zero)
+            {
+                SendMessage(hWnd, WM_SETICON, ICON_BIG, hIconBig);
+                SetClassLongPtr(hWnd, GCLP_HICON, hIconBig);
+            }
+
+            if (hIconSmall != IntPtr.Zero)
+            {
+                SendMessage(hWnd, WM_SETICON, ICON_SMALL, hIconSmall);
+                SetClassLongPtr(hWnd, GCLP_HICONSM, hIconSmall);
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logger.Error("ApplyWindowIcons", ex);
+        }
+    }
+
+    private static void EnsureStartMenuShortcut(string iconPath)
+    {
+        try
+        {
+            var startMenuDir = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            if (string.IsNullOrEmpty(startMenuDir) || !Directory.Exists(startMenuDir)) return;
+
+            var shortcutPath = Path.Combine(startMenuDir, "SCLogMate.lnk");
+            var exePath = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.exe");
+            if (!File.Exists(exePath)) return;
+
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            var shortcut = shell.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = exePath;
+            shortcut.WorkingDirectory = Path.GetDirectoryName(exePath) ?? "";
+            if (File.Exists(iconPath))
+            {
+                shortcut.IconLocation = $"{iconPath},0";
+            }
+            else
+            {
+                shortcut.IconLocation = $"{exePath},0";
+            }
+            shortcut.Description = "Star Citizen Live Log Companion";
+            shortcut.Save();
+        }
+        catch { }
+    }
 
     private static string EnsureIconFile()
     {
         var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCLogMate");
+        var appDataIcon = Path.Combine(appDataDir, "SCLogMate.ico");
+
+        // Immer sicherstellen, dass das Icon im AppData-Ordner existiert (für Verknüpfungen und Taskbar)
+        try
+        {
+            if (!File.Exists(appDataIcon))
+            {
+                var asm = typeof(Program).Assembly;
+                var resName = asm.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith("SCLogMate.ico", StringComparison.OrdinalIgnoreCase));
+                if (resName != null)
+                {
+                    using var stream = asm.GetManifestResourceStream(resName);
+                    if (stream != null)
+                    {
+                        Directory.CreateDirectory(appDataDir);
+                        using var fs = File.Create(appDataIcon);
+                        stream.CopyTo(fs);
+                    }
+                }
+            }
+        }
+        catch { }
 
         // 1. Direkt neben der Executable
         var localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SCLogMate.ico");
@@ -97,43 +208,24 @@ internal static partial class Program
         if (File.Exists("SCLogMate.ico")) return Path.GetFullPath("SCLogMate.ico");
 
         // 3. Im AppData-Ordner
-        var appDataIcon = Path.Combine(appDataDir, "SCLogMate.ico");
         if (File.Exists(appDataIcon)) return appDataIcon;
-
-        // 4. Aus eingebetteten Ressourcen extrahieren, falls auf Platte fehlend
-        try
-        {
-            var asm = typeof(Program).Assembly;
-            var resName = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith("SCLogMate.ico", StringComparison.OrdinalIgnoreCase));
-            if (resName != null)
-            {
-                using var stream = asm.GetManifestResourceStream(resName);
-                if (stream != null)
-                {
-                    Directory.CreateDirectory(appDataDir);
-                    using var fs = File.Create(appDataIcon);
-                    stream.CopyTo(fs);
-                    return appDataIcon;
-                }
-            }
-        }
-        catch { }
 
         return localPath;
     }
 
     private static void RunPhotinoApp(string[] args)
     {
-        try { SetCurrentProcessExplicitAppUserModelID("SCVerse.SCLogMate"); } catch { }
-
         var iconPath = EnsureIconFile();
+
+        // Startmenü-Verknüpfung für Windows Shell Icon-Cache registrieren
+        EnsureStartMenuShortcut(iconPath);
 
         var window = new Photino.NET.PhotinoWindow()
             .SetTitle("SCLogMate — Star Citizen Live Companion")
             .SetUseOsDefaultSize(false)
             .SetSize(1440, 900)
             .SetMinSize(1024, 700)
+            .SetNotificationRegistrationId(Guid.NewGuid().ToString())
             .Center();
 
         try { Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory; } catch { }
@@ -145,19 +237,24 @@ internal static partial class Program
 
         window.RegisterWindowCreatedHandler((sender, e) =>
         {
-            try
+            ApplyWindowIcons(window.WindowHandle, iconPath);
+        });
+
+        // Zusätzliche verzögerte Tasks, um das Taskleisten- und Klassen-Icon nach vollem Aufbau von WebView2 zu sichern
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            foreach (var delay in new[] { 150, 600, 1500, 3000 })
             {
-                if (window.WindowHandle != IntPtr.Zero && File.Exists(iconPath))
+                await System.Threading.Tasks.Task.Delay(delay);
+                try
                 {
-                    IntPtr hIconBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
-                    if (hIconBig != IntPtr.Zero)
+                    if (window.WindowHandle != IntPtr.Zero)
                     {
-                        SendMessage(window.WindowHandle, WM_SETICON, ICON_BIG, hIconBig);
-                        SendMessage(window.WindowHandle, WM_SETICON, ICON_SMALL, hIconBig);
+                        ApplyWindowIcons(window.WindowHandle, iconPath);
                     }
                 }
+                catch { }
             }
-            catch { }
         });
 
         var bridge = new Core.Photino.PhotinoBridge();

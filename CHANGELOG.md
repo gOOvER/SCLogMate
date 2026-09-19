@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Windows Taskbar Application Icon Display (`Program.cs`)**:
+  - Removed unmapped `SetCurrentProcessExplicitAppUserModelID("SCVerse.SCLogMate")` call which caused Windows Shell to decouple the process from `SCLogMate.exe`'s embedded icon resource and fall back to the default blank/generic application icon on the taskbar.
+  - Implemented `SetClassLongPtr` (`GCLP_HICON` and `GCLP_HICONSM`) alongside `WM_SETICON` (`ICON_BIG` and `ICON_SMALL`) using exact system metrics (`SM_CXICON`, `SM_CXSMICON`) to ensure the window class and native handle retain the custom icon across minimizations and window switches.
+  - Added `SetNotificationRegistrationId(Guid.NewGuid().ToString())` to prevent Photino/Windows from caching a missing or default icon for the webview process.
+  - Automatically register a Start Menu shortcut (`SCLogMate.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs` pointing to `SCLogMate.exe` and `SCLogMate.ico` to ensure system-wide Windows Shell icon indexing.
+  - Ensured `SCLogMate.ico` is extracted from embedded assembly resources into `%APPDATA%\SCLogMate\` on initial launch.
 - **Salvage Claim & Mission Title Ship Collision Protection (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
   - **Ship Model Conflict Prevention in `MissionCatalog.FuzzyLookup`**: Added known ship model detection (`corsair`, `cutlass`, `vulture`, `caterpillar`, etc.) and manufacturer stop-words (`drake`, `aegis`, `anvil`, `rsi`, etc.) to prevent fuzzy matching across conflicting ship models. Fixed an issue where accepted Drake Corsair missions (e.g. `Claim #92872: Drake Corsair Salvage Rights`) were erroneously matched with `Legal Salvage Claim: Drake Cutlass`.
   - **In-Game Mission Title Preservation (`MissionCatalog.ResolveTitle`)**: Refactored `LogParser.cs` and `MainViewModel.cs` to preserve specific in-game mission titles from HUD notifications rather than overwriting them with generic or conflicting catalog titles.
