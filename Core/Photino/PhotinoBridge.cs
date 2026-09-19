@@ -881,6 +881,10 @@ public class SettingsDto
     [JsonPropertyName("auroraQuantumArrival")] public bool AuroraQuantumArrival { get; set; } = true;
     [JsonPropertyName("auroraPlayerDeath")] public bool AuroraPlayerDeath { get; set; } = true;
     [JsonPropertyName("auroraServerErrors")] public bool AuroraServerErrors { get; set; } = true;
+    [JsonPropertyName("auroraAtcAndLanding")] public bool AuroraAtcAndLanding { get; set; } = true;
+    [JsonPropertyName("auroraMaintenance")] public bool AuroraMaintenance { get; set; } = true;
+    [JsonPropertyName("auroraDestinations")] public bool AuroraDestinations { get; set; } = true;
+    [JsonPropertyName("auroraShipSystems")] public bool AuroraShipSystems { get; set; } = true;
     [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
     [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
@@ -1117,6 +1121,10 @@ public class PhotinoBridge
         _auroraService.QuantumArrivalEnabled = s.AuroraQuantumArrival;
         _auroraService.PlayerDeathEnabled = s.AuroraPlayerDeath;
         _auroraService.ServerErrorsEnabled = s.AuroraServerErrors;
+        _auroraService.AtcAndLandingEnabled = s.AuroraAtcAndLanding;
+        _auroraService.MaintenanceEnabled = s.AuroraMaintenance;
+        _auroraService.DestinationsEnabled = s.AuroraDestinations;
+        _auroraService.ShipSystemsEnabled = s.AuroraShipSystems;
         UexApiClient.SetApiKey(s.UexApiKey);
         I18n.Instance.SetLanguage(s.AppLanguage ?? "Auto");
         _currentLogPath = s.LogPath ?? PathFinder.FindBest();
@@ -6062,6 +6070,10 @@ public class PhotinoBridge
             AuroraQuantumArrival = s.AuroraQuantumArrival,
             AuroraPlayerDeath = s.AuroraPlayerDeath,
             AuroraServerErrors = s.AuroraServerErrors,
+            AuroraAtcAndLanding = s.AuroraAtcAndLanding,
+            AuroraMaintenance = s.AuroraMaintenance,
+            AuroraDestinations = s.AuroraDestinations,
+            AuroraShipSystems = s.AuroraShipSystems,
             RsTargetAlertEnabled = s.RsTargetAlertEnabled,
             RsTargetSoundEnabled = s.RsTargetSoundEnabled,
             WalletRegion = s.WalletRegion,
@@ -6122,6 +6134,10 @@ public class PhotinoBridge
         s.AuroraQuantumArrival = dto.AuroraQuantumArrival;
         s.AuroraPlayerDeath = dto.AuroraPlayerDeath;
         s.AuroraServerErrors = dto.AuroraServerErrors;
+        s.AuroraAtcAndLanding = dto.AuroraAtcAndLanding;
+        s.AuroraMaintenance = dto.AuroraMaintenance;
+        s.AuroraDestinations = dto.AuroraDestinations;
+        s.AuroraShipSystems = dto.AuroraShipSystems;
 
         _auroraService.IsEnabled = dto.AuroraIntegrationEnabled;
         _auroraService.Volume = dto.AuroraVolume;
@@ -6134,6 +6150,10 @@ public class PhotinoBridge
         _auroraService.QuantumArrivalEnabled = dto.AuroraQuantumArrival;
         _auroraService.PlayerDeathEnabled = dto.AuroraPlayerDeath;
         _auroraService.ServerErrorsEnabled = dto.AuroraServerErrors;
+        _auroraService.AtcAndLandingEnabled = dto.AuroraAtcAndLanding;
+        _auroraService.MaintenanceEnabled = dto.AuroraMaintenance;
+        _auroraService.DestinationsEnabled = dto.AuroraDestinations;
+        _auroraService.ShipSystemsEnabled = dto.AuroraShipSystems;
         s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
         s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
         s.WalletRegion = dto.WalletRegion;

@@ -221,6 +221,18 @@ public class AppSettings
     /// <summary>Aurora: Serverfehler-Meldungen abspielen.</summary>
     public bool AuroraServerErrors { get; set; } = true;
 
+    /// <summary>Aurora: ATC, Landefreigabe, Startfreigabe &amp; Andocken abspielen.</summary>
+    public bool AuroraAtcAndLanding { get; set; } = true;
+
+    /// <summary>Aurora: Wartung, Tanken &amp; Reparatur abspielen.</summary>
+    public bool AuroraMaintenance { get; set; } = true;
+
+    /// <summary>Aurora: Ankunft bei Monden &amp; Raffineriestationen abspielen.</summary>
+    public bool AuroraDestinations { get; set; } = true;
+
+    /// <summary>Aurora: Bordsysteme (Sitz, Türen, Triebwerke, Scan) abspielen.</summary>
+    public bool AuroraShipSystems { get; set; } = true;
+
     /// <summary>
     /// Aktiviert den Entwickler- &amp; Debug-Modus.
     /// In lokalen Debug-Builds standardmäßig true, in Release-Builds standardmäßig false.

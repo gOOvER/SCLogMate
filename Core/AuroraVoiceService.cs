@@ -18,6 +18,7 @@ public partial class AuroraVoiceService : IDisposable
     private readonly System.Threading.Lock _lock = new();
     private readonly Random _rand = new();
     private string? _auroraDir;
+    private string? _befehleDir;
     private bool _isInstalled;
     private int _volume = 40; // 0 to 100
     private bool _isEnabled = true;
@@ -32,6 +33,10 @@ public partial class AuroraVoiceService : IDisposable
     public bool QuantumArrivalEnabled { get; set; } = true;
     public bool PlayerDeathEnabled { get; set; } = true;
     public bool ServerErrorsEnabled { get; set; } = true;
+    public bool AtcAndLandingEnabled { get; set; } = true;
+    public bool MaintenanceEnabled { get; set; } = true;
+    public bool DestinationsEnabled { get; set; } = true;
+    public bool ShipSystemsEnabled { get; set; } = true;
 
     private bool _isAtStation;
 
@@ -65,7 +70,6 @@ public partial class AuroraVoiceService : IDisposable
         }
     }
 
-
     // Sound Dictionaries
     private readonly Dictionary<string, List<string>> _shipSoundsByFamily = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _safetyZoneEnterSounds = new();
@@ -76,9 +80,25 @@ public partial class AuroraVoiceService : IDisposable
     private readonly List<string> _monitoredSpaceLeaveSounds = new();
     private readonly Dictionary<string, List<string>> _jurisdictionSounds = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _quantumArrivalSounds = new();
+    private readonly List<string> _quantumInitiatedSounds = new();
     private readonly List<string> _blueprintSounds = new();
     private readonly List<string> _playerDeathSounds = new();
     private readonly List<string> _serverErrorSounds = new();
+
+    // Befehle\Aurora sounds
+    private readonly List<string> _atcLandingSounds = new();
+    private readonly List<string> _dockingSounds = new();
+    private readonly List<string> _refuelSounds = new();
+    private readonly List<string> _repairSounds = new();
+    private readonly List<string> _seatExitSounds = new();
+    private readonly List<string> _powerOnSounds = new();
+    private readonly List<string> _powerOffSounds = new();
+    private readonly List<string> _doorOpenSounds = new();
+    private readonly List<string> _doorCloseSounds = new();
+    private readonly Dictionary<string, string> _stantonMoonsSounds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _stantonRefineriesSounds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _sensorScanSounds = new();
+    private readonly List<string> _countermeasureSounds = new();
 
     // Spam cooldowns & variant history (category/name -> last trigger timestamp)
     private readonly ConcurrentDictionary<string, DateTime> _lastTriggerTime = new(StringComparer.OrdinalIgnoreCase);
@@ -89,6 +109,7 @@ public partial class AuroraVoiceService : IDisposable
 
     public bool IsInstalled => _isInstalled;
     public string? AuroraDirectory => _auroraDir;
+    public string? BefehleDirectory => _befehleDir;
 
     public int Volume
     {
@@ -193,6 +214,37 @@ public partial class AuroraVoiceService : IDisposable
         Initialize(customPath);
     }
 
+    public static string? DetectBefehleDirectory(string? auroraDir = null)
+    {
+        if (!string.IsNullOrEmpty(auroraDir))
+        {
+            var parent = Path.GetDirectoryName(auroraDir);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                var sibling = Path.Combine(parent, "Befehle", "Aurora");
+                if (Directory.Exists(sibling)) return Path.GetFullPath(sibling);
+            }
+        }
+
+        var candidates = new List<string>();
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(userProfile))
+        {
+            candidates.Add(Path.Combine(userProfile, "OneDrive", "Dokumente", "VoiceAttack", "Befehle", "Aurora"));
+            candidates.Add(Path.Combine(userProfile, "OneDrive", "Documents", "VoiceAttack", "Befehle", "Aurora"));
+            candidates.Add(Path.Combine(userProfile, "Dokumente", "VoiceAttack", "Befehle", "Aurora"));
+            candidates.Add(Path.Combine(userProfile, "Documents", "VoiceAttack", "Befehle", "Aurora"));
+        }
+
+        var myDocs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (!string.IsNullOrEmpty(myDocs))
+        {
+            candidates.Add(Path.Combine(myDocs, "VoiceAttack", "Befehle", "Aurora"));
+        }
+
+        return candidates.FirstOrDefault(Directory.Exists);
+    }
+
     public static string? DetectAuroraDirectory(string? customPath = null)
     {
         if (!string.IsNullOrWhiteSpace(customPath) && Directory.Exists(customPath))
@@ -236,6 +288,8 @@ public partial class AuroraVoiceService : IDisposable
         lock (_lock)
         {
             _auroraDir = DetectAuroraDirectory(customPath);
+            _befehleDir = DetectBefehleDirectory(_auroraDir);
+
             if (_auroraDir == null || !Directory.Exists(_auroraDir))
             {
                 _isInstalled = false;
@@ -244,9 +298,10 @@ public partial class AuroraVoiceService : IDisposable
 
             try
             {
-                LoadSoundCatalogs(_auroraDir);
+                LoadSoundCatalogs(_auroraDir, _befehleDir);
                 _isInstalled = true;
-                Logger.Log($"[AuroraVoiceService] Aurora Log-Wächter erfolgreich geladen aus: {_auroraDir}");
+                Logger.Log($"[AuroraVoiceService] Aurora Log-Wächter erfolgreich geladen aus: {_auroraDir}" +
+                           (_befehleDir != null ? $" (Befehle aus: {_befehleDir})" : ""));
             }
             catch (Exception ex)
             {
@@ -256,7 +311,7 @@ public partial class AuroraVoiceService : IDisposable
         }
     }
 
-    private void LoadSoundCatalogs(string baseDir)
+    private void LoadSoundCatalogs(string baseDir, string? befehleDir)
     {
         _shipSoundsByFamily.Clear();
         _safetyZoneEnterSounds.Clear();
@@ -267,9 +322,24 @@ public partial class AuroraVoiceService : IDisposable
         _monitoredSpaceLeaveSounds.Clear();
         _jurisdictionSounds.Clear();
         _quantumArrivalSounds.Clear();
+        _quantumInitiatedSounds.Clear();
         _blueprintSounds.Clear();
         _playerDeathSounds.Clear();
         _serverErrorSounds.Clear();
+
+        _atcLandingSounds.Clear();
+        _dockingSounds.Clear();
+        _refuelSounds.Clear();
+        _repairSounds.Clear();
+        _seatExitSounds.Clear();
+        _powerOnSounds.Clear();
+        _powerOffSounds.Clear();
+        _doorOpenSounds.Clear();
+        _doorCloseSounds.Clear();
+        _stantonMoonsSounds.Clear();
+        _stantonRefineriesSounds.Clear();
+        _sensorScanSounds.Clear();
+        _countermeasureSounds.Clear();
 
         // 1. Original Ship Greetings (64 files -> 32 families)
         var origShipDir = Path.Combine(baseDir, "Willkommen an bord + schiffsnamen");
@@ -329,28 +399,59 @@ public partial class AuroraVoiceService : IDisposable
             if (logFiles.TryGetValue(13, out var re2)) _restrictedZoneLeaveSounds.Add(re2);
         }
 
-        // 4. Nyx & Pyro
+        // 4. Nyx & Pyro (Unterordner Nyx und Pyro sauber einbinden)
         var nyxPyroDir = Directory.GetDirectories(baseDir, "*nyx*").FirstOrDefault() ?? Path.Combine(baseDir, "nyx und pyro");
         if (Directory.Exists(nyxPyroDir))
         {
-            var files = Directory.GetFiles(nyxPyroDir, "*.mp3").OrderBy(f => f).ToList();
-            if (files.Count > 0) _jurisdictionSounds["Pyro"] = files;
-            if (files.Count > 0) _jurisdictionSounds["Nyx"] = files;
+            var nyxDir = Path.Combine(nyxPyroDir, "Nyx");
+            if (Directory.Exists(nyxDir))
+            {
+                var nyxFiles = Directory.GetFiles(nyxDir, "*.mp3").OrderBy(f => f).ToList();
+                if (nyxFiles.Count > 0) _jurisdictionSounds["Nyx"] = nyxFiles;
+            }
+
+            var pyroDir = Path.Combine(nyxPyroDir, "Pyro");
+            if (Directory.Exists(pyroDir))
+            {
+                var pyroFiles = Directory.GetFiles(pyroDir, "*.mp3").OrderBy(f => f).ToList();
+                if (pyroFiles.Count > 0) _jurisdictionSounds["Pyro"] = pyroFiles;
+            }
+
+            // Fallback für rekursive Suche falls Struktur flach ist
+            if (!_jurisdictionSounds.ContainsKey("Nyx") || !_jurisdictionSounds.ContainsKey("Pyro"))
+            {
+                var allNyxPyro = Directory.GetFiles(nyxPyroDir, "*.mp3", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+                if (!_jurisdictionSounds.ContainsKey("Nyx"))
+                {
+                    var nList = allNyxPyro.Where(f => f.Contains("Nyx", StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (nList.Count > 0) _jurisdictionSounds["Nyx"] = nList;
+                }
+                if (!_jurisdictionSounds.ContainsKey("Pyro"))
+                {
+                    var pList = allNyxPyro.Where(f => f.Contains("Pyro", StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (pList.Count > 0) _jurisdictionSounds["Pyro"] = pList;
+                }
+            }
         }
 
         // 5. People's Alliance
         var paDir = Directory.GetDirectories(baseDir, "*people*").FirstOrDefault() ?? Path.Combine(baseDir, "peoples alliance");
         if (Directory.Exists(paDir))
         {
-            var files = Directory.GetFiles(paDir, "*.mp3").OrderBy(f => f).ToList();
-            if (files.Count > 0) _jurisdictionSounds["People's Alliance"] = files;
+            var files = Directory.GetFiles(paDir, "*.mp3", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+            if (files.Count > 0)
+            {
+                _jurisdictionSounds["People's Alliance"] = files;
+                _jurisdictionSounds["Peoples Alliance"] = files;
+                _jurisdictionSounds["People Alliance"] = files;
+            }
         }
 
         // 6. Safety Zones (Armistice)
         var safetyDir = Directory.GetDirectories(baseDir, "*sicherheitszone*").FirstOrDefault() ?? Path.Combine(baseDir, "sicherheitszone verlassen betreten");
         if (Directory.Exists(safetyDir))
         {
-            var allMp3 = Directory.GetFiles(safetyDir, "*.mp3");
+            var allMp3 = Directory.GetFiles(safetyDir, "*.mp3", SearchOption.AllDirectories);
             foreach (var f in allMp3)
             {
                 var name = Path.GetFileName(f);
@@ -361,15 +462,14 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 7. Restricted Area Entry (Sperrzone)
+        // 7. Restricted Area Entry (Sperrzone - alle 4 Warnsounds einbinden!)
         var restrictedDir = Directory.GetDirectories(baseDir, "*sperrzone*").FirstOrDefault() ?? Path.Combine(baseDir, "sperrzone");
         if (Directory.Exists(restrictedDir))
         {
-            var allMp3 = Directory.GetFiles(restrictedDir, "*.mp3");
+            var allMp3 = Directory.GetFiles(restrictedDir, "*.mp3", SearchOption.AllDirectories);
             foreach (var f in allMp3)
             {
-                if (Regex.IsMatch(Path.GetFileName(f), @"Systemwarnung|Sicherheitsprotokoll|Warnstufe", RegexOptions.IgnoreCase))
-                    _restrictedZoneEnterSounds.Add(f);
+                _restrictedZoneEnterSounds.Add(f);
             }
         }
 
@@ -377,7 +477,7 @@ public partial class AuroraVoiceService : IDisposable
         var bpDir = Directory.GetDirectories(baseDir, "*blueprint*").FirstOrDefault() ?? Path.Combine(baseDir, "blueprint");
         if (Directory.Exists(bpDir))
         {
-            var files = Directory.GetFiles(bpDir, "*.mp3").OrderBy(f => f).ToList();
+            var files = Directory.GetFiles(bpDir, "*.mp3", SearchOption.AllDirectories).OrderBy(f => f).ToList();
             _blueprintSounds.AddRange(files);
         }
 
@@ -385,7 +485,7 @@ public partial class AuroraVoiceService : IDisposable
         var kcDir = Directory.GetDirectories(baseDir, "*kill*").FirstOrDefault() ?? Path.Combine(baseDir, "killcounter");
         if (Directory.Exists(kcDir))
         {
-            var files = Directory.GetFiles(kcDir, "*.mp3").OrderBy(f => f).ToList();
+            var files = Directory.GetFiles(kcDir, "*.mp3", SearchOption.AllDirectories).OrderBy(f => f).ToList();
             _playerDeathSounds.AddRange(files);
         }
 
@@ -393,15 +493,121 @@ public partial class AuroraVoiceService : IDisposable
         var seDir = Directory.GetDirectories(baseDir, "*server*error*").FirstOrDefault() ?? Path.Combine(baseDir, "server error");
         if (Directory.Exists(seDir))
         {
-            var files = Directory.GetFiles(seDir, "*.mp3").OrderBy(f => f).ToList();
+            var files = Directory.GetFiles(seDir, "*.mp3", SearchOption.AllDirectories).OrderBy(f => f).ToList();
             _serverErrorSounds.AddRange(files);
+        }
+
+        // 11. Befehle\Aurora (Erweiterte Flug-, Navigations- und Bordsystem-Stimmen)
+        if (!string.IsNullOrEmpty(befehleDir) && Directory.Exists(befehleDir))
+        {
+            // ATC Landefreigabe / Startfreigabe
+            var atcDir = Path.Combine(befehleDir, "Landefreigabe-Startfreigabe");
+            if (Directory.Exists(atcDir))
+                _atcLandingSounds.AddRange(Directory.GetFiles(atcDir, "*.mp3").OrderBy(f => f));
+
+            // Andocken
+            var dockDir = Path.Combine(befehleDir, "andocken");
+            if (Directory.Exists(dockDir))
+                _dockingSounds.AddRange(Directory.GetFiles(dockDir, "*.mp3").OrderBy(f => f));
+
+            // Tanken
+            var tankDir = Path.Combine(befehleDir, "Tanken");
+            if (Directory.Exists(tankDir))
+                _refuelSounds.AddRange(Directory.GetFiles(tankDir, "*.mp3").OrderBy(f => f));
+
+            // Reparatur & Wartungsservice
+            var repDir = Path.Combine(befehleDir, "Reparatur anfordern");
+            if (Directory.Exists(repDir))
+                _repairSounds.AddRange(Directory.GetFiles(repDir, "*.mp3").OrderBy(f => f));
+            var wartDir = Path.Combine(befehleDir, "wartungservice");
+            if (Directory.Exists(wartDir))
+                _repairSounds.AddRange(Directory.GetFiles(wartDir, "*.mp3").OrderBy(f => f));
+
+            // Sitz verlassen
+            var sitzDir = Path.Combine(befehleDir, "sitz verlassen");
+            if (Directory.Exists(sitzDir))
+                _seatExitSounds.AddRange(Directory.GetFiles(sitzDir, "*.mp3").OrderBy(f => f));
+
+            // Schiff ein / aus
+            var pOnDir = Path.Combine(befehleDir, "Schiff einschalten");
+            if (Directory.Exists(pOnDir))
+                _powerOnSounds.AddRange(Directory.GetFiles(pOnDir, "*.mp3").OrderBy(f => f));
+            var pOffDir = Path.Combine(befehleDir, "Schiff ausschalten");
+            if (Directory.Exists(pOffDir))
+                _powerOffSounds.AddRange(Directory.GetFiles(pOffDir, "*.mp3").OrderBy(f => f));
+
+            // Türen
+            var tAufDir = Path.Combine(befehleDir, "Türen öffnen");
+            if (Directory.Exists(tAufDir))
+                _doorOpenSounds.AddRange(Directory.GetFiles(tAufDir, "*.mp3").OrderBy(f => f));
+            var tZuDir = Path.Combine(befehleDir, "Türen schliessen");
+            if (Directory.Exists(tZuDir))
+                _doorCloseSounds.AddRange(Directory.GetFiles(tZuDir, "*.mp3").OrderBy(f => f));
+
+            // Sprung einleiten
+            var sprungDir = Path.Combine(befehleDir, "Sprung einleiten");
+            if (Directory.Exists(sprungDir))
+                _quantumInitiatedSounds.AddRange(Directory.GetFiles(sprungDir, "*.mp3").OrderBy(f => f));
+
+            // Navigation abgeschlossen (zusätzlich zu Quantum Arrival)
+            var navAbgDir = Path.Combine(befehleDir, "Navigation abgeschlossen");
+            if (Directory.Exists(navAbgDir))
+                _quantumArrivalSounds.AddRange(Directory.GetFiles(navAbgDir, "*.mp3").OrderBy(f => f));
+
+            // Stanton Monde (Zielankunft-Ansagen)
+            var mondeDir = Path.Combine(befehleDir, "stanton monde");
+            if (Directory.Exists(mondeDir))
+            {
+                foreach (var f in Directory.GetFiles(mondeDir, "*.mp3"))
+                {
+                    var moon = Path.GetFileNameWithoutExtension(f).Trim();
+                    _stantonMoonsSounds[moon] = f;
+                    if (moon.Equals("GrimHEX", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _stantonMoonsSounds["Grim HEX"] = f;
+                        _stantonMoonsSounds["Grim-HEX"] = f;
+                    }
+                }
+            }
+
+            // Stanton Raffinerien (Zielankunft-Ansagen)
+            var raffDir = Path.Combine(befehleDir, "raffinerien stanton");
+            if (Directory.Exists(raffDir))
+            {
+                foreach (var f in Directory.GetFiles(raffDir, "*.mp3"))
+                {
+                    var name = Path.GetFileNameWithoutExtension(f).Trim();
+                    _stantonRefineriesSounds[name] = f;
+                    if (name.Contains("Ambitious Dream", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["CRU-L1"] = f;
+                    else if (name.Contains("Faint Glen", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["CRU-L5"] = f;
+                    else if (name.Contains("Green Glade", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["HUR-L1"] = f;
+                    else if (name.Contains("Faithful Dream", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["HUR-L2"] = f;
+                    else if (name.Contains("Lively Pathway", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["HUR-L3"] = f;
+                    else if (name.Contains("Long Forest", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["HUR-L5"] = f;
+                    else if (name.Contains("Shallow Frontier", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["MIC-L1"] = f;
+                    else if (name.Contains("Modern Icarus", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["MIC-L2"] = f;
+                    else if (name.Contains("wide forest", StringComparison.OrdinalIgnoreCase) || name.Contains("arc l1", StringComparison.OrdinalIgnoreCase)) _stantonRefineriesSounds["ARC-L1"] = f;
+                }
+            }
+
+            // Sensorscan
+            var scanDir = Path.Combine(befehleDir, "Sensorscan");
+            if (Directory.Exists(scanDir))
+                _sensorScanSounds.AddRange(Directory.GetFiles(scanDir, "*.mp3").OrderBy(f => f));
+
+            // Täuschkörper
+            var flareDir = Path.Combine(befehleDir, "Täuschkörper");
+            if (Directory.Exists(flareDir))
+                _countermeasureSounds.AddRange(Directory.GetFiles(flareDir, "*.mp3").OrderBy(f => f));
         }
 
         Logger.Log($"[AuroraVoiceService] Kataloge geladen: Schiffe={_shipSoundsByFamily.Count} Familien, " +
                    $"Sicherheit(Enter/Leave)={_safetyZoneEnterSounds.Count}/{_safetyZoneLeaveSounds.Count}, " +
                    $"Monitored(Enter/Leave)={_monitoredSpaceEnterSounds.Count}/{_monitoredSpaceLeaveSounds.Count}, " +
                    $"Sperrzone(Enter/Leave)={_restrictedZoneEnterSounds.Count}/{_restrictedZoneLeaveSounds.Count}, " +
-                   $"Rechtsgebiete={_jurisdictionSounds.Count} Zonen, Quantum={_quantumArrivalSounds.Count}, " +
+                   $"Rechtsgebiete={_jurisdictionSounds.Count} Zonen, Quantum={_quantumArrivalSounds.Count}+{_quantumInitiatedSounds.Count}, " +
+                   $"ATC/Landung={_atcLandingSounds.Count}, Andocken={_dockingSounds.Count}, Tanken/Rep={_refuelSounds.Count}/{_repairSounds.Count}, " +
+                   $"Monde/Raff={_stantonMoonsSounds.Count}/{_stantonRefineriesSounds.Count}, " +
                    $"Blueprints={_blueprintSounds.Count}, Death={_playerDeathSounds.Count}, 30k={_serverErrorSounds.Count}");
     }
 
@@ -479,10 +685,11 @@ public partial class AuroraVoiceService : IDisposable
             _greetedShipsAtCurrentStation.Clear();
         }
 
-        // ClearDriver / Pilotensitz verlassen: Niemals Begrüßung auslösen
+        // ClearDriver / Pilotensitz verlassen: Niemals Begrüßung auslösen, aber Sitz-Verlassen-Sound abspielen
         if (line.Contains("ClearDriver", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("releasing control token", StringComparison.OrdinalIgnoreCase))
         {
+            if (ShipSystemsEnabled) OnSeatExit();
             return;
         }
 
@@ -556,7 +763,117 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 5. Quantum Arrival
+        // 5. Jurisdictions / Rechtsgebiete
+        if (JurisdictionsEnabled && (line.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) || line.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (line.Contains("UEE", StringComparison.OrdinalIgnoreCase) || line.Contains("microTech", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("UEE");
+                return;
+            }
+            if (line.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("ArcCorp");
+                return;
+            }
+            if (line.Contains("Hurston Dynamics", StringComparison.OrdinalIgnoreCase) || line.Contains("Hurston", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("Hurston Dynamics");
+                return;
+            }
+            if (line.Contains("Crusader Industries", StringComparison.OrdinalIgnoreCase) || line.Contains("Crusader", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("Crusader Industries");
+                return;
+            }
+            if (line.Contains("Klescher Rehabilitation", StringComparison.OrdinalIgnoreCase) || line.Contains("Klescher", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("Klescher Rehabilitation");
+                return;
+            }
+            if (line.Contains("Nyx", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("Nyx");
+                return;
+            }
+            if (line.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("Pyro");
+                return;
+            }
+            if (line.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase) || line.Contains("Peoples Alliance", StringComparison.OrdinalIgnoreCase) || line.Contains("People Alliance", StringComparison.OrdinalIgnoreCase))
+            {
+                OnJurisdictionChanged("People's Alliance");
+                return;
+            }
+        }
+
+        // 6. Blueprints / Baupläne
+        if (BlueprintsEnabled && (line.Contains("Received Blueprint", StringComparison.OrdinalIgnoreCase) || line.Contains("Bauplan erhalten", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnBlueprintLearned(line);
+            return;
+        }
+
+        // 7. ATC Landung / Startfreigabe
+        if (AtcAndLandingEnabled && (
+            line.Contains("ATC::RequestLanding", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landing service has been requested", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Assigned to Landing Pad", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Takeoff Request", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnAtcLanding();
+            return;
+        }
+
+        // 8. Andocken
+        if (AtcAndLandingEnabled && (
+            line.Contains("DockingTube", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("RequestDocking", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Docking collar", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Docking complete", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnDocking();
+            return;
+        }
+
+        // 9. Tanken
+        if (MaintenanceEnabled && (
+            line.Contains("LandingServices: Refuel", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Refueling", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Tanken begonnen", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnRefuel();
+            return;
+        }
+
+        // 10. Reparatur & Wartung
+        if (MaintenanceEnabled && (
+            line.Contains("LandingServices: Repair", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Repairing", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Reparatur", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("LandingServices: Restock", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnRepair();
+            return;
+        }
+
+        // 11. Quantum Spooling / Engaged
+        if (QuantumArrivalEnabled && (
+            line.Contains("<Quantum Drive Spooling>", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("<Quantum Drive Engaged>", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Quantum Travel Initiated", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnQuantumInitiated();
+            return;
+        }
+
+        // 12. Quantum Arrival
         if (QuantumArrivalEnabled)
         {
             if (line.Contains("<Quantum Drive Arrived - Arrived at Final Destination>", StringComparison.OrdinalIgnoreCase))
@@ -566,7 +883,17 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 6. Server Error (30k)
+        // 13. Täuschkörper / Gegenmaßnahmen
+        if (ShipSystemsEnabled && (
+            line.Contains("Countermeasure", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Decoy deployed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Noise deployed", StringComparison.OrdinalIgnoreCase)))
+        {
+            OnCountermeasure();
+            return;
+        }
+
+        // 14. Server Error (30k)
         if (ServerErrorsEnabled)
         {
             if (line.Contains("Connection with the server has been lost", StringComparison.OrdinalIgnoreCase) ||
@@ -578,7 +905,7 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 7. Player Death
+        // 15. Player Death
         if (PlayerDeathEnabled)
         {
             if (line.Contains("Standby, Local Emergency Services Are En Route", StringComparison.OrdinalIgnoreCase) ||
@@ -627,6 +954,28 @@ public partial class AuroraVoiceService : IDisposable
             {
                 OnQuantumArrival();
             }
+            if (DestinationsEnabled && !string.IsNullOrWhiteSpace(e.Detail))
+            {
+                OnDestinationReached(e.Detail);
+            }
+        }
+        else if (e.Kind == EventKind.Location && DestinationsEnabled)
+        {
+            if (!string.IsNullOrWhiteSpace(e.Detail))
+            {
+                OnDestinationReached(e.Detail);
+            }
+        }
+        else if (e.Kind == EventKind.Hangar && AtcAndLandingEnabled)
+        {
+            OnAtcLanding();
+        }
+        else if (e.Kind == EventKind.Maintenance && MaintenanceEnabled)
+        {
+            if (e.Detail.Contains("Refuel", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("Tanken", StringComparison.OrdinalIgnoreCase))
+                OnRefuel();
+            else
+                OnRepair();
         }
         else if (e.Kind == EventKind.Blueprint && BlueprintsEnabled)
         {
@@ -790,14 +1139,89 @@ public partial class AuroraVoiceService : IDisposable
     {
         if (!_isEnabled || !_isInstalled || !QuantumArrivalEnabled) return;
         if (_quantumArrivalSounds.Count > 0)
-            PlaySoundWithCooldown("quantum_arrival", _quantumArrivalSounds);
+            PlaySoundWithCooldown("quantum_arrival", _quantumArrivalSounds, minCooldownSeconds: 15);
+    }
+
+    public void OnQuantumInitiated()
+    {
+        if (!_isEnabled || !_isInstalled || !QuantumArrivalEnabled) return;
+        if (_quantumInitiatedSounds.Count > 0)
+            PlaySoundWithCooldown("quantum_initiated", _quantumInitiatedSounds, minCooldownSeconds: 20);
+    }
+
+    public void OnAtcLanding()
+    {
+        if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
+        if (_atcLandingSounds.Count > 0)
+            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 20);
+    }
+
+    public void OnDocking()
+    {
+        if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
+        if (_dockingSounds.Count > 0)
+            PlaySoundWithCooldown("docking", _dockingSounds, minCooldownSeconds: 20);
+    }
+
+    public void OnRefuel()
+    {
+        if (!_isEnabled || !_isInstalled || !MaintenanceEnabled) return;
+        if (_refuelSounds.Count > 0)
+            PlaySoundWithCooldown("refuel", _refuelSounds, minCooldownSeconds: 30);
+    }
+
+    public void OnRepair()
+    {
+        if (!_isEnabled || !_isInstalled || !MaintenanceEnabled) return;
+        if (_repairSounds.Count > 0)
+            PlaySoundWithCooldown("repair", _repairSounds, minCooldownSeconds: 30);
+    }
+
+    public void OnSeatExit()
+    {
+        if (!_isEnabled || !_isInstalled || !ShipSystemsEnabled) return;
+        if (_seatExitSounds.Count > 0)
+            PlaySoundWithCooldown("seat_exit", _seatExitSounds, minCooldownSeconds: 20);
+    }
+
+    public void OnCountermeasure()
+    {
+        if (!_isEnabled || !_isInstalled || !ShipSystemsEnabled) return;
+        if (_countermeasureSounds.Count > 0)
+            PlaySoundWithCooldown("countermeasure", _countermeasureSounds, minCooldownSeconds: 15);
+    }
+
+    public void OnDestinationReached(string destinationName)
+    {
+        if (!_isEnabled || !_isInstalled || !DestinationsEnabled) return;
+        if (string.IsNullOrWhiteSpace(destinationName)) return;
+
+        // 1. Prüfe auf Monde in Stanton
+        foreach (var (moon, path) in _stantonMoonsSounds)
+        {
+            if (destinationName.Contains(moon, StringComparison.OrdinalIgnoreCase))
+            {
+                PlaySoundWithCooldown($"moon_{moon}", [path], minCooldownSeconds: 60);
+                return;
+            }
+        }
+
+        // 2. Prüfe auf Raffineriestationen in Stanton
+        foreach (var (refinery, path) in _stantonRefineriesSounds)
+        {
+            if (destinationName.Contains(refinery, StringComparison.OrdinalIgnoreCase))
+            {
+                PlaySoundWithCooldown($"refinery_{refinery}", [path], minCooldownSeconds: 60);
+                return;
+            }
+        }
     }
 
     public void OnBlueprintLearned(string blueprintName)
     {
         if (!_isEnabled || !_isInstalled || !BlueprintsEnabled) return;
         if (_blueprintSounds.Count > 0)
-            PlaySoundWithCooldown("blueprint", _blueprintSounds);
+            PlaySoundWithCooldown("blueprint", _blueprintSounds, minCooldownSeconds: 10);
     }
 
     public void OnPlayerDeath()
@@ -806,14 +1230,14 @@ public partial class AuroraVoiceService : IDisposable
         _greetedShipsAtCurrentStation.Clear();
         if (!_isEnabled || !_isInstalled || !PlayerDeathEnabled) return;
         if (_playerDeathSounds.Count > 0)
-            PlaySoundWithCooldown("player_death", _playerDeathSounds);
+            PlaySoundWithCooldown("player_death", _playerDeathSounds, minCooldownSeconds: 20);
     }
 
     public void OnServerError()
     {
         if (!_isEnabled || !_isInstalled || !ServerErrorsEnabled) return;
         if (_serverErrorSounds.Count > 0)
-            PlaySoundWithCooldown("server_error", _serverErrorSounds);
+            PlaySoundWithCooldown("server_error", _serverErrorSounds, minCooldownSeconds: 45);
     }
 
     private Windows.Media.Playback.MediaPlayer? _mediaPlayer;
@@ -821,10 +1245,12 @@ public partial class AuroraVoiceService : IDisposable
     public void PlayTestSound()
     {
         if (!_isInstalled) return;
-        // Pick any available sound (e.g., first quantum arrival or first ship sound)
-        var sound = _quantumArrivalSounds.FirstOrDefault() ??
+        // Teste bevorzugt verfügbare Sounds: Begrüßung, ATC, Quantum, Schutzzone etc.
+        var sound = _shipSoundsByFamily.Values.SelectMany(v => v).FirstOrDefault() ??
+                    _atcLandingSounds.FirstOrDefault() ??
+                    _quantumArrivalSounds.FirstOrDefault() ??
                     _safetyZoneEnterSounds.FirstOrDefault() ??
-                    _shipSoundsByFamily.Values.SelectMany(v => v).FirstOrDefault();
+                    _blueprintSounds.FirstOrDefault();
 
         if (sound != null && File.Exists(sound))
         {

@@ -877,6 +877,10 @@ export interface SettingsDto {
   auroraQuantumArrival?: boolean;
   auroraPlayerDeath?: boolean;
   auroraServerErrors?: boolean;
+  auroraAtcAndLanding?: boolean;
+  auroraMaintenance?: boolean;
+  auroraDestinations?: boolean;
+  auroraShipSystems?: boolean;
   rsTargetAlertEnabled: boolean;
   rsTargetSoundEnabled: boolean;
   walletRegion?: ScanRegionDto | null;

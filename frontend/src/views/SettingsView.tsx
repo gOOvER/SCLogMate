@@ -74,6 +74,10 @@ export const SettingsView: React.FC = () => {
     auroraQuantumArrival: true,
     auroraPlayerDeath: true,
     auroraServerErrors: true,
+    auroraAtcAndLanding: true,
+    auroraMaintenance: true,
+    auroraDestinations: true,
+    auroraShipSystems: true,
     rsTargetAlertEnabled: true,
     rsTargetSoundEnabled: true,
     wipeFilterEnabled: false,
@@ -2069,6 +2073,59 @@ export const SettingsView: React.FC = () => {
                   <div>
                     <div className="text-xs font-semibold text-slate-100">⚠️ Serverfehler (30k)</div>
                     <div className="text-[10px] text-slate-400">Verbindungsabbruch</div>
+                  </div>
+                </label>
+
+                {/* Spalte 4 */}
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraAtcAndLanding ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraAtcAndLanding: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🛬 ATC &amp; Landung</div>
+                    <div className="text-[10px] text-slate-400">Landung, Start &amp; Docking</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraMaintenance ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraMaintenance: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🔧 Wartung &amp; Service</div>
+                    <div className="text-[10px] text-slate-400">Reparatur, Betankung &amp; Restock</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraDestinations ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraDestinations: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">🪐 Stationen &amp; Monde</div>
+                    <div className="text-[10px] text-slate-400">Raffinerien &amp; Mondankünfte</div>
+                  </div>
+                </label>
+
+                <label className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 flex items-start space-x-3 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={settings.auroraShipSystems ?? true}
+                    onChange={(e) => setSettings({ ...settings, auroraShipSystems: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">⚙️ Bordsysteme</div>
+                    <div className="text-[10px] text-slate-400">Pilotensitz, Türen &amp; Triebwerke</div>
                   </div>
                 </label>
               </div>

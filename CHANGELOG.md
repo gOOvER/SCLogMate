@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0-rc3] - 2026-09-18
+### Added
+- **Extended Aurora Voice Category Controls (`Core/AuroraVoiceService.cs`, `Core/Settings.cs`, `PhotinoBridge.cs`, `SettingsView.tsx`)**:
+  - Added granular category toggles in the Settings view and backend configuration for ATC & Landing (`auroraAtcAndLanding`), Maintenance & Refuel (`auroraMaintenance`), Stations & Moons (`auroraDestinations`), and Onboard Ship Systems (`auroraShipSystems`).
+  - Integrated active category filtering into `AuroraVoiceService` event playback, allowing users to customize voice notifications per gameplay subsystem.
+
 
 ### Added
 - **Rock-Cracking Mining Calculator ("Can I Crack It?") (`Core/RockCracking.cs`, `OreScannerView.tsx`, `PhotinoBridge.cs`)**:
