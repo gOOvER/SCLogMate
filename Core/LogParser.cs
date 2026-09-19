@@ -2059,7 +2059,7 @@ public partial class LogParser
                 {
                     var finalReward = isSalvageClaim ? 0 : (cat?.BaseReward ?? 0);
                     var finalIssuer = ResolveIssuer(cat, mId);
-                    if (finalIssuer == "Unbekannt" && cleanTitle.Contains(':'))
+                    if ((finalIssuer == "Unbekannt" || finalIssuer == "TheBackpocket") && cleanTitle.Contains(':'))
                     {
                         var colonIdx = cleanTitle.IndexOf(':');
                         if (colonIdx > 0)
@@ -2069,7 +2069,8 @@ public partial class LogParser
                                 !candidate.Equals("Contract", StringComparison.OrdinalIgnoreCase) &&
                                 !candidate.Equals("Auftrag", StringComparison.OrdinalIgnoreCase) &&
                                 !candidate.Equals("Mission", StringComparison.OrdinalIgnoreCase) &&
-                                !candidate.Equals("Objective", StringComparison.OrdinalIgnoreCase))
+                                !candidate.Equals("Objective", StringComparison.OrdinalIgnoreCase) &&
+                                !Regex.IsMatch(candidate, @"^Claim\s*#?\d+", RegexOptions.IgnoreCase))
                             {
                                 finalIssuer = candidate;
                             }
@@ -2120,7 +2121,7 @@ public partial class LogParser
                     var finalSystem = ResolveMissionSystem(cat, finalIssuer);
                     var resolvedTitle = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : (!string.IsNullOrEmpty(cleanTitle) ? cleanTitle : "Auftrag");
 
-                    bool newlyTaken = false;
+                    bool shouldEmit = false;
                     lock (_stateLock)
                     {
                         if (!_contracts.TryGetValue(mId, out var existing))
@@ -2139,29 +2140,32 @@ public partial class LogParser
                                 Reward = finalReward,
                                 Outcome = ContractOutcome.InProgress
                             };
+                            shouldEmit = _missionsTaken.Add(mId);
                         }
                         else
                         {
+                            bool wasSynthetic = existing.Title.Contains(" · ") || existing.Issuer == "TheBackpocket" || existing.Issuer == "Unbekannt";
                             _contracts[mId] = existing with
                             {
                                 Title = resolvedTitle,
-                                Issuer = finalIssuer != "Unbekannt" ? finalIssuer : (existing.Issuer != "mobiGlas" && existing.Issuer != "Unbekannt" ? existing.Issuer : (cat?.Contractor ?? "Unbekannt")),
+                                Issuer = finalIssuer != "Unbekannt" && finalIssuer != "TheBackpocket" ? finalIssuer : (existing.Issuer != "mobiGlas" && existing.Issuer != "Unbekannt" && existing.Issuer != "TheBackpocket" ? existing.Issuer : (cat?.Contractor ?? "Unbekannt")),
                                 Type = finalType != "Auftrag" ? finalType : (existing.Type != "Sonstige" && existing.Type != "Auftrag" ? existing.Type : finalType),
                                 Reward = finalReward > 0 ? finalReward : existing.Reward,
                                 System = finalSystem != "Stanton" && finalSystem != "k.A." ? finalSystem : (existing.System != "k.A." ? existing.System : finalSystem)
                             };
+                            shouldEmit = _missionsTaken.Add(mId) || wasSynthetic;
                         }
-                        newlyTaken = _missionsTaken.Add(mId);
                     }
 
-                    if (newlyTaken)
+                    if (shouldEmit)
                     {
+                        var rec = _contracts[mId];
                         return new LogEntry
                         {
                             Time = ParseTs(line),
                             Kind = EventKind.MissionTaken,
                             Amount = finalReward,
-                            Detail = $"{finalIssuer} · {finalType} · k.A. · {finalSystem}"
+                            Detail = $"{rec.Issuer} · {rec.Type} · {rec.Difficulty} · {rec.System}"
                         };
                     }
                     return null;
@@ -2297,7 +2301,7 @@ public partial class LogParser
                         _contracts[mId] = existing with
                         {
                             Title = keepTitle ? existing.Title : Missions.Format(info),
-                            Issuer = info.Faction != "Unbekannt" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
+                            Issuer = info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "TheBackpocket" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
                             Type = info.Type != "Sonstige" && info.Type != "Auftrag" ? info.Type : existing.Type,
                             Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
                             System = info.System != "k.A." ? info.System : existing.System
@@ -2306,7 +2310,11 @@ public partial class LogParser
 
                     if (_missionsTaken.Add(mId))
                     {
-                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+                        // Nur ein Event emittieren, wenn der Faction-Name kein generischer CIG-Engine-String (TheBackpocket/Unbekannt) ist
+                        if (info.Faction != "Unbekannt" && info.Faction != "TheBackpocket")
+                        {
+                            return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+                        }
                     }
                 }
                 return null;
@@ -2863,6 +2871,7 @@ public partial class LogParser
 
     private string ResolveIssuer(MissionInfo? cat, string mId)
     {
+        // 1. Direkte Comms / Funkübertragung prüfen
         if (_missionComms.TryGetValue(mId, out var comms))
         {
             if (!string.IsNullOrWhiteSpace(comms.Giver) && comms.Giver != "Unbekannt")
@@ -2871,20 +2880,23 @@ public partial class LogParser
                 return comms.Faction;
         }
 
-        if (cat != null)
-        {
-            if (!string.IsNullOrWhiteSpace(cat.Contractor))
-                return cat.Contractor;
-            if (!string.IsNullOrWhiteSpace(cat.Faction))
-                return cat.Faction;
-        }
-
+        // 2. Bestehenden Vertrag aus dem Parser-Speicher prüfen (z. B. aus CreateMarker oder vorherigem Event)
         if (!string.IsNullOrEmpty(mId) && _contracts.TryGetValue(mId, out var existingContract))
         {
             if (!string.IsNullOrWhiteSpace(existingContract.Issuer) &&
                 existingContract.Issuer != "Unbekannt" &&
-                existingContract.Issuer != "mobiGlas")
+                existingContract.Issuer != "mobiGlas" &&
+                existingContract.Issuer != "TheBackpocket")
                 return existingContract.Issuer;
+        }
+
+        // 3. Missionskatalog (ohne generische Fallbacks wie 'Salvage Broker' oder 'Civilian')
+        if (cat != null)
+        {
+            if (!string.IsNullOrWhiteSpace(cat.Contractor) && cat.Contractor != "Salvage Broker")
+                return cat.Contractor;
+            if (!string.IsNullOrWhiteSpace(cat.Faction) && cat.Faction != "Civilian")
+                return cat.Faction;
         }
 
         return "Unbekannt";

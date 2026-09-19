@@ -5013,17 +5013,35 @@ public class PhotinoBridge
         }
 
         var history = Database.LoadRecentEvents(2500)
-            .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken)
+            .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken or EventKind.MissionReward)
             .Reverse()
             .Take(100)
-            .Select(e => new MissionItemDto
+            .Select(e =>
             {
-                Id = Guid.NewGuid().ToString("N"),
-                Title = e.Detail ?? e.KindText,
-                Contractor = "Star Citizen Auftragsmanager",
-                BaseReward = (int)e.Amount,
-                IsCompleted = e.Kind == EventKind.MissionDone,
-                Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+                bool isDone = e.Kind == EventKind.MissionReward ||
+                              e.Kind == EventKind.MissionDone ||
+                              (e.Kind == EventKind.Mission && (e.Detail != null && (e.Detail.Contains("Complete", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase))));
+
+                var title = e.Detail ?? e.KindText;
+                string contractor = "Star Citizen Auftragsmanager";
+                if (title.Contains(" · "))
+                {
+                    var parts = title.Split(" · ");
+                    if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[0]))
+                    {
+                        contractor = parts[0].Trim();
+                    }
+                }
+
+                return new MissionItemDto
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Title = title,
+                    Contractor = contractor,
+                    BaseReward = (int)e.Amount,
+                    IsCompleted = isDone,
+                    Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+                };
             }).ToList();
 
         return new

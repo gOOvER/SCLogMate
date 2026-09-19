@@ -51,6 +51,14 @@ public static class MissionCatalog
         return _lookupByNormTitle.TryGetValue(norm, out var m) ? m : null;
     }
 
+    private static readonly HashSet<string> _genericStopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "claim", "rights", "small", "medium", "large", "vlarge", "intro", "order", "haul", "hauling",
+        "job", "from", "with", "into", "near", "mission", "contract", "objective", "cargo", "delivery",
+        "salvage", "bounty", "patrol", "defend", "service", "services", "system", "local", "stanton",
+        "pyro", "nyx", "hurston", "crusader", "microtech", "arccorp"
+    };
+
     public static MissionInfo? FuzzyLookup(string? rawTitle)
     {
         if (string.IsNullOrWhiteSpace(rawTitle)) return null;
@@ -58,9 +66,9 @@ public static class MissionCatalog
         if (exact != null) return exact;
 
         var rawNorm = Normalize(rawTitle);
-        if (rawNorm.Length < 3) return null;
+        if (rawNorm.Length < 4) return null;
 
-        // 1. Substring / Contains Match - Bevorzuge den längsten und spezifischsten Match!
+        // 1. Substring / Contains Match - Nur wenn eine signifikante Überdeckung vorliegt
         MissionInfo? bestSubMatch = null;
         int bestSubScore = 0;
 
@@ -71,42 +79,71 @@ public static class MissionCatalog
 
             if (rawNorm.Contains(mNorm))
             {
-                // rawTitle enthält den Titel des Katalogs (z.B. "salvage job large" enthält "salvage job large" oder "salvage job")
-                int score = mNorm.Length * 2;
-                if (score > bestSubScore)
+                // rawTitle enthält den Titel des Katalogs (z.B. "contract complete: tracker training permit certification")
+                // Nur akzeptieren, wenn der Katalogtitel mindestens 40% des Gesamttitels ausmacht oder >= 12 Zeichen lang ist
+                if (mNorm.Length >= 12 || (double)mNorm.Length / rawNorm.Length >= 0.40)
                 {
-                    bestSubScore = score;
-                    bestSubMatch = m;
+                    int score = mNorm.Length * 2;
+                    if (score > bestSubScore)
+                    {
+                        bestSubScore = score;
+                        bestSubMatch = m;
+                    }
                 }
             }
             else if (mNorm.Contains(rawNorm))
             {
-                int score = rawNorm.Length;
-                if (score > bestSubScore)
+                // mNorm enthält rawTitle (z.B. Spieler sucht nach "Tracker Training Permit")
+                // Nur akzeptieren, wenn rawTitle mindestens 60% des Katalogtitels ausmacht
+                if ((double)rawNorm.Length / mNorm.Length >= 0.60)
                 {
-                    bestSubScore = score;
-                    bestSubMatch = m;
+                    int score = rawNorm.Length + (100 - Math.Abs(mNorm.Length - rawNorm.Length));
+                    if (score > bestSubScore)
+                    {
+                        bestSubScore = score;
+                        bestSubMatch = m;
+                    }
                 }
             }
         }
 
         if (bestSubMatch != null) return bestSubMatch;
 
-        // 2. Token Overlap Match (mindestens 2 gemeinsame Wörter mit >= 4 Zeichen)
-        var rawTokens = rawNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 4).ToHashSet();
+        // 2. Token Overlap Match (mit Stopwort-Filterung und Schwellenwert)
+        var rawTokens = rawNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
         if (rawTokens.Count > 0)
         {
             MissionInfo? bestMatch = null;
-            int maxOverlap = 0;
+            int maxScore = 0;
 
             foreach (var m in _catalog)
             {
-                var mTokens = Normalize(m.Title).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 4).ToHashSet();
-                int overlap = rawTokens.Intersect(mTokens).Count();
-                if (overlap >= 2 && overlap > maxOverlap)
+                var mTokens = Normalize(m.Title).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
+                var intersection = rawTokens.Intersect(mTokens).ToList();
+                if (intersection.Count == 0) continue;
+
+                // Mindestens ein spezifisches Token (kein reines Stopwort)
+                bool hasSpecificToken = intersection.Any(t => !_genericStopWords.Contains(t) && t.Length >= 4);
+
+                // Score berechnen: Spezifische Tokens zählen 3-fach, generische 1-fach
+                int score = 0;
+                foreach (var t in intersection)
                 {
-                    maxOverlap = overlap;
-                    bestMatch = m;
+                    score += (_genericStopWords.Contains(t) ? 1 : 3);
+                }
+
+                double overlapRatio = (double)intersection.Count / Math.Min(rawTokens.Count, mTokens.Count);
+
+                // Akzeptieren wenn:
+                // a) Mindestens ein spezifisches Token und Score >= 4
+                // b) Oder sehr hoher Overlap (>= 75% aller Tokens)
+                if ((hasSpecificToken && score >= 4) || (intersection.Count >= 2 && overlapRatio >= 0.75))
+                {
+                    if (score > maxScore)
+                    {
+                        maxScore = score;
+                        bestMatch = m;
+                    }
                 }
             }
 
@@ -470,8 +507,66 @@ public static class MissionCatalog
             StarSystems = "Stanton",
             Description = "Verlade 96 SCU Frachtkisten über den Frachtaufzug am Hangar und liefere sie am Ziel-Verteilzentrum ab."
         });
-
-        // ── BERGUNG, SALVAGE & WRACK-VERWERTUNG ──────────────────────────────
+        Add(new MissionInfo
+        {
+            Id = "orison_relief_small_supply",
+            Title = "Orison Relief: Small Supply Haul",
+            Contractor = "Orison Relief Services",
+            Faction = "Crusader Industries",
+            MissionType = "Fracht & Transport",
+            BaseReward = 32000,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Transport von Hilfsgütern und Versorgungsmaterialien nach August Dunlow Spaceport (Orison)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "orison_relief_med_supply",
+            Title = "Orison Relief: Medium Supply Haul",
+            Contractor = "Orison Relief Services",
+            Faction = "Crusader Industries",
+            MissionType = "Fracht & Transport",
+            BaseReward = 65000,
+            ReputationGain = 550,
+            StarSystems = "Stanton",
+            Description = "Mittelschwerer Frachttransport von Versorgungsgütern und Baumaterialien nach Orison."
+        });
+        Add(new MissionInfo
+        {
+            Id = "orison_relief_large_supply",
+            Title = "Orison Relief: Large Supply Haul",
+            Contractor = "Orison Relief Services",
+            Faction = "Crusader Industries",
+            MissionType = "Fracht & Transport",
+            BaseReward = 125000,
+            ReputationGain = 1100,
+            StarSystems = "Stanton",
+            Description = "Großfracht-Konvoi mit Hilfslieferungen zur Unterstützung der Orison-Plattformen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "orison_relief_med_order",
+            Title = "Orison Relief: Medium Materials Order",
+            Contractor = "Orison Relief Services",
+            Faction = "Crusader Industries",
+            MissionType = "Fracht & Transport",
+            BaseReward = 58000,
+            ReputationGain = 480,
+            StarSystems = "Stanton",
+            Description = "Lieferung von Rohstoffen und Komponenten zur Aufrechterhaltung der Industrieanlagen auf Crusader."
+        });
+        Add(new MissionInfo
+        {
+            Id = "orison_relief_medical_aid",
+            Title = "Orison Relief: Medical Aid Delivery",
+            Contractor = "Orison Relief Services",
+            Faction = "Crusader Industries",
+            MissionType = "Fracht & Transport",
+            BaseReward = 45000,
+            ReputationGain = 400,
+            StarSystems = "Stanton",
+            Description = "Eillieferung medizinischer Hilfspakete und Medikamente für Krankenhäuser auf Orison."
+        });
         Add(new MissionInfo
         {
             Id = "salvage_hull_scraping_cutlass",

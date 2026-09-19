@@ -4460,7 +4460,26 @@ public partial class MainViewModel : ObservableObject
 
         if (matchContract == null && ActiveContracts.Count == 1)
         {
-            matchContract = ActiveContracts[0];
+            var single = ActiveContracts[0];
+            bool isGenericTitle = string.IsNullOrWhiteSpace(missionTitle) ||
+                                  missionTitle.StartsWith("(Belohnung", StringComparison.OrdinalIgnoreCase) ||
+                                  missionTitle.Equals("Missions-Belohnung", StringComparison.OrdinalIgnoreCase) ||
+                                  missionTitle.Equals("Auftrag", StringComparison.OrdinalIgnoreCase);
+
+            if (isGenericTitle)
+            {
+                matchContract = single;
+            }
+            else
+            {
+                var normSingle = ContractParser.NormalizeTitle(single.Title);
+                var normCompleted = ContractParser.NormalizeTitle(missionTitle);
+                var completedTokens = normCompleted.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 4);
+                if (completedTokens.Any(t => normSingle.Contains(t)))
+                {
+                    matchContract = single;
+                }
+            }
         }
 
         long reward = matchContract != null && matchContract.Reward > 0 ? matchContract.Reward : passedReward;
@@ -4601,7 +4620,24 @@ public partial class MainViewModel : ObservableObject
 
         if (matchContract == null && ActiveContracts.Count == 1)
         {
-            matchContract = ActiveContracts[0];
+            var single = ActiveContracts[0];
+            bool isGenericTitle = string.IsNullOrWhiteSpace(missionTitle) ||
+                                  missionTitle.Equals("Auftrag", StringComparison.OrdinalIgnoreCase);
+
+            if (isGenericTitle)
+            {
+                matchContract = single;
+            }
+            else
+            {
+                var normSingle = ContractParser.NormalizeTitle(single.Title);
+                var normAb = ContractParser.NormalizeTitle(missionTitle);
+                var abTokens = normAb.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 4);
+                if (abTokens.Any(t => normSingle.Contains(t)))
+                {
+                    matchContract = single;
+                }
+            }
         }
 
         if (matchContract != null)

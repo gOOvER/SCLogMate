@@ -204,7 +204,9 @@ public partial class MainViewModel
                 c.Outcome == ContractOutcome.InProgress &&
                 (ContractParser.NormalizeTitle(c.Title).Contains(normAc) ||
                  normAc.Contains(ContractParser.NormalizeTitle(c.Title)) ||
-                 (c.Title.Contains(" · ") && !string.IsNullOrEmpty(ac.ContractedBy) && (c.Issuer == ac.ContractedBy || ac.ContractedBy.Contains(c.Issuer)))));
+                 (c.Title.Contains(" · ") && !string.IsNullOrEmpty(ac.ContractedBy) &&
+                  (c.Issuer.Equals(ac.ContractedBy, StringComparison.OrdinalIgnoreCase) || ac.ContractedBy.Contains(c.Issuer, StringComparison.OrdinalIgnoreCase)) &&
+                  (normAc.Contains(ContractParser.NormalizeTitle(c.Type)) || c.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(w => w.Length >= 4 && normAc.Contains(w.ToLowerInvariant()))))));
 
             if (matchedRaw != null)
             {
