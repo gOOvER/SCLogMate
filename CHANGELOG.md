@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Inventory Item Class Resolution & Noise Filtering (`Core/WikiApiClient.cs`, `Core/WarehouseCatalog.cs`, `release.ps1`)**:
+  - Automatically strip numeric entity instance IDs (e.g. `_776193770765`) from internal CIG item class identifiers before performing Star Citizen Wiki API lookups and caching.
+  - Suppress character customization loadout noise (`necksock`, `fp_visor`, `hair_`, `brows_`, `eyedetail`, `eyelashes`, etc.) from being logged as unknown item classes in `SCLogMate.unknown.log`.
+  - Normalized class name lookups in `WarehouseCatalog` to ensure clean item names and categories for inventory and loot items.
+  - Hardened `release.ps1` git push target to `refs/heads/main` preventing ambiguous refspec conflicts.
 - **Mission Detection, Contractor Resolution & Management Accuracy (`Core/MissionCatalog.cs`, `Core/Missions.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `ViewModels/MainViewModel.QuantumViews.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
   - **FuzzyLookup Over-Matching Protection**: Enhanced `MissionCatalog.FuzzyLookup` with stop-word filtering (`claim`, `rights`, `small`, `medium`, `large`, `haul`, `salvage`, etc.) and strict length-ratio checks, preventing false-positive matches (e.g. salvage rights claims matching `Salvage Claim: Small` and corrupting contractor and faction data).
   - **Dynamic Engine Generator Resolution**: Upgraded `Missions.cs` to resolve Star Citizen 3.24+ / 4.0 dynamic generator identifiers (`TheBackpocket`, `CleanAir`) to real in-lore factions and contractors (`Orison Relief Services`, `People's Alliance`, `Red Wind Line`, `Covalex Shipping`, `Ling Family`, `Civilian Defense`).

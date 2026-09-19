@@ -301,10 +301,10 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
    - Vor Ausführung von `release.ps1` sicherstellen, dass SimplySign Desktop eingeloggt ist (oder `release.ps1 -SkipSign` verwenden).
 
 ### 📋 ToDo-Checkliste vor dem Release
-- [ ] **Phase 1: Bereinigung & Feinschliff**
+- [x] **Phase 1: Bereinigung & Feinschliff**
   - [x] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
-  - [ ] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
-  - [ ] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
+  - [x] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
+  - [x] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
 - [ ] **Phase 2: Dokumentation & Changelog-Stempelung**
   - [ ] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` stempeln.
   - [ ] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.

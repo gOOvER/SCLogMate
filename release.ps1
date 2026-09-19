@@ -26,7 +26,7 @@ if ($cl -match $verPat) {
   Set-Content $clPath $cl -Encoding UTF8
   git add CHANGELOG.md
   git commit -m "changelog: $tag" 2>&1 | Out-Null
-  git push 2>&1 | Out-Null
+  git push origin refs/heads/main 2>&1 | Out-Null
 } else {
   $body = "Siehe Commits."
 }

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SCLogMate.Core;
@@ -128,28 +129,65 @@ public static class WikiApiClient
         return null;
     }
 
+    private static readonly Regex TrailingInstanceIdRegex = new(@"_\d{4,}$", RegexOptions.Compiled);
+
+    public static string NormalizeClassName(string className)
+    {
+        if (string.IsNullOrWhiteSpace(className)) return "";
+        var clean = className.Trim();
+        return TrailingInstanceIdRegex.Replace(clean, "");
+    }
+
+    public static bool IsIgnoredItemNoise(string className)
+    {
+        if (string.IsNullOrWhiteSpace(className)) return true;
+        var lower = className.ToLowerInvariant();
+        return lower.Contains("necksock") ||
+               lower.Contains("fp_visor") ||
+               lower.Contains("hair_") ||
+               lower.Contains("brows_") ||
+               lower.Contains("eyedetail") ||
+               lower.Contains("eyelashes") ||
+               lower.StartsWith("head_") ||
+               lower.StartsWith("pupil_");
+    }
+
     public static async Task<WikiInfo?> LookupByClassNameAsync(string className)
     {
         if (string.IsNullOrWhiteSpace(className)) return null;
-        var clean = className.Trim();
+        var raw = className.Trim();
+        var normalized = NormalizeClassName(raw);
+
+        if (IsIgnoredItemNoise(normalized))
+        {
+            Cache[raw] = null;
+            if (raw != normalized) Cache[normalized] = null;
+            return null;
+        }
 
         // 1. In-Memory Cache
-        if (Cache.TryGetValue(clean, out var cached) && cached != null)
-            return cached;
+        if (Cache.TryGetValue(raw, out var cachedRaw) && cachedRaw != null)
+            return cachedRaw;
+        if (Cache.TryGetValue(normalized, out var cachedNorm) && cachedNorm != null)
+        {
+            Cache[raw] = cachedNorm;
+            return cachedNorm;
+        }
 
         // 2. Persistent SQLite Cache
-        var dbCached = Database.GetCachedWikiItem(clean);
+        var dbCached = Database.GetCachedWikiItem(normalized) ?? Database.GetCachedWikiItem(raw);
         if (dbCached != null)
         {
             WikiImageCache.PrefetchImage(dbCached.ImageUrl ?? dbCached.ThumbnailUrl);
-            Cache[clean] = dbCached;
+            Cache[normalized] = dbCached;
+            Cache[raw] = dbCached;
             return dbCached;
         }
 
         // 3. star-citizen.wiki API
         try
         {
-            var url = $"items?filter[class_name]={Uri.EscapeDataString(clean)}";
+            var url = $"items?filter[class_name]={Uri.EscapeDataString(normalized)}";
             var response = await Http.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
@@ -160,7 +198,7 @@ public static class WikiApiClient
                 if (root.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
                 {
                     var first = data[0];
-                    var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? clean : clean;
+                    var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? normalized : normalized;
                     var classLabel = first.TryGetProperty("classification_label", out var cl) ? cl.GetString() : null;
                     var typeLabel = first.TryGetProperty("type_label", out var tl) ? tl.GetString() : null;
                     var category = MapClassificationToCategory(classLabel, typeLabel);
@@ -193,20 +231,28 @@ public static class WikiApiClient
                         if (img.TryGetProperty("original_url", out var ou)) info.ImageUrl = ou.GetString() ?? "";
                     }
 
-                    Database.SaveCachedWikiItem(clean, info);
+                    Database.SaveCachedWikiItem(normalized, info);
                     WikiImageCache.PrefetchImage(info.ImageUrl ?? info.ThumbnailUrl);
-                    Cache[clean] = info;
-                    ItemResolved?.Invoke(clean, info);
+                    Cache[normalized] = info;
+                    Cache[raw] = info;
+                    ItemResolved?.Invoke(raw, info);
+                    if (raw != normalized) ItemResolved?.Invoke(normalized, info);
                     return info;
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.Log($"WikiApi Lookup Fehler ({clean}): {ex.Message}");
+            Logger.Log($"WikiApi Lookup Fehler ({normalized}): {ex.Message}");
         }
 
-        UnknownEventsLogger.LogUnknown("ItemClass", clean);
+        if (!IsIgnoredItemNoise(normalized))
+        {
+            UnknownEventsLogger.LogUnknown("ItemClass", normalized);
+        }
+
+        Cache[raw] = null;
+        Cache[normalized] = null;
         return null;
     }
 
@@ -313,10 +359,13 @@ public static class WikiApiClient
     public static void EnqueueClassPrefetch(string className)
     {
         if (string.IsNullOrWhiteSpace(className)) return;
-        var clean = className.Trim();
-        if (_queuedOrFetched.TryAdd(clean, 0))
+        var raw = className.Trim();
+        var normalized = NormalizeClassName(raw);
+        if (IsIgnoredItemNoise(normalized)) return;
+
+        if (_queuedOrFetched.TryAdd(normalized, 0))
         {
-            _prefetchQueue.Enqueue(clean);
+            _prefetchQueue.Enqueue(normalized);
             StartPrefetchWorker();
         }
     }

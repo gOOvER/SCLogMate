@@ -45,7 +45,11 @@ public static class WarehouseCatalog
             return ("Unbekannter Gegenstand", "Sonstiges");
 
         var raw = itemClass.Trim();
+        var normalized = WikiApiClient.NormalizeClassName(raw);
         bool de = isGerman ?? I18n.Instance.IsGerman;
+
+        if (WikiApiClient.IsIgnoredItemNoise(normalized))
+            return (de ? "Spieler-Ausrüstung" : "Player Equipment", de ? "Sonstiges" : "Miscellaneous");
 
         EnsureWikiCacheLoaded();
 
@@ -54,18 +58,23 @@ public static class WarehouseCatalog
         {
             return wikiEntry;
         }
+        if (raw != normalized && _cachedWikiNames.TryGetValue(normalized, out var wikiNorm) && !string.IsNullOrWhiteSpace(wikiNorm.Name))
+        {
+            _cachedWikiNames[raw] = wikiNorm;
+            return wikiNorm;
+        }
 
         // 2. Statisches Wörterbuch bekannter Items
-        if (KnownItems.TryGetValue(raw, out var entry))
+        if (KnownItems.TryGetValue(raw, out var entry) || (raw != normalized && KnownItems.TryGetValue(normalized, out entry)))
         {
             return (de ? entry.NameDe : entry.NameEn, de ? entry.CatDe : entry.CatEn);
         }
 
         // 3. Asynchron im Hintergrund bei star-citizen.wiki nachschlagen (Non-Blocking)
-        WikiApiClient.EnqueueClassPrefetch(raw);
+        WikiApiClient.EnqueueClassPrefetch(normalized);
 
         // 4. Regelbasierte intelligente Aufbereitung & Lokalisierung
-        var lower = raw.ToLowerInvariant();
+        var lower = normalized.ToLowerInvariant();
 
         // Edelsteine / Harvestables
         if (lower.Contains("mineral") || lower.Contains("janalite") || lower.Contains("aphorite") ||
@@ -73,14 +82,14 @@ public static class WarehouseCatalog
             lower.Contains("feynmaline") || lower.Contains("beradom") ||
             lower.Contains("revenant") || lower.Contains("harvestable") || lower.Contains("kopion"))
         {
-            return (PrettifyHarvestable(raw, de), de ? "Mineralien & Erze" : "Minerals & Ores");
+            return (PrettifyHarvestable(normalized, de), de ? "Mineralien & Erze" : "Minerals & Ores");
         }
 
         // Schiffskomponenten & Schiffsausrüstung
         if (lower.StartsWith("qdrv_") || lower.StartsWith("shld_") || lower.StartsWith("cool_") ||
             lower.StartsWith("powr_") || lower.StartsWith("jdrv_") || lower.Contains("_scitem"))
         {
-            return (PrettifyShipComponent(raw, de), de ? "Schiffsausrüstung" : "Ship Equipment");
+            return (PrettifyShipComponent(normalized, de), de ? "Schiffsausrüstung" : "Ship Equipment");
         }
 
         // Werkzeuge & Module
@@ -88,7 +97,7 @@ public static class WarehouseCatalog
             lower.Contains("salvage") || lower.Contains("repair") || lower.Contains("cambio") ||
             lower.Contains("fabricator"))
         {
-            return (PrettifyTool(raw, de), de ? "Werkzeuge & Module" : "Tools & Modules");
+            return (PrettifyTool(normalized, de), de ? "Werkzeuge & Module" : "Tools & Modules");
         }
 
         // Waffen & Munition
@@ -97,7 +106,7 @@ public static class WarehouseCatalog
             lower.Contains("gren") || lower.Contains("mag") || lower.Contains("melee") ||
             lower.Contains("knife") || lower.Contains("weapon") || lower.Contains("optics"))
         {
-            return (PrettifyWeapon(raw, de), de ? "Waffen & Munition" : "Weapons & Ammo");
+            return (PrettifyWeapon(normalized, de), de ? "Waffen & Munition" : "Weapons & Ammo");
         }
 
         // Rüstung & Kleidung
@@ -114,7 +123,7 @@ public static class WarehouseCatalog
             lower.StartsWith("ops_") || lower.StartsWith("oct_") || lower.StartsWith("ccc_") ||
             lower.StartsWith("qrt_") || lower.StartsWith("dmc_") || lower.StartsWith("987_"))
         {
-            return (PrettifyArmor(raw, de), de ? "Rüstung & Kleidung" : "Armor & Clothing");
+            return (PrettifyArmor(normalized, de), de ? "Rüstung & Kleidung" : "Armor & Clothing");
         }
 
         // Medizin & Verpflegung
@@ -124,7 +133,7 @@ public static class WarehouseCatalog
             lower.Contains("can_") || lower.Contains("snack") || lower.Contains("tin_") ||
             lower.Contains("sachet_"))
         {
-            return (PrettifyConsumable(raw, de), de ? "Verbrauchsgüter" : "Consumables");
+            return (PrettifyConsumable(normalized, de), de ? "Verbrauchsgüter" : "Consumables");
         }
 
         // Quest, Utensilien, Frachtkisten, Wertsachen
@@ -132,11 +141,11 @@ public static class WarehouseCatalog
             lower.Contains("cryptokey") || lower.Contains("carryable") || lower.Contains("currency_bar") ||
             lower.Contains("medal") || lower.Contains("blackbox") || lower.Contains("inventorycontainer"))
         {
-            return (PrettifyUtility(raw, de), de ? "Quest & Wertsachen" : "Quest & Valuables");
+            return (PrettifyUtility(normalized, de), de ? "Quest & Wertsachen" : "Quest & Valuables");
         }
 
         // Fallback: Generische Bereinigung
-        return (FormatGeneric(raw), de ? "Sonstiges" : "Miscellaneous");
+        return (FormatGeneric(normalized), de ? "Sonstiges" : "Miscellaneous");
     }
 
     private static string PrettifyHarvestable(string raw, bool de)
