@@ -1982,7 +1982,7 @@ public partial class LogParser
                                 MissionId = mId,
                                 AcceptedAt = ParseTs(line),
                                 CompletedAt = ParseTs(line),
-                                Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                                Title = MissionCatalog.ResolveTitle(cleanTitle, cat),
                                 Issuer = issuer,
                                 Type = cat?.MissionType ?? "Auftrag",
                                 Difficulty = "k.A.",
@@ -2027,7 +2027,7 @@ public partial class LogParser
                                 MissionId = mId,
                                 AcceptedAt = ParseTs(line),
                                 CompletedAt = ParseTs(line),
-                                Title = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : cleanTitle,
+                                Title = MissionCatalog.ResolveTitle(cleanTitle, cat),
                                 Issuer = issuer,
                                 Type = cat?.MissionType ?? "Auftrag",
                                 Difficulty = "k.A.",
@@ -2080,7 +2080,7 @@ public partial class LogParser
                         }
                     }
 
-                    var finalType = cat?.MissionType ?? (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ? "Person/Bergung" : "Auftrag");
+                    var finalType = isSalvageClaim ? "Bergung & Salvage" : (cat?.MissionType ?? (cleanTitle.Contains("Missing Person", StringComparison.OrdinalIgnoreCase) ? "Person/Bergung" : "Auftrag"));
                     if (finalType == "Auftrag")
                     {
                         if (cleanTitle.Contains("Cargo", StringComparison.OrdinalIgnoreCase) ||
@@ -2122,7 +2122,7 @@ public partial class LogParser
                     }
 
                     var finalSystem = ResolveMissionSystem(cat, finalIssuer);
-                    var resolvedTitle = !string.IsNullOrEmpty(cat?.Title) ? cat.Title : (!string.IsNullOrEmpty(cleanTitle) ? cleanTitle : "Auftrag");
+                    var resolvedTitle = MissionCatalog.ResolveTitle(cleanTitle, cat);
 
                     bool shouldEmit = false;
                     lock (_stateLock)

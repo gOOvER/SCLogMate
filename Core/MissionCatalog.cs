@@ -56,7 +56,27 @@ public static class MissionCatalog
         "claim", "rights", "small", "medium", "large", "vlarge", "intro", "order", "haul", "hauling",
         "job", "from", "with", "into", "near", "mission", "contract", "objective", "cargo", "delivery",
         "salvage", "bounty", "patrol", "defend", "service", "services", "system", "local", "stanton",
-        "pyro", "nyx", "hurston", "crusader", "microtech", "arccorp"
+        "pyro", "nyx", "hurston", "crusader", "microtech", "arccorp",
+        // Hersteller dürfen nie alleinige Match-Grundlage sein
+        "drake", "aegis", "anvil", "rsi", "misc", "crusader", "argo", "origin", "mirai",
+        "esperia", "banu", "gatac", "kruger", "tumbril", "greycat", "consol", "consolidated",
+        // Generische Modifikatoren
+        "legal", "illegal", "unverified", "unlawful", "lawful", "heavy", "light", "massive",
+        "unsanctioned", "sanctioned", "recovery", "scraping", "scrap", "derelict", "clean", "cleanup"
+    };
+
+    private static readonly HashSet<string> _knownShipModels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cutlass", "corsair", "vulture", "caterpillar", "cutter", "buccaneer", "herald", "ironclad", "kraken", "clipper", "mule", "dragonfly",
+        "gladius", "avenger", "sabre", "vanguard", "eclipse", "retaliator", "hammerhead", "reclaimer", "redeemer", "nautilus", "idris", "javelin", "stalker", "titan", "warlock",
+        "arrow", "hornet", "f7c", "f8c", "hurricane", "valkyrie", "carrack", "terrapin", "crucible", "gladiator", "hawk", "ballista", "centurion", "spartan",
+        "aurora", "constellation", "connie", "taurus", "andromeda", "aquila", "phoenix", "scorpius", "zeus", "mantis", "polaris", "galaxy", "perseus", "apollo",
+        "freelancer", "prospector", "starfarer", "reliant", "hull", "expanse", "odyssey",
+        "hercules", "ares", "mercury", "msr", "starlifter", "genesis", "ion", "inferno", "c1", "c2", "m1", "m2", "a1", "a2", "e1",
+        "mole", "raft", "srv", "mpuv",
+        "100i", "125a", "135c", "300i", "315p", "325a", "350r", "400i", "600i", "890", "890jump",
+        "defender", "blade", "glaive", "scythe", "prowler", "talon", "syulen", "santokyai", "san'tok.yāi", "khartu", "khartu-al",
+        "nomad", "mustang", "pioneer"
     };
 
     public static MissionInfo? FuzzyLookup(string? rawTitle)
@@ -65,10 +85,21 @@ public static class MissionCatalog
         var exact = Lookup(rawTitle);
         if (exact != null) return exact;
 
-        var rawNorm = Normalize(rawTitle);
+        // Claim-Nummer entfernen (z. B. "Claim #92872: Drake Corsair Salvage Rights" -> "Drake Corsair Salvage Rights")
+        var strippedTitle = Regex.Replace(rawTitle, @"^Claim\s*#?\d+:\s*", "", RegexOptions.IgnoreCase).Trim();
+        if (strippedTitle.Length != rawTitle.Length)
+        {
+            var strippedExact = Lookup(strippedTitle);
+            if (strippedExact != null) return strippedExact;
+        }
+
+        var rawNorm = Normalize(strippedTitle);
         if (rawNorm.Length < 4) return null;
 
-        // 1. Substring / Contains Match - Nur wenn eine signifikante Überdeckung vorliegt
+        var rawTokens = rawNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
+        var rawShip = _knownShipModels.FirstOrDefault(s => rawTokens.Contains(s));
+
+        // 1. Substring / Contains Match - Nur wenn eine signifikante Überdeckung vorliegt und Schiffsmodelle nicht kollidieren
         MissionInfo? bestSubMatch = null;
         int bestSubScore = 0;
 
@@ -77,10 +108,19 @@ public static class MissionCatalog
             var mNorm = Normalize(m.Title);
             if (mNorm.Length < 4) continue;
 
+            if (rawShip != null)
+            {
+                var mTokens = mNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
+                var mShip = _knownShipModels.FirstOrDefault(s => mTokens.Contains(s));
+                if (mShip != null && !string.Equals(rawShip, mShip, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue; // Schiffsmodelle kollidieren (z. B. Corsair vs Cutlass)
+                }
+            }
+
             if (rawNorm.Contains(mNorm))
             {
-                // rawTitle enthält den Titel des Katalogs (z.B. "contract complete: tracker training permit certification")
-                // Nur akzeptieren, wenn der Katalogtitel mindestens 40% des Gesamttitels ausmacht oder >= 12 Zeichen lang ist
+                // rawTitle enthält den Titel des Katalogs
                 if (mNorm.Length >= 12 || (double)mNorm.Length / rawNorm.Length >= 0.40)
                 {
                     int score = mNorm.Length * 2;
@@ -93,8 +133,7 @@ public static class MissionCatalog
             }
             else if (mNorm.Contains(rawNorm))
             {
-                // mNorm enthält rawTitle (z.B. Spieler sucht nach "Tracker Training Permit")
-                // Nur akzeptieren, wenn rawTitle mindestens 60% des Katalogtitels ausmacht
+                // mNorm enthält rawTitle
                 if ((double)rawNorm.Length / mNorm.Length >= 0.60)
                 {
                     int score = rawNorm.Length + (100 - Math.Abs(mNorm.Length - rawNorm.Length));
@@ -109,8 +148,7 @@ public static class MissionCatalog
 
         if (bestSubMatch != null) return bestSubMatch;
 
-        // 2. Token Overlap Match (mit Stopwort-Filterung und Schwellenwert)
-        var rawTokens = rawNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
+        // 2. Token Overlap Match (mit Stopwort-Filterung und Schiffsmodell-Kollisionsschutz)
         if (rawTokens.Count > 0)
         {
             MissionInfo? bestMatch = null;
@@ -119,10 +157,22 @@ public static class MissionCatalog
             foreach (var m in _catalog)
             {
                 var mTokens = Normalize(m.Title).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).ToHashSet();
+
+                // Schutz vor Schiffsmodell-Fehlzuordnungen:
+                // Wenn rawTitle ein Schiff enthält (z. B. "corsair") und Katalogeintrag ein ANDERES Schiff (z. B. "cutlass"), NIEMALS matchen!
+                if (rawShip != null)
+                {
+                    var mShip = _knownShipModels.FirstOrDefault(s => mTokens.Contains(s));
+                    if (mShip != null && !string.Equals(rawShip, mShip, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                }
+
                 var intersection = rawTokens.Intersect(mTokens).ToList();
                 if (intersection.Count == 0) continue;
 
-                // Mindestens ein spezifisches Token (kein reines Stopwort)
+                // Mindestens ein spezifisches Token (kein reines Stopwort oder Hersteller)
                 bool hasSpecificToken = intersection.Any(t => !_genericStopWords.Contains(t) && t.Length >= 4);
 
                 // Score berechnen: Spezifische Tokens zählen 3-fach, generische 1-fach
@@ -164,6 +214,41 @@ public static class MissionCatalog
             else if (char.IsWhiteSpace(ch) && (sb.Length == 0 || sb[^1] != ' ')) sb.Append(' ');
         }
         return sb.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Ermittelt den besten Anzeigenamen für einen Auftrag.
+    /// Behält spezifische Spieler-Missionsnamen (z. B. "Claim #92872: Drake Corsair Salvage Rights") bei
+    /// und ersetzt sie NICHT durch ungenaue/fremde Katalog-Titel (z. B. "Legal Salvage Claim: Drake Cutlass").
+    /// </summary>
+    public static string ResolveTitle(string? rawTitle, MissionInfo? cat)
+    {
+        if (string.IsNullOrWhiteSpace(rawTitle))
+            return cat?.Title ?? "Auftrag";
+
+        var trimmed = rawTitle.Trim(' ', ':', '-');
+        if (trimmed.Length == 0)
+            return cat?.Title ?? "Auftrag";
+
+        // Prozedurale oder generische Bezeichner (z. B. "salvage_claim_small" oder "contract_...")
+        if (trimmed.StartsWith("salvage_claim_", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("contract_", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("mission_", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Auftrag", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Mission", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Contract", StringComparison.OrdinalIgnoreCase))
+        {
+            return cat?.Title ?? trimmed;
+        }
+
+        // Wenn der Titel exakt (normalisiert) dem Katalogtitel entspricht, kanonische Formatierung nutzen
+        if (cat != null && string.Equals(Normalize(cat.Title), Normalize(trimmed), StringComparison.OrdinalIgnoreCase))
+        {
+            return cat.Title;
+        }
+
+        // Bei echtem in-game Titel den spezifischen Spieltitel unverändert beibehalten
+        return trimmed;
     }
 
     private static void Add(MissionInfo info)
@@ -579,6 +664,71 @@ public static class MissionCatalog
             ReputationGain = 180,
             StarSystems = "Stanton",
             Description = "Exklusive Bergbaurechte für ein verlassenes Cutlass-Wrack. Schabe die Hülle ab und sichere RMC."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_corsair_rights",
+            Title = "Drake Corsair Salvage Rights",
+            Contractor = "Adagio Holdings",
+            Faction = "Adagio Holdings",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 35000,
+            ReputationGain = 320,
+            StarSystems = "Stanton",
+            Description = "Offizielle Bergungsrechte für ein verlassenes Drake Corsair-Wrack. Hülle abtragen und Fracht/Komponenten bergen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_legal_claim_corsair",
+            Title = "Legal Salvage Claim: Drake Corsair",
+            Contractor = "Crusader Security",
+            Faction = "Crusader Industries",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 35000,
+            ReputationGain = 320,
+            StarSystems = "Stanton",
+            Description = "Exklusive Bergungsrechte für ein Drake Corsair-Wrack im Raum Stanton."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_vulture_rights",
+            Title = "Drake Vulture Salvage Rights",
+            Contractor = "Adagio Holdings",
+            Faction = "Adagio Holdings",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 20000,
+            ReputationGain = 200,
+            StarSystems = "Stanton",
+            Description = "Offizielle Bergungsrechte für ein verlassenes Drake Vulture-Wrack."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_caterpillar_rights",
+            Title = "Heavy Salvage Rights: Drake Caterpillar",
+            Contractor = "Hurston Dynamics",
+            Faction = "Hurston Dynamics",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 65000,
+            ReputationGain = 600,
+            StarSystems = "Stanton",
+            Description = "Bergungsrechte für einen schwer beschädigten Caterpillar-Großfrachter."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_reclaimer_rights",
+            Title = "Massive Salvage Rights: Aegis Reclaimer",
+            Contractor = "Salvage Guild",
+            Faction = "Salvage Guild",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 95000,
+            ReputationGain = 850,
+            StarSystems = "Stanton & Pyro",
+            Description = "Großangelegte Bergungsoperation an einer havarierten Aegis Reclaimer."
         });
         Add(new MissionInfo
         {

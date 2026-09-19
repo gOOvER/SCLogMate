@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Salvage Claim & Mission Title Ship Collision Protection (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
+  - **Ship Model Conflict Prevention in `MissionCatalog.FuzzyLookup`**: Added known ship model detection (`corsair`, `cutlass`, `vulture`, `caterpillar`, etc.) and manufacturer stop-words (`drake`, `aegis`, `anvil`, `rsi`, etc.) to prevent fuzzy matching across conflicting ship models. Fixed an issue where accepted Drake Corsair missions (e.g. `Claim #92872: Drake Corsair Salvage Rights`) were erroneously matched with `Legal Salvage Claim: Drake Cutlass`.
+  - **In-Game Mission Title Preservation (`MissionCatalog.ResolveTitle`)**: Refactored `LogParser.cs` and `MainViewModel.cs` to preserve specific in-game mission titles from HUD notifications rather than overwriting them with generic or conflicting catalog titles.
+  - **Added Drake Corsair & Modern Salvage Claims**: Added missing catalog entries for Drake Corsair, Drake Vulture, Drake Caterpillar, and Aegis Reclaimer salvage claims to `Core/MissionCatalog.cs`.
+  - **Database Migration v28 & Parser Version 38**: Incremented `CurrentSchemaVersion` to 28 (purging active contract rows corrupted with `Drake Cutlass`) and `CurrentParserVersion` to 38 in `Core/Database.cs`.
 - **Aurora Voice ATC & Hangar Assignment Audio Playback (`Core/Photino/PhotinoBridge.cs`, `Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
   - Connected `_auroraService.ProcessLiveEvent(entry)` inside `PhotinoBridge.OnLogLineReceived`, ensuring parsed live events (`EventKind.Hangar`, `EventKind.Maintenance`, `EventKind.Blueprint`, etc.) are delivered to the voice engine.
   - Expanded ATC and Hangar assignment matchers in `AuroraVoiceService.ProcessLiveLine` to support Star Citizen 4.10+ PU log formats (`Hangar Request Completed`, `Joined hangar queue`, `Hangar Queue`, `Hangaranforderung`, `Hangar-Zuweisung`, `AImodule_ATC`).

@@ -16,8 +16,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 27; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v27: Salvage-Claims Belohnungsbereinigung)
-    public const int CurrentParserVersion = 37; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v37: Optimierte Auftragserkennung & Fraktions-Zuordnung)
+    public const int CurrentSchemaVersion = 28; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v28: Bereinigung fälschlicher Cutlass Active Contracts)
+    public const int CurrentParserVersion = 38; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v38: Schiffsmodell-Kollisionsschutz in MissionCatalog & präzise Salvage-Claim Erkennung)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }
@@ -655,6 +655,26 @@ public static class Database
             Exec(db, "PRAGMA user_version = 27;");
             dbSchemaVersion = 27;
             Logger.Log("DB Schema: Migration auf v27 (Fälschliche Belohnungen von Salvage Claims/Rights bereinigt) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 28)
+        {
+            try
+            {
+                // Bereinigung von fälschlich als Cutlass gespeicherten aktiven Aufträgen
+                Exec(db, @"
+                    DELETE FROM contracts 
+                    WHERE status = 'Active' 
+                      AND title LIKE '%Drake Cutlass%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v28 (Bereinigung fälschlicher Cutlass Active Contracts)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 28;");
+            dbSchemaVersion = 28;
+            Logger.Log("DB Schema: Migration auf v28 (Bereinigung fälschlicher Cutlass Salvage Claims aus aktiven Aufträgen) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

@@ -114,7 +114,7 @@ public static partial class ContractParser
         var cat = MissionCatalog.FuzzyLookup(title);
         if (cat != null)
         {
-            title = cat.Title;
+            title = MissionCatalog.ResolveTitle(title, cat);
             if (string.IsNullOrWhiteSpace(contractedBy) && !string.IsNullOrWhiteSpace(cat.Contractor))
                 contractedBy = cat.Contractor;
             if (reward <= 0 && cat.BaseReward > 0)

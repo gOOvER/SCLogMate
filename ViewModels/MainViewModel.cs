@@ -4786,7 +4786,7 @@ public partial class MainViewModel : ObservableObject
 
         var contract = new ContractDetails
         {
-            Title = cat?.Title ?? missionTitle,
+            Title = MissionCatalog.ResolveTitle(missionTitle, cat),
             Reward = finalReward,
             ContractedBy = org,
             ScannedAt = DateTime.UtcNow
@@ -4798,7 +4798,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (finalReward > 0 && existing.Reward <= 0) existing.Reward = finalReward;
             if (!string.IsNullOrEmpty(org) && (string.IsNullOrEmpty(existing.ContractedBy) || existing.ContractedBy == "Unbekannt" || existing.ContractedBy == "mobiGlas")) existing.ContractedBy = org;
-            if (contract.Title.Length > existing.Title.Length) existing.Title = contract.Title;
+            if (existing.Title.Contains(" · ") || contract.Title.Length > existing.Title.Length || (!existing.Title.Contains("Corsair") && contract.Title.Contains("Corsair"))) existing.Title = contract.Title;
             existing.ScannedAt = DateTime.UtcNow;
             Database.SaveContract(existing);
 
