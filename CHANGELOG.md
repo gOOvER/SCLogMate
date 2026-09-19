@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Salvage Claim Contract Reward Fix & Cleanup (`Core/LogParser.cs`, `Core/Database.cs`, `Core/MissionCatalog.cs`)**:
+  - Fixed an issue where completing Salvage Rights / Salvage Claim contracts incorrectly awarded an artificial aUEC mission completion reward. In Star Citizen, salvage claims require paying an upfront fee and do not award completion payouts (revenue is generated solely through scraping/selling RMC and Construction Materials).
+  - Updated `LogParser` to identify salvage claims and suppress completion reward amounts (`reward = 0`, logged as `EventKind.Mission` instead of `EventKind.MissionReward`).
+  - Added `ContractFee` property to `MissionCatalog` and set `BaseReward = 0` across all legal and unverified salvage claim definitions.
+  - Implemented database schema migration v27 (`CurrentSchemaVersion = 27`) to clean up legacy false-positive `MissionReward` events from past salvage claim completions.
 - **Aurora Voice False-Positive Docking Output (`Core/AuroraVoiceService.cs`)**:
   - Resolved an issue where approaching any station, rest stop, or armistice zone triggered the "Andocken" (Docking) voice output.
   - Removed overly broad substring matchers (`DockingTube`, `Docking collar`) that were false-positively triggered by Star Citizen's background entity streaming (such as `Station_DockingTube_Reststop-arm` and fuel port attachment components).

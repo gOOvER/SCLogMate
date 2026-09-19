@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 26; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v26: fleet_user_ships livery & components)
+    public const int CurrentSchemaVersion = 27; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v27: Salvage-Claims Belohnungsbereinigung)
     public const int CurrentParserVersion = 36; // Erhöhen, wenn der LogParser neue Felder/Events liefert
 
     public static bool WasParserResetRequired { get; set; }
@@ -634,6 +634,27 @@ public static class Database
             Exec(db, "PRAGMA user_version = 26;");
             dbSchemaVersion = 26;
             Logger.Log("DB Schema: Migration auf v26 (fleet_user_ships Lackierung & Komponenten-Speicherung) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 27)
+        {
+            try
+            {
+                // Bereinigung fälschlich gutgeschriebener Salvage-Claim / Salvage-Rights Belohnungen
+                Exec(db, @"
+                    UPDATE events 
+                    SET kind = 'Mission', amount = 0 
+                    WHERE kind = 'MissionReward' 
+                      AND (detail LIKE '%Salvage Rights%' OR detail LIKE '%Salvage Claim%' OR detail LIKE '%Bergungsrechte%' OR detail LIKE '%Bergungsanspruch%');
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v27 (Salvage Rights falsche Belohnungen bereinigt)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 27;");
+            dbSchemaVersion = 27;
+            Logger.Log("DB Schema: Migration auf v27 (Fälschliche Belohnungen von Salvage Claims/Rights bereinigt) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

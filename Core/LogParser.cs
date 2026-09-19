@@ -1874,11 +1874,26 @@ public partial class LogParser
                                   full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase);
 
+                bool isSalvageClaim = cleanTitle.Contains("Salvage Rights", StringComparison.OrdinalIgnoreCase) ||
+                                      cleanTitle.Contains("Salvage Claim", StringComparison.OrdinalIgnoreCase) ||
+                                      cleanTitle.Contains("Bergungsrechte", StringComparison.OrdinalIgnoreCase) ||
+                                      cleanTitle.Contains("Bergungsanspruch", StringComparison.OrdinalIgnoreCase) ||
+                                      full.Contains("Salvage Rights", StringComparison.OrdinalIgnoreCase) ||
+                                      full.Contains("Salvage Claim", StringComparison.OrdinalIgnoreCase);
+
                 long reward = 0;
                 if (isComplete)
                 {
-                    lock (_stateLock)
+                    if (isSalvageClaim)
                     {
+                        // Bei Salvage-Claims/Bergungsrechten zahlt der Spieler eine Kaufgebühr;
+                        // der Abschluss der Mission schüttet KEINE Belohnung aus (Gewinn entsteht erst durch RMC/CM-Verkauf).
+                        reward = 0;
+                    }
+                    else
+                    {
+                        lock (_stateLock)
+                        {
                         // 1. Zuerst aktiven Auftrag in _contracts mit bekanntem Reward prüfen
                         string? targetKey = null;
                         if (_contracts.ContainsKey(mId)) targetKey = mId;
@@ -1930,6 +1945,7 @@ public partial class LogParser
                             reward = 25000; // Standard aUEC für Belohnungs-Events
                         }
                     }
+                }
 
                     lock (_stateLock)
                     {
@@ -2041,7 +2057,7 @@ public partial class LogParser
                 }
                 else if (isAccepted)
                 {
-                    var finalReward = cat?.BaseReward ?? 0;
+                    var finalReward = isSalvageClaim ? 0 : (cat?.BaseReward ?? 0);
                     var finalIssuer = ResolveIssuer(cat, mId);
                     if (finalIssuer == "Unbekannt" && cleanTitle.Contains(':'))
                     {
@@ -2154,7 +2170,7 @@ public partial class LogParser
                 return new LogEntry
                 {
                     Time = ParseTs(line),
-                    Kind = isComplete ? EventKind.MissionReward : EventKind.Mission,
+                    Kind = (isComplete && reward > 0) ? EventKind.MissionReward : EventKind.Mission,
                     Amount = reward,
                     Detail = full
                 };

@@ -13,15 +13,17 @@ public sealed class MissionInfo
     public string Faction { get; init; } = "";
     public string MissionType { get; init; } = "Sonstiges";
     public int BaseReward { get; init; }
+    public int ContractFee { get; init; }
     public int ReputationGain { get; init; }
     public bool IsIllegal { get; init; }
     public string StarSystems { get; init; } = "Stanton";
     public string[] Blueprints { get; init; } = Array.Empty<string>();
     public string Description { get; init; } = "";
 
-    public string RewardText => BaseReward > 0 ? $"+{BaseReward:N0} aUEC" : "Variabel";
+    public string RewardText => BaseReward > 0 ? $"+{BaseReward:N0} aUEC" : (ContractFee > 0 ? $"-{ContractFee:N0} aUEC (Gebühr)" : "0 aUEC / Variabel");
     public string ReputationText => ReputationGain > 0 ? $"+{ReputationGain} XP" : "–";
     public string LegalityText => IsIllegal ? "Illegal" : "Legal";
+    public string HasFeeText => ContractFee > 0 ? $"{ContractFee:N0} aUEC" : "Kostenlos";
     public bool HasBlueprints => Blueprints.Length > 0;
     public string BlueprintsText => HasBlueprints ? string.Join(", ", Blueprints) : "Keine";
 }
@@ -477,7 +479,8 @@ public static class MissionCatalog
             Contractor = "Crusader Security",
             Faction = "Crusader Industries",
             MissionType = "Bergung & Salvage",
-            BaseReward = 15000,
+            BaseReward = 0,
+            ContractFee = 15000,
             ReputationGain = 180,
             StarSystems = "Stanton",
             Description = "Exklusive Bergbaurechte für ein verlassenes Cutlass-Wrack. Schabe die Hülle ab und sichere RMC."
@@ -489,10 +492,24 @@ public static class MissionCatalog
             Contractor = "Hurston Dynamics",
             Faction = "Hurston Dynamics",
             MissionType = "Bergung & Salvage",
-            BaseReward = 45000,
+            BaseReward = 0,
+            ContractFee = 45000,
             ReputationGain = 450,
             StarSystems = "Stanton",
             Description = "Großes Wrack im Asteroidenring von Yela. Hülle schaben und Strukturteile bergen."
+        });
+        Add(new MissionInfo
+        {
+            Id = "salvage_mole_recovery",
+            Title = "Salvage Rights: Argo MOLE",
+            Contractor = "Civilian",
+            Faction = "Civilian",
+            MissionType = "Bergung & Salvage",
+            BaseReward = 0,
+            ContractFee = 20000,
+            ReputationGain = 350,
+            StarSystems = "Stanton & Pyro",
+            Description = "Offizielle Bergungsrechte für ein verlassenes Argo-MOLE-Wrack. Hülle abtragen und Struktur zerlegen."
         });
         Add(new MissionInfo
         {
@@ -956,7 +973,8 @@ public static class MissionCatalog
             Contractor = "Salvage Broker",
             Faction = "Civilian",
             MissionType = "Bergung",
-            BaseReward = 20000,
+            BaseReward = 0,
+            ContractFee = 20000,
             ReputationGain = 200,
             StarSystems = "Stanton",
             Description = "Offizieller Bergungsanspruch für ein kleines Wrack."
@@ -968,7 +986,8 @@ public static class MissionCatalog
             Contractor = "Salvage Broker",
             Faction = "Civilian",
             MissionType = "Bergung",
-            BaseReward = 50000,
+            BaseReward = 0,
+            ContractFee = 50000,
             ReputationGain = 350,
             StarSystems = "Stanton",
             Description = "Offizieller Bergungsanspruch für ein mittleres Wrack."
@@ -980,7 +999,8 @@ public static class MissionCatalog
             Contractor = "Salvage Broker",
             Faction = "Civilian",
             MissionType = "Bergung",
-            BaseReward = 90000,
+            BaseReward = 0,
+            ContractFee = 90000,
             ReputationGain = 600,
             StarSystems = "Stanton",
             Description = "Offizieller Bergungsanspruch für ein großes Frachter- oder Tankschiffwrack."
@@ -992,7 +1012,8 @@ public static class MissionCatalog
             Contractor = "Salvage Broker",
             Faction = "Civilian",
             MissionType = "Bergung",
-            BaseReward = 150000,
+            BaseReward = 0,
+            ContractFee = 150000,
             ReputationGain = 900,
             StarSystems = "Stanton",
             Description = "Offizieller Bergungsanspruch für ein sehr großes Wrack."
@@ -1017,7 +1038,8 @@ public static class MissionCatalog
             Contractor = "Unverified",
             Faction = "Underworld",
             MissionType = "Bergung",
-            BaseReward = 30000,
+            BaseReward = 0,
+            ContractFee = 30000,
             ReputationGain = 250,
             IsIllegal = true,
             StarSystems = "Stanton & Pyro",
@@ -1030,7 +1052,8 @@ public static class MissionCatalog
             Contractor = "Unverified",
             Faction = "Underworld",
             MissionType = "Bergung",
-            BaseReward = 60000,
+            BaseReward = 0,
+            ContractFee = 60000,
             ReputationGain = 400,
             IsIllegal = true,
             StarSystems = "Stanton & Pyro",
@@ -1043,7 +1066,8 @@ public static class MissionCatalog
             Contractor = "Unverified",
             Faction = "Underworld",
             MissionType = "Bergung",
-            BaseReward = 120000,
+            BaseReward = 0,
+            ContractFee = 120000,
             ReputationGain = 750,
             IsIllegal = true,
             StarSystems = "Stanton & Pyro",
@@ -1056,7 +1080,8 @@ public static class MissionCatalog
             Contractor = "Unverified",
             Faction = "Underworld",
             MissionType = "Bergung",
-            BaseReward = 250000,
+            BaseReward = 0,
+            ContractFee = 250000,
             ReputationGain = 1200,
             IsIllegal = true,
             StarSystems = "Stanton & Pyro",
