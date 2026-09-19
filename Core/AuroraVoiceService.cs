@@ -814,16 +814,26 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // 7. ATC Landung / Startfreigabe
+        // 7. ATC Landung / Hangar-Zuweisung / Startfreigabe
         if (AtcAndLandingEnabled && (
+            line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangar-Anforderung", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangaranforderung", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangar Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Hangarzuweisung", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("ATC::RequestLanding", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landing service has been requested", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Assigned to Landing Pad", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Takeoff Request", StringComparison.OrdinalIgnoreCase)))
+            line.Contains("Takeoff Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("AImodule_ATC", StringComparison.OrdinalIgnoreCase)))
         {
             OnAtcLanding();
             return;
@@ -1153,7 +1163,14 @@ public partial class AuroraVoiceService : IDisposable
     {
         if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
         if (_atcLandingSounds.Count > 0)
-            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 20);
+        {
+            Logger.Log($"[AuroraVoiceService] ATC / Hangar-Zuweisung ausgelöst ({_atcLandingSounds.Count} Sounds verfügbar).");
+            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 15);
+        }
+        else
+        {
+            Logger.Log($"[AuroraVoiceService] ATC / Hangar-Zuweisung ausgelöst, aber keine Sounds in _atcLandingSounds geladen!");
+        }
     }
 
     public void OnDocking()

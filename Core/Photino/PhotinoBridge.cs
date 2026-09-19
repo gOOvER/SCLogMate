@@ -6633,6 +6633,11 @@ public class PhotinoBridge
             var entry = _parser.Feed(rawLine);
             if (entry == null) return;
 
+            if (isLive)
+            {
+                _auroraService.ProcessLiveEvent(entry);
+            }
+
             _lastEventTime = entry.Time;
 
             var dto = new LogEventDto

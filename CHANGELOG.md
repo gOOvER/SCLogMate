@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Aurora Voice ATC & Hangar Assignment Audio Playback (`Core/Photino/PhotinoBridge.cs`, `Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
+  - Connected `_auroraService.ProcessLiveEvent(entry)` inside `PhotinoBridge.OnLogLineReceived`, ensuring parsed live events (`EventKind.Hangar`, `EventKind.Maintenance`, `EventKind.Blueprint`, etc.) are delivered to the voice engine.
+  - Expanded ATC and Hangar assignment matchers in `AuroraVoiceService.ProcessLiveLine` to support Star Citizen 3.24+ / 4.0 log formats (`Hangar Request Completed`, `Joined hangar queue`, `Hangar Queue`, `Hangaranforderung`, `Hangar-Zuweisung`, `AImodule_ATC`).
+  - Added queue notifications (`Joined hangar queue`, `In Hangar-Warteschlange eingereiht`) to `LogParser`'s `EventKind.Hangar` detection.
+  - Added diagnostic logging in `AuroraVoiceService.OnAtcLanding` showing available audio files and playback triggers.
+
 ## [1.0.0-rc3] - 2026-09-19
 ### Fixed
 - **Inventory Item Class Resolution & Noise Filtering (`Core/WikiApiClient.cs`, `Core/WarehouseCatalog.cs`, `release.ps1`)**:

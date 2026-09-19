@@ -1255,7 +1255,10 @@ public partial class LogParser
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "📡 Unüberwachter Raum (Kein Comm-Array)" };
                 }
-                if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) || text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("In Hangar-Warteschlange eingereiht", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
                 }
