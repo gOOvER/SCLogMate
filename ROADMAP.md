@@ -308,9 +308,9 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
 - [x] **Phase 2: Dokumentation & Changelog-Stempelung**
   - [x] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` vorbereiten.
   - [x] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.
-- [ ] **Phase 3: Release-Build & Tagging**
-  - [ ] `.\release.ps1` ausführen (mit Signierung oder `-SkipSign`).
-  - [ ] GitHub-Release `v1.0.0-rc3` überprüfen.
+- [x] **Phase 3: Release-Build & Tagging**
+  - [x] `.\release.ps1` ausführen (mit Signierung oder `-SkipSign`).
+  - [x] GitHub-Release `v1.0.0-rc3` überprüfen.
 
 
 
