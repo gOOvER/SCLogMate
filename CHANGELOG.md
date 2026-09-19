@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Fixed
+- **Live Session Income and Spend Calculation Fix in HUD (`Core/Photino/PhotinoBridge.cs`)**:
+  - **Excluded Non-Financial Events (`MissionTaken`, `Inventory`) from Session Financials**: Fixed a critical bug in `GetHudTelemetry` where all events in `_liveEvents` with `Amount > 0` were indiscriminately treated as session income and `Amount < 0` as session spend. This resulted in:
+    - Accepted contract previews (`MissionTaken`, e.g. +200,000 aUEC) being summed alongside completed payouts (`MissionReward`, +200,000 aUEC), erroneously doubling reported live session earnings (e.g. 4.000.000 aUEC actual mission rewards reported as +8.000.000 aUEC).
+    - Cargo elevator and freight item delivery requests (`Inventory`, e.g. -1 item) being interpreted as currency spend (e.g. -17 items reported as -17 aUEC spend).
+  - **Strict Financial Kind Filtering (`IsFinancialIncomeKind`, `IsFinancialSpendKind`)**: Restricted live session income aggregation strictly to genuine revenue kinds (`MissionReward`, `Sale`, `Trade`, `TransferIn`) and spend strictly to financial outflow (`Purchase`, `TransferOut`, `Maintenance`, `Fine`).
+  - **Eliminated Synthetic Event Pollution (`OnBalanceCaptured`)**: Removed automatic creation of synthetic `TransferIn` / `Maintenance` events when mobiGlas OCR reads the current wallet balance, ensuring the live session ledger and HUD metrics exclusively track authentic in-session gameplay transactions.
 - **Decoupled mobiGlas Wallet Balance Discrepancies from Mission Rewards (`Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
   - **Eliminated Erroneous Mission Reward Inflation**: Removed the legacy reconciliation logic in `OnBalanceCaptured` that automatically tacked positive balance discrepancies onto recently completed missions. Missions maintain their authentic contract rewards (e.g. 200,000 aUEC), and unlogged balance gains (such as player-to-player transfers, trade, or unlogged sales) are now strictly recorded as independent `TransferIn` events (`Einnahme (mobiGlas)` / `Saldo-Abgleich`).
   - **Database Migration v32 & Reward Rectification**: Added SQLite schema migration `v32` to restore any artificially inflated mission rewards back to their authentic contract amounts, ensuring historical quest records and ledger statistics remain accurate.
