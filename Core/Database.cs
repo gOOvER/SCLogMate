@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 30; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v30: Korrektur Missionsbelohnung Orison Relief: Medium Materials Order auf 200.000 aUEC)
+    public const int CurrentSchemaVersion = 31; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v31: Bereinigung fehlerhafter mobiGlas OCR Teil-Lesungen und 230 aUEC Maintenance-Events)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -720,6 +720,34 @@ public static class Database
             Exec(db, "PRAGMA user_version = 30;");
             dbSchemaVersion = 30;
             Logger.Log("DB Schema: Migration auf v30 (Korrektur Missionsbelohnung Orison Relief Medium Materials Order auf 200.000 aUEC) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 31)
+        {
+            try
+            {
+                // Bereinigung von fälschlichen mobiGlas OCR Maintenance/Ausgaben-Events bei Teil-Lesung (z.B. 230 aUEC)
+                Exec(db, @"
+                    DELETE FROM events 
+                    WHERE kind = 'Maintenance' 
+                      AND amount < -1000000 
+                      AND detail LIKE '%mobiGlas Kontostand: 230 aUEC%';
+
+                    UPDATE events 
+                    SET amount = 200000,
+                        detail = 'Contract Complete: Orison Relief: Medium Materials Order (+200.000 aUEC)'
+                    WHERE kind = 'MissionReward'
+                      AND amount = 58000
+                      AND detail LIKE '%Orison Relief: Medium Materials Order%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v31 (Bereinigung falscher mobiGlas 230 aUEC Events)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 31;");
+            dbSchemaVersion = 31;
+            Logger.Log("DB Schema: Migration auf v31 (Bereinigung falscher mobiGlas 230 aUEC OCR Events) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

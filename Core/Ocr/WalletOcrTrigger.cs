@@ -24,14 +24,14 @@ public static partial class WalletOcrTrigger
     private static partial Regex CurrencyLabelRegex();
 
     // Normalisiert Tausendertrennzeichen zwischen Zifferngruppen, die im OCR oft als %, ;, :, ', `, ~, _, -, v, Leerzeichen o.ä. fehlinterpretiert werden
-    // z.B. "25%031" -> "25.031", "25'031" -> "25.031", "1 250 000" -> "1.250.000", "1%250%031" -> "1.250.031"
-    [GeneratedRegex(@"(?<=\b\d{1,3})\s*[,.'’`´;:_%~|\-vV]\s*(?=\d{3}\b)")]
+    // z.B. "25%031" -> "25.031", "25'031" -> "25.031", "1 250 000" -> "1.250.000", "1%250%031" -> "1.250.031", "4038,230" -> "4038.230"
+    [GeneratedRegex(@"(?<=\b\d{1,9})\s*[,.'’`´;:_%~|\-vV]\s*(?=\d{3}\b)")]
     private static partial Regex ThousandsSeparatorRegex();
 
     [GeneratedRegex(@"[+*~|/\\()\[\]{}%^$#@!?;:_=]")]
     private static partial Regex OcrNoiseCharsRegex();
 
-    [GeneratedRegex(@"(?<=\b\d{1,3})\s+(?=\d{3}(?:\s+\d{3})*\b)")]
+    [GeneratedRegex(@"(?<=\b\d{1,9})\s+(?=\d{3}(?:\s+\d{3})*\b)")]
     private static partial Regex SpaceThousandsRegex();
 
     /// <summary>Prüft, ob die Logzeile das Öffnen des mobiGlas oder Inventorys signalisiert.</summary>
@@ -97,8 +97,9 @@ public static partial class WalletOcrTrigger
 
             if (parts.Length > 1)
             {
-                // Tausender-Gruppierung: erste Gruppe 1-3 Ziffern, alle folgenden 3 Ziffern (oder Vielfache falls Trennzeichen verschmolzen)
-                if (parts[0].Length < 1 || parts[0].Length > 3) continue;
+                // Tausender-Gruppierung: erste Gruppe 1-9 Ziffern (falls vorangehende Trennzeichen verschmolzen/überlesen wurden wie "4038,230"),
+                // alle folgenden Gruppen 3 Ziffern (oder Vielfache falls Trennzeichen verschmolzen: 6, 9)
+                if (parts[0].Length < 1 || parts[0].Length > 9) continue;
 
                 // Erste Gruppe darf bei mehrstelliger Gruppe keine führende Null haben (z.B. "031.000" ist ungültig)
                 if (parts[0].Length > 1 && parts[0].StartsWith('0')) continue;

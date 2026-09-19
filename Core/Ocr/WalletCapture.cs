@@ -12,7 +12,7 @@ namespace SCLogMate.Core.Ocr;
 /// </summary>
 public sealed class WalletCapture : IDisposable
 {
-    public static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(300); // Warten auf mobiGlas UI Fade-In
+    public static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(500); // Warten auf mobiGlas UI Fade-In
     public static readonly TimeSpan GrabSpacing = TimeSpan.FromMilliseconds(250);
     public static readonly TimeSpan RetrySpacing = TimeSpan.FromMilliseconds(100);
     public static readonly TimeSpan BurstBudget = TimeSpan.FromSeconds(7);
@@ -149,7 +149,12 @@ public sealed class WalletCapture : IDisposable
 
                     // Cross-Grab Bestätigung: Derselbe Wert muss 2× im Burst gelesen werden,
                     // um OCR-Fehllesungen auszuschließen.
-                    if (seen.Contains(val))
+                    // Schutz vor Teil-Lesungen (z.B. "230" während Fade-in wenn eigentlich "4.038.230" ansteht):
+                    // Ein Wert mit weniger Stellen als ein bereits im selben Burst gesehener Wert darf nicht bestätigt werden.
+                    int valDigits = val.ToString().Length;
+                    int maxSeenDigits = seen.Count > 0 ? seen.Max(x => x.ToString().Length) : 0;
+
+                    if (valDigits >= maxSeenDigits && seen.Contains(val))
                     {
                         Finish("confirmed");
                         BalanceCaptured?.Invoke(val);
