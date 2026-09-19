@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Aurora Voice ATC & Hangar Assignment Audio Playback (`Core/Photino/PhotinoBridge.cs`, `Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
   - Connected `_auroraService.ProcessLiveEvent(entry)` inside `PhotinoBridge.OnLogLineReceived`, ensuring parsed live events (`EventKind.Hangar`, `EventKind.Maintenance`, `EventKind.Blueprint`, etc.) are delivered to the voice engine.
-  - Expanded ATC and Hangar assignment matchers in `AuroraVoiceService.ProcessLiveLine` to support Star Citizen 3.24+ / 4.0 log formats (`Hangar Request Completed`, `Joined hangar queue`, `Hangar Queue`, `Hangaranforderung`, `Hangar-Zuweisung`, `AImodule_ATC`).
+  - Expanded ATC and Hangar assignment matchers in `AuroraVoiceService.ProcessLiveLine` to support Star Citizen 4.10+ PU log formats (`Hangar Request Completed`, `Joined hangar queue`, `Hangar Queue`, `Hangaranforderung`, `Hangar-Zuweisung`, `AImodule_ATC`).
   - Added queue notifications (`Joined hangar queue`, `In Hangar-Warteschlange eingereiht`) to `LogParser`'s `EventKind.Hangar` detection.
   - Added diagnostic logging in `AuroraVoiceService.OnAtcLanding` showing available audio files and playback triggers.
 
@@ -23,13 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hardened `release.ps1` git push target to `refs/heads/main` preventing ambiguous refspec conflicts.
 - **Mission Detection, Contractor Resolution & Management Accuracy (`Core/MissionCatalog.cs`, `Core/Missions.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.cs`, `ViewModels/MainViewModel.QuantumViews.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
   - **FuzzyLookup Over-Matching Protection**: Enhanced `MissionCatalog.FuzzyLookup` with stop-word filtering (`claim`, `rights`, `small`, `medium`, `large`, `haul`, `salvage`, etc.) and strict length-ratio checks, preventing false-positive matches (e.g. salvage rights claims matching `Salvage Claim: Small` and corrupting contractor and faction data).
-  - **Dynamic Engine Generator Resolution**: Upgraded `Missions.cs` to resolve Star Citizen 3.24+ / 4.0 dynamic generator identifiers (`TheBackpocket`, `CleanAir`) to real in-lore factions and contractors (`Orison Relief Services`, `People's Alliance`, `Red Wind Line`, `Covalex Shipping`, `Ling Family`, `Civilian Defense`).
+  - **Dynamic Engine Generator Resolution**: Upgraded `Missions.cs` to resolve Star Citizen 4.10+ dynamic generator identifiers (`TheBackpocket`, `CleanAir`) to real in-lore factions and contractors (`Orison Relief Services`, `People's Alliance`, `Red Wind Line`, `Covalex Shipping`, `Ling Family`, `Civilian Defense`).
   - **Marker vs. HUD Notification Synchronization**: Resolved race condition where `<CLocalMissionPhaseMarker::CreateMarker>` preceded HUD notifications (`Contract Accepted`), preventing real mission titles from being dropped or replaced by placeholder strings.
   - **Colon-Separated Title Parsing**: Refined contractor extraction from mission notifications, preventing claim reference numbers (e.g. `Claim #79277`) from being misinterpreted as contractor names.
   - **Active Contract Completion Fallback Safeguards**: Removed blind single-contract fallback in `HandleMissionCompleted` and abandoned contract handling when completion notifications have conflicting specific titles.
   - **QuantumViews Contract Deduplication**: Prevented merging unrelated concurrent contracts from the same contractor in the contracts overview.
   - **Missions History & Completion State**: Updated `PhotinoBridge.GetMissionsData()` to include `EventKind.MissionReward` in the mission history and correctly determine completion states for both rewarded contracts and fee-based salvage claims.
-  - **Added Modern 3.24+ Contracts**: Added Orison Relief cargo hauling and medical supply contract definitions to `MissionCatalog.cs`.
+  - **Added Modern 4.10+ Contracts**: Added Orison Relief cargo hauling and medical supply contract definitions to `MissionCatalog.cs`.
   - **Parser Version Bump**: Incremented `CurrentParserVersion` to 37 in `Database.cs` to automatically re-index historical sessions with sanitized contractor and mission records.
 - **Salvage Claim Contract Reward Fix & Cleanup (`Core/LogParser.cs`, `Core/Database.cs`, `Core/MissionCatalog.cs`)**:
   - Fixed an issue where completing Salvage Rights / Salvage Claim contracts incorrectly awarded an artificial aUEC mission completion reward. In Star Citizen, salvage claims require paying an upfront fee and do not award completion payouts (revenue is generated solely through scraping/selling RMC and Construction Materials).
