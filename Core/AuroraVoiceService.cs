@@ -649,7 +649,6 @@ public partial class AuroraVoiceService : IDisposable
             line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("DockingTube", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("LoadingPlatformManager", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("OnClientSpawned", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("PlayerSpawnZone", StringComparison.OrdinalIgnoreCase) ||
@@ -830,13 +829,14 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // 8. Andocken
+        // 8. Andocken (nur bei echten Docking-Anfragen / ATC-Freigaben, KEINE statischen Engine-Mesh/Port-Objekte wie DockingTube oder Docking collar)
         if (AtcAndLandingEnabled && (
-            line.Contains("DockingTube", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("RequestDocking", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Docking collar", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Docking Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Assigned to Docking", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Docking complete", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase)))
+            line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Andockfreigabe", StringComparison.OrdinalIgnoreCase)))
         {
             OnDocking();
             return;

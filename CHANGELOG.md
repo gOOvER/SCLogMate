@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Aurora Voice False-Positive Docking Output (`Core/AuroraVoiceService.cs`)**:
+  - Resolved an issue where approaching any station, rest stop, or armistice zone triggered the "Andocken" (Docking) voice output.
+  - Removed overly broad substring matchers (`DockingTube`, `Docking collar`) that were false-positively triggered by Star Citizen's background entity streaming (such as `Station_DockingTube_Reststop-arm` and fuel port attachment components).
+  - Restricted docking voice alerts to explicit player docking actions and ATC assignments (`RequestDocking`, `Docking Request`, `Assigned to Docking`, `Docking complete`, `Docking granted`, `Andockfreigabe`).
+
 ### Added
 - **Extended Aurora Voice Category Controls (`Core/AuroraVoiceService.cs`, `Core/Settings.cs`, `PhotinoBridge.cs`, `SettingsView.tsx`)**:
   - Added granular category toggles in the Settings view and backend configuration for ATC & Landing (`auroraAtcAndLanding`), Maintenance & Refuel (`auroraMaintenance`), Stations & Moons (`auroraDestinations`), and Onboard Ship Systems (`auroraShipSystems`).
