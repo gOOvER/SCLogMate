@@ -7,6 +7,7 @@ import {
   Search,
   Target,
   Trash2,
+  X,
 } from 'lucide-react';
 
 export interface MissionsViewProps {
@@ -75,24 +76,30 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   }, []);
 
   useEffect(() => {
-    if (initialSearch !== undefined) {
-      setSearch(initialSearch);
-      if (initialTab) {
-        setActiveTab(initialTab);
-      } else if (data.history.length > 0 || data.active.length > 0) {
-        const q = initialSearch.toLowerCase();
-        const inActive = data.active.some(
-          (m) => m.title.toLowerCase().includes(q) || m.contractor.toLowerCase().includes(q)
-        );
-        const inHistory = data.history.some(
-          (m) => m.title.toLowerCase().includes(q) || m.contractor.toLowerCase().includes(q)
-        );
-        if (!inActive && inHistory) {
-          setActiveTab('history');
-        }
+    setSearch(initialSearch || '');
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialSearch, initialTab]);
+
+  useEffect(() => {
+    if (initialSearch && !initialTab && (data.history.length > 0 || data.active.length > 0)) {
+      const q = initialSearch.toLowerCase();
+      const inActive = data.active.some(
+        (m) =>
+          (m.title && m.title.toLowerCase().includes(q)) ||
+          (m.contractor && m.contractor.toLowerCase().includes(q))
+      );
+      const inHistory = data.history.some(
+        (m) =>
+          (m.title && m.title.toLowerCase().includes(q)) ||
+          (m.contractor && m.contractor.toLowerCase().includes(q))
+      );
+      if (!inActive && inHistory) {
+        setActiveTab('history');
       }
     }
-  }, [initialSearch, initialTab, data]);
+  }, [data, initialSearch, initialTab]);
 
   const formatNumber = (num?: number) => {
     if (num === undefined || num === null) return '0';
@@ -100,12 +107,16 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   };
 
   const getFilteredList = (list: MissionItemDto[]) => {
+    const q = search.trim().toLowerCase();
     return list.filter((m) => {
       const matchSearch =
-        !search ||
-        m.title.toLowerCase().includes(search.toLowerCase()) ||
-        m.contractor.toLowerCase().includes(search.toLowerCase()) ||
-        m.faction.toLowerCase().includes(search.toLowerCase());
+        !q ||
+        (m.title && m.title.toLowerCase().includes(q)) ||
+        (m.contractor && m.contractor.toLowerCase().includes(q)) ||
+        (m.faction && m.faction.toLowerCase().includes(q)) ||
+        (m.missionType && m.missionType.toLowerCase().includes(q)) ||
+        (m.description && m.description.toLowerCase().includes(q)) ||
+        (m.starSystems && m.starSystems.toLowerCase().includes(q));
 
       const matchType =
         typeFilter === 'all' ||
@@ -241,8 +252,18 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Auftrag filtern..."
-              className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-48"
+              className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-52"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200 p-0.5 rounded cursor-pointer transition"
+                title="Suche leeren"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           <button
@@ -272,7 +293,36 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             {currentList.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-16 text-center text-slate-500 font-mono">
-                  Keine Aufträge in dieser Kategorie gefunden.
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div>
+                      {search || typeFilter !== 'all' ? (
+                        <>
+                          Keine Aufträge für den aktuellen Filter gefunden
+                          {search && (
+                            <span className="text-cyan-400 font-semibold ml-1">
+                              "{search}"
+                            </span>
+                          )}
+                          .
+                        </>
+                      ) : (
+                        'Keine Aufträge in dieser Kategorie vorhanden.'
+                      )}
+                    </div>
+                    {(search || typeFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch('');
+                          setTypeFilter('all');
+                        }}
+                        className="mt-1 px-3 py-1 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-700/60 hover:border-cyan-400 text-cyan-300 rounded text-xs transition cursor-pointer flex items-center gap-1.5 font-sans"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Filter zurücksetzen</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (

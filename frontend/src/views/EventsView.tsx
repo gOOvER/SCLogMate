@@ -230,6 +230,51 @@ export const EventsView: React.FC<EventsViewProps> = ({
     });
   }, [events, sortCol, sortDir]);
 
+  // Helper to extract clean mission queries from events without generic words or prefixes
+  const cleanMissionSearch = (title?: string, description?: string): string | undefined => {
+    let raw = (description || '').trim();
+    if (!raw) raw = (title || '').trim();
+
+    // Strip prefixes like "Neuer Auftrag: ", "Auftrag angenommen: ", "Missionsziel abgeschlossen: ", "Contract Accepted: "
+    raw = raw
+      .replace(
+        /^(neuer auftrag|auftrag angenommen|auftrag erfolgreich abgeschlossen|auftrag fehlgeschlagen|auftrag abgebrochen|contract accepted|contract completed|contract complete|contract failed|missionsziel abgeschlossen|neues missionsziel|missions-belohnung):\s*/i,
+        ''
+      )
+      .trim();
+
+    // If it's structured like "Faction · Type · Difficulty · System", pick the contractor/faction
+    if (raw.includes(' · ')) {
+      const parts = raw.split(' · ').map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 0 && parts[0].toLowerCase() !== 'unbekannt' && parts[0].toLowerCase() !== 'sonstige') {
+        return parts[0];
+      }
+    }
+
+    // Check if it's a generic word like "Mission", "Auftrag", "System"
+    const genericWords = [
+      'mission',
+      'auftrag',
+      'missions',
+      'aufträge',
+      'missions-belohnung',
+      'belohnung',
+      'system',
+      'objective complete',
+      'contract complete',
+    ];
+    if (!raw || genericWords.includes(raw.toLowerCase())) {
+      return undefined;
+    }
+
+    // Strip standalone currency like "+45.000 aUEC" if description was just a payout
+    if (/^[+-]?[\d.,\s]+(auec|uec)?$/i.test(raw)) {
+      return undefined;
+    }
+
+    return raw;
+  };
+
   const getCategoryBadge = (cat: string, evItem?: LogEventItem) => {
     switch (cat) {
       case 'wallet':
@@ -263,7 +308,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             onClick={(ev) => {
               if (onNavigate) {
                 ev.stopPropagation();
-                onNavigate('missions', { search: evItem?.title || evItem?.description });
+                onNavigate('missions');
               }
             }}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/60 hover:border-amber-500 shrink-0 cursor-pointer transition"
@@ -775,10 +820,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           type="button"
                           onClick={(ev) => {
                             ev.stopPropagation();
-                            onNavigate?.('missions', { search: e.title || e.description });
+                            const query = cleanMissionSearch(e.title, e.description);
+                            onNavigate?.('missions', query ? { search: query } : undefined);
                           }}
                           className="opacity-0 group-hover/detail:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 hover:border-amber-400 text-[10px] text-amber-300 hover:text-white flex items-center gap-1 shrink-0 transition cursor-pointer font-mono"
-                          title={`Auftrag im Manager öffnen: ${e.title || e.description}`}
+                          title={`Auftrag im Manager öffnen${cleanMissionSearch(e.title, e.description) ? `: ${cleanMissionSearch(e.title, e.description)}` : ''}`}
                         >
                           <Target className="w-2.5 h-2.5 text-amber-400" />
                           <span>Auftrag ↗</span>
@@ -930,7 +976,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     {selectedEvent.category === 'mission' && (
                       <button
                         type="button"
-                        onClick={() => onNavigate?.('missions', { search: selectedEvent.title || selectedEvent.description })}
+                        onClick={() => {
+                          const query = cleanMissionSearch(selectedEvent.title, selectedEvent.description);
+                          onNavigate?.('missions', query ? { search: query } : undefined);
+                        }}
                         className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 hover:border-amber-400 text-amber-200 text-xs font-semibold transition cursor-pointer"
                         title="Im Auftragsmanager aufrufen"
                       >
@@ -1077,7 +1126,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     label: 'Auftrag im Manager öffnen',
                     icon: Target,
                     onClick: () => {
-                      onNavigate?.('missions', { search: contextMenu.event.title || contextMenu.event.description });
+                      const query = cleanMissionSearch(contextMenu.event.title, contextMenu.event.description);
+                      onNavigate?.('missions', query ? { search: query } : undefined);
                     },
                   },
                 ]

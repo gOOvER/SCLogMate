@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Fixed
+- **Missions Navigation & Empty Filter State Fix (`frontend/src/views/EventsView.tsx`, `frontend/src/views/MissionsView.tsx`)**:
+  - **Stripped Generic Query on Mission Navigation (`EventsView.tsx`)**: Fixed an issue where clicking the category badge "Auftrag" or mission detail links passed generic strings like `"Mission"` as search queries, filtering out valid active missions whose titles/contractors didn't match the word `"Mission"`. Added `cleanMissionSearch` to extract real contractor/mission names while stripping log prefixes, currency, and generic labels.
+  - **Category Badge Navigation**: Made the "Auftrag" category badge navigate to `missions` directly without any filter query.
+  - **Search Input Clear Button & State Reset (`MissionsView.tsx`)**: Added a 1-click clear button (`✕`) inside the search input.
+  - **Empty-State Filter Reset**: Added an inline "Filter zurücksetzen" button when search or type filters result in zero matches, allowing users to instantly restore the full mission list.
+  - **Expanded Filter Matching**: Broadened `getFilteredList` to search across mission type, description, and star systems in addition to title, contractor, and faction.
+  - **Decoupled Search State**: Removed `data` from `useEffect` dependencies so search inputs are not continuously overwritten when telemetry updates arrive.
 - **Warehouse & Places Location Deduplication and Canonicalization (`Core/Locations.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.QuantumViews.cs`)**:
   - **Fixed Duplicate Location Names (`ExtractLocationFromShop`)**: Fixed an issue where purchasing or selling items at shops attached redundant parent body suffixes (e.g. `Levski · Delamar`, `Area 18 · ArcCorp`, `New Babbage · microTech`), resulting in duplicate entries and split inventory item totals between shop purchases and freight elevator movements.
   - **Location Name Normalization (`Locations.NormalizeLocationName`)**: Added automatic normalization for formatted location strings (stripping compound celestial body separators such as ` · ` and ` (...)`) in `Locations.ResolveLocation` and database warehouse movement persistence.
