@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc3] - 2026-09-19
 ### Fixed
 - **Inventory Item Class Resolution & Noise Filtering (`Core/WikiApiClient.cs`, `Core/WarehouseCatalog.cs`, `release.ps1`)**:
   - Automatically strip numeric entity instance IDs (e.g. `_776193770765`) from internal CIG item class identifiers before performing Star Citizen Wiki API lookups and caching.
@@ -701,5 +702,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
