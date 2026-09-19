@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 29; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v29: Bereinigung & Zusammenführung doppelter Standorte im Lager)
+    public const int CurrentSchemaVersion = 30; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v30: Korrektur Missionsbelohnung Orison Relief: Medium Materials Order auf 200.000 aUEC)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -690,6 +690,36 @@ public static class Database
             Exec(db, "PRAGMA user_version = 29;");
             dbSchemaVersion = 29;
             Logger.Log("DB Schema: Migration auf v29 (Harmonisierung und Deduplizierung doppelter Standorte im Lager) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 30)
+        {
+            try
+            {
+                // Korrektur des Belohnungsbetrags für Orison Relief: Medium Materials Order (von 58.000 auf 200.000 aUEC)
+                Exec(db, @"
+                    UPDATE events 
+                    SET amount = 200000 
+                    WHERE kind IN ('MissionTaken', 'MissionReward')
+                      AND amount = 58000
+                      AND (detail LIKE '%Orison Relief: Medium Materials Order%' 
+                           OR detail LIKE '%Orison Relief Services · Fracht & Transport · Mittel%');
+
+                    UPDATE events
+                    SET amount = 200000,
+                        detail = 'Contract Complete: Orison Relief: Medium Materials Order (+200.000 aUEC)'
+                    WHERE kind = 'MissionReward'
+                      AND amount = 800000
+                      AND detail LIKE '%Orison Relief: Medium Materials Order%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v30 (Orison Relief Medium Materials Order 200k Korrektur)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 30;");
+            dbSchemaVersion = 30;
+            Logger.Log("DB Schema: Migration auf v30 (Korrektur Missionsbelohnung Orison Relief Medium Materials Order auf 200.000 aUEC) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

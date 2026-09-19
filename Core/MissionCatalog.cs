@@ -635,7 +635,7 @@ public static class MissionCatalog
             Contractor = "Orison Relief Services",
             Faction = "Crusader Industries",
             MissionType = "Fracht & Transport",
-            BaseReward = 58000,
+            BaseReward = 200000,
             ReputationGain = 480,
             StarSystems = "Stanton",
             Description = "Lieferung von Rohstoffen und Komponenten zur Aufrechterhaltung der Industrieanlagen auf Crusader."

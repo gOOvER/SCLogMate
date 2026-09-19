@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Fixed
+- **Orison Relief Medium Materials Order Reward Correction (`Core/MissionCatalog.cs`, `Core/Database.cs`)**:
+  - Corrected `BaseReward` for `Orison Relief: Medium Materials Order` (`orison_relief_med_order`) from outdated `58.000 aUEC` to the authentic Star Citizen 4.10 payout of `200.000 aUEC`.
+  - Added SQLite schema migration `v30` in `Core/Database.cs` to update all existing historical and active `MissionTaken` and `MissionReward` log events from `58.000` to `200.000 aUEC`, and rectified OCR reconciliation deltas that had accumulated the difference.
 - **Aurora ATC Hangar Clearance Infinite Voice Repetition Fix (`Core/AuroraVoiceService.cs`)**:
   - **Excluded Freight & Ship Elevators from Voice Triggers**: Fixed an issue where freight and ship elevator operations (`LoadingPlatformManager`, `Frachtaufzug bereit`, `Schiffsaufzug bereit`) continuously triggered `OnAtcLanding` voice announcements ("Landefreigabe erteilt", "Startfreigabe erteilt") whenever any elevator reached `OpenIdle` in spaceports (e.g. Orison).
   - **Granular Event Filtering in `ProcessLiveEvent`**: Verified that `EventKind.Hangar` events only trigger voice playback when `e.Detail` represents an actual ATC landing/takeoff clearance or hangar assignment, explicitly excluding cargo/ship elevators and ship retrieval spawns.
