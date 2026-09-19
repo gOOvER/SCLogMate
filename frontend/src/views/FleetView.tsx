@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   bridge,
   FleetShipDto,
@@ -38,6 +38,18 @@ export const FleetView: React.FC<FleetViewProps> = ({
   const [search, setSearch] = useState<string>(initialSearch || '');
   const [selectedAcquisition, setSelectedAcquisition] = useState<string>('Alle');
   const [selectedManufacturer, setSelectedManufacturer] = useState<string>('Alle');
+
+  const autoSwitchedRef = useRef<string | null>(null);
+
+  const handleTabClick = (tab: 'hangar' | 'history') => {
+    autoSwitchedRef.current = initialSearch || '__user_selected__';
+    setActiveTab(tab);
+  };
+
+  const handleClearSearch = () => {
+    setSearch('');
+    autoSwitchedRef.current = initialSearch || '__cleared__';
+  };
 
   // Modal for "+ Schiff hinzufügen"
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -99,15 +111,29 @@ export const FleetView: React.FC<FleetViewProps> = ({
       setSearch(initialSearch);
       if (initialTab) {
         setActiveTab(initialTab);
-      } else if (fleetData?.ships) {
-        const query = initialSearch.toLowerCase();
-        const found = fleetData.ships.find((s) => s.name.toLowerCase().includes(query));
-        if (found && !found.isInHangar) {
-          setActiveTab('history');
-        }
+        autoSwitchedRef.current = initialSearch || '__explicit_tab__';
+      } else if (initialSearch !== autoSwitchedRef.current) {
+        autoSwitchedRef.current = null;
       }
     }
-  }, [initialSearch, initialTab, fleetData]);
+  }, [initialSearch, initialTab]);
+
+  useEffect(() => {
+    if (
+      initialSearch &&
+      !initialTab &&
+      autoSwitchedRef.current !== initialSearch &&
+      fleetData?.ships &&
+      fleetData.ships.length > 0
+    ) {
+      const query = initialSearch.toLowerCase();
+      const found = fleetData.ships.find((s) => s.name.toLowerCase().includes(query));
+      if (found && !found.isInHangar) {
+        setActiveTab('history');
+      }
+      autoSwitchedRef.current = initialSearch;
+    }
+  }, [fleetData, initialSearch, initialTab]);
 
   const handleScanScreenshot = async () => {
     setIsScanningScreenshot(true);
@@ -268,7 +294,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
             {/* Segmented Switcher */}
             <div className="bg-[#030810] border border-[#122236] rounded-lg p-1 flex items-center gap-1 shadow-inner">
               <button
-                onClick={() => setActiveTab('hangar')}
+                onClick={() => handleTabClick('hangar')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'hangar'
                     ? 'bg-gradient-to-r from-cyan-950/80 to-[#07243B] text-cyan-300 border border-cyan-500/40 shadow-sm'
@@ -284,7 +310,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
               </button>
 
               <button
-                onClick={() => setActiveTab('history')}
+                onClick={() => handleTabClick('history')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'history'
                     ? 'bg-gradient-to-r from-slate-900 to-[#101D2E] text-sky-300 border border-sky-500/40 shadow-sm'
@@ -476,7 +502,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
             />
             {search && (
               <button
-                onClick={() => setSearch('')}
+                onClick={handleClearSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
                 title="Suche zurücksetzen"
               >

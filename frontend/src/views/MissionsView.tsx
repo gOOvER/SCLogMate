@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { bridge, MissionItemDto, MissionsResponseDto } from '../services/photinoBridge';
 import {
   CheckCircle2,
@@ -28,6 +28,18 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   const [search, setSearch] = useState<string>(initialSearch || '');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
+
+  const autoSwitchedRef = useRef<string | null>(null);
+
+  const handleTabClick = (tab: 'active' | 'history' | 'catalog') => {
+    autoSwitchedRef.current = initialSearch || '__user_selected__';
+    setActiveTab(tab);
+  };
+
+  const handleClearSearch = () => {
+    setSearch('');
+    autoSwitchedRef.current = initialSearch || '__cleared__';
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -79,11 +91,19 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
     setSearch(initialSearch || '');
     if (initialTab) {
       setActiveTab(initialTab);
+      autoSwitchedRef.current = initialSearch || '__explicit_tab__';
+    } else if (initialSearch !== autoSwitchedRef.current) {
+      autoSwitchedRef.current = null;
     }
   }, [initialSearch, initialTab]);
 
   useEffect(() => {
-    if (initialSearch && !initialTab && (data.history.length > 0 || data.active.length > 0)) {
+    if (
+      initialSearch &&
+      !initialTab &&
+      autoSwitchedRef.current !== initialSearch &&
+      (data.history.length > 0 || data.active.length > 0)
+    ) {
       const q = initialSearch.toLowerCase();
       const inActive = data.active.some(
         (m) =>
@@ -98,6 +118,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
       if (!inActive && inHistory) {
         setActiveTab('history');
       }
+      autoSwitchedRef.current = initialSearch;
     }
   }, [data, initialSearch, initialTab]);
 
@@ -138,7 +159,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div
-          onClick={() => setActiveTab('active')}
+          onClick={() => handleTabClick('active')}
           className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-emerald-500/50 ${
             activeTab === 'active' ? 'ring-1 ring-emerald-500/40 bg-emerald-950/15' : ''
           }`}
@@ -156,7 +177,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
         </div>
 
         <div
-          onClick={() => setActiveTab('history')}
+          onClick={() => handleTabClick('history')}
           className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-cyan-500/50 ${
             activeTab === 'history' ? 'ring-1 ring-cyan-500/40 bg-cyan-950/15' : ''
           }`}
@@ -174,7 +195,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
         </div>
 
         <div
-          onClick={() => setActiveTab('catalog')}
+          onClick={() => handleTabClick('catalog')}
           className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-amber-500/50 ${
             activeTab === 'catalog' ? 'ring-1 ring-amber-500/40 bg-amber-950/15' : ''
           }`}
@@ -196,7 +217,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab('active')}
+            onClick={() => handleTabClick('active')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'active'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]'
@@ -207,7 +228,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => handleTabClick('history')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'history'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]'
@@ -218,7 +239,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('catalog')}
+            onClick={() => handleTabClick('catalog')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'catalog'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]'
@@ -257,7 +278,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch('')}
+                onClick={handleClearSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200 p-0.5 rounded cursor-pointer transition"
                 title="Suche leeren"
               >

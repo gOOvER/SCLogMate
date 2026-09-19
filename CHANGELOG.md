@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Fixed
+- **Tab Auto-Switch Loop and User Selection Override Fix (`frontend/src/views/MissionsView.tsx`, `frontend/src/views/FleetView.tsx`)**:
+  - **Eliminated Tab Reversion on Background Updates (`MissionsView.tsx`)**: Fixed an issue where clicking other tabs (such as `Aktive Aufträge` or `Auftragskatalog`) in the mission manager would immediately snap back to `Verlauf (History)`. The auto-switch effect had `data` in its dependency array, which re-evaluated and forced `activeTab` back to `'history'` on every periodic HUD update or background mission data fetch.
+  - **Single-Run Guard with `useRef` Tracking (`MissionsView.tsx`, `FleetView.tsx`)**: Introduced `autoSwitchedRef` to guarantee that intelligent auto-switching to the history tab for navigated searches runs at most once upon receiving data, and is permanently disarmed once the user manually selects any tab or clears the search filter (`handleTabClick`, `handleClearSearch`).
+  - **Protected Search Input and Tab State in Fleet Manager (`FleetView.tsx`)**: Resolved a matching issue in `FleetView` where background fleet data updates repeatedly overwrote the user's manual search input and forced the active tab back to `history`.
 - **Live Session Income and Spend Calculation Fix in HUD (`Core/Photino/PhotinoBridge.cs`)**:
   - **Excluded Non-Financial Events (`MissionTaken`, `Inventory`) from Session Financials**: Fixed a critical bug in `GetHudTelemetry` where all events in `_liveEvents` with `Amount > 0` were indiscriminately treated as session income and `Amount < 0` as session spend. This resulted in:
     - Accepted contract previews (`MissionTaken`, e.g. +200,000 aUEC) being summed alongside completed payouts (`MissionReward`, +200,000 aUEC), erroneously doubling reported live session earnings (e.g. 4.000.000 aUEC actual mission rewards reported as +8.000.000 aUEC).
