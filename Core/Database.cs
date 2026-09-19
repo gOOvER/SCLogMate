@@ -16,7 +16,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 31; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v31: Bereinigung fehlerhafter mobiGlas OCR Teil-Lesungen und 230 aUEC Maintenance-Events)
+    public const int CurrentSchemaVersion = 32; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v32: Entkoppelung von mobiGlas OCR-Saldodifferenzen von Missionsbelohnungen)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -748,6 +748,30 @@ public static class Database
             Exec(db, "PRAGMA user_version = 31;");
             dbSchemaVersion = 31;
             Logger.Log("DB Schema: Migration auf v31 (Bereinigung falscher mobiGlas 230 aUEC OCR Events) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 32)
+        {
+            try
+            {
+                // Entkoppelung von OCR-Differenzen und Missionsbelohnungen:
+                // Falls Missionsbelohnungen durch alte OCR-Reconciliation aufgebläht wurden, auf die echte Vertragssumme zurücksetzen
+                Exec(db, @"
+                    UPDATE events 
+                    SET amount = 200000,
+                        detail = 'Contract Complete: Orison Relief: Medium Materials Order'
+                    WHERE kind = 'MissionReward' 
+                      AND amount > 500000 
+                      AND detail LIKE '%Orison Relief: Medium Materials Order%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v32 (Entkoppelung OCR-Differenzen von Missionsbelohnungen)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 32;");
+            dbSchemaVersion = 32;
+            Logger.Log("DB Schema: Migration auf v32 (Missionsbelohnungen von OCR-Deltas entkoppelt & bereinigt) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

@@ -1306,87 +1306,33 @@ public class PhotinoBridge
         {
             if (unloggedDiff > 0)
             {
-                // Prüfen, ob vor wenigen Sekunden (<45s) eine Missionsbelohnung einging, deren Betrag durch den OCR-Saldo präzisiert werden kann
-                bool reconciledWithMission = false;
-                try
+                // Einnahme / Saldo-Differenz (z.B. mo.Trader Spielerüberweisungen, ungeloggte Verkäufe oder Saldo-Korrektur).
+                // Niemals auf eine vorangegangene Mission aufschlagen, da Missionen feste Vertragssummen haben!
+                string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (+{unloggedDiff:N0} aUEC Gutschrift)";
+                Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, unloggedDiff, detail, ship);
+
+                var dto = new LogEventDto
                 {
-                    using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
-                    db.Open();
-                    using var cmdCheck = db.CreateCommand();
-                    cmdCheck.CommandText = @"
-                        SELECT rowid, amount, detail
-                        FROM events
-                        WHERE kind = 'MissionReward'
-                          AND time >= @cutoff
-                        ORDER BY time DESC
-                        LIMIT 1;";
-                    cmdCheck.Parameters.AddWithValue("@cutoff", nowUtc.AddSeconds(-45).ToString("o", CultureInfo.InvariantCulture));
-                    using var r = cmdCheck.ExecuteReader();
-                    if (r.Read())
-                    {
-                        var rowId = r.GetInt64(0);
-                        var oldMissionAmt = r.GetInt64(1);
-                        var oldDetail = r.GetString(2);
-                        r.Close();
+                    Id = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                    Category = "wallet",
+                    Kind = EventKind.TransferIn.ToString(),
+                    KindText = "Einnahme (mobiGlas)",
+                    Icon = "💰",
+                    Title = "Einnahme (mobiGlas)",
+                    Description = detail,
+                    Amount = unloggedDiff,
+                    Ship = ship,
+                    RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: +{unloggedDiff:N0} aUEC)"
+                };
 
-                        // Missionsevent auf den echten, durch mobiGlas bestätigten Gesamtbetrag anheben
-                        long updatedAmt = oldMissionAmt + unloggedDiff;
-                        using var cmdUpd = db.CreateCommand();
-                        cmdUpd.CommandText = "UPDATE events SET amount = @newAmt, detail = @newDetail WHERE rowid = @rowId;";
-                        cmdUpd.Parameters.AddWithValue("@newAmt", updatedAmt);
-                        cmdUpd.Parameters.AddWithValue("@newDetail", $"{oldDetail} (+{updatedAmt:N0} aUEC)");
-                        cmdUpd.Parameters.AddWithValue("@rowId", rowId);
-                        cmdUpd.ExecuteNonQuery();
-
-                        reconciledWithMission = true;
-                        Logger.Log($"OnBalanceCaptured: Missionsbelohnung (rowid={rowId}) von {oldMissionAmt:N0} auf {updatedAmt:N0} aUEC angepasst (OCR-Delta +{unloggedDiff:N0}).");
-
-                        lock (_liveEventsLock)
-                        {
-                            var liveEv = _liveEvents.FirstOrDefault(e => e.Kind == EventKind.MissionReward.ToString());
-                            if (liveEv != null)
-                            {
-                                liveEv.Amount = updatedAmt;
-                                liveEv.Description = $"{oldDetail} (+{updatedAmt:N0} aUEC)";
-                                Broadcast("LOG_EVENT", liveEv);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
+                lock (_liveEventsLock)
                 {
-                    Logger.Error("OnBalanceCaptured.ReconcileMission", ex);
+                    _liveEvents.Insert(0, dto);
+                    if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
                 }
 
-                if (!reconciledWithMission)
-                {
-                    // Einnahme (mobiGlas Saldo-Zunahme, z.B. Missions-Belohnung, Verkauf, Transfer)
-                    string detail = $"mobiGlas Kontostand: {newBalance:N0} aUEC (+{unloggedDiff:N0} aUEC Gutschrift)";
-                    Database.InsertCustomEvent(currentSession, nowUtc, EventKind.TransferIn, unloggedDiff, detail, ship);
-
-                    var dto = new LogEventDto
-                    {
-                        Id = Guid.NewGuid().ToString("N"),
-                        Timestamp = DateTime.Now.ToString("HH:mm:ss"),
-                        Category = "wallet",
-                        Kind = EventKind.TransferIn.ToString(),
-                        KindText = "Einnahme (mobiGlas)",
-                        Icon = "💰",
-                        Title = "Einnahme (mobiGlas)",
-                        Description = detail,
-                        Amount = unloggedDiff,
-                        Ship = ship,
-                        RawText = $"mobiGlas OCR: {newBalance:N0} aUEC (Delta: +{unloggedDiff:N0} aUEC)"
-                    };
-
-                    lock (_liveEventsLock)
-                    {
-                        _liveEvents.Insert(0, dto);
-                        if (_liveEvents.Count > 1000) _liveEvents.RemoveAt(_liveEvents.Count - 1);
-                    }
-
-                    Broadcast("LOG_EVENT", dto);
-                }
+                Broadcast("LOG_EVENT", dto);
             }
             else
             {
