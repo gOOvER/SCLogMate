@@ -23,11 +23,22 @@ import {
   Info,
   Database,
 } from 'lucide-react';
+import { NavTabId } from '../components/Sidebar';
 
-export const FinancesView: React.FC = () => {
+export interface FinancesViewProps {
+  onNavigate?: (tab: NavTabId, context?: { search?: string; subTab?: string }) => void;
+  initialSearch?: string;
+  initialSubTab?: 'overview' | 'ledger' | 'spending' | 'cargo';
+}
+
+export const FinancesView: React.FC<FinancesViewProps> = ({
+  onNavigate,
+  initialSearch,
+  initialSubTab,
+}) => {
   const [data, setData] = useState<FinanceOverviewDto | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>('overview');
-  const [search, setSearch] = useState<string>('');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>(initialSubTab || 'overview');
+  const [search, setSearch] = useState<string>(initialSearch || '');
   const [copiedDiscord, setCopiedDiscord] = useState<boolean>(false);
   const [scope, setScope] = useState<'all' | 'current'>('all');
 
@@ -58,6 +69,14 @@ export const FinancesView: React.FC = () => {
     });
     return () => unbind();
   }, [scope]);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    if (initialSubTab !== undefined) setActiveSubTab(initialSubTab);
+  }, [initialSubTab]);
 
   const formatNumber = (num?: number | null) => {
     if (num === undefined || num === null) return '0';
@@ -923,7 +942,21 @@ export const FinancesView: React.FC = () => {
                           {((item.amount || 0) >= 0 ? '+' : '')}{formatNumber(item.amount)} aUEC
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-cyan-300 font-semibold truncate max-w-[140px]">{item.ship || '—'}</td>
+                      <td className="py-2 px-3 text-cyan-300 font-semibold truncate max-w-[140px]">
+                        {item.ship && item.ship !== '—' ? (
+                          <button
+                            type="button"
+                            onClick={() => onNavigate?.('fleet', { search: item.ship })}
+                            className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-xs group truncate max-w-full"
+                            title={`In Flotte anzeigen: ${item.ship}`}
+                          >
+                            <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className="truncate">{item.ship}</span>
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-slate-300 truncate max-w-md" title={item.description}>{item.description}</td>
                     </tr>
                   ))}
@@ -1003,7 +1036,21 @@ export const FinancesView: React.FC = () => {
                       <td className="py-2 px-3 font-bold text-emerald-400 whitespace-nowrap">
                         {formatNumber(c.amount)} aUEC
                       </td>
-                      <td className="py-2 px-3 text-cyan-300 truncate max-w-[130px]">{c.ship || '—'}</td>
+                      <td className="py-2 px-3 text-cyan-300 truncate max-w-[130px]">
+                        {c.ship && c.ship !== '—' ? (
+                          <button
+                            type="button"
+                            onClick={() => onNavigate?.('fleet', { search: c.ship })}
+                            className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-xs group truncate max-w-full"
+                            title={`In Flotte anzeigen: ${c.ship}`}
+                          >
+                            <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className="truncate">{c.ship}</span>
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-slate-300 truncate max-w-md">{c.description}</td>
                     </tr>
                   ))}

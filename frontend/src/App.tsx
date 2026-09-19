@@ -38,6 +38,13 @@ import { WikiDossierModal } from './components/WikiDossierModal';
 import { HardDrive } from 'lucide-react';
 import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto } from './services/photinoBridge';
 
+export interface NavTargetContext {
+  search?: string;
+  subTab?: string;
+  location?: string;
+  tab?: string;
+}
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -248,7 +255,10 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const handleSelectTab = (tab: NavTabId) => {
+  const [navContext, setNavContext] = useState<NavTargetContext | null>(null);
+
+  const handleSelectTab = (tab: NavTabId, context?: NavTargetContext) => {
+    setNavContext(context || null);
     setActiveTab(tab);
   };
 
@@ -380,20 +390,33 @@ export const App: React.FC = () => {
             <EventsView
               sessions={sessions}
               initialEvents={events}
+              onNavigate={handleSelectTab}
+              onOpenWiki={handleOpenWiki}
             />
           )}
 
           {activeTab === 'chat' && <ChatLogView />}
 
-          {activeTab === 'finances' && <FinancesView />}
+          {activeTab === 'finances' && (
+            <FinancesView
+              onNavigate={handleSelectTab}
+              initialSearch={navContext?.search}
+              initialSubTab={navContext?.subTab as any}
+            />
+          )}
 
-          {activeTab === 'missions' && <MissionsView />}
+          {activeTab === 'missions' && (
+            <MissionsView
+              initialSearch={navContext?.search}
+              initialTab={navContext?.subTab as any}
+            />
+          )}
 
           {activeTab === 'reputation' && <ReputationView />}
 
           {activeTab === 'starmap' && <StarmapView telemetry={telemetry} />}
 
-          {activeTab === 'places' && <PlacesView />}
+          {activeTab === 'places' && <PlacesView initialSearch={navContext?.search} />}
 
           {activeTab === 'blackbox' && <BlackboxView />}
 
@@ -403,11 +426,21 @@ export const App: React.FC = () => {
 
           {activeTab === 'market' && <MarketView />}
 
-          {activeTab === 'fleet' && <FleetView />}
+          {activeTab === 'fleet' && (
+            <FleetView
+              initialSearch={navContext?.search}
+              initialTab={navContext?.subTab as any}
+            />
+          )}
 
           {activeTab === 'wiki' && <WikiExplorerView onOpenDossier={handleOpenWiki} />}
 
-          {activeTab === 'warehouse' && <WarehouseView />}
+          {activeTab === 'warehouse' && (
+            <WarehouseView
+              initialSearch={navContext?.search}
+              initialLocation={navContext?.location}
+            />
+          )}
 
           {activeTab === 'blueprints' && <BlueprintsView />}
 

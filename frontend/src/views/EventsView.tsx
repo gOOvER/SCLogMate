@@ -22,20 +22,26 @@ import {
   ShieldAlert,
   AlertOctagon,
   Activity,
+  Package,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
+import { NavTabId } from '../components/Sidebar';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
 
-interface EventsViewProps {
+export interface EventsViewProps {
   sessions?: SessionSummary[];
   initialEvents?: LogEventItem[];
+  onNavigate?: (tab: NavTabId, context?: { search?: string; subTab?: string }) => void;
+  onOpenWiki?: (query: string) => void;
 }
 
 export const EventsView: React.FC<EventsViewProps> = ({
   sessions = [],
   initialEvents = [],
+  onNavigate,
+  onOpenWiki,
 }) => {
   const [events, setEvents] = useState<LogEventItem[]>(initialEvents);
   const [viewMode, setViewMode] = useState<'live' | 'archive' | 'combat'>('live');
@@ -224,14 +230,24 @@ export const EventsView: React.FC<EventsViewProps> = ({
     });
   }, [events, sortCol, sortDir]);
 
-  const getCategoryBadge = (cat: string) => {
+  const getCategoryBadge = (cat: string, evItem?: LogEventItem) => {
     switch (cat) {
       case 'wallet':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 shrink-0">
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('finances', { subTab: 'ledger' });
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/60 hover:border-emerald-500 shrink-0 cursor-pointer transition"
+            title="In Finanzen & Buchhaltung aufrufen"
+          >
             <Coins className="w-2.5 h-2.5 text-emerald-400" />
             <span>Finanzen</span>
-          </span>
+          </button>
         );
       case 'combat':
         return (
@@ -242,24 +258,71 @@ export const EventsView: React.FC<EventsViewProps> = ({
         );
       case 'mission':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-800/60 shrink-0">
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('missions', { search: evItem?.title || evItem?.description });
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/60 hover:border-amber-500 shrink-0 cursor-pointer transition"
+            title="Im Auftragsmanager aufrufen"
+          >
             <Target className="w-2.5 h-2.5 text-amber-400" />
             <span>Auftrag</span>
-          </span>
+          </button>
         );
       case 'ship':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950/60 text-sky-300 border border-sky-800/60 shrink-0">
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('fleet', evItem?.ship ? { search: evItem.ship } : undefined);
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 border border-sky-800/60 hover:border-sky-500 shrink-0 cursor-pointer transition"
+            title="In Flotte & Hangar aufrufen"
+          >
             <Rocket className="w-2.5 h-2.5 text-sky-400" />
             <span>Schiff</span>
-          </span>
+          </button>
         );
       case 'location':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-800/60 shrink-0">
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('places');
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 hover:border-cyan-500 shrink-0 cursor-pointer transition"
+            title="In Orte & POIs aufrufen"
+          >
             <MapPin className="w-2.5 h-2.5 text-cyan-400" />
             <span>Ort</span>
-          </span>
+          </button>
+        );
+      case 'inventory':
+        return (
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('warehouse');
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-800/60 hover:border-purple-500 shrink-0 cursor-pointer transition"
+            title="Im Warenlager aufrufen"
+          >
+            <Package className="w-2.5 h-2.5 text-purple-400" />
+            <span>Lager</span>
+          </button>
         );
       default:
         return (
@@ -671,7 +734,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
                     {/* Typ Badge */}
                     <div className="px-3 py-1.5 border-r border-cyan-950/40 flex items-center">
-                      {getCategoryBadge(e.category)}
+                      {getCategoryBadge(e.category, e)}
                     </div>
 
                     {/* Betrag */}
@@ -685,13 +748,55 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     </div>
 
                     {/* Schiff */}
-                    <div className="truncate text-sky-400 font-medium text-[11px] px-3 py-1.5 border-r border-cyan-950/40" title={e.ship || ''}>
-                      {e.ship || null}
+                    <div className="truncate font-medium text-[11px] px-3 py-1.5 border-r border-cyan-950/40" title={e.ship || ''}>
+                      {e.ship && e.ship !== '—' ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onNavigate?.('fleet', { search: e.ship });
+                          }}
+                          className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-[11px] group truncate max-w-full"
+                          title={`In Flotte anzeigen: ${e.ship}`}
+                        >
+                          <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
+                          <span className="truncate">{e.ship}</span>
+                        </button>
+                      ) : null}
                     </div>
 
                     {/* Detail Text */}
-                    <div className={`truncate text-xs px-3 py-1.5 ${getDetailColor(e)}`} title={e.description || e.title}>
-                      {e.description || e.title}
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 overflow-hidden min-w-0 group/detail">
+                      <span className={`truncate text-xs ${getDetailColor(e)}`} title={e.description || e.title}>
+                        {e.description || e.title}
+                      </span>
+                      {e.category === 'mission' ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onNavigate?.('missions', { search: e.title || e.description });
+                          }}
+                          className="opacity-0 group-hover/detail:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 hover:border-amber-400 text-[10px] text-amber-300 hover:text-white flex items-center gap-1 shrink-0 transition cursor-pointer font-mono"
+                          title={`Auftrag im Manager öffnen: ${e.title || e.description}`}
+                        >
+                          <Target className="w-2.5 h-2.5 text-amber-400" />
+                          <span>Auftrag ↗</span>
+                        </button>
+                      ) : e.ship && e.ship !== '—' ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onNavigate?.('fleet', { search: e.ship });
+                          }}
+                          className="opacity-0 group-hover/detail:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-400 text-[10px] text-sky-300 hover:text-white flex items-center gap-1 shrink-0 transition cursor-pointer font-mono"
+                          title={`Schiff in Flotte öffnen: ${e.ship}`}
+                        >
+                          <Rocket className="w-2.5 h-2.5 text-sky-400" />
+                          <span>Schiff ↗</span>
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -782,6 +887,87 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 )}
               </div>
 
+              {/* Schnellverknüpfungen (Quick Actions) */}
+              {(selectedEvent.ship || selectedEvent.category === 'mission' || (selectedEvent.amount !== undefined && selectedEvent.amount !== null && selectedEvent.amount !== 0) || selectedEvent.category === 'inventory') && (
+                <div className="p-2.5 rounded bg-[#061224] border border-cyan-900/60 space-y-2">
+                  <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider flex items-center gap-1.5">
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Direkt-Verknüpfungen</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    {/* Schiff Link */}
+                    {selectedEvent.ship && selectedEvent.ship !== '—' && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onNavigate?.('fleet', { search: selectedEvent.ship })}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-400 text-sky-200 text-xs font-semibold transition cursor-pointer"
+                          title={`Schiff in Flotte anzeigen: ${selectedEvent.ship}`}
+                        >
+                          <Rocket className="w-3.5 h-3.5 text-sky-400" />
+                          <span className="truncate">In Flotte: {selectedEvent.ship}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onOpenWiki && selectedEvent.ship) {
+                              onOpenWiki(selectedEvent.ship);
+                            } else if (selectedEvent.ship) {
+                              window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: selectedEvent.ship }));
+                            }
+                          }}
+                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-700/60 hover:border-cyan-400 text-cyan-200 text-xs font-semibold transition cursor-pointer shrink-0"
+                          title="Star Citizen Wiki Dossier öffnen"
+                        >
+                          <BookOpen className="w-3 h-3 text-cyan-400" />
+                          <span>Wiki</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Mission Link */}
+                    {selectedEvent.category === 'mission' && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate?.('missions', { search: selectedEvent.title || selectedEvent.description })}
+                        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 hover:border-amber-400 text-amber-200 text-xs font-semibold transition cursor-pointer"
+                        title="Im Auftragsmanager aufrufen"
+                      >
+                        <Target className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Im Auftragsmanager öffnen</span>
+                      </button>
+                    )}
+
+                    {/* Finanzen Link */}
+                    {selectedEvent.amount !== undefined && selectedEvent.amount !== null && selectedEvent.amount !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate?.('finances', { subTab: 'ledger' })}
+                        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 hover:border-emerald-400 text-emerald-200 text-xs font-semibold transition cursor-pointer"
+                        title="In Finanzen & Buchhaltung aufrufen"
+                      >
+                        <Coins className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>In Finanzen & Buchhaltung</span>
+                      </button>
+                    )}
+
+                    {/* Warenlager Link */}
+                    {selectedEvent.category === 'inventory' && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate?.('warehouse')}
+                        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-purple-950/60 hover:bg-purple-900 border border-purple-700/60 hover:border-purple-400 text-purple-200 text-xs font-semibold transition cursor-pointer"
+                        title="Im Warenlager aufrufen"
+                      >
+                        <Package className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Im Warenlager anzeigen</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Rohdaten / Logzeile Box */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -831,7 +1017,11 @@ export const EventsView: React.FC<EventsViewProps> = ({
               {selectedEvent.ship && (
                 <button
                   onClick={() => {
-                    window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: selectedEvent.ship }));
+                    if (onOpenWiki && selectedEvent.ship) {
+                      onOpenWiki(selectedEvent.ship);
+                    } else if (selectedEvent.ship) {
+                      window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: selectedEvent.ship }));
+                    }
                   }}
                   className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded bg-[#061224] hover:bg-cyan-950/60 border border-cyan-950 hover:border-cyan-800 text-xs text-cyan-400 hover:text-cyan-200 transition cursor-pointer"
                   title="Star Citizen Wiki Dossier öffnen"
@@ -855,18 +1045,62 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.ship && contextMenu.event.ship !== '—'
               ? [
                   {
+                    label: `Schiff in Flotte anzeigen: ${contextMenu.event.ship}`,
+                    icon: Rocket,
+                    onClick: () => {
+                      onNavigate?.('fleet', { search: contextMenu.event.ship });
+                    },
+                  },
+                  {
                     label: `Im SCWiki öffnen: ${contextMenu.event.ship}`,
                     icon: BookOpen,
                     onClick: () => {
-                      window.dispatchEvent(
-                        new CustomEvent('open-wiki-dossier', { detail: contextMenu.event.ship })
-                      );
+                      if (onOpenWiki && contextMenu.event.ship) {
+                        onOpenWiki(contextMenu.event.ship);
+                      } else {
+                        window.dispatchEvent(
+                          new CustomEvent('open-wiki-dossier', { detail: contextMenu.event.ship })
+                        );
+                      }
                     },
                   },
                   {
                     label: `Filter auf Schiff: ${contextMenu.event.ship}`,
                     icon: Filter,
                     onClick: () => setSearch(contextMenu.event.ship || ''),
+                  },
+                ]
+              : []),
+            ...(contextMenu.event.category === 'mission' || (contextMenu.event.kind && contextMenu.event.kind.toLowerCase().includes('mission'))
+              ? [
+                  {
+                    label: 'Auftrag im Manager öffnen',
+                    icon: Target,
+                    onClick: () => {
+                      onNavigate?.('missions', { search: contextMenu.event.title || contextMenu.event.description });
+                    },
+                  },
+                ]
+              : []),
+            ...(contextMenu.event.category === 'wallet' || contextMenu.event.amount
+              ? [
+                  {
+                    label: 'In Buchhaltung anzeigen',
+                    icon: Coins,
+                    onClick: () => {
+                      onNavigate?.('finances', { subTab: 'ledger' });
+                    },
+                  },
+                ]
+              : []),
+            ...(contextMenu.event.category === 'inventory'
+              ? [
+                  {
+                    label: 'Im Warenlager anzeigen',
+                    icon: Package,
+                    onClick: () => {
+                      onNavigate?.('warehouse');
+                    },
                   },
                 ]
               : []),

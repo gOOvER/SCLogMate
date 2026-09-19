@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Interactive Ship & Mission Cross-Linking across Live-Log and Finances (`frontend/src/views/EventsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/views/FleetView.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/views/WarehouseView.tsx`, `frontend/src/views/PlacesView.tsx`, `frontend/src/App.tsx`)**:
+  - **Live-Log & Events Table Links (`EventsView.tsx`)**:
+    - Made the **Ship** column clickable with a dedicated rocket icon badge. Clicking any ship (e.g. Drake Corsair, Drake Vulture) instantly navigates to the Fleet tab (`fleet`) and sets the search filter to that ship.
+    - Added interactive category badges and hover quick-links (`Auftrag ↗`, `Schiff ↗`) in the Detail column to open associated missions or ships directly.
+    - Added a dedicated "Direkt-Verknüpfungen" quick-action card in the side-drawer for selected events, allowing instant navigation to Fleet, Wiki dossier, Mission Manager, Finances ledger, or Warehouse.
+    - Added contextual navigation options (`Schiff in Flotte anzeigen`, `Auftrag im Manager öffnen`, `In Buchhaltung anzeigen`, `Im Warenlager anzeigen`) to the right-click context menu.
+  - **Finances & Cargo Ledger Links (`FinancesView.tsx`)**:
+    - Made the **Ship** column in both the Buchhaltung (Ledger) and Fracht & Handel (Cargo) tables clickable, jumping directly to the ship in Fleet view.
+  - **Deep-Link Navigation & Search Synchronization (`App.tsx`, `FleetView.tsx`, `MissionsView.tsx`, `WarehouseView.tsx`, `PlacesView.tsx`)**:
+    - Added `NavTargetContext` in `App.tsx` allowing cross-tab navigation with pre-filtered search queries, locations, and subtabs.
+    - Enhanced `FleetView` to automatically switch between Hangar and History tabs if a navigated ship was flown historically but is not currently in the player's active hangar.
+    - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
+
 ### Fixed
 - **Warehouse & Places Location Deduplication and Canonicalization (`Core/Locations.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.QuantumViews.cs`)**:
   - **Fixed Duplicate Location Names (`ExtractLocationFromShop`)**: Fixed an issue where purchasing or selling items at shops attached redundant parent body suffixes (e.g. `Levski · Delamar`, `Area 18 · ArcCorp`, `New Babbage · microTech`), resulting in duplicate entries and split inventory item totals between shop purchases and freight elevator movements.

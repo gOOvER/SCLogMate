@@ -23,13 +23,17 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const PlacesView: React.FC = () => {
+export interface PlacesViewProps {
+  initialSearch?: string;
+}
+
+export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
   const [activeTab, setActiveTab] = useState<'starmap' | 'pois' | 'contested'>('pois');
   const [places, setPlaces] = useState<PlaceItemDto[]>([]);
   const [userPois, setUserPois] = useState<UserPoiDto[]>([]);
   const [lastCopiedLoc, setLastCopiedLoc] = useState<CopiedLocationReading | null>(null);
   const [execHangar, setExecHangar] = useState<ExecHangarSnapshotDto | null>(null);
-  const [search, setSearch] = useState<string>('');
+  const [search, setSearch] = useState<string>(initialSearch || '');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [poiCategoryFilter, setPoiCategoryFilter] = useState<string>('all');
@@ -149,6 +153,10 @@ export const PlacesView: React.FC = () => {
       clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) setSearch(initialSearch);
+  }, [initialSearch]);
 
   const types = [
     { id: 'all', label: 'Alle Orte' },

@@ -9,14 +9,22 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export const MissionsView: React.FC = () => {
+export interface MissionsViewProps {
+  initialSearch?: string;
+  initialTab?: 'active' | 'history' | 'catalog';
+}
+
+export const MissionsView: React.FC<MissionsViewProps> = ({
+  initialSearch,
+  initialTab,
+}) => {
   const [data, setData] = useState<MissionsResponseDto>({
     active: [],
     history: [],
     catalog: [],
   });
-  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>('active');
-  const [search, setSearch] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog'>(initialTab || 'active');
+  const [search, setSearch] = useState<string>(initialSearch || '');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
 
@@ -65,6 +73,26 @@ export const MissionsView: React.FC = () => {
       unsubMissions();
     };
   }, []);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch);
+      if (initialTab) {
+        setActiveTab(initialTab);
+      } else if (data.history.length > 0 || data.active.length > 0) {
+        const q = initialSearch.toLowerCase();
+        const inActive = data.active.some(
+          (m) => m.title.toLowerCase().includes(q) || m.contractor.toLowerCase().includes(q)
+        );
+        const inHistory = data.history.some(
+          (m) => m.title.toLowerCase().includes(q) || m.contractor.toLowerCase().includes(q)
+        );
+        if (!inActive && inHistory) {
+          setActiveTab('history');
+        }
+      }
+    }
+  }, [initialSearch, initialTab, data]);
 
   const formatNumber = (num?: number) => {
     if (num === undefined || num === null) return '0';

@@ -21,13 +21,21 @@ import {
   BookOpen,
 } from 'lucide-react';
 
-export const WarehouseView: React.FC = () => {
+export interface WarehouseViewProps {
+  initialSearch?: string;
+  initialLocation?: string;
+}
+
+export const WarehouseView: React.FC<WarehouseViewProps> = ({
+  initialSearch,
+  initialLocation,
+}) => {
   const [locations, setLocations] = useState<WarehouseLocationDto[]>([]);
   const [items, setItems] = useState<WarehouseItemDto[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('all');
+  const [selectedLocation, setSelectedLocation] = useState<string>(initialLocation || 'all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<'all' | 'Stanton' | 'Pyro'>('all');
-  const [search, setSearch] = useState<string>('');
+  const [search, setSearch] = useState<string>(initialSearch || '');
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showLocationsSidebar, setShowLocationsSidebar] = useState<boolean>(true);
@@ -59,6 +67,14 @@ export const WarehouseView: React.FC = () => {
 
     return () => unbind();
   }, [selectedLocation, selectedCategory]);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    if (initialLocation !== undefined) setSelectedLocation(initialLocation);
+  }, [initialLocation]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);

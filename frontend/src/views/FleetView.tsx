@@ -24,10 +24,18 @@ import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
 import { ShipCompareModal } from '../components/ShipCompareModal';
 import { ShipLoadoutModal } from '../components/ShipLoadoutModal';
 
-export const FleetView: React.FC = () => {
+export interface FleetViewProps {
+  initialSearch?: string;
+  initialTab?: 'hangar' | 'history';
+}
+
+export const FleetView: React.FC<FleetViewProps> = ({
+  initialSearch,
+  initialTab,
+}) => {
   const [fleetData, setFleetData] = useState<FleetResponseDto | null>(null);
-  const [activeTab, setActiveTab] = useState<'hangar' | 'history'>('hangar');
-  const [search, setSearch] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'hangar' | 'history'>(initialTab || 'hangar');
+  const [search, setSearch] = useState<string>(initialSearch || '');
   const [selectedAcquisition, setSelectedAcquisition] = useState<string>('Alle');
   const [selectedManufacturer, setSelectedManufacturer] = useState<string>('Alle');
 
@@ -85,6 +93,21 @@ export const FleetView: React.FC = () => {
       unsubScreenshot();
     };
   }, []);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch);
+      if (initialTab) {
+        setActiveTab(initialTab);
+      } else if (fleetData?.ships) {
+        const query = initialSearch.toLowerCase();
+        const found = fleetData.ships.find((s) => s.name.toLowerCase().includes(query));
+        if (found && !found.isInHangar) {
+          setActiveTab('history');
+        }
+      }
+    }
+  }, [initialSearch, initialTab, fleetData]);
 
   const handleScanScreenshot = async () => {
     setIsScanningScreenshot(true);
