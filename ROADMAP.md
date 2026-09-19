@@ -302,7 +302,7 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
 
 ### 📋 ToDo-Checkliste vor dem Release
 - [ ] **Phase 1: Bereinigung & Feinschliff**
-  - [ ] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
+  - [x] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
   - [ ] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
   - [ ] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
 - [ ] **Phase 2: Dokumentation & Changelog-Stempelung**
