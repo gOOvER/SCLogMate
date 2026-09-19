@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Warehouse & Places Location Deduplication and Canonicalization (`Core/Locations.cs`, `Core/LogParser.cs`, `Core/Database.cs`, `ViewModels/MainViewModel.QuantumViews.cs`)**:
+  - **Fixed Duplicate Location Names (`ExtractLocationFromShop`)**: Fixed an issue where purchasing or selling items at shops attached redundant parent body suffixes (e.g. `Levski · Delamar`, `Area 18 · ArcCorp`, `New Babbage · microTech`), resulting in duplicate entries and split inventory item totals between shop purchases and freight elevator movements.
+  - **Location Name Normalization (`Locations.NormalizeLocationName`)**: Added automatic normalization for formatted location strings (stripping compound celestial body separators such as ` · ` and ` (...)`) in `Locations.ResolveLocation` and database warehouse movement persistence.
+  - **Defensive Summary Merging (`Database.GetWarehouseLocationsSummary`, `Database.GetWarehouseItems`)**: Grouped and merged warehouse locations by canonical name and aggregated total item quantities and distinct types across both C# backend and SQL queries.
+  - **Database Migration v29 & Parser Version 39**: Implemented SQLite schema migration `v29` to atomically deduplicate and merge existing redundant location rows in `warehouse_items` into their canonical locations. Incremented `CurrentParserVersion` to 39 in `Core/Database.cs`.
+  - **Top Locations Merging (`ViewModels/MainViewModel.QuantumViews.cs`)**: Grouped `TopLocations` in the Places overview by canonical location name so visit counts from differently formatted log entries are unified.
 - **Windows Taskbar Application Icon Display (`Program.cs`)**:
   - Removed unmapped `SetCurrentProcessExplicitAppUserModelID("SCVerse.SCLogMate")` call which caused Windows Shell to decouple the process from `SCLogMate.exe`'s embedded icon resource and fall back to the default blank/generic application icon on the taskbar.
   - Implemented `SetClassLongPtr` (`GCLP_HICON` and `GCLP_HICONSM`) alongside `WM_SETICON` (`ICON_BIG` and `ICON_SMALL`) using exact system metrics (`SM_CXICON`, `SM_CXSMICON`) to ensure the window class and native handle retain the custom icon across minimizations and window switches.

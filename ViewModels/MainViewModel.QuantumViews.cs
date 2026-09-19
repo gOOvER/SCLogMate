@@ -481,15 +481,28 @@ public partial class MainViewModel
 
         // Top-Standorte berechnen
         var locGrouped = locQuery
-            .GroupBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new LocationVisitTotal
+            .GroupBy(l => Locations.NormalizeLocationName(l.Name), StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
             {
-                Name = g.Key,
-                System = g.First().System,
-                Body = g.First().Body,
-                Kind = g.First().Kind,
-                Visits = g.Count(),
-                LastVisit = g.Max(l => l.Time)
+                var canonicalKey = g.Key;
+                var res = Locations.ResolveLocation(canonicalKey);
+                var displayName = res.DisplayName != "—" ? res.DisplayName : canonicalKey;
+                var firstWithSys = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.System) && x.System != "—");
+                var sys = !string.IsNullOrWhiteSpace(firstWithSys.System) ? firstWithSys.System : (res.SystemName != "—" ? res.SystemName : "Stanton");
+                var firstWithBody = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.Body) && x.Body != "—" && x.Body != sys);
+                var body = !string.IsNullOrWhiteSpace(firstWithBody.Body) ? firstWithBody.Body : (res.ParentBody != "—" ? res.ParentBody : sys);
+                var firstWithKind = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.Kind) && x.Kind != "—");
+                var kind = !string.IsNullOrWhiteSpace(firstWithKind.Kind) ? firstWithKind.Kind : res.Type.ToString();
+
+                return new LocationVisitTotal
+                {
+                    Name = displayName,
+                    System = sys,
+                    Body = body,
+                    Kind = kind,
+                    Visits = g.Count(),
+                    LastVisit = g.Max(l => l.Time)
+                };
             })
             .OrderByDescending(l => l.Visits)
             .ToList();

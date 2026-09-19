@@ -207,10 +207,50 @@ public static partial class Locations
         return resolved;
     }
 
+    /// <summary>
+    /// Bereinigt zusammengesetzte Standortnamen ("Area 18 · ArcCorp" -> "Area 18", "Levski (Delamar)" -> "Levski").
+    /// </summary>
+    public static string NormalizeLocationName(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var s = raw.Trim();
+        if (s.Contains(" · "))
+        {
+            var parts = s.Split(" · ", 2, StringSplitOptions.TrimEntries);
+            s = parts[0];
+        }
+        else if (s.Contains(" (") && s.EndsWith(")"))
+        {
+            var idx = s.IndexOf(" (", StringComparison.Ordinal);
+            if (idx > 0) s = s[..idx].Trim();
+        }
+        return s;
+    }
+
     private static ResolvedLocation ResolveLocationInternal(string rawId)
     {
         if (string.IsNullOrWhiteSpace(rawId) || rawId == "—")
             return new ResolvedLocation { RawCode = rawId ?? "", DisplayName = "—", SystemName = ActiveSystem, ParentBody = "—" };
+
+        // 0. Zusammengesetzte Standorte auflösen (z. B. "Area 18 · ArcCorp", "Levski · Delamar", "New Babbage · microTech")
+        var norm = NormalizeLocationName(rawId);
+        if (!string.Equals(norm, rawId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(norm))
+        {
+            var resBase = ResolveLocationInternal(norm);
+            if (resBase.DisplayName != "—")
+            {
+                var parts = rawId.Split(" · ", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    var parentHint = parts[1].Trim();
+                    if (string.IsNullOrEmpty(resBase.ParentBody) || resBase.ParentBody == "—" || resBase.ParentBody == resBase.SystemName)
+                    {
+                        resBase.ParentBody = parentHint;
+                    }
+                }
+                return resBase;
+            }
+        }
 
         var id = CleanRawId(rawId);
 

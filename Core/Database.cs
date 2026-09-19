@@ -16,8 +16,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 28; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v28: Bereinigung fälschlicher Cutlass Active Contracts)
-    public const int CurrentParserVersion = 38; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v38: Schiffsmodell-Kollisionsschutz in MissionCatalog & präzise Salvage-Claim Erkennung)
+    public const int CurrentSchemaVersion = 29; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v29: Bereinigung & Zusammenführung doppelter Standorte im Lager)
+    public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }
@@ -677,7 +677,135 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v28 (Bereinigung fälschlicher Cutlass Salvage Claims aus aktiven Aufträgen) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 29)
+        {
+            try
+            {
+                DeduplicateWarehouseLocations(db);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v29 (DeduplicateWarehouseLocations)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 29;");
+            dbSchemaVersion = 29;
+            Logger.Log("DB Schema: Migration auf v29 (Harmonisierung und Deduplizierung doppelter Standorte im Lager) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// Führt doppelt angelegte Standorte im Lager (z. B. "Levski · Delamar" -> "Levski", "Area 18 · ArcCorp" -> "Area 18") zusammen.
+    /// </summary>
+    public static void DeduplicateWarehouseLocations(SqliteConnection db)
+    {
+        using var tx = db.BeginTransaction();
+        try
+        {
+            var items = new List<(string Location, string Code, string System, string ParentBody, string ItemClass, string ItemName, string Category, int Quantity, string LastUpdated)>();
+
+            using (var readCmd = db.CreateCommand())
+            {
+                readCmd.Transaction = tx;
+                readCmd.CommandText = "SELECT location, location_code, system, parent_body, item_class, item_name, category, quantity, last_updated FROM warehouse_items;";
+                using var reader = readCmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    items.Add((
+                        reader.GetString(0),
+                        reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        reader.IsDBNull(2) ? "Stanton" : reader.GetString(2),
+                        reader.IsDBNull(3) ? "" : reader.GetString(3),
+                        reader.GetString(4),
+                        reader.IsDBNull(5) ? "" : reader.GetString(5),
+                        reader.IsDBNull(6) ? "Ausrüstung" : reader.GetString(6),
+                        Convert.ToInt32(reader.GetInt64(7)),
+                        reader.IsDBNull(8) ? "" : reader.GetString(8)
+                    ));
+                }
+            }
+
+            if (items.Count == 0)
+            {
+                tx.Commit();
+                return;
+            }
+
+            var merged = new Dictionary<(string Loc, string Cls), (string Code, string System, string ParentBody, string ItemName, string Category, int Quantity, string LastUpdated)>();
+
+            foreach (var item in items)
+            {
+                var canonicalLoc = Locations.NormalizeLocationName(item.Location);
+                var res = Locations.ResolveLocation(canonicalLoc);
+                if (res.DisplayName != "—") canonicalLoc = res.DisplayName;
+
+                var sys = !string.IsNullOrEmpty(res.SystemName) && res.SystemName != "—" ? res.SystemName : item.System;
+                var body = !string.IsNullOrEmpty(res.ParentBody) && res.ParentBody != "—" ? res.ParentBody : item.ParentBody;
+                var code = !string.IsNullOrEmpty(res.RawCode) && res.RawCode != "—" ? res.RawCode : item.Code;
+
+                var key = (canonicalLoc, item.ItemClass);
+                if (merged.TryGetValue(key, out var existing))
+                {
+                    int sumQty = existing.Quantity + item.Quantity;
+                    string latest = string.CompareOrdinal(item.LastUpdated, existing.LastUpdated) > 0 ? item.LastUpdated : existing.LastUpdated;
+                    string name = !string.IsNullOrEmpty(existing.ItemName) ? existing.ItemName : item.ItemName;
+                    string cat = !string.IsNullOrEmpty(existing.Category) ? existing.Category : item.Category;
+                    merged[key] = (existing.Code, existing.System, existing.ParentBody, name, cat, sumQty, latest);
+                }
+                else
+                {
+                    merged[key] = (code, sys, body, item.ItemName, item.Category, item.Quantity, item.LastUpdated);
+                }
+            }
+
+            using (var clearCmd = db.CreateCommand())
+            {
+                clearCmd.Transaction = tx;
+                clearCmd.CommandText = "DELETE FROM warehouse_items;";
+                clearCmd.ExecuteNonQuery();
+            }
+
+            using (var insertCmd = db.CreateCommand())
+            {
+                insertCmd.Transaction = tx;
+                insertCmd.CommandText = @"
+                    INSERT INTO warehouse_items (location, location_code, system, parent_body, item_class, item_name, category, quantity, last_updated)
+                    VALUES ($loc, $code, $sys, $body, $cls, $name, $cat, $qty, $lu);
+                ";
+                var pLoc = insertCmd.Parameters.Add("$loc", SqliteType.Text);
+                var pCode = insertCmd.Parameters.Add("$code", SqliteType.Text);
+                var pSys = insertCmd.Parameters.Add("$sys", SqliteType.Text);
+                var pBody = insertCmd.Parameters.Add("$body", SqliteType.Text);
+                var pCls = insertCmd.Parameters.Add("$cls", SqliteType.Text);
+                var pName = insertCmd.Parameters.Add("$name", SqliteType.Text);
+                var pCat = insertCmd.Parameters.Add("$cat", SqliteType.Text);
+                var pQty = insertCmd.Parameters.Add("$qty", SqliteType.Integer);
+                var pLu = insertCmd.Parameters.Add("$lu", SqliteType.Text);
+
+                foreach (var kvp in merged)
+                {
+                    pLoc.Value = kvp.Key.Loc;
+                    pCls.Value = kvp.Key.Cls;
+                    pCode.Value = kvp.Value.Code;
+                    pSys.Value = kvp.Value.System;
+                    pBody.Value = kvp.Value.ParentBody;
+                    pName.Value = kvp.Value.ItemName;
+                    pCat.Value = kvp.Value.Category;
+                    pQty.Value = kvp.Value.Quantity;
+                    pLu.Value = kvp.Value.LastUpdated;
+                    insertCmd.ExecuteNonQuery();
+                }
+            }
+
+            tx.Commit();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("DeduplicateWarehouseLocations", ex);
+            tx.Rollback();
+            throw;
+        }
     }
 
     /// <summary>
@@ -2615,6 +2743,21 @@ public static class Database
 
     public static void RecordWarehouseMovementInternal(SqliteConnection db, SqliteTransaction? tx, DateTime time, string location, string locationCode, string system, string parentBody, string itemClass, string itemName, string category, int deltaQty)
     {
+        var normLoc = Locations.NormalizeLocationName(location);
+        if (string.IsNullOrWhiteSpace(normLoc)) normLoc = location;
+
+        if (string.IsNullOrWhiteSpace(parentBody) || parentBody == "—" || normLoc != location)
+        {
+            var res = Locations.ResolveLocation(normLoc);
+            if (res.DisplayName != "—")
+            {
+                normLoc = res.DisplayName;
+                if (!string.IsNullOrWhiteSpace(res.SystemName) && res.SystemName != "—") system = res.SystemName;
+                if (!string.IsNullOrWhiteSpace(res.ParentBody) && res.ParentBody != "—") parentBody = res.ParentBody;
+                if (!string.IsNullOrWhiteSpace(res.RawCode) && res.RawCode != "—") locationCode = res.RawCode;
+            }
+        }
+
         using var cmd = db.CreateCommand();
         if (tx != null) cmd.Transaction = tx;
         cmd.CommandText = @"
@@ -2624,7 +2767,7 @@ public static class Database
                 quantity = warehouse_items.quantity + excluded.quantity,
                 last_updated = CASE WHEN excluded.last_updated > warehouse_items.last_updated THEN excluded.last_updated ELSE warehouse_items.last_updated END;
         ";
-        cmd.Parameters.AddWithValue("$loc", location);
+        cmd.Parameters.AddWithValue("$loc", normLoc);
         cmd.Parameters.AddWithValue("$code", locationCode);
         cmd.Parameters.AddWithValue("$sys", system);
         cmd.Parameters.AddWithValue("$body", parentBody);
@@ -2643,6 +2786,7 @@ public static class Database
         {
             try
             {
+                var normLoc = Locations.NormalizeLocationName(location);
                 using var db = new SqliteConnection(Conn);
                 db.Open();
                 using var cmd = db.CreateCommand();
@@ -2650,13 +2794,14 @@ public static class Database
                     UPDATE warehouse_items
                     SET quantity = quantity + $delta,
                         last_updated = $lu
-                    WHERE location = $loc AND item_class = $cls;
+                    WHERE (location = $loc OR location = $normLoc) AND item_class = $cls;
 
                     DELETE FROM warehouse_items
-                    WHERE location = $loc AND item_class = $cls AND quantity <= 0;
+                    WHERE (location = $loc OR location = $normLoc) AND item_class = $cls AND quantity <= 0;
                 ";
                 cmd.Parameters.AddWithValue("$delta", delta);
                 cmd.Parameters.AddWithValue("$loc", location);
+                cmd.Parameters.AddWithValue("$normLoc", normLoc);
                 cmd.Parameters.AddWithValue("$cls", itemClass);
                 cmd.Parameters.AddWithValue("$lu", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
                 cmd.ExecuteNonQuery();
@@ -2675,11 +2820,13 @@ public static class Database
         {
             try
             {
+                var normLoc = Locations.NormalizeLocationName(location);
                 using var db = new SqliteConnection(Conn);
                 db.Open();
                 using var cmd = db.CreateCommand();
-                cmd.CommandText = "DELETE FROM warehouse_items WHERE location = $loc AND item_class = $cls;";
+                cmd.CommandText = "DELETE FROM warehouse_items WHERE (location = $loc OR location = $normLoc) AND item_class = $cls;";
                 cmd.Parameters.AddWithValue("$loc", location);
+                cmd.Parameters.AddWithValue("$normLoc", normLoc);
                 cmd.Parameters.AddWithValue("$cls", itemClass);
                 cmd.ExecuteNonQuery();
             }
@@ -2697,11 +2844,14 @@ public static class Database
         {
             try
             {
+                var normLoc = Locations.NormalizeLocationName(location);
                 using var db = new SqliteConnection(Conn);
                 db.Open();
                 using var cmd = db.CreateCommand();
-                cmd.CommandText = "DELETE FROM warehouse_items WHERE location = $loc;";
+                cmd.CommandText = "DELETE FROM warehouse_items WHERE location = $loc OR location = $normLoc OR location LIKE $locPattern;";
                 cmd.Parameters.AddWithValue("$loc", location);
+                cmd.Parameters.AddWithValue("$normLoc", normLoc);
+                cmd.Parameters.AddWithValue("$locPattern", $"{normLoc} · %");
                 cmd.ExecuteNonQuery();
             }
             catch (Exception ex)
@@ -2725,8 +2875,11 @@ public static class Database
 
             if (!string.IsNullOrWhiteSpace(locationFilter) && locationFilter != "Alle Standorte")
             {
-                sql += " AND location = $loc";
+                var normLoc = Locations.NormalizeLocationName(locationFilter);
+                sql += " AND (location = $loc OR location = $normLoc OR location LIKE $locPattern)";
                 cmd.Parameters.AddWithValue("$loc", locationFilter);
+                cmd.Parameters.AddWithValue("$normLoc", normLoc);
+                cmd.Parameters.AddWithValue("$locPattern", $"{normLoc} · %");
             }
 
             if (!string.IsNullOrWhiteSpace(categoryFilter) && categoryFilter != "Alle Kategorien")
@@ -2749,6 +2902,13 @@ public static class Database
             while (reader.Read())
             {
                 DateTime.TryParse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lu);
+                var rawLoc = reader.GetString(0);
+                var normLoc = Locations.NormalizeLocationName(rawLoc);
+                var res = Locations.ResolveLocation(normLoc);
+                var dispLoc = res.DisplayName != "—" ? res.DisplayName : normLoc;
+                var sys = reader.IsDBNull(2) ? (res.SystemName != "—" ? res.SystemName : "Stanton") : reader.GetString(2);
+                var body = reader.IsDBNull(3) ? (res.ParentBody != "—" ? res.ParentBody : sys) : reader.GetString(3);
+
                 var itemClass = reader.GetString(4);
                 var rawName = reader.GetString(5);
                 var rawCat = reader.GetString(6);
@@ -2759,10 +2919,10 @@ public static class Database
 
                 items.Add(new WarehouseItem
                 {
-                    Location = reader.GetString(0),
-                    LocationCode = reader.GetString(1),
-                    System = reader.GetString(2),
-                    ParentBody = reader.GetString(3),
+                    Location = dispLoc,
+                    LocationCode = reader.IsDBNull(1) ? res.RawCode : reader.GetString(1),
+                    System = sys,
+                    ParentBody = body,
                     ItemClass = itemClass,
                     ItemName = finalName,
                     Category = finalCat,
@@ -2795,9 +2955,10 @@ public static class Database
                 ORDER BY total_items DESC, location ASC;
             ";
             using var reader = cmd.ExecuteReader();
+            var rawList = new List<WarehouseLocationGroup>();
             while (reader.Read())
             {
-                list.Add(new WarehouseLocationGroup
+                rawList.Add(new WarehouseLocationGroup
                 {
                     LocationName = reader.GetString(0),
                     LocationCode = reader.GetString(1),
@@ -2807,6 +2968,37 @@ public static class Database
                     UniqueItemTypes = Convert.ToInt32(reader.GetInt64(5))
                 });
             }
+
+            // Standorte kanonisch zusammenführen (z. B. "Levski · Delamar" -> "Levski", "Area 18 · ArcCorp" -> "Area 18")
+            var grouped = rawList
+                .GroupBy(l => Locations.NormalizeLocationName(l.LocationName), StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
+                {
+                    var canonicalKey = g.Key;
+                    var res = Locations.ResolveLocation(canonicalKey);
+                    var displayName = res.DisplayName != "—" ? res.DisplayName : canonicalKey;
+                    var sys = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.System) && x.System != "—")?.System
+                              ?? (res.SystemName != "—" ? res.SystemName : "Stanton");
+                    var body = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.ParentBody) && x.ParentBody != "—" && x.ParentBody != sys)?.ParentBody
+                               ?? (res.ParentBody != "—" ? res.ParentBody : sys);
+                    var code = g.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.LocationCode) && x.LocationCode != "—")?.LocationCode
+                               ?? res.RawCode;
+
+                    return new WarehouseLocationGroup
+                    {
+                        LocationName = displayName,
+                        LocationCode = code,
+                        System = sys,
+                        ParentBody = body,
+                        TotalItems = g.Sum(x => x.TotalItems),
+                        UniqueItemTypes = g.Sum(x => x.UniqueItemTypes)
+                    };
+                })
+                .OrderByDescending(l => l.TotalItems)
+                .ThenBy(l => l.LocationName)
+                .ToList();
+
+            return grouped;
         }
         catch (Exception ex)
         {

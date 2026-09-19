@@ -2801,19 +2801,19 @@ public partial class LogParser
     static string? ExtractLocationFromShop(string shop)
     {
         if (string.IsNullOrWhiteSpace(shop)) return null;
-        if (shop.Contains("Lorville", StringComparison.OrdinalIgnoreCase)) return "Lorville · Hurston";
-        if (shop.Contains("Everus", StringComparison.OrdinalIgnoreCase)) return "Everus Harbor · Hurston";
-        if (shop.Contains("NewBabbage", StringComparison.OrdinalIgnoreCase) || shop.Contains("New Babbage", StringComparison.OrdinalIgnoreCase) || shop.Contains("Babbage", StringComparison.OrdinalIgnoreCase)) return "New Babbage · microTech";
-        if (shop.Contains("Tressler", StringComparison.OrdinalIgnoreCase)) return "Port Tressler · microTech";
-        if (shop.Contains("Area18", StringComparison.OrdinalIgnoreCase) || shop.Contains("Area 18", StringComparison.OrdinalIgnoreCase)) return "Area 18 · ArcCorp";
-        if (shop.Contains("Baijini", StringComparison.OrdinalIgnoreCase)) return "Baijini Point · ArcCorp";
-        if (shop.Contains("Orison", StringComparison.OrdinalIgnoreCase)) return "Orison · Crusader";
-        if (shop.Contains("Seraphim", StringComparison.OrdinalIgnoreCase)) return "Seraphim Station · Crusader";
-        if (shop.Contains("GrimHEX", StringComparison.OrdinalIgnoreCase) || shop.Contains("Grim HEX", StringComparison.OrdinalIgnoreCase)) return "Grim HEX · Yela";
-        if (shop.Contains("Levski", StringComparison.OrdinalIgnoreCase)) return "Levski · Delamar";
-        if (shop.Contains("Checkmate", StringComparison.OrdinalIgnoreCase)) return "Checkmate Station · Monox";
-        if (shop.Contains("Orbituary", StringComparison.OrdinalIgnoreCase)) return "Orbituary · Bloom";
-        if (shop.Contains("Ruin", StringComparison.OrdinalIgnoreCase)) return "Ruin Station · Terminus";
+        if (shop.Contains("Lorville", StringComparison.OrdinalIgnoreCase)) return "Lorville";
+        if (shop.Contains("Everus", StringComparison.OrdinalIgnoreCase)) return "Everus Harbor";
+        if (shop.Contains("NewBabbage", StringComparison.OrdinalIgnoreCase) || shop.Contains("New Babbage", StringComparison.OrdinalIgnoreCase) || shop.Contains("Babbage", StringComparison.OrdinalIgnoreCase)) return "New Babbage";
+        if (shop.Contains("Tressler", StringComparison.OrdinalIgnoreCase)) return "Port Tressler";
+        if (shop.Contains("Area18", StringComparison.OrdinalIgnoreCase) || shop.Contains("Area 18", StringComparison.OrdinalIgnoreCase)) return "Area 18";
+        if (shop.Contains("Baijini", StringComparison.OrdinalIgnoreCase)) return "Baijini Point";
+        if (shop.Contains("Orison", StringComparison.OrdinalIgnoreCase)) return "Orison";
+        if (shop.Contains("Seraphim", StringComparison.OrdinalIgnoreCase)) return "Seraphim Station";
+        if (shop.Contains("GrimHEX", StringComparison.OrdinalIgnoreCase) || shop.Contains("Grim HEX", StringComparison.OrdinalIgnoreCase)) return "Grim HEX";
+        if (shop.Contains("Levski", StringComparison.OrdinalIgnoreCase)) return "Levski";
+        if (shop.Contains("Checkmate", StringComparison.OrdinalIgnoreCase)) return "Checkmate Station";
+        if (shop.Contains("Orbituary", StringComparison.OrdinalIgnoreCase)) return "Orbituary";
+        if (shop.Contains("Ruin", StringComparison.OrdinalIgnoreCase)) return "Ruin Station";
         return null;
     }
 
