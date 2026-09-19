@@ -814,26 +814,29 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // 7. ATC Landung / Hangar-Zuweisung / Startfreigabe
-        if (AtcAndLandingEnabled && (
-            line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar-Anforderung", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangaranforderung", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Hangarzuweisung", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("ATC::RequestLanding", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Landing service has been requested", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Assigned to Landing Pad", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Takeoff Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("AImodule_ATC", StringComparison.OrdinalIgnoreCase)))
+        // 7. ATC Landung / Hangar-Zuweisung / Startfreigabe (nur echte Freigaben & HUD-Zuweisungen, KEINE Aufzüge oder Comms-Bubbles!)
+        if (AtcAndLandingEnabled &&
+            !line.Contains("LoadingPlatformManager", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("CSCCommsComponent", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("AImodule_ATC", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase) &&
+            (
+                (line.Contains("Added notification", StringComparison.OrdinalIgnoreCase) &&
+                 (line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase))) ||
+                line.Contains("Landing Request Granted", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Assigned to Landing Pad", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Hangarzuweisung", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Landefreigabe:", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Startfreigabe:", StringComparison.OrdinalIgnoreCase)
+            ))
         {
             OnAtcLanding();
             return;
@@ -978,7 +981,19 @@ public partial class AuroraVoiceService : IDisposable
         }
         else if (e.Kind == EventKind.Hangar && AtcAndLandingEnabled)
         {
-            OnAtcLanding();
+            // Nur bei echten ATC Lande-/Startfreigaben oder Zuweisungen – NIEMALS bei Fracht- oder Schiffsaufzügen!
+            if (!string.IsNullOrEmpty(e.Detail) &&
+                !e.Detail.Contains("aufzug", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("elevator", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase) &&
+                (e.Detail.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Hangarzuweisung", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase)))
+            {
+                OnAtcLanding();
+            }
         }
         else if (e.Kind == EventKind.Maintenance && MaintenanceEnabled)
         {
@@ -1165,7 +1180,7 @@ public partial class AuroraVoiceService : IDisposable
         if (_atcLandingSounds.Count > 0)
         {
             Logger.Log($"[AuroraVoiceService] ATC / Hangar-Zuweisung ausgelöst ({_atcLandingSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 15);
+            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 45);
         }
         else
         {

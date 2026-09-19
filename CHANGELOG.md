@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Fixed
+- **Aurora ATC Hangar Clearance Infinite Voice Repetition Fix (`Core/AuroraVoiceService.cs`)**:
+  - **Excluded Freight & Ship Elevators from Voice Triggers**: Fixed an issue where freight and ship elevator operations (`LoadingPlatformManager`, `Frachtaufzug bereit`, `Schiffsaufzug bereit`) continuously triggered `OnAtcLanding` voice announcements ("Landefreigabe erteilt", "Startfreigabe erteilt") whenever any elevator reached `OpenIdle` in spaceports (e.g. Orison).
+  - **Granular Event Filtering in `ProcessLiveEvent`**: Verified that `EventKind.Hangar` events only trigger voice playback when `e.Detail` represents an actual ATC landing/takeoff clearance or hangar assignment, explicitly excluding cargo/ship elevators and ship retrieval spawns.
+  - **Hardened Regex & Matchers in `ProcessLiveLine`**: Excluded background ATC comms bubbles (`AImodule_ATC`, `CSCCommsComponent`), hangar queue polling events (`Hangar Queue`, `Joined hangar queue`), and notification fading/removal updates (`UpdateNotificationItem`). Only actual HUD notifications (`Added notification ... Hangar Request Completed / Landefreigabe / Startfreigabe`) or granted ATC responses now trigger voice lines.
+  - **Increased Cooldown**: Raised `atc_landing` playback cooldown from 15s to 45s to avoid duplicate voice lines when multiple log notifications fire for the same clearance.
 - **Missions Navigation & Empty Filter State Fix (`frontend/src/views/EventsView.tsx`, `frontend/src/views/MissionsView.tsx`)**:
   - **Stripped Generic Query on Mission Navigation (`EventsView.tsx`)**: Fixed an issue where clicking the category badge "Auftrag" or mission detail links passed generic strings like `"Mission"` as search queries, filtering out valid active missions whose titles/contractors didn't match the word `"Mission"`. Added `cleanMissionSearch` to extract real contractor/mission names while stripping log prefixes, currency, and generic labels.
   - **Category Badge Navigation**: Made the "Auftrag" category badge navigate to `missions` directly without any filter query.
