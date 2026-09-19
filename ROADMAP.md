@@ -305,9 +305,9 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
   - [x] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
   - [x] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
   - [x] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
-- [ ] **Phase 2: Dokumentation & Changelog-Stempelung**
-  - [ ] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` stempeln.
-  - [ ] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.
+- [x] **Phase 2: Dokumentation & Changelog-Stempelung**
+  - [x] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` vorbereiten.
+  - [x] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.
 - [ ] **Phase 3: Release-Build & Tagging**
   - [ ] `.\release.ps1` ausführen (mit Signierung oder `-SkipSign`).
   - [ ] GitHub-Release `v1.0.0-rc3` überprüfen.
