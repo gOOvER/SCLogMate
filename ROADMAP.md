@@ -274,14 +274,43 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
   - Erstellung von `RefineryView.tsx` mit 4 spezialisierten Ansichten (Auftrags-Tracking, OCR-Kiosk-Erfassung, UEX/SCWiki-Ertragsrechner, Stations-Atlas für Stanton, Pyro & Nyx) und Live-Sekunden-Countdown.
 - [ ] **Schritt 7 (Warchest Management & Best Sales Locations):**
   - Erfassung von Mineralienbeständen mit Reinheitsstufen (Quality Ratings) und automatischer Ermittlung der besten Verkaufsorte via UEX Corp API.
-- [ ] **Schritt 8 (Rock Breaking Calculator & Optimal Loadout Finder):**
-  - Laser-Power vs. Gesteinsmasse/Resistenz Rechner, Ausrüstungs-Datenbank und Multi-Crew Bergbau-Planer.
+- [x] **Schritt 8 (Rock Breaking Calculator & Frachtraum-Planer):**
+  - Physikalischer Gesteinsbruch-Rechner ("Can I Crack It?") für Prospector und MOLE mit Laser-/Modulkatalog.
+  - 3D/2D Frachtraum-Planer ("Cargo-Fit Grid Packer") für Standard-SCU-Container mit Schiffsbucht-Höhenprüfung.
 - [ ] **Schritt 9 (In-Game Chat-Protokoll & OCR-Rework — Backlog):**
   - **Komplette Überarbeitung der Chat-Texterkennung & Protokollierung:**
     - Trennung des Spielernamens / Senders in eine separate Tabellenspalte und UI-Spalte zur besseren visuellen Gliederung.
     - Zuverlässigere Textextraktion bei wechselnden Spielhintergründen und Visor-Transparenzen (Adaptive Thresholding / Hintergrund-Maskierung).
     - Verbesserte Vermeidung von Mehrfachlesungen stehender Nachrichten bei inaktivem Chatverlauf.
     - Reaktivierung des Navigationstabs und der Hintergrund-Erfassung nach erfolgreicher Fertigstellung.
+
+---
+
+## 📦 10. Release Candidate 3 (RC3) — Checkliste & Offene Punkte vor Release
+
+### 🚨 Bekannte Probleme & Stolpersteine
+1. **Mehrdeutiger Git-Tag `main`**:
+   - Ein veralteter Tag `refs/tags/main` führt bei einfachem `git push` zu `error: src refspec main matches more than one`.
+   - *Fix:* `git tag -d main` und `git push origin :refs/tags/main` ausführen bzw. in `release.ps1` explizit `git push origin refs/heads/main` verwenden.
+2. **Item-Instanz-IDs im `SCLogMate.unknown.log`**:
+   - CIG hängt an Inventar-Gegenstände bei Abfragen numerische Instanz-IDs an (`grin_multitool_..._776193770765`).
+   - *Fix:* Vor dem Aufruf in `WikiApiClient.cs` Trailing-IDs (`_\d{4,}$`) abtrennen und Player-Noise (`necksock`, `FP_Visor`) filtern.
+3. **In-Game Chat-OCR Status**:
+   - Chat-OCR ist für ein Rework (Absender-Spalte, besseres Thresholding) im Backlog (Schritt 9). In den RC3-Release-Notes als vorübergehend pausiert vermerken.
+4. **Code-Signing (`sign.ps1`)**:
+   - Vor Ausführung von `release.ps1` sicherstellen, dass SimplySign Desktop eingeloggt ist (oder `release.ps1 -SkipSign` verwenden).
+
+### 📋 ToDo-Checkliste vor dem Release
+- [ ] **Phase 1: Bereinigung & Feinschliff**
+  - [ ] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
+  - [ ] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
+  - [ ] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
+- [ ] **Phase 2: Dokumentation & Changelog-Stempelung**
+  - [ ] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` stempeln.
+  - [ ] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.
+- [ ] **Phase 3: Release-Build & Tagging**
+  - [ ] `.\release.ps1` ausführen (mit Signierung oder `-SkipSign`).
+  - [ ] GitHub-Release `v1.0.0-rc3` überprüfen.
 
 
 
