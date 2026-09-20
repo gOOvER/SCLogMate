@@ -366,9 +366,30 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                         candClean.StartsWith("Weapon -", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Turret Weapon", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Radar", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase))
+                        candClean.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Missile", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Tractor", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Salvage", StringComparison.OrdinalIgnoreCase))
                     {
                         break;
+                    }
+
+                    if (candClean.Equals("Empty", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.Equals("EOUIPPEO", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.Equals("EQUIPPED", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+
+                    // Ignoriere Währungszeilen (Ä 6.438,230) und den direkt darauf folgenden Spieler-Handle (z.B. GOOVER)
+                    bool isAfterCurrency = k > 0 && lines[k - 1].Trim().StartsWith("Ä");
+                    if (isAfterCurrency ||
+                        candClean.Equals("GOOVER", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.Equals("gOOvER", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Missile Slot", StringComparison.OrdinalIgnoreCase))
+                    {
+                        k++;
+                        continue;
                     }
 
                     if (!UiNoise.Contains(cand) && !UiNoise.Contains(candClean) && candClean.Length > 2 &&

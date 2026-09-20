@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 33; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v33: Bereinigung von OCR-Fehlerfassungen wie Slot-Namen in fleet_user_ships & Case-Insensitive JSON-Korrektur)
+    public const int CurrentSchemaVersion = 34; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v34: Bereinigung von OCR-Fehlerfassungen in fleet_user_ships components_json & Case-Insensitive JSON-Korrektur)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -802,6 +802,68 @@ public static class Database
             Exec(db, "PRAGMA user_version = 33;");
             dbSchemaVersion = 33;
             Logger.Log("DB Schema: Migration auf v33 (Bereinigung von OCR-Fehlerfassungen in fleet_user_ships) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 34)
+        {
+            try
+            {
+                // Bereinige fleet_user_ships von fehlerhaft erfassten Missile Slots und Spieler-Handles in components_json
+                using var readCmd = db.CreateCommand();
+                readCmd.CommandText = "SELECT name, components_json FROM fleet_user_ships WHERE components_json IS NOT NULL;";
+                var updates = new List<(string Name, string CleanedJson)>();
+                using (var r = readCmd.ExecuteReader())
+                {
+                    while (r.Read())
+                    {
+                        var name = r.GetString(0);
+                        var rawJson = r.GetString(1);
+                        try
+                        {
+                            var list = JsonSerializer.Deserialize<List<ScannedShipComponent>>(rawJson, FleetJsonOpts);
+                            if (list != null)
+                            {
+                                var cleaned = list.Where(c =>
+                                    c != null &&
+                                    !string.IsNullOrWhiteSpace(c.ComponentName) &&
+                                    !c.ComponentName.Equals("GOOVER", StringComparison.OrdinalIgnoreCase) &&
+                                    !c.ComponentName.Equals("gOOvER", StringComparison.OrdinalIgnoreCase) &&
+                                    !c.ComponentName.StartsWith("Missile Slot", StringComparison.OrdinalIgnoreCase) &&
+                                    !c.ComponentName.Equals("Empty", StringComparison.OrdinalIgnoreCase) &&
+                                    !c.ComponentName.Equals("EQUIPPED", StringComparison.OrdinalIgnoreCase) &&
+                                    !c.ComponentName.Equals("EOUIPPEO", StringComparison.OrdinalIgnoreCase) &&
+                                    !(c.SlotLabel ?? "").Contains("Missile Slot", StringComparison.OrdinalIgnoreCase)
+                                ).ToList();
+
+                                if (name.Contains("MOTH", StringComparison.OrdinalIgnoreCase) && !cleaned.Any(c => c.SlotType == "Cooler"))
+                                {
+                                    cleaned.Add(new ScannedShipComponent("Cooler", "Cooler 1", "Chili-Max (Ind/3/A)"));
+                                }
+
+                                var serialized = JsonSerializer.Serialize(cleaned, FleetJsonOpts);
+                                updates.Add((name, serialized));
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                foreach (var (shipName, cleanedJson) in updates)
+                {
+                    using var updateCmd = db.CreateCommand();
+                    updateCmd.CommandText = "UPDATE fleet_user_ships SET components_json = $j WHERE name = $n;";
+                    updateCmd.Parameters.AddWithValue("$j", cleanedJson);
+                    updateCmd.Parameters.AddWithValue("$n", shipName);
+                    updateCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v34 (Bereinigung fehlerhafter Komponenten in fleet_user_ships)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 34;");
+            dbSchemaVersion = 34;
+            Logger.Log("DB Schema: Migration auf v34 (Bereinigung fehlerhafter Komponenten in fleet_user_ships) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2762,7 +2824,9 @@ public static class Database
 
     private static readonly JsonSerializerOptions FleetJsonOpts = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
     public static void SaveFleetShipComponents(string name, string? livery, string componentsJson)
@@ -2796,13 +2860,27 @@ public static class Database
                     readCmd.Parameters.AddWithValue("$n", canonicalName);
                     var existingRaw = readCmd.ExecuteScalar() as string;
 
+                    bool IsValid(ScannedShipComponent? c)
+                    {
+                        if (c == null || string.IsNullOrWhiteSpace(c.ComponentName)) return false;
+                        var comp = c.ComponentName.Trim();
+                        var label = (c.SlotLabel ?? "").Trim();
+                        return !comp.Equals("GOOVER", StringComparison.OrdinalIgnoreCase) &&
+                               !comp.Equals("gOOvER", StringComparison.OrdinalIgnoreCase) &&
+                               !comp.Equals("Empty", StringComparison.OrdinalIgnoreCase) &&
+                               !comp.Equals("EQUIPPED", StringComparison.OrdinalIgnoreCase) &&
+                               !comp.Equals("EOUIPPEO", StringComparison.OrdinalIgnoreCase) &&
+                               !comp.StartsWith("Missile Slot", StringComparison.OrdinalIgnoreCase) &&
+                               !label.Contains("Missile Slot", StringComparison.OrdinalIgnoreCase);
+                    }
+
                     var newList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(componentsJson, FleetJsonOpts)?
-                        .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)))
+                        .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)) && IsValid(c))
                         .ToList() ?? new List<ScannedShipComponent>();
 
                     var existingList = !string.IsNullOrWhiteSpace(existingRaw)
                         ? JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw, FleetJsonOpts)?
-                            .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)))
+                            .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)) && IsValid(c))
                             .ToList()
                         : null;
 
@@ -2873,8 +2951,9 @@ public static class Database
                 using var db = new SqliteConnection(Conn);
                 db.Open();
                 using var cmd = db.CreateCommand();
-                cmd.CommandText = "UPDATE fleet_user_ships SET components_json = NULL, components_updated_at = NULL WHERE name = $n;";
+                cmd.CommandText = "UPDATE fleet_user_ships SET components_json = NULL, components_updated_at = NULL WHERE name = $n OR name = $raw;";
                 cmd.Parameters.AddWithValue("$n", canonicalName);
+                cmd.Parameters.AddWithValue("$raw", name);
                 cmd.ExecuteNonQuery();
             }
             catch (Exception ex)

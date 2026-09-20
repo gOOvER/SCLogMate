@@ -192,7 +192,7 @@ public static partial class PipsAnalyzer
         ["C1 Spirit"] = new[] { "Panther", "Panther", "Panther", "Panther" },         // 1 Pip (1480)
         ["Avenger Titan"] = new[] { "Tigerstreik", "Badger", "Badger" },              // 2 Pips (1332 + 1480)
         ["Hermes"] = new[] { "Rhino", "Rhino", "Rhino", "Rhino" },                    // 1 Pip (1480)
-        ["MOTH"] = new[] { "Badger", "Badger", "Badger" },                            // 1 Pip (1480)
+        ["MOTH"] = new[] { "Badger", "Badger" },                                    // 1 Pip (1480)
         ["Hull B"] = new[] { "Badger", "Badger" },                                    // 1 Pip (1480)
         ["Freelancer"] = new[] { "Tarantula", "Tarantula", "Tarantula", "Tarantula" },// 1 Pip (1150)
         ["Constellation Taurus"] = new[] { "Rhino", "Rhino", "Rhino", "Rhino" },     // 1 Pip (1480)
