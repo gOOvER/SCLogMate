@@ -1702,6 +1702,7 @@ class PhotinoBridge {
         } as ShipComparisonDataDto;
 
       case 'scan_screenshot_loadout':
+      case 'scan_clipboard_loadout':
         return {
           success: true,
           shipName: 'Cutlass Black',
@@ -1710,9 +1711,10 @@ class PhotinoBridge {
             { slotType: 'Weapon', slotLabel: 'Pilot Hardpoint 1', componentName: 'CF-337 Panther' },
             { slotType: 'Weapon', slotLabel: 'Pilot Hardpoint 2', componentName: 'CF-337 Panther' },
             { slotType: 'Shield', slotLabel: 'Shield 1', componentName: 'FR-66' },
-            { slotType: 'QuantumDrive', slotLabel: 'Quantum Drive', componentName: 'Atlas' }
+            { slotType: 'QuantumDrive', slotLabel: 'Quantum Drive', componentName: 'Atlas' },
+            { slotType: 'Avionics', slotLabel: 'Radar', componentName: 'Cassandra' }
           ],
-          message: 'Loadout erfolgreich aus Screenshot erkannt!'
+          message: 'Loadout erfolgreich erkannt!'
         } as ScreenshotLoadoutResult;
 
       case 'get_sanitized_diagnostic_summary':

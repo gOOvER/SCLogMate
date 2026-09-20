@@ -131,6 +131,9 @@ public static class FleetCatalog
         ["Freelancer MIS"] = new("Freelancer MIS · MISC", "MISC", "MISC", "#A78BFA", "Schweres Raketen-Gunship", 3_900_000, 175, "120 Monate (IAE)"),
         ["Hull A"] = new("Hull A · MISC", "MISC", "MISC", "#A78BFA", "Modularer Zubringerfrachter (64 SCU)", 1_850_000, 90, "LTI (Lifetime)"),
         ["Hull B"] = new("Hull B · MISC", "MISC", "MISC", "#A78BFA", "Mittlerer Frachter (384 SCU)", 3_800_000, 140, "LTI (Lifetime)"),
+        ["Hull_B"] = new("Hull B · MISC", "MISC", "MISC", "#A78BFA", "Mittlerer Frachter (384 SCU)", 3_800_000, 140, "LTI (Lifetime)"),
+        ["MISC Hull B"] = new("Hull B · MISC", "MISC", "MISC", "#A78BFA", "Mittlerer Frachter (384 SCU)", 3_800_000, 140, "LTI (Lifetime)"),
+        ["MISC_Hull_B"] = new("Hull B · MISC", "MISC", "MISC", "#A78BFA", "Mittlerer Frachter (384 SCU)", 3_800_000, 140, "LTI (Lifetime)"),
         ["Hull C"] = new("Hull C · MISC", "MISC", "MISC", "#A78BFA", "Interstellarer Großfrachter (4608 SCU)", 35_000_000, 500, "LTI (Lifetime)"),
         ["Hull D"] = new("Hull D · MISC", "MISC", "MISC", "#A78BFA", "Schwerer Großraumfrachter", 48_000_000, 550, "LTI (Lifetime)"),
         ["Hull E"] = new("Hull E · MISC", "MISC", "MISC", "#A78BFA", "Gigantischer Mega-Frachter", 75_000_000, 750, "LTI (Lifetime)"),
@@ -202,6 +205,8 @@ public static class FleetCatalog
         ["MOLE"] = new("MOLE · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrieller Multi-Crew Bergbau", 5_150_000, 315, "120 Monate (IAE)"),
         ["MOLE Salvage"] = new("MOLE · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrieller Multi-Crew Bergbau", 5_150_000, 315, "120 Monate (IAE)"),
         ["Argo RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
+        ["ARGO RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
+        ["ARGO_RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
         ["RAFT"] = new("RAFT · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Frachtlader (96 SCU)", 2_150_000, 125, "LTI (Lifetime)"),
         ["Argo SRV"] = new("SRV · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Schlepper & Bergung (Tractor)", 2_450_000, 165, "LTI (Lifetime)"),
         ["SRV"] = new("SRV · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Schlepper & Bergung (Tractor)", 2_450_000, 165, "LTI (Lifetime)"),
@@ -258,8 +263,12 @@ public static class FleetCatalog
         var clean = shipName.Trim();
         if (!IsValidShipName(clean)) return false;
         if (Catalog.ContainsKey(clean)) return true;
+        var cleanSpace = clean.Replace('_', ' ');
+        if (Catalog.ContainsKey(cleanSpace)) return true;
         return Catalog.Values.Any(c => c.NormalizedName.Equals(clean, StringComparison.OrdinalIgnoreCase) ||
-                                       clean.Contains(c.NormalizedName, StringComparison.OrdinalIgnoreCase));
+                                       c.NormalizedName.Equals(cleanSpace, StringComparison.OrdinalIgnoreCase) ||
+                                       clean.Contains(c.NormalizedName, StringComparison.OrdinalIgnoreCase) ||
+                                       cleanSpace.Contains(c.NormalizedName, StringComparison.OrdinalIgnoreCase));
     }
 
     public static bool IsValidShipName(string? shipName)
@@ -305,20 +314,25 @@ public static class FleetCatalog
             return new("Unbekannt", "Unbekannt", "SC", "#58A6FF", "Raumschiff", 1_500_000, 50, "6 Monate");
 
         var clean = shipName.Trim();
+        var cleanSpace = clean.Replace('_', ' ');
 
         // Standorte, Stationen und URNs sind keine Schiffe
-        if (!IsValidShipName(clean))
+        if (!IsValidShipName(clean) && !IsValidShipName(cleanSpace))
             return new("Unbekannt", "Unbekannt", "SC", "#58A6FF", "Nicht-Schiff", 0, 0, "—");
 
         // 1. Exakter O(1) Match
         if (Catalog.TryGetValue(clean, out var exact))
             return exact;
+        if (Catalog.TryGetValue(cleanSpace, out var exactSpace))
+            return exactSpace;
 
         // 2. Längster Teilstring-Abgleich (verhindert False-Positives von kurzen Namen wie 'Cutter' vor 'Cutter Rambler')
         foreach (var (key, val) in SortedCatalog)
         {
             if (clean.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                key.Contains(clean, StringComparison.OrdinalIgnoreCase))
+                cleanSpace.Contains(key, StringComparison.OrdinalIgnoreCase) ||
+                key.Contains(clean, StringComparison.OrdinalIgnoreCase) ||
+                key.Contains(cleanSpace, StringComparison.OrdinalIgnoreCase))
             {
                 return val;
             }

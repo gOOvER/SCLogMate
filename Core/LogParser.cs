@@ -902,8 +902,6 @@ public partial class LogParser
                 var suffix = qty > 1 ? $"×{qty} · {shop}" : $"· {shop}";
                 var ts = ParseTs(line);
                 var itemName = ItemNames.CleanFallback(rawItem);
-                _pendingPurchase = new PendingPurchase(ts, shop, itemName, by.Groups["guid"].Value, price, qty);
-
                 if (!string.IsNullOrWhiteSpace(rawItem))
                 {
                     var locInfo = GetLocationInfo("");
@@ -913,8 +911,18 @@ public partial class LogParser
                     {
                         itemName = resolved.Name;
                     }
-                    WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, +qty));
+                    // Schiffe & Fahrzeuge gehören in die Flotte, nicht in das lokale Lager (Warehouse)
+                    bool isVehicle = resolved.Category == "Schiff & Fahrzeug" ||
+                                     resolved.Category == "Ship & Vehicle" ||
+                                     FleetCatalog.IsKnownCatalogShip(rawItem) ||
+                                     FleetCatalog.IsKnownCatalogShip(rawItem.Replace('_', ' '));
+                    if (!isVehicle)
+                    {
+                        WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, +qty));
+                    }
                 }
+
+                _pendingPurchase = new PendingPurchase(ts, shop, itemName, by.Groups["guid"].Value, price, qty);
 
                 return new LogEntry
                 {

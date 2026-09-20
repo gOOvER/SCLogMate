@@ -182,6 +182,26 @@ public static class WikiApiClient
             return null;
         }
 
+        // 0. Handelt es sich um ein Schiff / Fahrzeug?
+        var candidateShip = normalized.Replace('_', ' ');
+        if (FleetCatalog.IsKnownCatalogShip(candidateShip) || FleetCatalog.IsKnownCatalogShip(normalized) || FleetCatalog.IsKnownCatalogShip(raw))
+        {
+            var ship = FleetCatalog.Lookup(candidateShip);
+            if (ship != null && ship.Role != "Nicht-Schiff" && ship.Role != "Raumschiff" && ship.Role != "Unbekannt")
+            {
+                var shipInfo = new WikiInfo
+                {
+                    Name = ship.NormalizedName,
+                    Category = "Schiff & Fahrzeug",
+                    Manufacturer = ship.Manufacturer,
+                    Role = ship.Role
+                };
+                Cache[normalized] = shipInfo;
+                Cache[raw] = shipInfo;
+                return shipInfo;
+            }
+        }
+
         // 1. In-Memory Cache
         if (Cache.TryGetValue(raw, out var cachedRaw) && cachedRaw != null)
             return cachedRaw;
@@ -214,7 +234,32 @@ public static class WikiApiClient
 
                 if (root.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
                 {
-                    var first = data[0];
+                    // WICHTIG: Nur akzeptieren, wenn class_name EXAKT mit der gesuchten Klasse übereinstimmt!
+                    // star-citizen.wiki filter[class_name] führt eine Substring-/Präfix-Suche durch.
+                    // data[0] ohne Prüfung führte dazu, dass z.B. ARGO_RAFT auf ARGO_RAFT_CML_Decoy_Small ("Aegis Gladius - Decoy Launcher") matchte!
+                    JsonElement? exactMatch = null;
+                    foreach (var itemEl in data.EnumerateArray())
+                    {
+                        if (itemEl.TryGetProperty("class_name", out var cnEl))
+                        {
+                            var cn = cnEl.GetString();
+                            if (string.Equals(cn, normalized, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(cn, raw, StringComparison.OrdinalIgnoreCase))
+                            {
+                                exactMatch = itemEl;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!exactMatch.HasValue)
+                    {
+                        Cache[normalized] = null;
+                        Cache[raw] = null;
+                        return null;
+                    }
+
+                    var first = exactMatch.Value;
                     var name = first.TryGetProperty("name", out var n) ? n.GetString() ?? normalized : normalized;
                     var classLabel = first.TryGetProperty("classification_label", out var cl) ? cl.GetString() : null;
                     var typeLabel = first.TryGetProperty("type_label", out var tl) ? tl.GetString() : null;

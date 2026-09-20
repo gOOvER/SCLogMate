@@ -51,6 +51,17 @@ public static class WarehouseCatalog
         if (WikiApiClient.IsIgnoredItemNoise(normalized))
             return (de ? "Spieler-Ausrüstung" : "Player Equipment", de ? "Sonstiges" : "Miscellaneous");
 
+        // 0. Handelt es sich um ein Schiff / Fahrzeug (z. B. ARGO_RAFT, MISC_Hull_B bei Terminal-Käufen)?
+        var candidateShip = raw.Replace('_', ' ');
+        if (FleetCatalog.IsKnownCatalogShip(candidateShip) || FleetCatalog.IsKnownCatalogShip(raw))
+        {
+            var ship = FleetCatalog.Lookup(candidateShip);
+            if (ship != null && ship.Role != "Nicht-Schiff" && ship.Role != "Raumschiff" && ship.Role != "Unbekannt")
+            {
+                return (ship.NormalizedName, de ? "Schiff & Fahrzeug" : "Ship & Vehicle");
+            }
+        }
+
         EnsureWikiCacheLoaded();
 
         // 1. Aus dem persistenten Star Citizen Wiki Cache
