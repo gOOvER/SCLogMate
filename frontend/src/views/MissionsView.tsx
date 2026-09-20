@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export interface MissionsViewProps {
   initialSearch?: string;
@@ -19,6 +20,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   initialSearch,
   initialTab,
 }) => {
+  const { t, locale } = useI18n();
   const [data, setData] = useState<MissionsResponseDto>({
     active: [],
     history: [],
@@ -224,7 +226,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Radio className="w-3.5 h-3.5" /> Aktive Aufträge ({data.active.length})
+            <Radio className="w-3.5 h-3.5" /> {t('missions.tabActive')} ({data.active.length})
           </button>
 
           <button
@@ -235,7 +237,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" /> Verlauf ({data.history.length})
+            <Clock className="w-3.5 h-3.5" /> {t('missions.tabHistory')} ({data.history.length})
           </button>
 
           <button
@@ -246,7 +248,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Target className="w-3.5 h-3.5" /> Auftragskatalog ({data.catalog.length})
+            <Target className="w-3.5 h-3.5" /> {t('missions.tabCatalog')} ({data.catalog.length})
           </button>
         </div>
 
@@ -257,7 +259,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             onChange={(e) => setTypeFilter(e.target.value)}
             className="bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/50 cursor-pointer font-mono"
           >
-            <option value="all">Alle Typen</option>
+            <option value="all">{locale === 'en' ? 'All Types' : 'Alle Typen'}</option>
             <option value="Bounty">Bounty</option>
             <option value="Delivery">Delivery</option>
             <option value="Mercenary">Mercenary</option>
@@ -272,7 +274,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Auftrag filtern..."
+              placeholder={t('missions.searchPlaceholder')}
               className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-52"
             />
             {search && (
@@ -293,7 +295,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             title="Aktive Auftragsliste leeren (behebt feststeckende Aufträge)"
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>✕ Aufträge leeren</span>
+            <span>✕ {t('missions.clearActive')}</span>
           </button>
         </div>
       </div>
@@ -303,11 +305,11 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-mono uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
-              <th className="py-3 px-4">Auftrag / Bezeichnung</th>
-              <th className="py-3 px-4">Auftraggeber / Fraktion</th>
-              <th className="py-3 px-4">Typ / System</th>
-              <th className="py-3 px-4 text-right">Belohnung</th>
-              <th className="py-3 px-4 text-center">Status</th>
+              <th className="py-3 px-4">{locale === 'en' ? 'Mission / Name' : 'Auftrag / Bezeichnung'}</th>
+              <th className="py-3 px-4">{locale === 'en' ? 'Contract Giver / Faction' : 'Auftraggeber / Fraktion'}</th>
+              <th className="py-3 px-4">{locale === 'en' ? 'Type / System' : 'Typ / System'}</th>
+              <th className="py-3 px-4 text-right">{t('hud.reward')}</th>
+              <th className="py-3 px-4 text-center">{t('common.status')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40">

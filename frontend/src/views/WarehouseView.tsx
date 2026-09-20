@@ -20,6 +20,7 @@ import {
   PanelLeftClose,
   BookOpen,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export interface WarehouseViewProps {
   initialSearch?: string;
@@ -30,6 +31,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
   initialSearch,
   initialLocation,
 }) => {
+  const { t, locale } = useI18n();
   const [locations, setLocations] = useState<WarehouseLocationDto[]>([]);
   const [items, setItems] = useState<WarehouseItemDto[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>(initialLocation || 'all');
@@ -93,7 +95,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
       });
       if (res?.items) setItems(res.items);
       if (res?.locations) setLocations(res.locations);
-      showToast(`${item.itemName}: ${delta > 0 ? '+1' : '-1'} verbucht`);
+      showToast(`${item.itemName}: ${delta > 0 ? '+1' : '-1'} ${locale === 'en' ? 'logged' : 'verbucht'}`);
     } catch (err) {
       console.error('Failed to adjust quantity:', err);
     }
@@ -121,9 +123,10 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
 
   const handleClearLocation = async () => {
     if (selectedLocation === 'all') return;
-    if (!confirm(`Möchtest du wirklich das gesamte Lager an "${selectedLocation}" leeren?`)) {
-      return;
-    }
+    const confirm = window.confirm(
+      t('warehouse.clearLocationConfirm')
+    );
+    if (!confirm) return;
     try {
       const res = await bridge.sendRequest<{
         locations: WarehouseLocationDto[];
@@ -151,7 +154,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
     });
 
     navigator.clipboard.writeText(md);
-    showToast('Lagerbestand als Markdown kopiert!');
+    showToast(t('warehouse.copiedExport'));
   };
 
   const totalAllItems = locations.reduce((acc, l) => acc + l.totalItems, 0);
@@ -217,7 +220,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm">🌌</span>
-                <span className="font-sans font-medium">Alle Standorte</span>
+                <span className="font-sans font-medium">{t('warehouse.allLocations')}</span>
               </div>
               <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#020610] text-cyan-400 font-bold">
                 {totalAllItems}
@@ -273,7 +276,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
                 ) : (
                   <PanelLeft className="w-3.5 h-3.5 text-cyan-400" />
                 )}
-                <span className="hidden sm:inline">{showLocationsSidebar ? 'Standorte' : 'Standorte einblenden'}</span>
+                <span className="hidden sm:inline">{showLocationsSidebar ? t('warehouse.toggleLocations') : t('warehouse.showLocations')}</span>
               </button>
 
               <div className="relative flex-1">
@@ -283,7 +286,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchWarehouse()}
-                  placeholder="Gegenstand, Klasse oder CIG ID suchen..."
+                  placeholder={t('warehouse.searchPlaceholder')}
                   className="w-full bg-[#071322] border border-cyan-900/60 rounded pl-8 pr-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
@@ -303,7 +306,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
                   onClick={handleClearLocation}
                   className="px-2.5 py-1.5 rounded text-xs font-mono font-semibold border border-rose-800/60 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 transition cursor-pointer flex items-center gap-1"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Standort leeren
+                  <Trash2 className="w-3.5 h-3.5" /> {t('warehouse.clearLocation')}
                 </button>
               )}
 
@@ -312,7 +315,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
                 title="Lagerbestand als formatierte Markdown-Tabelle kopieren"
                 className="px-2.5 py-1.5 rounded text-xs font-mono font-semibold border border-cyan-950 hover:border-cyan-800 bg-[#061224] text-slate-300 hover:text-cyan-300 transition cursor-pointer flex items-center gap-1.5"
               >
-                <Download className="w-3.5 h-3.5" /> Export (.md)
+                <Download className="w-3.5 h-3.5" /> {t('warehouse.exportMd')}
               </button>
             </div>
           </div>
@@ -341,12 +344,12 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
             <thead>
               <tr className="border-b border-cyan-950 bg-[#061224] text-slate-400 text-[11px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
                 <th className="py-2.5 px-3 w-10 text-center shrink-0">#</th>
-                <th className="py-2.5 px-4 font-sans min-w-[220px]">Gegenstand / CIG Klasse</th>
-                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[160px] w-44">Kategorie</th>
-                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[140px]">Standort</th>
-                <th className="py-2.5 px-4 text-center whitespace-nowrap w-36 min-w-[120px]">Menge</th>
-                <th className="py-2.5 px-4 whitespace-nowrap w-36 min-w-[120px]">Erfasst</th>
-                <th className="py-2.5 px-3 text-right w-12 font-sans shrink-0">Aktion</th>
+                <th className="py-2.5 px-4 font-sans min-w-[220px]">{t('warehouse.colItem')}</th>
+                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[160px] w-44">{t('warehouse.colCategory')}</th>
+                <th className="py-2.5 px-4 font-sans whitespace-nowrap min-w-[140px]">{t('warehouse.colLocation')}</th>
+                <th className="py-2.5 px-4 text-center whitespace-nowrap w-36 min-w-[120px]">{t('warehouse.colQuantity')}</th>
+                <th className="py-2.5 px-4 whitespace-nowrap w-36 min-w-[120px]">{t('warehouse.colRecorded')}</th>
+                <th className="py-2.5 px-3 text-right w-12 font-sans shrink-0">{t('warehouse.colAction')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-cyan-950/40">
@@ -354,7 +357,7 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({
                 <tr>
                   <td colSpan={7} className="py-20 text-center text-slate-500 font-mono">
                     <Package className="w-8 h-8 text-cyan-500/30 mx-auto mb-2" />
-                    Keine Gegenstände an diesem Standort gefunden.
+                    {t('warehouse.emptyWarehouse')}
                   </td>
                 </tr>
               ) : (

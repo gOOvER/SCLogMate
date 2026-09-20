@@ -12,8 +12,10 @@ import {
   ChevronDown,
   Zap,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export const BlackboxView: React.FC = () => {
+  const { t, locale } = useI18n();
   const [data, setData] = useState<FlightRecorderDto | null>(null);
   const [filterKind, setFilterKind] = useState<string>('all');
   const [copied, setCopied] = useState<boolean>(false);
@@ -101,7 +103,7 @@ export const BlackboxView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <span className="text-xs font-mono text-cyan-400 font-bold uppercase flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-cyan-400" />
-            Flugschreiber Sitzung:
+            {locale === 'en' ? 'Flight Recorder Session:' : 'Flugschreiber Sitzung:'}
           </span>
           <div className="relative">
             <select
@@ -109,8 +111,8 @@ export const BlackboxView: React.FC = () => {
               onChange={(e) => setSelectedSession(e.target.value)}
               className="appearance-none bg-[#071322] border border-cyan-900/70 hover:border-cyan-500 rounded px-2.5 py-1 pr-7 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 transition cursor-pointer max-w-xs"
             >
-              <option value="__live__">🔴 Live-Sitzung (Game.log)</option>
-              <option value="__all__">🌐 Alle Flüge (Gesamthistorie)</option>
+              <option value="__live__">{locale === 'en' ? '🔴 Live Session (Game.log)' : '🔴 Live-Sitzung (Game.log)'}</option>
+              <option value="__all__">{locale === 'en' ? '🌐 All Sorties (Full History)' : '🌐 Alle Flüge (Gesamthistorie)'}</option>
               {sessions.map((s) => (
                 <option key={s.id || s.name} value={s.name}>
                   📁 {s.name} ({s.startTime})
@@ -128,7 +130,7 @@ export const BlackboxView: React.FC = () => {
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#071322] border border-slate-800 hover:border-cyan-500 text-xs font-mono text-slate-300 hover:text-cyan-300 transition cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">Kopieren</span>
+            <span className="hidden sm:inline">{t('common.copy')}</span>
           </button>
         </div>
       </div>
@@ -137,7 +139,7 @@ export const BlackboxView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">GESAMTDISTANZ</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'TOTAL DISTANCE' : 'GESAMTDISTANZ'}</div>
             <div className="text-lg font-bold text-cyan-400 mt-0.5">
               {data?.totalDistanceText || '0 GM'}
             </div>
@@ -149,7 +151,7 @@ export const BlackboxView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">QUANTUM-SPRÜNGE</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'QUANTUM JUMPS' : 'QUANTUM-SPRÜNGE'}</div>
             <div className="text-lg font-bold text-emerald-400 mt-0.5">
               {data?.quantumJumps ?? 0}
             </div>
@@ -161,7 +163,7 @@ export const BlackboxView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">SCHIFFSVERLUSTE</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'SHIP LOSSES' : 'SCHIFFSVERLUSTE'}</div>
             <div className="text-lg font-bold text-rose-400 mt-0.5">
               {data?.shipLosses ?? 0}
             </div>
@@ -173,7 +175,7 @@ export const BlackboxView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">PILOTENSITZ FLUGZEIT</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'FLIGHT SEAT TIME' : 'PILOTENSITZ FLUGZEIT'}</div>
             <div className="text-lg font-bold text-amber-400 mt-0.5">
               {data?.seatFlightDurationText || data?.flightDurationText || '0h 0m'}
             </div>

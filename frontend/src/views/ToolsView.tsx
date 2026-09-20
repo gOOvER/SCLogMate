@@ -39,6 +39,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { bridge, ToolsStatusDto, ConfigBackupItemDto, KeybindBackupItemDto } from '../services/photinoBridge';
+import { useI18n } from '../i18n';
 
 export interface HardwareRecommendation {
   cpuShort: string;
@@ -568,6 +569,7 @@ function mergeCfgContent(
 }
 
 export const ToolsView: React.FC = () => {
+  const { t, locale } = useI18n();
   // Navigation: Exactly 3 primary tools in the top bar
   const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds'>('cfg');
   const [cfgView, setCfgView] = useState<'editor' | 'tuning' | 'backups' | 'reference'>('editor');
@@ -1223,7 +1225,7 @@ export const ToolsView: React.FC = () => {
             className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} />
-            <span>Neu laden</span>
+            <span>{t('common.refresh')}</span>
           </button>
         </div>
       </div>
@@ -1239,7 +1241,7 @@ export const ToolsView: React.FC = () => {
           }`}
         >
           <Wrench className="w-4 h-4" />
-          <span>Wartung &amp; Diagnose</span>
+          <span>{locale === 'en' ? 'Maintenance & Diagnostics' : 'Wartung & Diagnose'}</span>
         </button>
 
         <button

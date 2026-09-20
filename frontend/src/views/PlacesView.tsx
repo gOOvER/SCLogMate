@@ -22,12 +22,14 @@ import {
   RotateCcw,
   Zap,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export interface PlacesViewProps {
   initialSearch?: string;
 }
 
 export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
+  const { t, locale } = useI18n();
   const [activeTab, setActiveTab] = useState<'starmap' | 'pois' | 'contested'>('pois');
   const [places, setPlaces] = useState<PlaceItemDto[]>([]);
   const [userPois, setUserPois] = useState<UserPoiDto[]>([]);
@@ -290,7 +292,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
   };
 
   const handleDeletePoi = async (id: number) => {
-    if (!window.confirm('Diesen POI wirklich löschen?')) return;
+    if (!window.confirm(locale === 'en' ? 'Are you sure you want to delete this POI?' : 'Diesen POI wirklich löschen?')) return;
     try {
       await bridge.sendRequest('delete_user_poi', { id });
       fetchUserPois();
@@ -310,10 +312,10 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">
-                /showlocation Auto-Clipboard-Watcher
+                {t('places.autoWatcher')}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                Aktiv
+                {t('places.active')}
               </span>
             </div>
             {lastCopiedLoc ? (
@@ -347,7 +349,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold transition cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.3)]"
           >
             <Plus className="w-4 h-4" />
-            Als POI pinnen
+            {locale === 'en' ? 'Pin as POI' : 'Als POI pinnen'}
           </button>
         </div>
       </div>
@@ -364,7 +366,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
             }`}
           >
             <MapPin className="w-4 h-4 text-amber-400" />
-            Gepinnte POIs & GPS-Wegpunkte ({userPois.length})
+            {locale === 'en' ? 'Pinned POIs & GPS Waypoints' : 'Gepinnte POIs & GPS-Wegpunkte'} ({userPois.length})
           </button>
           <button
             onClick={() => setActiveTab('starmap')}
@@ -375,7 +377,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
             }`}
           >
             <Compass className="w-4 h-4 text-cyan-400" />
-            Starmap Orte & Stationen ({places.length})
+            {locale === 'en' ? 'Starmap Places & Stations' : 'Starmap Orte & Stationen'} ({places.length})
           </button>
           <button
             onClick={() => setActiveTab('contested')}
@@ -413,7 +415,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {sys === 'all' ? 'Alle Systeme' : sys}
+              {sys === 'all' ? (locale === 'en' ? 'All Systems' : 'Alle Systeme') : sys}
             </button>
           ))}
         </div>

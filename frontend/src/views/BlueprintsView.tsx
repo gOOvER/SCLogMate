@@ -29,8 +29,10 @@ import {
   RefreshCw,
   ExternalLink,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export const BlueprintsView: React.FC = () => {
+  const { t, locale } = useI18n();
   const [blueprints, setBlueprints] = useState<BlueprintDto[]>([]);
   const [coverage, setCoverage] = useState<BlueprintCoverageReport | null>(null);
   const [activeTab, setActiveTab] = useState<'catalog' | 'coverage'>('catalog');
@@ -286,7 +288,7 @@ export const BlueprintsView: React.FC = () => {
               }`}
             >
               <Scroll className="w-3.5 h-3.5" />
-              Bauplan-Katalog ({totalCount})
+              {locale === 'en' ? 'Blueprint Catalog' : 'Bauplan-Katalog'} ({totalCount})
             </button>
             <button
               onClick={() => setActiveTab('coverage')}
@@ -297,14 +299,14 @@ export const BlueprintsView: React.FC = () => {
               }`}
             >
               <Network className="w-3.5 h-3.5 text-emerald-400" />
-              Netzwerk & Org-Abdeckung
+              {locale === 'en' ? 'Network & Org Coverage' : 'Netzwerk & Org-Abdeckung'}
             </button>
           </div>
 
           <button
             onClick={reloadAll}
             disabled={loading}
-            title="Aktualisieren"
+            title={t('common.refresh')}
             className="p-1.5 rounded bg-slate-900/90 border border-slate-700 text-slate-400 hover:text-slate-200 cursor-pointer transition"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />

@@ -15,10 +15,12 @@ import {
   Database,
   ChevronUp,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 const LEVEL_THRESHOLDS = [0, 1000, 3000, 7500, 15000, 30000];
 
 export const ReputationView: React.FC = () => {
+  const { t, locale } = useI18n();
   const [factions, setFactions] = useState<FactionReputationDto[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
@@ -299,7 +301,7 @@ export const ReputationView: React.FC = () => {
             title="Nur Fraktionen mit bereits erfahrener Reputation (XP > 0) anzeigen"
           >
             <span className={`w-1.5 h-1.5 rounded-full ${onlyActive ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-            <span>Nur aktive</span>
+            <span>{locale === 'en' ? 'Active only' : 'Nur aktive'}</span>
           </button>
 
           {/* Search Box */}
@@ -307,7 +309,7 @@ export const ReputationView: React.FC = () => {
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
             <input
               type="text"
-              placeholder="Fraktion, System..."
+              placeholder={locale === 'en' ? 'Faction, system...' : 'Fraktion, System...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-8 pr-2.5 py-1 text-xs font-mono bg-[#030a16] border border-cyan-950 rounded text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-600"
@@ -321,7 +323,7 @@ export const ReputationView: React.FC = () => {
         {filtered.length === 0 ? (
           <div className="h-44 flex flex-col items-center justify-center text-xs font-mono text-slate-500 space-y-1">
             <Award className="w-6 h-6 text-slate-600 mb-1" />
-            <div>Keine Organisationen für diesen Filter gefunden.</div>
+            <div>{t('reputation.noFactions')}</div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -555,7 +557,7 @@ export const ReputationView: React.FC = () => {
                 title="Diesen Fraktionsruf auf 0 XP zurücksetzen"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                <span>Zurücksetzen</span>
+                <span>{locale === 'en' ? 'Reset' : 'Zurücksetzen'}</span>
               </button>
 
               <div className="flex items-center gap-2">
@@ -563,14 +565,14 @@ export const ReputationView: React.FC = () => {
                   onClick={() => setCalibratingFaction(null)}
                   className="px-3 py-1.5 rounded border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900 cursor-pointer transition text-xs"
                 >
-                  Abbrechen
+                  {t('loadoutModal.cancel')}
                 </button>
                 <button
                   onClick={handleSaveCalibration}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-black font-bold cursor-pointer transition shadow-[0_0_10px_rgba(6,182,212,0.4)] text-xs"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>In SQLite sichern</span>
+                  <span>{locale === 'en' ? 'Save to SQLite' : 'In SQLite sichern'}</span>
                 </button>
               </div>
             </div>

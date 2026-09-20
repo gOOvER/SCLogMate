@@ -23,6 +23,7 @@ import {
   Clipboard,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from './PipsAnalyzerBadge';
+import { useI18n } from '../i18n';
 
 interface ShipLoadoutModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
   ship,
   onRefreshFleet,
 }) => {
+  const { t, locale } = useI18n();
   const [isResetting, setIsResetting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -252,7 +254,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
                 </span>
                 {ship.isCurrent && (
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
-                    AKTIV
+                    {locale === 'en' ? 'ACTIVE' : 'AKTIV'}
                   </span>
                 )}
               </div>
@@ -320,10 +322,10 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">
-                  Lackierung / Skin
+                  {locale === 'en' ? 'Livery / Paint' : 'Lackierung / Skin'}
                 </span>
                 <span className="text-xs font-semibold text-purple-200 truncate block">
-                  {ship.livery || 'Standard-Werkslackierung'}
+                  {ship.livery || (locale === 'en' ? 'Default Factory Paint' : 'Standard-Werkslackierung')}
                 </span>
               </div>
             </div>
@@ -339,12 +341,12 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">
-                  Erfassungsmethode
+                  {locale === 'en' ? 'Capture Method' : 'Erfassungsmethode'}
                 </span>
                 <span className="text-xs font-semibold text-slate-200 truncate block">
                   {isCustomScanned
                     ? `📷 VLM Screenshot (${ship.componentsUpdatedAt})`
-                    : 'Werks-Katalog (Stock)'}
+                    : (locale === 'en' ? 'Factory Catalog (Stock)' : 'Werks-Katalog (Stock)')}
                 </span>
               </div>
             </div>
@@ -386,15 +388,15 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
-                  Installierte Ausrüstung ({components.length})
+                  {locale === 'en' ? 'Installed Equipment' : 'Installierte Ausrüstung'} ({components.length})
                 </span>
                 <span className="text-[10px] text-slate-400 block mt-0.5">
-                  Klicke auf eine Komponente für Spezifikationen & Händlerstandorte im SCWiki
+                  {locale === 'en' ? 'Click a component for specs & vendor locations in SCWiki' : 'Klicke auf eine Komponente für Spezifikationen & Händlerstandorte im SCWiki'}
                 </span>
               </div>
               {isCustomScanned && (
                 <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Aus Spiel-Screenshot verifiziert
+                  <CheckCircle2 className="w-3 h-3" /> {locale === 'en' ? 'Verified from game screenshot' : 'Aus Spiel-Screenshot verifiziert'}
                 </span>
               )}
             </div>
@@ -476,7 +478,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               title="Aktuellen Star Citizen Screenshot nach Schiffsausrüstung scannen"
             >
               <Camera className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
-              <span>{isScanning ? 'Scanne Screenshot...' : 'Screenshot scannen'}</span>
+              <span>{isScanning ? (locale === 'en' ? 'Scanning screenshot...' : 'Scanne Screenshot...') : t('fleet.scanScreenshot')}</span>
             </button>
 
             <button
@@ -486,7 +488,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               title="Screenshot direkt aus der Zwischenablage scannen (oder einfach Strg+V drücken)"
             >
               <Clipboard className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Aus Zwischenablage (Strg+V)</span>
+              <span>{locale === 'en' ? 'From Clipboard (Ctrl+V)' : 'Aus Zwischenablage (Strg+V)'}</span>
             </button>
 
             {isCustomScanned && (
@@ -497,7 +499,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
                 title="Ausrüstung auf Star Citizen Standard-Werkskomponenten zurücksetzen"
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
-                <span>Auf Werkszustand</span>
+                <span>{locale === 'en' ? 'Reset to Stock' : 'Auf Werkszustand'}</span>
               </button>
             )}
           </div>
@@ -506,7 +508,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
             onClick={onClose}
             className="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
           >
-            Schließen
+            {t('common.close')}
           </button>
         </div>
       </div>

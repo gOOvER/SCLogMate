@@ -45,8 +45,10 @@ import {
   PluginDto,
 } from '../services/photinoBridge';
 import { SettingsPluginsTab } from './SettingsPluginsTab';
+import { useI18n } from '../i18n';
 
 export const SettingsView: React.FC = () => {
+  const { locale } = useI18n();
   const [activeSubTab, setActiveSubTab] = useState<
     'general' | 'wipe' | 'hud' | 'ocr' | 'uex' | 'audio' | 'plugins' | 'database' | 'developer'
   >('general');
@@ -761,7 +763,7 @@ export const SettingsView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-xl font-bold text-white tracking-wide">EINSTELLUNGEN & OPTIONEN</h1>
+              <h1 className="text-xl font-bold text-white tracking-wide">{locale === 'en' ? 'SETTINGS & OPTIONS' : 'EINSTELLUNGEN & OPTIONEN'}</h1>
               <span className="px-2 py-0.5 text-xs font-semibold rounded bg-sky-950 text-sky-400 border border-sky-800">
                 SCLogMate 1.3
               </span>
@@ -776,13 +778,13 @@ export const SettingsView: React.FC = () => {
           {autoSaveStatus === 'saving' && (
             <span className="flex items-center space-x-1.5 text-xs text-sky-400 font-mono animate-pulse bg-sky-950/40 px-2.5 py-1 rounded border border-sky-800/60">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Speichert...</span>
+              <span>{locale === 'en' ? 'Saving...' : 'Speichert...'}</span>
             </span>
           )}
           {autoSaveStatus === 'saved' && (
             <span className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-800/60">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Automatisch gespeichert</span>
+              <span>{locale === 'en' ? 'Auto-saved' : 'Automatisch gespeichert'}</span>
             </span>
           )}
           <button
@@ -791,7 +793,7 @@ export const SettingsView: React.FC = () => {
             className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 border border-sky-400 transition cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>{saving ? 'Speichere...' : 'Manuell speichern'}</span>
+            <span>{saving ? (locale === 'en' ? 'Saving...' : 'Speichere...') : (locale === 'en' ? 'Save Manually' : 'Manuell speichern')}</span>
           </button>
         </div>
       </div>
@@ -799,15 +801,15 @@ export const SettingsView: React.FC = () => {
       {/* Sub-Tab Navigation Bar */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
         {[
-          { id: 'general', label: '📁 Allgemein', icon: Folder },
-          { id: 'wipe', label: '⏳ Wipe & Filter', icon: Clock },
-          { id: 'hud', label: '🖥 Overlays & HUD', icon: Eye },
-          { id: 'ocr', label: '👁 mobiGlas & OCR', icon: Radio },
-          { id: 'uex', label: '🌐 UEX Integration', icon: Globe },
-          { id: 'audio', label: '🎙 VoiceAttack & Aurora', icon: Volume2 },
-          { id: 'plugins', label: '🧩 Plugins & Widgets', icon: Puzzle },
-          { id: 'database', label: '💾 Datenbank & Wartung', icon: Database },
-          ...(settings.debugMode ? [{ id: 'developer', label: '🧪 Entwickler', icon: Sparkles }] : []),
+          { id: 'general', label: locale === 'en' ? '📁 General' : '📁 Allgemein', icon: Folder },
+          { id: 'wipe', label: locale === 'en' ? '⏳ Wipe & Filter' : '⏳ Wipe & Filter', icon: Clock },
+          { id: 'hud', label: locale === 'en' ? '🖥 Overlays & HUD' : '🖥 Overlays & HUD', icon: Eye },
+          { id: 'ocr', label: locale === 'en' ? '👁 mobiGlas & OCR' : '👁 mobiGlas & OCR', icon: Radio },
+          { id: 'uex', label: locale === 'en' ? '🌐 UEX Integration' : '🌐 UEX Integration', icon: Globe },
+          { id: 'audio', label: locale === 'en' ? '🎙 VoiceAttack & Aurora' : '🎙 VoiceAttack & Aurora', icon: Volume2 },
+          { id: 'plugins', label: locale === 'en' ? '🧩 Plugins & Widgets' : '🧩 Plugins & Widgets', icon: Puzzle },
+          { id: 'database', label: locale === 'en' ? '💾 Database & Maintenance' : '💾 Datenbank & Wartung', icon: Database },
+          ...(settings.debugMode ? [{ id: 'developer', label: locale === 'en' ? '🧪 Developer' : '🧪 Entwickler', icon: Sparkles }] : []),
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;

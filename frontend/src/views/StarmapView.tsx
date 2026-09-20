@@ -17,12 +17,14 @@ import {
   Search,
   Compass,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface StarmapViewProps {
   telemetry?: HudTelemetry;
 }
 
 export const StarmapView: React.FC<StarmapViewProps> = ({ telemetry }) => {
+  const { t } = useI18n();
   const [system, setSystem] = useState<'Stanton' | 'Pyro' | 'Nyx'>('Stanton');
   const [objects, setObjects] = useState<StarmapObjectDto[]>([]);
   const [drives, setDrives] = useState<QuantumDriveDto[]>([]);
@@ -345,7 +347,7 @@ export const StarmapView: React.FC<StarmapViewProps> = ({ telemetry }) => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Ort / Station / Ressource..."
+              placeholder={t('starmap.searchCelestial')}
               className="bg-slate-900/80 border border-slate-800 text-xs text-slate-200 pl-8 pr-2.5 py-1 rounded w-44 focus:w-56 transition-all focus:outline-none focus:border-cyan-500 font-mono"
             />
           </div>

@@ -24,6 +24,7 @@ import {
   Database,
 } from 'lucide-react';
 import { NavTabId } from '../components/Sidebar';
+import { useI18n } from '../i18n';
 
 export interface FinancesViewProps {
   onNavigate?: (tab: NavTabId, context?: { search?: string; subTab?: string }) => void;
@@ -36,6 +37,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   initialSearch,
   initialSubTab,
 }) => {
+  const { t, locale } = useI18n();
   const [data, setData] = useState<FinanceOverviewDto | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'spending' | 'cargo'>(initialSubTab || 'overview');
   const [search, setSearch] = useState<string>(initialSearch || '');
@@ -341,7 +343,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Einnahmen
+              {t('finances.income')}
             </span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
           </div>
@@ -349,7 +351,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             +{formatNumber(data?.totalIncome)} <span className="text-[10px] font-normal text-emerald-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-            ↗ Missionen, Handel & Erlöse
+            {t('finances.incomeSub')}
           </div>
         </div>
 
@@ -357,7 +359,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Ausgaben
+              {t('finances.expenses')}
             </span>
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
           </div>
@@ -365,7 +367,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             -{formatNumber(data?.totalSpend)} <span className="text-[10px] font-normal text-rose-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-            ↘ Wartung, Treibstoff & Käufe
+            {t('finances.expensesSub')}
           </div>
         </div>
 
@@ -373,7 +375,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Netto-Saldo
+              {t('finances.netBalance')}
             </span>
             <Coins className="w-3.5 h-3.5 text-cyan-400" />
           </div>
@@ -381,7 +383,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             {((data?.totalNet || 0) >= 0 ? '+' : '')}{formatNumber(data?.totalNet)} <span className="text-[10px] font-normal text-cyan-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-cyan-400 font-bold mt-0.5">
-            Marge: {data?.profitMargin || 0}% Netto
+            {t('finances.margin')}: {data?.profitMargin || 0}%
           </div>
         </div>
 
@@ -389,7 +391,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Live Saldo
+              {t('finances.activeWallet')}
             </span>
             <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
           </div>
@@ -397,7 +399,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             {formatNumber(data?.liveBalance || data?.totalNet)} <span className="text-[10px] font-normal text-slate-400">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-            mobiGlas Konto-Erfassung
+            {locale === 'en' ? 'mobiGlas Wallet Capture' : 'mobiGlas Konto-Erfassung'}
           </div>
         </div>
 
@@ -405,7 +407,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         <div className="col-span-2 md:col-span-1 bg-[#051122]/90 border border-cyan-950/80 rounded-lg p-2.5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-              Handelsvolumen
+              {t('finances.tradeVolume')}
             </span>
             <Package className="w-3.5 h-3.5 text-amber-400" />
           </div>
@@ -413,7 +415,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             {formatNumber(data?.totalCargoAuec || (data?.sales || 0) + (data?.trade || 0))} <span className="text-[10px] font-normal text-amber-500">aUEC</span>
           </div>
           <div className="text-[10px] font-mono text-amber-400/80 mt-0.5">
-            Waren & Beute-Verkäufe
+            {t('finances.tradeVolumeSub')}
           </div>
         </div>
       </div>
@@ -422,10 +424,10 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       <div className="flex items-center justify-between border-b border-cyan-950/80 bg-[#040914] px-3 py-1.5 shrink-0 rounded-t-lg">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
-            { id: 'overview', label: '📊 Übersicht & Verlauf' },
-            { id: 'ledger', label: `📑 Buchhaltung (${data?.ledger.length || 0})` },
-            { id: 'spending', label: `📉 Ausgaben-Analyse` },
-            { id: 'cargo', label: `📦 Fracht & Handel (${data?.cargo.length || 0})` },
+            { id: 'overview', label: `📊 ${t('finances.tabOverview')}` },
+            { id: 'ledger', label: `📑 ${t('finances.tabLedger')} (${data?.ledger.length || 0})` },
+            { id: 'spending', label: `📉 ${t('finances.tabSpending')}` },
+            { id: 'cargo', label: `📦 ${t('finances.tabCargo')} (${data?.cargo.length || 0})` },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -454,7 +456,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               title="Finanzdaten über alle historischen Sessions aggregieren"
             >
               <Database className="w-3 h-3 text-cyan-400" />
-              <span>Alle Sessions</span>
+              <span>{t('finances.scopeAll')}</span>
             </button>
             <button
               onClick={() => handleScopeChange('current')}
@@ -466,7 +468,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               title="Nur Geldbuchungen der aktuell aktiven Session anzeigen"
             >
               <span className={`w-1.5 h-1.5 rounded-full ${scope === 'current' ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-600'}`} />
-              <span>Aktuelle Session</span>
+              <span>{t('finances.scopeCurrent')}</span>
             </button>
           </div>
 
@@ -476,7 +478,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#071322] border border-cyan-950 hover:border-cyan-700 text-xs font-mono text-cyan-300 transition cursor-pointer"
           >
             {copiedDiscord ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{copiedDiscord ? 'Kopiert!' : 'Discord Copy'}</span>
+            <span>{copiedDiscord ? t('finances.copied') : 'Discord Copy'}</span>
           </button>
         </div>
       </div>
@@ -921,11 +923,11 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               <table className="w-full text-left font-mono text-xs border-collapse">
                 <thead className="bg-[#030914] text-slate-400 text-[11px] uppercase tracking-wider sticky top-0 border-b border-cyan-950 z-10">
                   <tr>
-                    <th className="py-2 px-3">Zeit</th>
-                    <th className="py-2 px-3">Typ</th>
-                    <th className="py-2 px-3">Betrag</th>
-                    <th className="py-2 px-3">Schiff</th>
-                    <th className="py-2 px-3">Buchungsdetail</th>
+                    <th className="py-2 px-3">{t('events.colTime')}</th>
+                    <th className="py-2 px-3">{t('events.colType')}</th>
+                    <th className="py-2 px-3">{t('events.colAmount')}</th>
+                    <th className="py-2 px-3">{t('events.colShip')}</th>
+                    <th className="py-2 px-3">{t('events.colDetail')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cyan-950/40">

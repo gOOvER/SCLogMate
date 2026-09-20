@@ -31,8 +31,10 @@ import {
   Package,
 } from 'lucide-react';
 import { CargoFitModal } from '../components/CargoFitModal';
+import { useI18n } from '../i18n';
 
 export const MarketView: React.FC = () => {
+  const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<'routes' | 'containers' | 'constraints' | 'salvage' | 'calculator'>('routes');
   const [isCargoFitOpen, setIsCargoFitOpen] = useState<boolean>(false);
   const [cargoFitShip, setCargoFitShip] = useState<string>('Crusader C2 Hercules');
@@ -434,7 +436,7 @@ export const MarketView: React.FC = () => {
           }`}
         >
           <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Handelsrouten</span>
+          <span>{locale === 'en' ? 'Trade Routes' : 'Handelsrouten'}</span>
           {tradeRoutes.length > 0 && (
             <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] bg-cyan-900/60 text-cyan-200">
               {tradeRoutes.length}

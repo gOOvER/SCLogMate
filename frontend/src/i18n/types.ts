@@ -189,4 +189,227 @@ export interface Translations {
     connected: string;
     offline: string;
   };
+  warehouse?: {
+    allLocations: string;
+    searchPlaceholder: string;
+    toggleLocations: string;
+    showLocations: string;
+    clearLocation: string;
+    exportMd: string;
+    allCategories: string;
+    colItem: string;
+    colCategory: string;
+    colLocation: string;
+    colQuantity: string;
+    colRecorded: string;
+    colAction: string;
+    emptyWarehouse: string;
+    clearLocationConfirm: string;
+    qtyBooked: string;
+    copiedExport: string;
+    [key: string]: any;
+  };
+  finances?: {
+    income: string;
+    expenses: string;
+    netBalance: string;
+    incomeSub: string;
+    expensesSub: string;
+    margin: string;
+    tradeVolume: string;
+    tradeVolumeSub: string;
+    activeWallet: string;
+    scopeAll: string;
+    scopeCurrent: string;
+    shareDiscord: string;
+    copied: string;
+    tabOverview: string;
+    tabLedger: string;
+    tabSpending: string;
+    tabCargo: string;
+    chartCumulative: string;
+    chartIncomeSpend: string;
+    colTimestamp: string;
+    colCategory: string;
+    colDescription: string;
+    colAmount: string;
+    colBalance: string;
+    noEntries: string;
+    [key: string]: any;
+  };
+  missions?: {
+    tabActive: string;
+    tabHistory: string;
+    tabCatalog: string;
+    searchPlaceholder: string;
+    clearActive: string;
+    colMission: string;
+    colGiver: string;
+    colReward: string;
+    colStatus: string;
+    colDuration: string;
+    colDate: string;
+    noActiveMissions: string;
+    noHistory: string;
+    [key: string]: any;
+  };
+  reputation?: {
+    title: string;
+    searchPlaceholder: string;
+    standing: string;
+    scope: string;
+    contracts: string;
+    headquarters: string;
+    system: string;
+    noFactions: string;
+    [key: string]: any;
+  };
+  loadoutModal?: {
+    title: string;
+    scanTooltip: string;
+    clipboardScan: string;
+    colSlot: string;
+    colComponent: string;
+    colGrade: string;
+    colManufacturer: string;
+    colHealth: string;
+    save: string;
+    cancel: string;
+    close: string;
+    noComponents: string;
+    [key: string]: any;
+  };
+  compareModal?: {
+    title: string;
+    selectShipA: string;
+    selectShipB: string;
+    crew: string;
+    cargo: string;
+    scu: string;
+    mass: string;
+    speed: string;
+    price: string;
+    quantumFuel: string;
+    hydrogenFuel: string;
+    [key: string]: any;
+  };
+  places?: {
+    autoWatcher: string;
+    active: string;
+    tabPois: string;
+    tabStarmap: string;
+    tabContested: string;
+    newPoi: string;
+    searchPlaceholder: string;
+    colName: string;
+    colSystem: string;
+    colBody: string;
+    colCategory: string;
+    colCoordinates: string;
+    colActions: string;
+    deleteConfirm: string;
+    cancel: string;
+    save: string;
+    [key: string]: any;
+  };
+  starmap?: {
+    systemStanton: string;
+    systemPyro: string;
+    planets: string;
+    moons: string;
+    stations: string;
+    jumpPoints: string;
+    searchCelestial: string;
+    [key: string]: any;
+  };
+  blackbox?: {
+    title: string;
+    sorties: string;
+    qtJumps: string;
+    destructions: string;
+    timeline: string;
+    noData: string;
+    [key: string]: any;
+  };
+  orescanner?: {
+    title: string;
+    signatures: string;
+    ores: string;
+    clusters: string;
+    searchOre: string;
+    [key: string]: any;
+  };
+  refinery?: {
+    title: string;
+    activeJobs: string;
+    history: string;
+    calc: string;
+    newOrder: string;
+    cancel: string;
+    save: string;
+    [key: string]: any;
+  };
+  market?: {
+    title: string;
+    commodities: string;
+    routes: string;
+    terminals: string;
+    searchCommodity: string;
+    [key: string]: any;
+  };
+  blueprints?: {
+    title: string;
+    recipes: string;
+    materials: string;
+    searchBlueprint: string;
+    cancel: string;
+    save: string;
+    [key: string]: any;
+  };
+  loadout?: {
+    title: string;
+    slots: string;
+    weapons: string;
+    armor: string;
+    searchEquipment: string;
+    [key: string]: any;
+  };
+  tools?: {
+    title: string;
+    cacheCleaner: string;
+    shaderDelete: string;
+    crashAnalyzer: string;
+    logExport: string;
+    cleanNow: string;
+    [key: string]: any;
+  };
+  settings?: {
+    title: string;
+    general: string;
+    paths: string;
+    audio: string;
+    ocr: string;
+    display: string;
+    plugins: string;
+    saveSettings: string;
+    [key: string]: any;
+  };
+  about?: {
+    title: string;
+    version: string;
+    credits: string;
+    license: string;
+    website: string;
+    [key: string]: any;
+  };
+  chat?: {
+    title: string;
+    channels: string;
+    ocrLog: string;
+    searchChat: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
 }
+
+

@@ -7,6 +7,7 @@ import {
   ShipComparisonSideDto,
 } from '../services/photinoBridge';
 import { PipsAnalyzerBadge } from './PipsAnalyzerBadge';
+import { useI18n } from '../i18n';
 
 interface ShipCompareModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
   catalog,
   onOpenWikiDossier,
 }) => {
+  const { t, locale } = useI18n();
   // Available ship options (unique by normalized name)
   const shipOptions = useMemo(() => {
     const map = new Map<string, { name: string; manufacturer: string; inHangar: boolean }>();
@@ -126,10 +128,12 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
             <span className="text-2xl">⚖️</span>
             <div>
               <h2 className="text-lg font-bold text-white tracking-wide">
-                Schiffs- & Hangar-Vergleich
+                {locale === 'en' ? 'Ship & Hangar Comparison' : 'Schiffs- & Hangar-Vergleich'}
               </h2>
               <p className="text-xs text-slate-400">
-                Direkte Gegenüberstellung von Spezifikationen, Ballistik, Frachtraum & Händlerpreisen
+                {locale === 'en'
+                  ? 'Direct comparison of specifications, ballistics, cargo space & vendor prices'
+                  : 'Direkte Gegenüberstellung von Spezifikationen, Ballistik, Frachtraum & Händlerpreisen'}
               </p>
             </div>
           </div>
@@ -138,15 +142,15 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
             <button
               onClick={handleSwap}
               className="px-3 py-1.5 rounded-lg border border-slate-700 hover:border-cyan-500/50 bg-slate-800/80 text-xs text-cyan-300 font-medium flex items-center gap-1.5 transition"
-              title="Seiten vertauschen"
+              title={locale === 'en' ? 'Swap sides' : 'Seiten vertauschen'}
             >
               <span>⇄</span>
-              <span>Tauschen</span>
+              <span>{locale === 'en' ? 'Swap' : 'Tauschen'}</span>
             </button>
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 transition"
-              title="Schließen"
+              title={t('common.close')}
             >
               ✕
             </button>
@@ -158,7 +162,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
           {/* Selector A */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-cyan-400 font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
-              SCHIFF A
+              {locale === 'en' ? 'SHIP A' : 'SCHIFF A'}
             </span>
             <select
               value={shipA}
@@ -177,7 +181,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
           {/* Selector B */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30">
-              SCHIFF B
+              {locale === 'en' ? 'SHIP B' : 'SCHIFF B'}
             </span>
             <select
               value={shipB}
@@ -250,7 +254,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
               </ComparisonSection>
 
               {/* Section 2: Fracht, Pads & Zugang */}
-              <ComparisonSection title="📦 Frachtkapazität & Landebedingungen">
+              <ComparisonSection title={locale === 'en' ? '📦 Cargo Capacity & Landing Specs' : '📦 Frachtkapazität & Landebedingungen'}>
                 <div className="space-y-2">
                   <ComparisonRow
                     label="Frachtvolumen"
@@ -293,7 +297,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
               </ComparisonSection>
 
               {/* Section 3: Abmessungen & Besatzung */}
-              <ComparisonSection title="📐 Dimensionen & Besatzung">
+              <ComparisonSection title={locale === 'en' ? '📐 Dimensions & Crew' : '📐 Dimensionen & Besatzung'}>
                 <div className="space-y-2">
                   <ComparisonRow
                     label="Länge × Breite × Höhe"
@@ -327,7 +331,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
               </ComparisonSection>
 
               {/* Section 4: Wirtschaft & Händlerverzeichnis */}
-              <ComparisonSection title="🛒 Händlerverzeichnis & Kaufpreise im Verse">
+              <ComparisonSection title={locale === 'en' ? '🛒 Vendors & Purchase Prices in Verse' : '🛒 Händlerverzeichnis & Kaufpreise im Verse'}>
                 <div className="grid grid-cols-2 gap-4">
                   {/* Stores A */}
                   <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2">

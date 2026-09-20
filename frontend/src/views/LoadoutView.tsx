@@ -10,8 +10,10 @@ import {
   Zap,
   Info,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export const LoadoutView: React.FC = () => {
+  const { locale } = useI18n();
   const [slots, setSlots] = useState<LoadoutSlotDto[]>([]);
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -143,7 +145,7 @@ export const LoadoutView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">PANZERUNGS-KLASSE</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'ARMOR CLASS' : 'PANZERUNGS-KLASSE'}</div>
             <div className="text-lg font-bold text-cyan-400 mt-0.5">{stats.dominantClass}</div>
           </div>
           <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -153,7 +155,7 @@ export const LoadoutView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">MAX. SCHADENS-SCHUTZ</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'MAX DAMAGE REDUCTION' : 'MAX. SCHADENS-SCHUTZ'}</div>
             <div className="text-lg font-bold text-emerald-400 mt-0.5">-{stats.maxDmgRed}%</div>
           </div>
           <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -163,7 +165,7 @@ export const LoadoutView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">DURCHSCHNITT REDUKTION</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'AVG REDUCTION' : 'DURCHSCHNITT REDUKTION'}</div>
             <div className="text-lg font-bold text-slate-200 mt-0.5">-{stats.avgDmgRed}%</div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700">
@@ -173,7 +175,7 @@ export const LoadoutView: React.FC = () => {
 
         <div className="sc-glass rounded-lg p-3 border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-mono tracking-wider">AUSGERÜSTETE SLOTS</div>
+            <div className="text-xs text-slate-400 font-mono tracking-wider">{locale === 'en' ? 'EQUIPPED SLOTS' : 'AUSGERÜSTETE SLOTS'}</div>
             <div className="text-lg font-bold text-amber-400 mt-0.5">
               {stats.equippedCount} <span className="text-xs font-normal text-slate-500">/ {slots.length}</span>
             </div>

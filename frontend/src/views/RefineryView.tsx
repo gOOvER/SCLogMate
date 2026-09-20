@@ -27,6 +27,7 @@ import {
   Timer,
   Copy,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface RefineryViewProps {
   onOpenWiki?: (target: string | WikiInfo) => void;
@@ -64,6 +65,7 @@ const ORE_BASE_PRICES: Record<string, number> = {
 };
 
 export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
+  const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<'orders' | 'ocr' | 'calculator' | 'stations'>('orders');
   const [hauls, setHauls] = useState<MiningHaulDto[]>([]);
   const [catalog, setCatalog] = useState<RefineryCatalogDto | null>(null);
@@ -437,7 +439,7 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
-                Raffinerie & Veredelung
+                {locale === 'en' ? 'Refinery & Processing' : 'Raffinerie & Veredelung'}
                 <span className="text-xs px-2 py-0.5 rounded font-mono font-medium bg-amber-500/15 border border-amber-500/30 text-amber-300">
                   Stanton · Pyro · Nyx
                 </span>
@@ -451,25 +453,25 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
           {/* Stat Badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-2.5 text-center min-w-[110px]">
-              <div className="text-[11px] text-slate-400">Laufend</div>
+              <div className="text-[11px] text-slate-400">{locale === 'en' ? 'Active' : 'Laufend'}</div>
               <div className="text-base font-bold text-amber-400 font-mono">
                 {stats.activeCount} {stats.activeCount === 1 ? 'Job' : 'Jobs'}
               </div>
             </div>
             <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-2.5 text-center min-w-[110px]">
-              <div className="text-[11px] text-slate-400">Abholbereit</div>
+              <div className="text-[11px] text-slate-400">{locale === 'en' ? 'Ready' : 'Abholbereit'}</div>
               <div className="text-base font-bold text-emerald-400 font-mono">
-                {stats.readyCount} {stats.readyCount === 1 ? 'Fertig' : 'Fertig'}
+                {stats.readyCount} {stats.readyCount === 1 ? (locale === 'en' ? 'Ready' : 'Fertig') : (locale === 'en' ? 'Ready' : 'Fertig')}
               </div>
             </div>
             <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-2.5 text-center min-w-[120px]">
-              <div className="text-[11px] text-slate-400">Gesamt-Ertrag</div>
+              <div className="text-[11px] text-slate-400">{locale === 'en' ? 'Total Yield' : 'Gesamt-Ertrag'}</div>
               <div className="text-base font-bold text-cyan-300 font-mono">
-                {stats.totalYieldScu.toLocaleString('de-DE')} SCU
+                {stats.totalYieldScu.toLocaleString(locale === 'en' ? 'en-US' : 'de-DE')} SCU
               </div>
             </div>
             <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-2.5 text-center min-w-[130px]">
-              <div className="text-[11px] text-slate-400">UEX Marktwert</div>
+              <div className="text-[11px] text-slate-400">{locale === 'en' ? 'UEX Market Value' : 'UEX Marktwert'}</div>
               <div className="text-base font-bold text-yellow-400 font-mono">
                 ~{(stats.totalEstValue / 1000).toFixed(0)}k <span className="text-[10px] text-slate-500 font-sans">aUEC</span>
               </div>
@@ -488,7 +490,7 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            1. Aktive Aufträge ({hauls.length})
+            {locale === 'en' ? '1. Active Jobs' : '1. Aktive Aufträge'} ({hauls.length})
           </button>
           <button
             onClick={() => setActiveTab('ocr')}
@@ -499,7 +501,7 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            2. Kiosk OCR-Scanner & Erfassung
+            {locale === 'en' ? '2. Kiosk OCR Scanner' : '2. Kiosk OCR-Scanner & Erfassung'}
           </button>
           <button
             onClick={() => setActiveTab('calculator')}
@@ -510,7 +512,7 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             }`}
           >
             <Calculator className="w-3.5 h-3.5" />
-            3. Methoden- & Ertrags-Rechner (UEX)
+            {locale === 'en' ? '3. Yield Calculator (UEX)' : '3. Methoden- & Ertrags-Rechner (UEX)'}
           </button>
           <button
             onClick={() => setActiveTab('stations')}
@@ -521,7 +523,7 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             }`}
           >
             <Compass className="w-3.5 h-3.5" />
-            4. Stations-Atlas (Stanton, Pyro & Nyx)
+            {locale === 'en' ? '4. Refinery Stations & Bonuses' : '4. Stations-Atlas (Stanton, Pyro & Nyx)'}
           </button>
 
           <div className="ml-auto flex items-center gap-2">

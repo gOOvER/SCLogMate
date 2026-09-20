@@ -21,8 +21,10 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export const OreScannerView: React.FC = () => {
+  const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<'radar' | 'cracker'>('radar');
 
   // Radar State
@@ -281,7 +283,7 @@ export const OreScannerView: React.FC = () => {
           }`}
         >
           <Radar className="w-4 h-4 text-cyan-400" />
-          <span>Radar-Signatur Decoder</span>
+          <span>{locale === 'en' ? 'Radar Signature Decoder' : 'Radar-Signatur Decoder'}</span>
         </button>
 
         <button
@@ -293,7 +295,7 @@ export const OreScannerView: React.FC = () => {
           }`}
         >
           <Hammer className="w-4 h-4 text-amber-400" />
-          <span>Gesteins-Knack-Rechner (Can I Crack It?)</span>
+          <span>{locale === 'en' ? 'Rock-Cracking Calculator (Can I Crack It?)' : 'Gesteins-Knack-Rechner (Can I Crack It?)'}</span>
         </button>
       </div>
 
