@@ -44,17 +44,40 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
   const components: ScannedShipComponentDto[] = Array.isArray(ship.components) ? ship.components : [];
   const isCustomScanned = Boolean(ship.componentsUpdatedAt);
 
-  const cleanComponentName = (rawName: string): string => {
+  const normalizeDisplayComponentName = (rawName: string): string => {
     if (!rawName) return '';
     let name = rawName.trim();
+
+    // Specific OCR typos
+    name = name.replace(/\bGin-zel\b/gi, 'Ginzel');
+    name = name.replace(/\bChili-Max\b/gi, 'Chill-Max');
+    name = name.replace(/\b5ca\s*'?akura['•·*]*/gi, "5CA 'Akura'");
+    name = name.replace(/\bFunstop\b/gi, 'FullStop');
+    name = name.replace(/\bGirnbal\b/gi, 'Gimbal');
+    name = name.replace(/\bVMP,uck\b/gi, 'VariPuck');
+    name = name.replace(/\bvariPuck\b/g, 'VariPuck');
+
+    // Clean spec distortions
+    name = name.replace(/\(Inci\/MC\)/gi, '(Ind/3/C)');
+    name = name.replace(/\(Inci\/(\d+)\/([A-D])\)/gi, '(Ind/$1/$2)');
+    name = name.replace(/\(CiV\//g, '(Civ/');
+
+    // Strip artifacts
+    name = name.replace(/•|\*|·/g, '').trim();
+    name = name.replace(/\s+O$/i, '').trim();
+
+    return name;
+  };
+
+  const cleanComponentName = (rawName: string): string => {
+    if (!rawName) return '';
+    const normalized = normalizeDisplayComponentName(rawName);
+    let name = normalized.trim();
     if (name.includes('(')) {
       name = name.split('(')[0].trim();
     }
     name = name.replace(/[•·*]/g, '').trim();
     name = name.replace(/['"]$/, '').trim();
-    if (name.toLowerCase() === 'chili-max') return 'Chill-Max';
-    if (name.toLowerCase() === 'gin-zel') return 'Ginzel';
-    if (name.toLowerCase().startsWith('5ca')) return "5CA 'Akura'";
     return name;
   };
 
@@ -351,7 +374,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
                             {c.slotLabel || c.slotType}
                           </span>
                           <span className="text-xs font-bold text-slate-100 truncate block group-hover:text-cyan-200 transition">
-                            {c.componentName}
+                            {normalizeDisplayComponentName(c.componentName)}
                           </span>
                         </div>
                       </div>

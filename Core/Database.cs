@@ -874,14 +874,34 @@ public static class Database
                 Exec(db, @"UPDATE sessions 
                            SET version = REPLACE(version, '4.10.0', '4.10.1') 
                            WHERE (name LIKE '%12660092%' OR version LIKE '%12660092%') AND version LIKE '4.10.0%';");
+
+                // v35: Clean up OCR garbled component names in fleet_user_ships (e.g. Gin-zel (Inci/MC) -> Ginzel (Ind/3/C))
+                Exec(db, @"UPDATE fleet_user_ships
+                           SET components_json = REPLACE(
+                                                   REPLACE(
+                                                     REPLACE(
+                                                       REPLACE(
+                                                         REPLACE(
+                                                           REPLACE(components_json, 'Gin-zel (Inci/MC)', 'Ginzel (Ind/3/C)'),
+                                                           'Gin-zel', 'Ginzel'
+                                                         ),
+                                                         'Chili-Max', 'Chill-Max'
+                                                       ),
+                                                       '5CA ''Akura•', '5CA ''Akura'''
+                                                     ),
+                                                     'Funstop', 'FullStop'
+                                                   ),
+                                                   'VariPuck S4 Girnbal Mount', 'VariPuck S4 Gimbal Mount'
+                                                 )
+                           WHERE components_json IS NOT NULL;");
             }
             catch (Exception ex)
             {
-                Logger.Error("Migration v35 (SC 4.10.1 version string correction)", ex);
+                Logger.Error("Migration v35 (SC 4.10.1 version & component OCR correction)", ex);
             }
             Exec(db, "PRAGMA user_version = 35;");
             dbSchemaVersion = 35;
-            Logger.Log("DB Schema: Migration auf v35 (Korrektur der Versionsbezeichnung für SC 4.10.1 Sessions) erfolgreich angewendet.");
+            Logger.Log("DB Schema: Migration auf v35 (Korrektur der Versionsbezeichnung & Komponenten-OCR-Bereinigung) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Settings Plugin Management Tab (`frontend/src/views/SettingsPluginsTab.tsx`, `frontend/src/views/SettingsView.tsx`)**: Added a dedicated `🧩 Plugins & Widgets` tab in Settings allowing users to toggle plugins on/off, reload manifests without restarting the app, view plugin directories, and copy OBS source URLs.
 
 ### Fixed
+- **Ship Loadout OCR Normalization & Typo Correction (`frontend/src/components/ShipLoadoutModal.tsx`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Database.cs`)**:
+  - Corrected OCR misread component names and garbled specification brackets in the Ship Loadout modal (e.g. `Gin-zel (Inci/MC)` corrected to `Ginzel (Ind/3/C)`, `Chili-Max` to `Chill-Max`, `5CA 'Akura•` to `5CA 'Akura'`, and `Funstop` to `FullStop`).
+  - Added frontend `normalizeDisplayComponentName` to render clean component titles in the loadout modal cards, and enhanced `cleanComponentName` for SCWiki lookup.
+  - Implemented `NormalizeComponentName` in `ScreenshotLoadoutWatcher` to clean OCR scanned equipment names and spec brackets before saving to database.
+  - Included database cleanup in migration v35 to sanitize existing historical component entries in `fleet_user_ships`.
 - **Accurate Star Citizen Version Resolution & Point-Release Parsing (`Core/GameVersionResolver.cs`, `Core/LogParser.cs`, `Core/Database.cs`)**:
   - Implemented `GameVersionResolver` to dynamically discover authoritative Star Citizen patch versions (e.g. `4.10.1` instead of `4.10.0`) from official RSI Launcher logs and Windows PE FileVersion headers (`4.10.193.11644`).
   - Resolved CIG's practice of retaining stale branch names (e.g. `sc-alpha-4.10.0`) across point releases by mapping build `12660092` directly to `4.10.1`, displaying `SC 4.10.1-LIVE` in the HUD and status bars.

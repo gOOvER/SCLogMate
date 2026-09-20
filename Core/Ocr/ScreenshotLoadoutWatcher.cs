@@ -432,12 +432,38 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                         }
                     }
 
+                    compLine = NormalizeComponentName(compLine);
                     result.Add(new ScannedShipComponent(slotType, slotLabel, compLine));
                 }
             }
         }
 
         return result;
+    }
+
+    public static string NormalizeComponentName(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+        var name = raw.Trim();
+        name = Regex.Replace(name, @"\[?\s*\(?\s*BRICKE[D\]I\)]*\s*\]?", "").Trim();
+        name = Regex.Replace(name, @"[O0\]]$", "").Trim();
+        name = Regex.Replace(name, @"[•·*]", "").Trim();
+
+        // Specific component name OCR error corrections
+        name = Regex.Replace(name, @"\bGin-zel\b", "Ginzel", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\bChili-Max\b", "Chill-Max", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\b5ca\s*'?akura['•·*]*", "5CA 'Akura'", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\bFunstop\b", "FullStop", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\bGirnbal\b", "Gimbal", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\bVMP,uck\b", "VariPuck", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\bvariPuck\b", "VariPuck");
+
+        // Specific spec OCR distortion corrections
+        name = Regex.Replace(name, @"\(Inci/MC\)", "(Ind/3/C)", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\(Inci/(\d+)/([A-D])\)", "(Ind/$1/$2)", RegexOptions.IgnoreCase);
+        name = Regex.Replace(name, @"\(CiV/", "(Civ/");
+
+        return name.Trim();
     }
 
     private static string CleanSlotLabel(string raw, string prefix)
