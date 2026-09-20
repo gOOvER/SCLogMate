@@ -208,6 +208,9 @@ public static class FleetCatalog
         ["MPUV Cargo"] = new("MPUV Cargo · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Fracht", 350_000, 35, "LTI (Lifetime)"),
         ["MPUV Personnel"] = new("MPUV Personnel · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Personen", 350_000, 35, "LTI (Lifetime)"),
         ["MPUV Tractor"] = new("MPUV Tractor · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Hafenshuttle / Traktorstrahl", 450_000, 40, "LTI (Lifetime)"),
+        ["Argo MOTH"] = new("MOTH · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrielles Bergungs- & Salvage-Schiff", 3_200_000, 160, "LTI (Lifetime)"),
+        ["MOTH"] = new("MOTH · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrielles Bergungs- & Salvage-Schiff", 3_200_000, 160, "LTI (Lifetime)"),
+        ["Moth"] = new("MOTH · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Industrielles Bergungs- & Salvage-Schiff", 3_200_000, 160, "LTI (Lifetime)"),
 
         // Greycat Industrial (#EAB308)
         ["Greycat ROC"] = new("ROC · Greycat", "Greycat Industrial", "GREYCAT", "#EAB308", "Leichter Bergbau-Bodenlader", 350_000, 55, "LTI (Lifetime)"),

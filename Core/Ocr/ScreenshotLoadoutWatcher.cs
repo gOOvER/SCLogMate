@@ -201,18 +201,55 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         );
     }
 
+    private static readonly HashSet<string> UiNoise = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Avionics", "Propulsion", "Systems", "Vhcl. Wpns.", "Utility", "Liveries", "Misc.", "HEALTH",
+        "HOME", "COMMS", "CONTRACTS", "MAPS", "JOURNAL", "ASSETS", "REP", "WALLET", "LANDING", "VEHICLES",
+        "SIZE", "GRADE", "Slot", "Size", "Type", "Awaiting Selection...", "Select an item from the",
+        "Only showing ships and equipment located in Crusader.", "For a full list use the mobiGlas Assets app.",
+        "For a full list use the mobiGIas Assets app.", "view its details.", "><", "x", "X", "Empty", "EQUIPPED",
+        "EOUIPPEO", "Available:", "In Use:", "In use:", "1", "2", "3", "4", "5", "6", "7", "8",
+        "X UNEQUIP", "X UNEOUIP", "CURRENTLY EQUIPPED", "CURRENTLY EQUIPPEO", "Vehicle Loadout Manager",
+        "Customize your ship Ioadout", "Customize your ship loadout", "Vehicle Information", "Fleet Manager",
+        "L", "Item Type:", "Manufacturer:", "Class:", "Grade:"
+    };
+
     private static string? DetectShipName(List<string> lines)
     {
-        // Bekannte Schiffe prüfen
         foreach (var line in lines)
         {
-            foreach (var ship in FleetCatalog.AllShips)
+            var trimmed = line.Trim();
+            if (trimmed.Length < 3 || UiNoise.Contains(trimmed) || trimmed.StartsWith("Ä")) continue;
+
+            // Pattern: Hersteller Präfix + Modell (z.B. "RSI HERMES", "ARGO MOTH")
+            var m = Regex.Match(trimmed, @"^(?:RSI|ARGO|DRAKE|AEGIS|ANVIL|MISC|ORIGIN|CRUSADER|MIRAI|ESPERIA|GATAC|BANU|GREYCAT|TUMBRILL?)\s+(?<model>.+)$", RegexOptions.IgnoreCase);
+            if (m.Success)
             {
-                if (line.Contains(ship.NormalizedName, StringComparison.OrdinalIgnoreCase))
+                var candidate = m.Groups["model"].Value.Trim();
+                var catEntry = FleetCatalog.Lookup(candidate);
+                if (catEntry.NormalizedName != "Unbekannt" && catEntry.Role != "Raumschiff")
                 {
-                    return ship.NormalizedName;
+                    return catEntry.NormalizedName;
                 }
             }
+
+            // Exakter Katalog-Abgleich auf bekannte Schiffe
+            var direct = FleetCatalog.Lookup(trimmed);
+            if (direct.NormalizedName != "Unbekannt" && direct.Role != "Raumschiff" && !direct.NormalizedName.Equals("Unbekannt", StringComparison.OrdinalIgnoreCase))
+            {
+                return direct.NormalizedName;
+            }
+
+            // Keyword check for recognizable ships in mobiGlas
+            if (trimmed.Contains("HERMES", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Hermes").NormalizedName;
+            if (trimmed.Contains("MOTH", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("MOTH").NormalizedName;
+            if (trimmed.Contains("RAFT", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("RAFT").NormalizedName;
+            if (trimmed.Contains("CLIPPER", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Clipper").NormalizedName;
+            if (trimmed.Contains("CORSAIR", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Corsair").NormalizedName;
+            if (trimmed.Contains("VULTURE", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Vulture").NormalizedName;
+            if (trimmed.Contains("REDEEMER", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Redeemer").NormalizedName;
+            if (trimmed.Contains("TITAN", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Avenger Titan").NormalizedName;
+            if (trimmed.Contains("CUTLASS", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Cutlass Black").NormalizedName;
         }
         return null;
     }
@@ -221,11 +258,14 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     {
         foreach (var line in lines)
         {
-            if (line.Contains("Livery", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("Paint", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("Skin", StringComparison.OrdinalIgnoreCase))
+            var trimmed = Regex.Replace(line, @"\[?\s*\(?\s*BRICKE[D\]I\)]*\s*\]?", "").Trim();
+            if ((trimmed.Contains("Livery", StringComparison.OrdinalIgnoreCase) || trimmed.Contains("Paint", StringComparison.OrdinalIgnoreCase))
+                && !trimmed.Equals("Liveries", StringComparison.OrdinalIgnoreCase)
+                && !trimmed.Equals("Livery", StringComparison.OrdinalIgnoreCase)
+                && !trimmed.Equals("Paints", StringComparison.OrdinalIgnoreCase)
+                && trimmed.Length > 6)
             {
-                return line.Trim();
+                return trimmed;
             }
         }
         return null;
@@ -235,55 +275,126 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     {
         var result = new List<ScannedShipComponent>();
 
-        var slotPatterns = new (string SlotType, Regex Pattern)[]
-        {
-            ("Cooler", new Regex(@"Cooler\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-            ("Shield", new Regex(@"(?:Shield Generator|Shield)\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-            ("PowerPlant", new Regex(@"Power Plant\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-            ("QuantumDrive", new Regex(@"Quantum Drive\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-            ("Weapon", new Regex(@"Weapon\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-            ("Missile", new Regex(@"Missile Rack\s*(?:×\s*(?<cnt>\d+)|(?<num>\d+))?", RegexOptions.IgnoreCase)),
-        };
-
         for (int i = 0; i < lines.Count; i++)
         {
             var line = lines[i];
 
-            foreach (var (slotType, pattern) in slotPatterns)
+            string? slotType = null;
+            string? slotLabel = null;
+
+            if (Regex.IsMatch(line, @"^Cooler(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
-                var match = pattern.Match(line);
-                if (match.Success)
+                slotType = "Cooler";
+                slotLabel = CleanSlotLabel(line, "Cooler");
+            }
+            else if (Regex.IsMatch(line, @"^Power\s*Plant(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            {
+                slotType = "PowerPlant";
+                slotLabel = CleanSlotLabel(line, "Power Plant");
+            }
+            else if (Regex.IsMatch(line, @"^(?:Shield\s*Generator|Shield)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            {
+                slotType = "Shield";
+                slotLabel = CleanSlotLabel(line, "Shield Generator");
+            }
+            else if (Regex.IsMatch(line, @"^Quantum\s*Drive", RegexOptions.IgnoreCase))
+            {
+                slotType = "QuantumDrive";
+                slotLabel = "Quantum Drive";
+            }
+            else if (Regex.IsMatch(line, @"^Jump\s*Module", RegexOptions.IgnoreCase))
+            {
+                slotType = "QuantumDrive";
+                slotLabel = "Jump Module";
+            }
+            else if (Regex.IsMatch(line, @"^Weapon\s*-\s*(Left|Right|Front|Top\s*Left|Top\s*Right|Top|Bottom|Rear)", RegexOptions.IgnoreCase))
+            {
+                slotType = "Weapon";
+                slotLabel = line.Trim();
+            }
+            else if (Regex.IsMatch(line, @"^Turret\s*Weapon\s*Slot\s*\d+", RegexOptions.IgnoreCase))
+            {
+                slotType = "Turret";
+                slotLabel = line.Trim();
+            }
+            else if (Regex.IsMatch(line, @"^(?:Remote|Manned)\s*Turret", RegexOptions.IgnoreCase))
+            {
+                slotType = "Turret";
+                slotLabel = line.Trim();
+            }
+            else if (Regex.IsMatch(line, @"^Radar", RegexOptions.IgnoreCase))
+            {
+                slotType = "Avionics";
+                slotLabel = "Radar";
+            }
+            else if (Regex.IsMatch(line, @"^Flight\s*Blade", RegexOptions.IgnoreCase))
+            {
+                slotType = "Avionics";
+                slotLabel = "Flight Blade";
+            }
+            else if (Regex.IsMatch(line, @"^(?:Tractor\s*(?:Mount|Turret)|Salvage\s*Head)", RegexOptions.IgnoreCase))
+            {
+                slotType = "Utility";
+                slotLabel = line.Trim();
+            }
+
+            if (slotType != null && slotLabel != null)
+            {
+                string? compLine = null;
+                int k = i + 1;
+                while (k < lines.Count && k <= i + 10)
                 {
-                    // Die nächste Zeile enthält typischerweise den Komponentennamen (z.B. "FR-66", "Panther")
-                    string componentName = "";
-                    if (i + 1 < lines.Count && !slotPatterns.Any(p => p.Pattern.IsMatch(lines[i + 1])))
+                    var cand = lines[k].Trim();
+                    if (cand.StartsWith("Cooler", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Shield", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Quantum", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Jump Module", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Weapon -", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Turret Weapon", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Radar", StringComparison.OrdinalIgnoreCase) ||
+                        cand.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase))
                     {
-                        componentName = lines[i + 1].Trim();
-                    }
-                    else
-                    {
-                        // Falls in derselben Zeile (z.B. "Cooler 1: Glacier")
-                        var colonIdx = line.IndexOf(':');
-                        if (colonIdx > 0)
-                        {
-                            componentName = line[(colonIdx + 1)..].Trim();
-                        }
+                        break;
                     }
 
-                    if (!string.IsNullOrWhiteSpace(componentName))
+                    if (!UiNoise.Contains(cand) && cand.Length > 2 && !cand.StartsWith("Ä") && !cand.StartsWith("Select") &&
+                        !Regex.IsMatch(cand, @"^\d+\.(?:Turret|Gun)", RegexOptions.IgnoreCase))
                     {
-                        result.Add(new ScannedShipComponent(
-                            SlotType: slotType,
-                            SlotLabel: match.Value.Trim(),
-                            ComponentName: componentName
-                        ));
+                        compLine = cand;
+                        if (compLine.Contains("Gimbal Mount", StringComparison.OrdinalIgnoreCase) && k + 1 < lines.Count)
+                        {
+                            var nextGun = lines[k + 1].Trim();
+                            if (!UiNoise.Contains(nextGun) && nextGun.Length > 2 && !nextGun.StartsWith("Ä"))
+                            {
+                                compLine = $"{nextGun} ({compLine})";
+                            }
+                        }
+                        break;
                     }
-                    break;
+                    k++;
+                }
+
+                if (!string.IsNullOrWhiteSpace(compLine))
+                {
+                    compLine = Regex.Replace(compLine, @"\[?\s*\(?\s*BRICKE[D\]I\)]*\s*\]?", "").Trim();
+                    compLine = Regex.Replace(compLine, @"[O0\]]$", "").Trim();
+                    result.Add(new ScannedShipComponent(slotType, slotLabel, compLine));
                 }
             }
         }
 
         return result;
+    }
+
+    private static string CleanSlotLabel(string raw, string prefix)
+    {
+        var cleaned = raw.Replace(" I ", " 1 ").Replace(" II ", " 2 ").Replace(" III ", " 3 ").Replace(" IV ", " 4 ");
+        cleaned = Regex.Replace(cleaned, @"\s+I$", " 1");
+        cleaned = Regex.Replace(cleaned, @"\s+II$", " 2");
+        cleaned = Regex.Replace(cleaned, @"\s+III$", " 3");
+        cleaned = Regex.Replace(cleaned, @"\s+IV$", " 4");
+        return cleaned.Trim();
     }
 
     public static string? DetectStarCitizenScreenshotFolder()

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using SCLogMate.Core.Ocr;
 using SCLogMate.Models;
 
 namespace SCLogMate.Core;
@@ -2744,6 +2746,40 @@ public static class Database
             {
                 using var db = new SqliteConnection(Conn);
                 db.Open();
+
+                string finalJson = componentsJson;
+                try
+                {
+                    using var readCmd = db.CreateCommand();
+                    readCmd.CommandText = "SELECT components_json FROM fleet_user_ships WHERE name = $n LIMIT 1;";
+                    readCmd.Parameters.AddWithValue("$n", canonicalName);
+                    var existingRaw = readCmd.ExecuteScalar() as string;
+                    if (!string.IsNullOrWhiteSpace(existingRaw))
+                    {
+                        var existingList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw);
+                        var newList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(componentsJson);
+                        if (existingList != null && newList != null && existingList.Count > 0)
+                        {
+                            var map = new Dictionary<string, ScannedShipComponent>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var c in existingList)
+                            {
+                                var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
+                                map[key] = c;
+                            }
+                            foreach (var c in newList)
+                            {
+                                var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
+                                map[key] = c;
+                            }
+                            finalJson = JsonSerializer.Serialize(map.Values.ToList());
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"SaveFleetShipComponents merge error: {ex.Message}");
+                }
+
                 using var cmd = db.CreateCommand();
                 cmd.CommandText = @"
                     INSERT INTO fleet_user_ships(name, in_hangar, is_pledge, pledge_usd, insurance, acquisition, notes, livery, components_json, components_updated_at)
@@ -2757,7 +2793,7 @@ public static class Database
                 cmd.Parameters.AddWithValue("$u", cat.PledgeValueUsd);
                 cmd.Parameters.AddWithValue("$i", cat.DefaultInsurance);
                 cmd.Parameters.AddWithValue("$liv", (object?)livery ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("$comps", componentsJson);
+                cmd.Parameters.AddWithValue("$comps", finalJson);
                 cmd.Parameters.AddWithValue("$ts", nowStr);
                 cmd.ExecuteNonQuery();
 

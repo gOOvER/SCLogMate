@@ -1153,9 +1153,11 @@ public class PhotinoBridge
         {
             try
             {
-                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) && res.Components != null && res.Components.Count > 0)
+                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) && ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
                 {
-                    var compsJson = JsonSerializer.Serialize(res.Components, JsonOpts);
+                    var compsJson = res.Components != null && res.Components.Count > 0
+                        ? JsonSerializer.Serialize(res.Components, JsonOpts)
+                        : "[]";
                     Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson);
                     Broadcast("FLEET_UPDATED", GetFleetResponse());
                 }
@@ -1845,10 +1847,67 @@ public class PhotinoBridge
                             var scFolder = _screenshotWatcher.WatchedFolder ?? ScreenshotLoadoutWatcher.DetectStarCitizenScreenshotFolder();
                             if (!string.IsNullOrEmpty(scFolder) && Directory.Exists(scFolder))
                             {
-                                filePath = Directory.GetFiles(scFolder, "*.jpg")
+                                var allFiles = Directory.GetFiles(scFolder, "*.jpg")
                                     .Concat(Directory.GetFiles(scFolder, "*.png"))
                                     .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
-                                    .FirstOrDefault();
+                                    .ToList();
+
+                                if (allFiles.Count > 0)
+                                {
+                                    var cutoff = DateTime.UtcNow.AddHours(-3);
+                                    var recentFiles = allFiles.Where(f => File.GetLastWriteTimeUtc(f) >= cutoff).ToList();
+                                    if (recentFiles.Count < 5)
+                                    {
+                                        recentFiles = allFiles.Take(25).ToList();
+                                    }
+
+                                    var processedShips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                    int totalComponents = 0;
+
+                                    // Chronologisch von alt nach neu auswerten, damit die neusten Modifikationen zuletzt gemergt werden
+                                    foreach (var file in recentFiles.OrderBy(f => File.GetLastWriteTimeUtc(f)))
+                                    {
+                                        try
+                                        {
+                                            var res = await _screenshotWatcher.AnalyzeScreenshotAsync(file);
+                                            if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName))
+                                            {
+                                                if (res.Components != null && res.Components.Count > 0)
+                                                {
+                                                    var compsJson = JsonSerializer.Serialize(res.Components, JsonOpts);
+                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson);
+                                                    totalComponents += res.Components.Count;
+                                                }
+                                                else if (!string.IsNullOrWhiteSpace(res.Livery))
+                                                {
+                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, "[]");
+                                                }
+                                                processedShips.Add(res.ShipName);
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Logger.Log($"Batch screenshot analyze error for {file}: {ex.Message}");
+                                        }
+                                    }
+
+                                    if (processedShips.Count > 0)
+                                    {
+                                        Broadcast("FLEET_UPDATED", GetFleetResponse());
+                                        var shipNames = string.Join(", ", processedShips.Select(s => s.Split('·')[0].Trim()));
+                                        SendResponse(req.Id, "scan_screenshot_loadout_response", new ScreenshotLoadoutResult(
+                                            Success: true,
+                                            ShipName: shipNames,
+                                            Livery: null,
+                                            Components: Array.Empty<ScannedShipComponent>(),
+                                            SourceFile: scFolder,
+                                            Message: $"{processedShips.Count} Schiff{(processedShips.Count > 1 ? "e" : "")} ({shipNames}) mit {totalComponents} Komponenten aus {recentFiles.Count} Screenshots erfasst."
+                                        ));
+                                        break;
+                                    }
+
+                                    filePath = allFiles.FirstOrDefault();
+                                }
                             }
                         }
 
@@ -1859,11 +1918,13 @@ public class PhotinoBridge
                         else
                         {
                             var scrLoadoutRes = await _screenshotWatcher.AnalyzeScreenshotAsync(filePath);
-                            if (scrLoadoutRes.Success && !string.IsNullOrWhiteSpace(scrLoadoutRes.ShipName) && scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0)
+                            if (scrLoadoutRes.Success && !string.IsNullOrWhiteSpace(scrLoadoutRes.ShipName) && ((scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(scrLoadoutRes.Livery)))
                             {
                                 try
                                 {
-                                    var compsJson = JsonSerializer.Serialize(scrLoadoutRes.Components, JsonOpts);
+                                    var compsJson = scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0
+                                        ? JsonSerializer.Serialize(scrLoadoutRes.Components, JsonOpts)
+                                        : "[]";
                                     Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson);
                                     Broadcast("FLEET_UPDATED", GetFleetResponse());
                                 }

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Argo MOTH Catalog Support (`Core/FleetCatalog.cs`, `Core/PipsAnalyzer.cs`)**:
+  - Added full fleet catalog entry for the new `ARGO MOTH` industrial salvage vessel, including default specs, pledge values, and stock armament (CF-227 Badger Repeaters) for pip calculations.
+- **Batch Multi-Screenshot Loadout Scanning (`Core/Photino/PhotinoBridge.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - Scanning screenshots now automatically processes all recent screenshots across sessions rather than only the single latest file, allowing multi-section captures (Weapons, Systems, Avionics, Livery) across multiple ships to be scanned and ingested in a single operation.
+  - Added support for Roman numeral slot indicators (`Cooler I`, `Power Plant I`, `Shield Generator I` mapped to canonical numeric slots).
+  - Added recognition for Jump Modules (`QuantumDrive`), Avionics/Radar/Flight Blades, and specialized salvage head utility mounts (`Baier Salvage Head`, `Abrade Scraper Module`, `Cinch Scraper Module`).
 - **Global Sci-Fi Tooltip System (`frontend/src/components/GlobalTooltip.tsx`, `frontend/src/App.tsx`)**:
   - **Replaced Buggy Native WebView2 Tooltips**: Implemented a centralized, high-performance `GlobalTooltip` component that intercepts native `title` attributes and `data-tooltip` elements. This completely resolves the Windows WebView2 bug where tooltips would render only once and fail to show again on subsequent hovers.
   - **Star Citizen Sci-Fi Aesthetics**: Styled all tooltips with dark glassmorphic backgrounds (`#030914`), cyan neon borders (`border-cyan-500/40`), glowing cyan radar pulse dots, and responsive auto-flipping/clamping to ensure tooltips never overflow viewport boundaries.
@@ -25,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Changed
+- **Fleet View Table Title Deduplication & Sleek Activation Checkmark (`frontend/src/views/FleetView.tsx`)**:
+  - **Clean Non-Redundant Ship Titles**: Stripped redundant manufacturer suffix (` · RSI`, ` · Drake`, etc.) from the ship name in the fleet table, displaying a clean primary ship title (e.g. `Hermes`, `Clipper`, `RAFT`, `MOTH`).
+  - **Deduplicated Manufacturer Badges & Labels**: Subtitle now displays the full manufacturer name (e.g. `[RSI]` `Roberts Space Industries` instead of repeating `[RSI] RSI`).
+  - **Replaced "Aktivieren" Text Button with Checkmark**: Replaced the bulky "Aktivieren" text button in the first column with an interactive, compact checkmark icon (`Check` `✓`). Active ships display a glowing emerald badge, while inactive ships display a subtle checkmark button with on-hover activation.
 - **Fleet View Table Modernization (`frontend/src/views/FleetView.tsx`)**:
   - **Enhanced Row Cards and Hover States**: Added glowing border indicators (`border-l-emerald-400` for active ships, `hover:border-l-cyan-400` on hover), refined cell padding, and high-contrast typography.
   - **Polished Status & Acquisition Badges**: Modernized `AKTIV` HUD badge with pulsing radar indicator, styled explicit activation button, refined star toggle button, and upgraded Pledge/In-Game/Rental badges with subtle sci-fi gradients.
@@ -35,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Harmonized Organization Card and Website Bar**: Polished organization branding, SID badge, rank display, and external website links with cohesive padding and border styling.
 
 ### Fixed
+- **Screenshot Loadout Multi-Section Component Accumulation & Overwrite Fix (`Core/Database.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - **Component Merging across Sections**: `SaveFleetShipComponents` now merges newly scanned component slots with existing stored components by slot label instead of completely overwriting the JSON array. Capturing Systems in one screenshot and Weapons/Avionics in another will now accumulate all components without data loss.
+  - **Robust Ship Name Detection in OCR**: Fixed `DetectShipName` in `ScreenshotLoadoutWatcher` to properly recognize `<Manufacturer> <ShipName>` headers (e.g. `RSI HERMES`, `ARGO MOTH`) and direct catalog names, resolving the bug where `RSI HERMES` was never matched because `Contains("Hermes · RSI")` failed against in-game mobiGlas text.
+  - **Cleaned OCR Noise & Bricked Tags**: Filtered out in-game holographic tags (`[BRICKED]`, `[BRICKEDI`), category labels (`Avionics`, `Propulsion`, `Systems`), and UI state lines from component names.
 - **Tab Auto-Switch Loop and User Selection Override Fix (`frontend/src/views/MissionsView.tsx`, `frontend/src/views/FleetView.tsx`)**:
   - **Eliminated Tab Reversion on Background Updates (`MissionsView.tsx`)**: Fixed an issue where clicking other tabs (such as `Aktive Aufträge` or `Auftragskatalog`) in the mission manager would immediately snap back to `Verlauf (History)`. The auto-switch effect had `data` in its dependency array, which re-evaluated and forced `activeTab` back to `'history'` on every periodic HUD update or background mission data fetch.
   - **Single-Run Guard with `useRef` Tracking (`MissionsView.tsx`, `FleetView.tsx`)**: Introduced `autoSwitchedRef` to guarantee that intelligent auto-switching to the history tab for navigated searches runs at most once upon receiving data, and is permanently disarmed once the user manually selects any tab or clears the search filter (`handleTabClick`, `handleClearSearch`).

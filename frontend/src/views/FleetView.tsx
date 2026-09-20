@@ -593,19 +593,21 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       {/* 1. Status & Hangar */}
                       <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2">
-                          {/* Active / Idle pill */}
+                          {/* Active / Inactive checkmark button */}
                           {ship.isCurrent ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.35)]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              AKTIV
+                            <span
+                              className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/60 text-emerald-400 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.35)]"
+                              data-tooltip="Aktives Schiff (für HUD & Live-Log)"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             </span>
                           ) : (
                             <button
                               onClick={() => handleSetCurrentShip(ship.name)}
-                              className="px-2 py-0.5 rounded text-[10px] font-mono border border-slate-800 bg-[#061224] hover:bg-cyan-950/60 hover:border-cyan-600 hover:text-cyan-300 text-slate-400 transition cursor-pointer"
+                              className="p-1.5 rounded-lg border border-slate-800 bg-[#061224] hover:bg-emerald-950/40 hover:border-emerald-500/60 hover:text-emerald-300 text-slate-500 transition cursor-pointer"
                               data-tooltip="Als aktives Schiff für HUD und Live-Log setzen"
                             >
-                              Aktivieren
+                              <Check className="w-3.5 h-3.5 opacity-40 hover:opacity-100 transition-opacity" />
                             </button>
                           )}
 
@@ -633,7 +635,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors text-[13px] tracking-wide">
-                              {ship.name}
+                              {ship.name.split(/\s*·\s*/)[0].trim()}
                             </span>
                             <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={true} />
                           </div>
@@ -648,8 +650,15 @@ export const FleetView: React.FC<FleetViewProps> = ({
                             >
                               {ship.manufacturerBadge || 'SHIP'}
                             </span>
-                            <span className="text-[11.5px] text-slate-400 truncate max-w-[160px] font-sans">
-                              {ship.manufacturer}
+                            <span className="text-[11.5px] text-slate-400 truncate max-w-[200px] font-sans">
+                              {(() => {
+                                const b = (ship.manufacturerBadge || '').toUpperCase();
+                                const m = ship.manufacturer || '';
+                                if (b === 'RSI' || m === 'RSI') return 'Roberts Space Industries';
+                                if (b === 'MISC' || m === 'MISC') return 'Musashi Industrial & Starflight Concern';
+                                if (m.length > b.length) return m;
+                                return m || b;
+                              })()}
                             </span>
                           </div>
 
