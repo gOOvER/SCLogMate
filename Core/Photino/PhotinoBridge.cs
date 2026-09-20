@@ -1725,7 +1725,8 @@ public class PhotinoBridge
                             "Miete (Rental)" => "Geliehen / Free Fly",
                             _ => "Pledge Store"
                         };
-                        bool inHangar = nextAcq is "Pledge Store" or "In-Game (aUEC)";
+                        // Herkunftsschutz: Ein Schiff im persönlichen Hangar (mit Stern) darf niemals durch das Ändern der Herkunft aus dem Hangar fliegen!
+                        bool inHangar = (exCd?.InHangar ?? false) || nextAcq is "Pledge Store" or "In-Game (aUEC)";
                         bool isPledge = nextAcq == "Pledge Store";
                         int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
                         string ins = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
@@ -1734,6 +1735,28 @@ public class PhotinoBridge
                         var fleetRes = GetFleetResponse();
                         Broadcast("FLEET_UPDATED", fleetRes);
                         SendResponse(req.Id, "cycle_ship_acquisition_response", fleetRes);
+                    }
+                    break;
+
+                case "set_ship_acquisition":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("shipName", out var ssaNameProp) &&
+                        req.Payload.Value.TryGetProperty("acquisition", out var ssaAcqProp))
+                    {
+                        var sName = ssaNameProp.GetString() ?? "";
+                        var targetAcq = ssaAcqProp.GetString() ?? "Pledge Store";
+                        var custom = Database.GetAllFleetCustomData();
+                        custom.TryGetValue(sName, out var exCd);
+
+                        // Herkunftsschutz: Ein Schiff im persönlichen Hangar (mit Stern) behält in_hangar = true
+                        bool inHangar = (exCd?.InHangar ?? false) || targetAcq is "Pledge Store" or "In-Game (aUEC)";
+                        bool isPledge = targetAcq == "Pledge Store";
+                        int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
+                        string ins = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
+                        string notes = exCd?.Notes ?? "";
+                        Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, ins, targetAcq, notes);
+                        var fleetRes = GetFleetResponse();
+                        Broadcast("FLEET_UPDATED", fleetRes);
+                        SendResponse(req.Id, "set_ship_acquisition_response", fleetRes);
                     }
                     break;
 

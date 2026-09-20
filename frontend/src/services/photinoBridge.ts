@@ -2020,6 +2020,7 @@ class PhotinoBridge {
       case 'add_catalog_ship_to_hangar':
       case 'remove_ship_from_hangar':
       case 'cycle_ship_acquisition':
+      case 'set_ship_acquisition':
       case 'cycle_ship_insurance':
       case 'update_ship_pledge':
       case 'update_ship_notes':

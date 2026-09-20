@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 36; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v36: MOTH & Fleet Loadout Radar, ASOP Loadout Estimate Support & Komponenten-Bereinigung)
+    public const int CurrentSchemaVersion = 37; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v37: Hangar-Eigentum & Herkunftsschutz gegen versehentliche Hangar-Entfernung)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -992,6 +992,37 @@ public static class Database
             Exec(db, "PRAGMA user_version = 36;");
             dbSchemaVersion = 36;
             Logger.Log("DB Schema: Migration auf v36 (MOTH & Fleet Loadout Radar & Komponenten-Bereinigung) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 37)
+        {
+            try
+            {
+                // v37: Hangar-Eigentum & Herkunftsschutz:
+                // 1. Alle Schiffe des Benutzers in fleet_user_ships erhalten in_hangar = 1 zurück.
+                // 2. Schiffe, die versehentlich durch Durchschalten auf "Miete" geraten sind, werden auf ihren korrekten Zustand zurückgesetzt.
+                Exec(db, @"
+                    UPDATE fleet_user_ships 
+                    SET in_hangar = 1;
+
+                    UPDATE fleet_user_ships 
+                    SET is_pledge = 1, acquisition = 'Pledge Store' 
+                    WHERE name IN ('MOTH · Argo', 'M80 · Origin', 'Cutlass Black · Drake', 'Clipper · Drake', 'Golem OX · Drake', 'Hermes · RSI') 
+                      AND (acquisition = 'Miete (Rental)' OR is_pledge = 0);
+
+                    UPDATE fleet_user_ships 
+                    SET is_pledge = 0, acquisition = 'In-Game (aUEC)' 
+                    WHERE name IN ('RAFT · Argo', 'Hull B · MISC', 'Golem · Drake', 'Prospector · MISC', 'Ironclad Assault · Drake') 
+                      AND acquisition = 'Miete (Rental)';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v37 (Fleet in_hangar & acquisition restoration)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 37;");
+            dbSchemaVersion = 37;
+            Logger.Log("DB Schema: Migration auf v37 (Hangar-Eigentum & Herkunftsschutz) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
