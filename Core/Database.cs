@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 32; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v32: Entkoppelung von mobiGlas OCR-Saldodifferenzen von Missionsbelohnungen)
+    public const int CurrentSchemaVersion = 33; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v33: Bereinigung von OCR-Fehlerfassungen wie Slot-Namen in fleet_user_ships & Case-Insensitive JSON-Korrektur)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -774,6 +774,34 @@ public static class Database
             Exec(db, "PRAGMA user_version = 32;");
             dbSchemaVersion = 32;
             Logger.Log("DB Schema: Migration auf v32 (Missionsbelohnungen von OCR-Deltas entkoppelt & bereinigt) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 33)
+        {
+            try
+            {
+                // 1. Bogus-Schiffe aus OCR-Fehlinterpretationen (Slots, Livery, etc.) entfernen
+                Exec(db, @"
+                    DELETE FROM fleet_user_ships WHERE name IN (
+                        'Cooler I', 'Cooler 1', 'Weapon - Right', 'GOOVER', 'MO rr4', 'Livery',
+                        'Jump Module', 'Missile Slot 4', 'Liveries Propulsion'
+                    ) OR name LIKE 'Cooler%' OR name LIKE 'Weapon%' OR name LIKE 'Missile%' OR name LIKE 'Liveries%' OR name LIKE 'Jump Module%';
+                ");
+
+                // 2. Durch Deserialisierungsfehler korrumpierte Components-JSONs auf NULL zurücksetzen, damit frische Daten sauber eingelesen werden
+                Exec(db, @"
+                    UPDATE fleet_user_ships 
+                    SET components_json = NULL, components_updated_at = NULL 
+                    WHERE components_json LIKE '%""SlotType"":null%';
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v33 (Bereinigung falscher Schiffs-Einträge in fleet_user_ships)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 33;");
+            dbSchemaVersion = 33;
+            Logger.Log("DB Schema: Migration auf v33 (Bereinigung von OCR-Fehlerfassungen in fleet_user_ships) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2732,11 +2760,24 @@ public static class Database
         }
     }
 
+    private static readonly JsonSerializerOptions FleetJsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static void SaveFleetShipComponents(string name, string? livery, string componentsJson)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
         var cat = FleetCatalog.Lookup(name);
         var canonicalName = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : name;
+
+        // Sicherheits-Check: Nur echte, im Katalog bekannte Schiffe speichern
+        if (!FleetCatalog.IsKnownCatalogShip(canonicalName) && !FleetCatalog.IsKnownCatalogShip(name))
+        {
+            Logger.Log($"SaveFleetShipComponents: '{name}' ist kein bekanntes Schiff. Übersprungen.");
+            return;
+        }
+
         var nowStr = DateTime.UtcNow.ToString("o");
 
         lock (_writeLock)
@@ -2754,26 +2795,32 @@ public static class Database
                     readCmd.CommandText = "SELECT components_json FROM fleet_user_ships WHERE name = $n LIMIT 1;";
                     readCmd.Parameters.AddWithValue("$n", canonicalName);
                     var existingRaw = readCmd.ExecuteScalar() as string;
-                    if (!string.IsNullOrWhiteSpace(existingRaw))
+
+                    var newList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(componentsJson, FleetJsonOpts)?
+                        .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)))
+                        .ToList() ?? new List<ScannedShipComponent>();
+
+                    var existingList = !string.IsNullOrWhiteSpace(existingRaw)
+                        ? JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw, FleetJsonOpts)?
+                            .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)))
+                            .ToList()
+                        : null;
+
+                    var map = new Dictionary<string, ScannedShipComponent>(StringComparer.OrdinalIgnoreCase);
+                    if (existingList != null)
                     {
-                        var existingList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw);
-                        var newList = JsonSerializer.Deserialize<List<ScannedShipComponent>>(componentsJson);
-                        if (existingList != null && newList != null && existingList.Count > 0)
+                        foreach (var c in existingList)
                         {
-                            var map = new Dictionary<string, ScannedShipComponent>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var c in existingList)
-                            {
-                                var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
-                                map[key] = c;
-                            }
-                            foreach (var c in newList)
-                            {
-                                var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
-                                map[key] = c;
-                            }
-                            finalJson = JsonSerializer.Serialize(map.Values.ToList());
+                            var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
+                            map[key] = c;
                         }
                     }
+                    foreach (var c in newList)
+                    {
+                        var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
+                        map[key] = c;
+                    }
+                    finalJson = JsonSerializer.Serialize(map.Values.ToList(), FleetJsonOpts);
                 }
                 catch (Exception ex)
                 {

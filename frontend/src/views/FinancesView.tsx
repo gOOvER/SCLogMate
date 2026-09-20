@@ -948,7 +948,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                             type="button"
                             onClick={() => onNavigate?.('fleet', { search: item.ship })}
                             className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-xs group truncate max-w-full"
-                            title={`In Flotte anzeigen: ${item.ship}`}
+                            title={`Im Hangar anzeigen: ${item.ship}`}
                           >
                             <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
                             <span className="truncate">{item.ship}</span>
@@ -1042,7 +1042,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                             type="button"
                             onClick={() => onNavigate?.('fleet', { search: c.ship })}
                             className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-xs group truncate max-w-full"
-                            title={`In Flotte anzeigen: ${c.ship}`}
+                            title={`Im Hangar anzeigen: ${c.ship}`}
                           >
                             <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
                             <span className="truncate">{c.ship}</span>

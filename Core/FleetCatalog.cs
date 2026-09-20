@@ -252,6 +252,16 @@ public static class FleetCatalog
     private static readonly KeyValuePair<string, ShipCatalogEntry>[] SortedCatalog =
         Catalog.OrderByDescending(kv => kv.Key.Length).ToArray();
 
+    public static bool IsKnownCatalogShip(string? shipName)
+    {
+        if (string.IsNullOrWhiteSpace(shipName)) return false;
+        var clean = shipName.Trim();
+        if (!IsValidShipName(clean)) return false;
+        if (Catalog.ContainsKey(clean)) return true;
+        return Catalog.Values.Any(c => c.NormalizedName.Equals(clean, StringComparison.OrdinalIgnoreCase) ||
+                                       clean.Contains(c.NormalizedName, StringComparison.OrdinalIgnoreCase));
+    }
+
     public static bool IsValidShipName(string? shipName)
     {
         if (string.IsNullOrWhiteSpace(shipName)) return false;

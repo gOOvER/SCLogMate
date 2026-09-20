@@ -98,10 +98,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'Flotte & Inventar',
+      title: 'Hangar & Inventar',
       items: [
         { id: 'market', label: 'Markt', icon: ShoppingBag, badge: autoLoadCount },
-        { id: 'fleet', label: 'Flotte', icon: Rocket },
+        { id: 'fleet', label: 'Hangar', icon: Rocket },
         { id: 'wiki', label: 'Wiki Explorer', icon: BookOpen },
         { id: 'warehouse', label: 'Warenlager', icon: Box, badge: warehouseCount },
         { id: 'blueprints', label: 'Baupläne', icon: FileCode2 },

@@ -6110,9 +6110,9 @@ public partial class MainViewModel : ObservableObject
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("```yaml");
-        sb.AppendLine("# 🚀 Star Citizen Flotte — Übersicht");
+        sb.AppendLine("# 🚀 Star Citizen Hangar — Übersicht");
         sb.AppendLine($"Hangar-Schiffe: {HangarShipCount} (Flug-Historie: {AllFlownShipCount})");
-        sb.AppendLine($"Flottenwert (aUEC): {TotalFleetValueText}");
+        sb.AppendLine($"Hangarwert (aUEC): {TotalFleetValueText}");
         sb.AppendLine($"Pledge-Wert (USD): {TotalFleetPledgeUsdText}");
         sb.AppendLine($"Rollen-Verteilung: {CombatShipsCount} Kampf · {CargoShipsCount} Fracht · {IndustrialShipsCount} Industrie · {ExplorationShipsCount} Erkundung");
         sb.AppendLine("----------------------------------------");
@@ -6126,7 +6126,7 @@ public partial class MainViewModel : ObservableObject
         if (UiServices.TopLevel?.Clipboard is { } clip)
         {
             await clip.SetTextAsync(sb.ToString());
-            Status = "✓ Flotten-Zusammenfassung in Zwischenablage kopiert (Discord-Format)!";
+            Status = "✓ Hangar-Zusammenfassung in Zwischenablage kopiert (Discord-Format)!";
         }
     }
 

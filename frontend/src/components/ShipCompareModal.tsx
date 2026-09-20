@@ -126,7 +126,7 @@ export const ShipCompareModal: React.FC<ShipCompareModalProps> = ({
             <span className="text-2xl">⚖️</span>
             <div>
               <h2 className="text-lg font-bold text-white tracking-wide">
-                Schiffs- & Flotten-Vergleich
+                Schiffs- & Hangar-Vergleich
               </h2>
               <p className="text-xs text-slate-400">
                 Direkte Gegenüberstellung von Spezifikationen, Ballistik, Frachtraum & Händlerpreisen

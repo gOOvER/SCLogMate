@@ -182,7 +182,7 @@ public sealed class I18n : INotifyPropertyChanged
             ["Tab_Starmap"] = "🗺 Karte",
             ["Tab_BlackBox"] = "⏱ Flugschreiber",
             ["Tab_OreScanner"] = "⛏ Mining",
-            ["Tab_Fleet"] = "🛸 Flotte",
+            ["Tab_Fleet"] = "🛸 Hangar",
             ["Tab_Warehouse"] = "📦 Lager",
             ["Tab_Blueprints"] = "🛠 Baupläne",
             ["Tab_Loadout"] = "🥋 Ausrüstung",

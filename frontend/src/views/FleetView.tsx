@@ -151,7 +151,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
         setScreenshotFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         fetchFleet();
       } else {
-        setScreenshotFeedback(`✕ ${res.message || 'Kein VLM/Flotten-Screenshot erkannt'}`);
+        setScreenshotFeedback(`✕ ${res.message || 'Kein VLM/Hangar-Screenshot erkannt'}`);
       }
     } catch (err: any) {
       setScreenshotFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);

@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Changed
+- **UI Nomenclature Renamed: "Flotte" to "Hangar" (`frontend/src/components/Sidebar.tsx`, `frontend/src/views/SettingsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/views/EventsView.tsx`, `frontend/src/components/HudBar.tsx`, `frontend/src/components/ShipCompareModal.tsx`, `frontend/src/components/CargoFitModal.tsx`, `Views/MainWindow.axaml`, `Core/I18n.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Unified naming across all navigation sidebars, headers, tooltips, settings checkboxes, cross-link action buttons, and Discord export summaries: Renamed "Flotte" to "Hangar" everywhere (e.g. `Hangar & Inventar`, `Hangar`, `Im Hangar anzeigen`, `Hangar-Check`).
 - **Fleet View Table Title Deduplication & Sleek Activation Checkmark (`frontend/src/views/FleetView.tsx`)**:
   - **Clean Non-Redundant Ship Titles**: Stripped redundant manufacturer suffix (` · RSI`, ` · Drake`, etc.) from the ship name in the fleet table, displaying a clean primary ship title (e.g. `Hermes`, `Clipper`, `RAFT`, `MOTH`).
   - **Deduplicated Manufacturer Badges & Labels**: Subtitle now displays the full manufacturer name (e.g. `[RSI]` `Roberts Space Industries` instead of repeating `[RSI] RSI`).
@@ -45,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Harmonized Organization Card and Website Bar**: Polished organization branding, SID badge, rank display, and external website links with cohesive padding and border styling.
 
 ### Fixed
+- **Hangar Empty Display & Component Deserialization Crash Fix (`Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/FleetCatalog.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - **Database Migration v33**: Added SQLite schema migration `v33` in `Database.cs` to automatically purge misidentified component slot names (`Cooler 1`, `Cooler I`, `Weapon - Right`, `Livery`, `Jump Module`, etc.) from `fleet_user_ships`, and reset corrupted `[{"SlotType":null...}]` component records back to clean states.
+  - **Case-Insensitive JSON Options (`FleetJsonOpts`)**: Fixed an issue where `JsonSerializer.Deserialize` without options failed to match camelCase JSON properties to PascalCase `ScannedShipComponent` record properties, storing empty null records in the database.
+  - **Null-Safe Component Filtering in `GetFleetResponse`**: Fixed an unhandled `NullReferenceException` in `comps.Where(c => c.SlotType.Equals(...))` that crashed the backend fleet endpoint whenever null components were present, causing the Hangar view in the frontend to appear empty.
+  - **Strict Catalog Validation in `DetectShipName`**: Guarded ship identification with `FleetCatalog.IsKnownCatalogShip` and explicit slot name exclusions to prevent equipment slots from ever being registered as ships.
 - **Screenshot Loadout Scan IPC Timeout & Modal Manufacturer Deduplication (`Core/Photino/PhotinoBridge.cs`, `frontend/src/services/photinoBridge.ts`, `frontend/src/components/ShipLoadoutModal.tsx`, `frontend/src/views/FleetView.tsx`)**:
   - **Resolved IPC Timeout on Batch Scanning**: Fixed `Fehler: Photino IPC timeout after 12000ms for scan_screenshot_loadout`. Batch OCR scanning over multiple recent screenshots takes longer than the default 12-second frontend request window. Extended `scanScreenshotLoadout` timeout to 90 seconds (`90000ms`) and capped recent session screenshot batches to 20 files.
   - **Live Scanning Feedback**: Added active status feedback (`Scanne Screenshots (OCR läuft)...`) in both the Fleet View and the Ship Loadout modal while OCR is processing.

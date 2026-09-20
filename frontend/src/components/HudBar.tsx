@@ -413,7 +413,7 @@ export const HudBar: React.FC<HudBarProps> = ({
               <button
                 onClick={() => onNavigate('fleet')}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-sky-300 hover:text-sky-200 bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 transition cursor-pointer"
-                title="Flottenübersicht & Hangar öffnen"
+                title="Hangar öffnen"
               >
                 <span>{t('nav.fleet')}</span>
               </button>

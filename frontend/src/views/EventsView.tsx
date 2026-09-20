@@ -329,7 +329,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               }
             }}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 border border-sky-800/60 hover:border-sky-500 shrink-0 cursor-pointer transition"
-            title="In Flotte & Hangar aufrufen"
+            title="Im Hangar aufrufen"
           >
             <Rocket className="w-2.5 h-2.5 text-sky-400" />
             <span>Schiff</span>
@@ -802,7 +802,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                             onNavigate?.('fleet', { search: e.ship });
                           }}
                           className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/70 border border-sky-800/40 hover:border-sky-500 text-sky-300 hover:text-white transition cursor-pointer text-[11px] group truncate max-w-full"
-                          title={`In Flotte anzeigen: ${e.ship}`}
+                          title={`Im Hangar anzeigen: ${e.ship}`}
                         >
                           <Rocket className="w-3 h-3 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
                           <span className="truncate">{e.ship}</span>
@@ -837,7 +837,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                             onNavigate?.('fleet', { search: e.ship });
                           }}
                           className="opacity-0 group-hover/detail:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-400 text-[10px] text-sky-300 hover:text-white flex items-center gap-1 shrink-0 transition cursor-pointer font-mono"
-                          title={`Schiff in Flotte öffnen: ${e.ship}`}
+                          title={`Schiff im Hangar öffnen: ${e.ship}`}
                         >
                           <Rocket className="w-2.5 h-2.5 text-sky-400" />
                           <span>Schiff ↗</span>
@@ -949,10 +949,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           type="button"
                           onClick={() => onNavigate?.('fleet', { search: selectedEvent.ship })}
                           className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-400 text-sky-200 text-xs font-semibold transition cursor-pointer"
-                          title={`Schiff in Flotte anzeigen: ${selectedEvent.ship}`}
+                          title={`Schiff im Hangar anzeigen: ${selectedEvent.ship}`}
                         >
                           <Rocket className="w-3.5 h-3.5 text-sky-400" />
-                          <span className="truncate">In Flotte: {selectedEvent.ship}</span>
+                          <span className="truncate">Im Hangar: {selectedEvent.ship}</span>
                         </button>
                         <button
                           type="button"
@@ -1094,7 +1094,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.ship && contextMenu.event.ship !== '—'
               ? [
                   {
-                    label: `Schiff in Flotte anzeigen: ${contextMenu.event.ship}`,
+                    label: `Schiff im Hangar anzeigen: ${contextMenu.event.ship}`,
                     icon: Rocket,
                     onClick: () => {
                       onNavigate?.('fleet', { search: contextMenu.event.ship });

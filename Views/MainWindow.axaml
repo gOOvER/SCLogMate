@@ -290,8 +290,8 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
               <TextBlock Grid.Column="0" Classes="label" Text="{Binding I18n[Dash_Ship_Fleet]}" VerticalAlignment="Center" />
               <Button Grid.Column="1" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1" Margin="0,0,4,0"
-                      Command="{Binding SwitchToFleetTabCommand}" ToolTip.Tip="🛸 Flottenübersicht &amp; Hangar öffnen">
-                <TextBlock Text="🛸 Flotte" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
+                      Command="{Binding SwitchToFleetTabCommand}" ToolTip.Tip="🛸 Hangar &amp; Schiffsübersicht öffnen">
+                <TextBlock Text="🛸 Hangar" FontSize="10" Foreground="#58A6FF" FontWeight="Bold" />
               </Button>
               <Button Grid.Column="2" Classes="ghost" Padding="6,2" CornerRadius="4" Background="#060C16" BorderBrush="#1A3047" BorderThickness="1"
                       Command="{Binding ShowShipWikiCommand}" ToolTip.Tip="📖 Star Citizen Wiki Datenblatt öffnen">
@@ -4842,7 +4842,7 @@
                             <TextBlock Text="❖ Missionen" FontSize="11" Foreground="#C9D1D9" />
                           </CheckBox>
                           <CheckBox Grid.Column="2" IsChecked="{Binding WipeFilterFleet}">
-                            <TextBlock Text="✈ Flotte" FontSize="11" Foreground="#C9D1D9" />
+                            <TextBlock Text="✈ Hangar" FontSize="11" Foreground="#C9D1D9" />
                           </CheckBox>
                           <CheckBox Grid.Column="3" IsChecked="{Binding WipeFilterBlueprints}">
                             <TextBlock Text="🛠 Baupläne" FontSize="11" Foreground="#C9D1D9" />

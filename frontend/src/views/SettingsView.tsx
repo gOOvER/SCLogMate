@@ -1159,7 +1159,7 @@ export const SettingsView: React.FC = () => {
                     onChange={(e) => setSettings({ ...settings, wipeFilterFleet: e.target.checked })}
                     className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-800"
                   />
-                  <span className="text-xs text-slate-200">✈ Flotte</span>
+                  <span className="text-xs text-slate-200">✈ Hangar</span>
                 </label>
 
                 <label className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer">

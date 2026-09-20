@@ -221,23 +221,33 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             var trimmed = line.Trim();
             if (trimmed.Length < 3 || UiNoise.Contains(trimmed) || trimmed.StartsWith("Ä")) continue;
 
+            if (trimmed.StartsWith("Cooler", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Shield", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Quantum", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Jump", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Weapon", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Missile", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Turret", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Livery", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Liveries", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             // Pattern: Hersteller Präfix + Modell (z.B. "RSI HERMES", "ARGO MOTH")
             var m = Regex.Match(trimmed, @"^(?:RSI|ARGO|DRAKE|AEGIS|ANVIL|MISC|ORIGIN|CRUSADER|MIRAI|ESPERIA|GATAC|BANU|GREYCAT|TUMBRILL?)\s+(?<model>.+)$", RegexOptions.IgnoreCase);
             if (m.Success)
             {
                 var candidate = m.Groups["model"].Value.Trim();
-                var catEntry = FleetCatalog.Lookup(candidate);
-                if (catEntry.NormalizedName != "Unbekannt" && catEntry.Role != "Raumschiff")
+                if (FleetCatalog.IsKnownCatalogShip(candidate))
                 {
-                    return catEntry.NormalizedName;
+                    return FleetCatalog.Lookup(candidate).NormalizedName;
                 }
             }
 
             // Exakter Katalog-Abgleich auf bekannte Schiffe
-            var direct = FleetCatalog.Lookup(trimmed);
-            if (direct.NormalizedName != "Unbekannt" && direct.Role != "Raumschiff" && !direct.NormalizedName.Equals("Unbekannt", StringComparison.OrdinalIgnoreCase))
+            if (FleetCatalog.IsKnownCatalogShip(trimmed))
             {
-                return direct.NormalizedName;
+                return FleetCatalog.Lookup(trimmed).NormalizedName;
             }
 
             // Keyword check for recognizable ships in mobiGlas

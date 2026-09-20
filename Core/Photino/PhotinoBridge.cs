@@ -4585,7 +4585,10 @@ public class PhotinoBridge
             if (cd == null) customData.TryGetValue(stat.Ship, out cd);
 
             var (comps, liv, compsTs) = ResolveShipComponents(canonicalName, cd);
-            var ocrGuns = comps.Where(c => c.SlotType.Equals("Weapon", StringComparison.OrdinalIgnoreCase)).Select(c => c.ComponentName).ToList();
+            var ocrGuns = comps
+                .Where(c => c != null && !string.IsNullOrWhiteSpace(c.ComponentName) && string.Equals(c.SlotType, "Weapon", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.ComponentName)
+                .ToList();
 
             var shipDto = new FleetShipDto
             {
@@ -4644,7 +4647,10 @@ public class PhotinoBridge
                      _currentShip.Equals(shipName, StringComparison.OrdinalIgnoreCase));
 
                 var (comps, liv, compsTs) = ResolveShipComponents(canonicalName, cd);
-                var ocrGuns = comps.Where(c => c.SlotType.Equals("Weapon", StringComparison.OrdinalIgnoreCase)).Select(c => c.ComponentName).ToList();
+                var ocrGuns = comps
+                    .Where(c => c != null && !string.IsNullOrWhiteSpace(c.ComponentName) && string.Equals(c.SlotType, "Weapon", StringComparison.OrdinalIgnoreCase))
+                    .Select(c => c.ComponentName)
+                    .ToList();
 
                 ships.Add(new FleetShipDto
                 {
@@ -4721,7 +4727,11 @@ public class PhotinoBridge
                 var parsed = JsonSerializer.Deserialize<List<ScannedShipComponent>>(cd.ComponentsJson, JsonOpts);
                 if (parsed != null && parsed.Count > 0)
                 {
-                    return (parsed, livery, updatedAt);
+                    var valid = parsed.Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName))).ToList();
+                    if (valid.Count > 0)
+                    {
+                        return (valid, livery, updatedAt);
+                    }
                 }
             }
             catch { }

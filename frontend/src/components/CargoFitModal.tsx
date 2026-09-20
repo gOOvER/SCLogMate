@@ -405,7 +405,7 @@ export const CargoFitModal: React.FC<CargoFitModalProps> = ({
             <div className="sc-glass p-3 rounded-lg border border-slate-800 space-y-2">
               <h3 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-400" />
-                Flotten-Check: Welche Schiffe aus deinem Hangar können das laden?
+                Hangar-Check: Welche Schiffe aus deinem Hangar können das laden?
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
