@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Harmonized Organization Card and Website Bar**: Polished organization branding, SID badge, rank display, and external website links with cohesive padding and border styling.
 
 ### Fixed
+- **Screenshot Loadout Missing Coolers & Lookahead Truncation Fix (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `frontend/src/views/FleetView.tsx`)**:
+  - **Extended Lookahead Window**: Fixed an issue where Coolers (e.g. `Aufeis`, `Chili-Max`) were skipped during OCR parsing. In mobiGlas screenshots, category navigation tabs (`Avionics`, `Propulsion`, `Systems`, etc.) span 11 lines between the slot title (e.g. `Cooler 1`) and the actual component name, exceeding the old 10-line lookahead limit. Expanded the lookahead window to 35 lines while cleanly stopping when a subsequent component slot header is encountered.
+  - **OCR Bullet & Noise Stripping**: Stripped leading mobiGlas slot bullet artifacts (`L `, `| `, `> `) so slot labels like `L Cooler 1` and `L Weapon - Top Left` match cleanly.
+  - **Utility Mount Disambiguation**: Categorized salvage modules (`Baier Salvage Head`, scraper heads) under `Utility` slots instead of colliding with primary vehicle weapon slots.
+  - **Live Loadout Modal Synchronization (`FleetView.tsx`)**: Added reactive synchronization in `FleetView` to instantly update the open loadout modal when newly scanned components are received from the backend bridge.
 - **Screenshot Loadout Multi-Section Component Accumulation & Overwrite Fix (`Core/Database.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`)**:
   - **Component Merging across Sections**: `SaveFleetShipComponents` now merges newly scanned component slots with existing stored components by slot label instead of completely overwriting the JSON array. Capturing Systems in one screenshot and Weapons/Avionics in another will now accumulate all components without data loss.
   - **Robust Ship Name Detection in OCR**: Fixed `DetectShipName` in `ScreenshotLoadoutWatcher` to properly recognize `<Manufacturer> <ShipName>` headers (e.g. `RSI HERMES`, `ARGO MOTH`) and direct catalog names, resolving the bug where `RSI HERMES` was never matched because `Contains("Hermes · RSI")` failed against in-game mobiGlas text.

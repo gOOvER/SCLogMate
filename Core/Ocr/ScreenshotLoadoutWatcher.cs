@@ -278,93 +278,101 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         for (int i = 0; i < lines.Count; i++)
         {
             var line = lines[i];
+            var cleanLine = Regex.Replace(line, @"^[\s\-L><|•·\*\.]+\s*", "").Trim();
 
             string? slotType = null;
             string? slotLabel = null;
 
-            if (Regex.IsMatch(line, @"^Cooler(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(cleanLine, @"^Cooler(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Cooler";
-                slotLabel = CleanSlotLabel(line, "Cooler");
+                slotLabel = CleanSlotLabel(cleanLine, "Cooler");
             }
-            else if (Regex.IsMatch(line, @"^Power\s*Plant(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Power\s*Plant(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "PowerPlant";
-                slotLabel = CleanSlotLabel(line, "Power Plant");
+                slotLabel = CleanSlotLabel(cleanLine, "Power Plant");
             }
-            else if (Regex.IsMatch(line, @"^(?:Shield\s*Generator|Shield)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Shield\s*Generator|Shield)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Shield";
-                slotLabel = CleanSlotLabel(line, "Shield Generator");
+                slotLabel = CleanSlotLabel(cleanLine, "Shield Generator");
             }
-            else if (Regex.IsMatch(line, @"^Quantum\s*Drive", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Quantum\s*Drive", RegexOptions.IgnoreCase))
             {
                 slotType = "QuantumDrive";
                 slotLabel = "Quantum Drive";
             }
-            else if (Regex.IsMatch(line, @"^Jump\s*Module", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Jump\s*Module", RegexOptions.IgnoreCase))
             {
                 slotType = "QuantumDrive";
                 slotLabel = "Jump Module";
             }
-            else if (Regex.IsMatch(line, @"^Weapon\s*-\s*(Left|Right|Front|Top\s*Left|Top\s*Right|Top|Bottom|Rear)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Weapon\s*-\s*(Left|Right|Front|Top\s*Left|Top\s*Right|Top|Bottom|Rear)", RegexOptions.IgnoreCase))
             {
                 slotType = "Weapon";
-                slotLabel = line.Trim();
+                slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(line, @"^Turret\s*Weapon\s*Slot\s*\d+", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Turret\s*Weapon\s*Slot\s*\d+", RegexOptions.IgnoreCase))
             {
                 slotType = "Turret";
-                slotLabel = line.Trim();
+                slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(line, @"^(?:Remote|Manned)\s*Turret", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Remote|Manned)\s*Turret", RegexOptions.IgnoreCase))
             {
                 slotType = "Turret";
-                slotLabel = line.Trim();
+                slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(line, @"^Radar", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Radar", RegexOptions.IgnoreCase))
             {
                 slotType = "Avionics";
                 slotLabel = "Radar";
             }
-            else if (Regex.IsMatch(line, @"^Flight\s*Blade", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^Flight\s*Blade", RegexOptions.IgnoreCase))
             {
                 slotType = "Avionics";
                 slotLabel = "Flight Blade";
             }
-            else if (Regex.IsMatch(line, @"^(?:Tractor\s*(?:Mount|Turret)|Salvage\s*Head)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Tractor\s*(?:Mount|Turret)|Salvage\s*Head)", RegexOptions.IgnoreCase))
             {
                 slotType = "Utility";
-                slotLabel = line.Trim();
+                slotLabel = cleanLine;
             }
 
             if (slotType != null && slotLabel != null)
             {
                 string? compLine = null;
                 int k = i + 1;
-                while (k < lines.Count && k <= i + 10)
+                while (k < lines.Count && k <= i + 35)
                 {
                     var cand = lines[k].Trim();
-                    if (cand.StartsWith("Cooler", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Power Plant", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Shield", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Quantum", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Jump Module", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Weapon -", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Turret Weapon", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Radar", StringComparison.OrdinalIgnoreCase) ||
-                        cand.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase))
+                    var candClean = Regex.Replace(cand, @"^[\s\-L><|•·\*\.]+\s*", "").Trim();
+
+                    if (candClean.StartsWith("Cooler", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Shield", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Quantum", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Jump Module", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Weapon -", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Turret Weapon", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Radar", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase))
                     {
                         break;
                     }
 
-                    if (!UiNoise.Contains(cand) && cand.Length > 2 && !cand.StartsWith("Ä") && !cand.StartsWith("Select") &&
-                        !Regex.IsMatch(cand, @"^\d+\.(?:Turret|Gun)", RegexOptions.IgnoreCase))
+                    if (!UiNoise.Contains(cand) && !UiNoise.Contains(candClean) && candClean.Length > 2 &&
+                        !candClean.StartsWith("Ä") && !candClean.StartsWith("Select") &&
+                        !candClean.Contains("Livery", StringComparison.OrdinalIgnoreCase) &&
+                        !candClean.Contains("Paint", StringComparison.OrdinalIgnoreCase) &&
+                        !candClean.Contains("HERMES", StringComparison.OrdinalIgnoreCase) &&
+                        !candClean.Contains("MOTH", StringComparison.OrdinalIgnoreCase) &&
+                        !Regex.IsMatch(candClean, @"^\d+\.(?:Turret|Gun)", RegexOptions.IgnoreCase))
                     {
-                        compLine = cand;
+                        compLine = candClean;
                         if (compLine.Contains("Gimbal Mount", StringComparison.OrdinalIgnoreCase) && k + 1 < lines.Count)
                         {
-                            var nextGun = lines[k + 1].Trim();
+                            var nextGun = Regex.Replace(lines[k + 1].Trim(), @"^[\s\-L><|•·\*\.]+\s*", "").Trim();
                             if (!UiNoise.Contains(nextGun) && nextGun.Length > 2 && !nextGun.StartsWith("Ä"))
                             {
                                 compLine = $"{nextGun} ({compLine})";
@@ -379,6 +387,20 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 {
                     compLine = Regex.Replace(compLine, @"\[?\s*\(?\s*BRICKE[D\]I\)]*\s*\]?", "").Trim();
                     compLine = Regex.Replace(compLine, @"[O0\]]$", "").Trim();
+
+                    // Disambiguate Utility hardpoints (e.g. Salvage Heads on Weapon slots)
+                    if (compLine.Contains("Salvage Head", StringComparison.OrdinalIgnoreCase) ||
+                        compLine.Contains("Scraper", StringComparison.OrdinalIgnoreCase) ||
+                        compLine.Contains("Tractor", StringComparison.OrdinalIgnoreCase) ||
+                        compLine.Contains("Mining", StringComparison.OrdinalIgnoreCase))
+                    {
+                        slotType = "Utility";
+                        if (slotLabel.StartsWith("Weapon", StringComparison.OrdinalIgnoreCase))
+                        {
+                            slotLabel = slotLabel.Replace("Weapon", "Utility");
+                        }
+                    }
+
                     result.Add(new ScannedShipComponent(slotType, slotLabel, compLine));
                 }
             }

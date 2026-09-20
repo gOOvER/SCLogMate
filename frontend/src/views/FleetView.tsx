@@ -107,6 +107,13 @@ export const FleetView: React.FC<FleetViewProps> = ({
   }, []);
 
   useEffect(() => {
+    if (selectedLoadoutShip && fleetData?.ships) {
+      const updated = fleetData.ships.find(s => s.name === selectedLoadoutShip.name);
+      if (updated) setSelectedLoadoutShip(updated);
+    }
+  }, [fleetData]);
+
+  useEffect(() => {
     if (initialSearch !== undefined) {
       setSearch(initialSearch);
       if (initialTab) {

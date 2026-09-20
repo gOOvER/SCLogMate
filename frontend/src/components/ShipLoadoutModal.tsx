@@ -45,15 +45,23 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     switch (slotType.toLowerCase()) {
       case 'weapon':
         return <Crosshair className="w-3.5 h-3.5 text-amber-400" />;
+      case 'turret':
+        return <Crosshair className="w-3.5 h-3.5 text-orange-400" />;
       case 'quantumdrive':
       case 'qd':
+      case 'jumpmodule':
         return <Radio className="w-3.5 h-3.5 text-cyan-400" />;
+      case 'avionics':
+      case 'radar':
+        return <Radio className="w-3.5 h-3.5 text-indigo-400" />;
       case 'shield':
         return <Shield className="w-3.5 h-3.5 text-blue-400" />;
       case 'cooler':
         return <Cpu className="w-3.5 h-3.5 text-sky-400" />;
       case 'powerplant':
         return <Zap className="w-3.5 h-3.5 text-yellow-400" />;
+      case 'utility':
+        return <Wrench className="w-3.5 h-3.5 text-emerald-400" />;
       default:
         return <Wrench className="w-3.5 h-3.5 text-slate-400" />;
     }
@@ -63,15 +71,23 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     switch (slotType.toLowerCase()) {
       case 'weapon':
         return 'border-amber-500/30 bg-amber-950/20 text-amber-300';
+      case 'turret':
+        return 'border-orange-500/30 bg-orange-950/20 text-orange-300';
       case 'quantumdrive':
       case 'qd':
+      case 'jumpmodule':
         return 'border-cyan-500/30 bg-cyan-950/20 text-cyan-300';
+      case 'avionics':
+      case 'radar':
+        return 'border-indigo-500/30 bg-indigo-950/20 text-indigo-300';
       case 'shield':
         return 'border-blue-500/30 bg-blue-950/20 text-blue-300';
       case 'cooler':
         return 'border-sky-500/30 bg-sky-950/20 text-sky-300';
       case 'powerplant':
         return 'border-yellow-500/30 bg-yellow-950/20 text-yellow-300';
+      case 'utility':
+        return 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300';
       default:
         return 'border-slate-700/50 bg-slate-900/30 text-slate-300';
     }
