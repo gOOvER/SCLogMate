@@ -11,8 +11,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { bridge } from '../services/photinoBridge';
+import { useI18n } from '../i18n';
 
 export const AboutView: React.FC = () => {
+  const { t } = useI18n();
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
 
@@ -22,12 +24,12 @@ export const AboutView: React.FC = () => {
       setUpdateStatusMsg(null);
       const res = await bridge.checkUpdate();
       if (res && res.updateAvailable) {
-        setUpdateStatusMsg(`Update ${res.newVersion} verfügbar!`);
+        setUpdateStatusMsg(t('about.updateAvailable', { version: res.newVersion }) || `Update ${res.newVersion} available!`);
       } else {
-        setUpdateStatusMsg(`SCLogMate ist auf dem neuesten Stand (${res?.currentVersion || 'v1.0.0-rc3'}).`);
+        setUpdateStatusMsg(t('about.upToDate', { version: res?.currentVersion || 'v1.0.0-rc3' }) || `SCLogMate is up to date (${res?.currentVersion || 'v1.0.0-rc3'}).`);
       }
     } catch (e) {
-      setUpdateStatusMsg('Fehler bei der Update-Prüfung');
+      setUpdateStatusMsg(t('about.checkError') || 'Error checking for updates');
     } finally {
       setIsCheckingUpdate(false);
       setTimeout(() => setUpdateStatusMsg(null), 6000);
@@ -56,7 +58,7 @@ export const AboutView: React.FC = () => {
                 </span>
               </div>
               <p className="text-sm text-slate-400 mt-1">
-                Star Citizen Live Log Companion & Hochleistungs-Telemetrie Suite
+                {t('about.subtitle') || 'Star Citizen Live Log Companion & High-Performance Telemetry Suite'}
               </p>
               <div className="text-xs text-slate-500 font-mono mt-1">
                 .NET 10 · Photino.NET · React 19 · Tailwind CSS v4 · SQLite
@@ -71,7 +73,7 @@ export const AboutView: React.FC = () => {
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-semibold border border-cyan-800 transition cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-              <span>{isCheckingUpdate ? 'Prüfe...' : 'Auf Updates prüfen'}</span>
+              <span>{isCheckingUpdate ? (t('about.checking') || 'Checking...') : (t('about.checkUpdate') || 'Check for Updates')}</span>
             </button>
             <a
               href="https://github.com/gOOvER/SCLogMate"
@@ -92,7 +94,7 @@ export const AboutView: React.FC = () => {
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 border border-rose-400 transition"
             >
               <Coffee className="w-4 h-4" />
-              <span>Kaffee spendieren</span>
+              <span>{t('about.coffee') || 'Buy a Coffee'}</span>
             </a>
           </div>
         </div>
@@ -118,14 +120,13 @@ export const AboutView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-bold text-white">Unterstütze die Weiterentwicklung</h3>
+              <h3 className="text-sm font-bold text-white">{t('about.supportDev') || 'Unterstütze die Weiterentwicklung'}</h3>
               <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-bold">
-                COMMUNITY DRIVEN
+                {t('about.communityDriven') || 'COMMUNITY DRIVEN'}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              SCLogMate ist ein 100% freies und quelloffenes Community-Projekt für Star Citizen Piloten.
-              Wenn dir das Tool gefällt und deine Flüge erleichtert, freuen wir uns über jede Unterstützung!
+              {t('about.supportDesc') || 'SCLogMate ist ein 100% freies und quelloffenes Community-Projekt für Star Citizen Piloten.'}
             </p>
           </div>
         </div>
@@ -136,7 +137,7 @@ export const AboutView: React.FC = () => {
           rel="noopener noreferrer"
           className="px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold border border-rose-500/40 transition shrink-0"
         >
-          Spenden via Ko-fi ☕
+          {t('about.donateKofi') || 'Spenden via Ko-fi ☕'}
         </a>
       </div>
 
@@ -144,7 +145,7 @@ export const AboutView: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center space-x-2 text-sky-400 font-bold text-xs tracking-wider uppercase">
           <Sparkles className="w-4 h-4" />
-          <span>Das SCVerse Ökosystem</span>
+          <span>{t('about.ecosystemTitle') || 'Das SCVerse Ökosystem'}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -155,7 +156,7 @@ export const AboutView: React.FC = () => {
               <h4 className="text-xs font-bold text-white">SCLogMate Desktop</h4>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Lokaler Live-Companion mit Game.log Parser, OCR Kontostand-Erkennung, Offline-Starmap und Hardware-Optimierer.
+              {t('about.scLogMateDesc') || 'Lokaler Live-Companion mit Game.log Parser, OCR Kontostand-Erkennung, Offline-Starmap und Hardware-Optimierer.'}
             </p>
             <div className="text-[10px] font-mono text-sky-300 font-semibold pt-1">
               Photino.NET + React UI
@@ -166,10 +167,10 @@ export const AboutView: React.FC = () => {
           <div className="p-4 rounded-xl bg-slate-900/60 border border-purple-500/30 space-y-2">
             <div className="flex items-center space-x-2 text-purple-400">
               <Bot className="w-5 h-5" />
-              <h4 className="text-xs font-bold text-white">MobiNexus Bot</h4>
+              <h4 className="text-xs font-bold text-white">{t('about.mobiNexusTitle') || 'MobiNexus Bot'}</h4>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Leistungsstarker Discord-Bot für Flottenorganisation, Event-Planung, Verifizierung und automatische Synchronisation.
+              {t('about.mobiNexusDesc') || 'Leistungsstarker Discord-Bot für Flottenorganisation, Event-Planung, Verifizierung und automatische Synchronisation.'}
             </p>
             <div className="text-[10px] font-mono text-purple-300 font-semibold pt-1">
               Sapphire Framework / Node 24
@@ -180,10 +181,10 @@ export const AboutView: React.FC = () => {
           <div className="p-4 rounded-xl bg-slate-900/60 border border-emerald-500/30 space-y-2">
             <div className="flex items-center space-x-2 text-emerald-400">
               <Globe className="w-5 h-5" />
-              <h4 className="text-xs font-bold text-white">SCVerse Website</h4>
+              <h4 className="text-xs font-bold text-white">{t('about.scVerseWebTitle') || 'SCVerse Website'}</h4>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Zentrales Community-Portal mit interaktiver Starmap, Handelsrouten-Rechner, Bauplan-Archiv und Flottenübersicht.
+              {t('about.scVerseWebDesc') || 'Zentrales Community-Portal mit interaktiver Starmap, Handelsrouten-Rechner, Bauplan-Archiv und Flottenübersicht.'}
             </p>
             <div className="text-[10px] font-mono text-emerald-300 font-semibold pt-1">
               Next.js / Tailwind CSS
@@ -196,7 +197,7 @@ export const AboutView: React.FC = () => {
       <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
         <div className="flex items-center space-x-2 text-white font-bold text-xs tracking-wider uppercase">
           <Code2 className="w-4 h-4 text-sky-400" />
-          <span>Technologie & Frameworks</span>
+          <span>{t('about.techFrameworks') || 'Technologie & Frameworks'}</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -238,12 +239,10 @@ export const AboutView: React.FC = () => {
       {/* 5. CIG Community Disclaimer */}
       <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/60 text-[11px] text-slate-500 leading-relaxed space-y-2">
         <p className="font-semibold text-slate-400">
-          Rechtlicher Hinweis / Roberts Space Industries Community Disclaimer:
+          {t('about.legalDisclaimerTitle') || 'Rechtlicher Hinweis / Roberts Space Industries Community Disclaimer:'}
         </p>
         <p>
-          Dieses Projekt ist kein offizielles Produkt von Cloud Imperium Games oder Roberts Space Industries.
-          Star Citizen®, Squadron 42®, Roberts Space Industries® und Cloud Imperium Games® sind eingetragene Warenzeichen
-          der Cloud Imperium Rights LLC. Alle Spielinhalte, Grafiken und Bezeichnungen sind geistiges Eigentum der jeweiligen Rechteinhaber.
+          {t('about.legalDisclaimerText') || 'Dieses Projekt ist kein offizielles Produkt von Cloud Imperium Games oder Roberts Space Industries.'}
         </p>
       </div>
     </div>

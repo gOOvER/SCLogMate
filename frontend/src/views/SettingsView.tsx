@@ -48,7 +48,7 @@ import { SettingsPluginsTab } from './SettingsPluginsTab';
 import { useI18n } from '../i18n';
 
 export const SettingsView: React.FC = () => {
-  const { locale } = useI18n();
+  const { locale, setLocale } = useI18n();
   const [activeSubTab, setActiveSubTab] = useState<
     'general' | 'wipe' | 'hud' | 'ocr' | 'uex' | 'audio' | 'plugins' | 'database' | 'developer'
   >('general');
@@ -389,6 +389,11 @@ export const SettingsView: React.FC = () => {
         setSettings(data);
         if (data.selectedFontFamily) {
           applyFontFamily(data.selectedFontFamily);
+        }
+        if (data.appLanguage === 'en-US' || data.appLanguage === 'en') {
+          setLocale('en');
+        } else if (data.appLanguage === 'de-DE' || data.appLanguage === 'de') {
+          setLocale('de');
         }
         if (data.uexApiKey) {
           setUexApiKeyInput(data.uexApiKey);
@@ -1015,7 +1020,15 @@ export const SettingsView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
               <select
                 value={settings.appLanguage || 'Auto'}
-                onChange={(e) => setSettings({ ...settings, appLanguage: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSettings({ ...settings, appLanguage: val });
+                  if (val === 'en-US' || val === 'en') {
+                    setLocale('en');
+                  } else {
+                    setLocale('de');
+                  }
+                }}
                 className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
               >
                 <option value="Auto">🌐 Auto (Systemstandard)</option>

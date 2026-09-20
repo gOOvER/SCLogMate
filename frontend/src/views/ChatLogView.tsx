@@ -16,12 +16,14 @@ import {
 import { ChatMessageDto, PilotProfile, bridge } from '../services/photinoBridge';
 import { PlayerReportModal } from '../components/PlayerReportModal';
 import { PilotDossierModal } from '../components/PilotDossierModal';
+import { useI18n } from '../i18n';
 
 interface ChatLogViewProps {
   initialSession?: string;
 }
 
 export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanningNow, setScanningNow] = useState(false);
@@ -281,7 +283,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
         <div className="sc-glass rounded-lg p-4 border border-cyan-500/30 sc-hud-corner relative overflow-hidden">
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Erfasste Nachrichten (OCR)
+              {t('chat.ocrLog') || 'Erfasste Nachrichten (OCR)'}
             </span>
             <MessageSquare className="w-4 h-4 text-cyan-400" />
           </div>
@@ -289,7 +291,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
             <span className="text-2xl font-bold font-mono text-cyan-300">
               {messages.length}
             </span>
-            <span className="text-xs font-normal text-slate-400">Zeilen</span>
+            <span className="text-xs font-normal text-slate-400">{t('common.lines') || 'Zeilen'}</span>
           </div>
         </div>
 
@@ -297,7 +299,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
         <div className="sc-glass rounded-lg p-4 border border-rose-500/30 sc-hud-corner relative overflow-hidden">
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Markiert für CIG Support-Report
+              {t('chat.flaggedOnly') || 'Markiert für Support-Report'}
             </span>
             <ShieldAlert className="w-4 h-4 text-rose-400" />
           </div>
@@ -306,7 +308,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
               <span className="text-2xl font-bold font-mono text-rose-300">
                 {flaggedCount}
               </span>
-              <span className="text-xs font-normal text-slate-400">Vorfälle</span>
+              <span className="text-xs font-normal text-slate-400">{t('chat.incidents') || 'Vorfälle'}</span>
             </div>
             {flaggedCount > 0 && (
               <button
@@ -314,7 +316,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold shadow-lg shadow-rose-950/50 transition-colors flex items-center space-x-1"
               >
                 <ShieldAlert className="w-3 h-3" />
-                <span>Ticket erstellen</span>
+                <span>{t('chat.createReport') || 'Report erstellen'}</span>
               </button>
             )}
           </div>
@@ -324,7 +326,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
         <div className="sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner relative overflow-hidden">
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Live Chat-Scanner (3,5s Takt)
+              {t('chat.title') || 'Live Chat-Scanner (3,5s Takt)'}
             </span>
             <Radio
               className={`w-4 h-4 ${
@@ -340,7 +342,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 }`}
               />
               <span className="text-sm font-bold text-slate-200">
-                {ocrEnabled ? 'AKTIV' : 'PAUSIERT'}
+                {ocrEnabled ? (t('common.statusActive') || 'AKTIV') : (t('common.statusPaused') || 'PAUSIERT')}
               </span>
             </div>
             <div className="flex items-center space-x-1.5">
@@ -348,19 +350,19 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 onClick={handleSelectRegion}
                 disabled={selectingRegion}
                 className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700 flex items-center space-x-1 transition-colors disabled:opacity-50"
-                title="Chat-Scanbereich interaktiv am Bildschirm markieren"
+                title={t('chat.selectRegion') || 'Chat-Scanbereich interaktiv am Bildschirm markieren'}
               >
                 <Crop className={`w-3 h-3 text-cyan-400 ${selectingRegion ? 'animate-spin' : ''}`} />
-                <span>Bereich</span>
+                <span>{t('chat.selectRegionBtn') || 'Bereich'}</span>
               </button>
               <button
                 onClick={handleTestScan}
                 disabled={testingScan}
                 className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs border border-slate-700 flex items-center space-x-1 transition-colors disabled:opacity-50"
-                title="OCR-Test auf aktuellem Chat-Bereich ausführen"
+                title={t('chat.testOcr') || 'OCR-Test auf aktuellem Chat-Bereich ausführen'}
               >
                 <Zap className={`w-3 h-3 text-amber-400 ${testingScan ? 'animate-spin' : ''}`} />
-                <span>Test</span>
+                <span>{t('chat.testBtn') || 'Test'}</span>
               </button>
               <button
                 onClick={handleToggleOcr}
@@ -370,16 +372,16 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                     : 'border-emerald-600/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
                 }`}
               >
-                {ocrEnabled ? 'Pause' : 'Start'}
+                {ocrEnabled ? (t('common.pause') || 'Pause') : (t('common.start') || 'Start')}
               </button>
               <button
                 onClick={handleTriggerScan}
                 disabled={scanningNow}
                 className="px-2 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs border border-cyan-500/50 flex items-center space-x-1 transition-colors disabled:opacity-50"
-                title="Manuellen Chat-Scan sofort auslösen"
+                title={t('chat.scanScreen') || 'Manuellen Chat-Scan sofort auslösen'}
               >
                 <RefreshCw className={`w-3 h-3 ${scanningNow ? 'animate-spin' : ''}`} />
-                <span>Scan</span>
+                <span>{t('chat.scanBtn') || 'Scan'}</span>
               </button>
             </div>
           </div>
@@ -408,7 +410,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              Alle Kanäle
+              {t('chat.allChannels') || 'Alle Kanäle'}
             </button>
             <button
               onClick={() => setSelectedChannel('Global')}
@@ -418,7 +420,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              [Global]
+              [{t('chat.global') || 'Global'}]
             </button>
             <button
               onClick={() => setSelectedChannel('Party')}
@@ -428,7 +430,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              [Party]
+              [{t('chat.party') || 'Party'}]
             </button>
             <button
               onClick={() => setSelectedChannel('Direct')}
@@ -438,7 +440,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              [Direct / Whisper]
+              [{t('chat.whisper') || 'Direct / Whisper'}]
             </button>
             {distinctOrgChannels.map((orgCh) => (
               <button
@@ -461,20 +463,20 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
               onClick={handleTriggerScan}
               disabled={scanningNow}
               className="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[11px] flex items-center space-x-1 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
-              title="In-Game Chatbereich jetzt sofort scannen"
+              title={t('chat.scanScreen') || 'In-Game Chatbereich jetzt sofort scannen'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${scanningNow ? 'animate-spin' : ''}`} />
-              <span>Scan</span>
+              <span>{t('chat.scanBtn') || 'Scan'}</span>
             </button>
 
             <button
               onClick={handleSelectRegion}
               disabled={selectingRegion}
               className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] border border-slate-700/60 flex items-center space-x-1 transition-colors disabled:opacity-50 cursor-pointer"
-              title="Chatfenster-Scanbereich am Bildschirm markieren"
+              title={t('chat.selectRegion') || 'Chatfenster-Scanbereich am Bildschirm markieren'}
             >
               <Crop className={`w-3.5 h-3.5 text-cyan-400 ${selectingRegion ? 'animate-spin' : ''}`} />
-              <span>Bereich</span>
+              <span>{t('chat.selectRegionBtn') || 'Bereich'}</span>
             </button>
 
             <button
@@ -484,9 +486,8 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   ? 'border-emerald-600/50 bg-emerald-950/50 text-emerald-300 hover:bg-emerald-900/60'
                   : 'border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800'
               }`}
-              title="Automatischen OCR-Hintergrundscanner (3,5s) starten oder pausieren"
             >
-              <span>{ocrEnabled ? 'Live: Ein' : 'Live: Aus'}</span>
+              <span>{ocrEnabled ? 'Live: ON' : 'Live: OFF'}</span>
             </button>
           </div>
         </div>
@@ -501,7 +502,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Spieler oder Chat-Nachricht suchen..."
+                placeholder={t('chat.searchChat') || 'Spieler oder Chat-Nachricht suchen...'}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-slate-200 text-xs focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
@@ -513,7 +514,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                 onChange={(e) => setFlaggedOnly(e.target.checked)}
                 className="rounded border-slate-700 text-rose-500 focus:ring-0 cursor-pointer"
               />
-              <span className="text-[11px]">Nur Markierte</span>
+              <span className="text-[11px]">{t('chat.flaggedOnly') || 'Nur Markierte'}</span>
             </label>
           </div>
 
@@ -526,10 +527,10 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                   ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
                   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
-              title="Automatisches Scrollen bei neuen OCR-Nachrichten"
+              title={t('chat.autoScroll') || 'Automatisches Scrollen'}
             >
               <ChevronDown className={`w-3.5 h-3.5 ${autoScroll ? 'text-cyan-400' : ''}`} />
-              <span>Auto-Scroll</span>
+              <span>{t('chat.autoScroll') || 'Auto-Scroll'}</span>
             </button>
 
             <button
@@ -537,13 +538,13 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
               className="px-3 py-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-500 border border-rose-500 text-white font-bold transition-colors flex items-center space-x-1.5 shadow-lg shadow-rose-950/40 cursor-pointer"
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Report erstellen</span>
+              <span>{t('chat.createReport') || 'Report erstellen'}</span>
             </button>
 
             <button
               onClick={handleClearChat}
               className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-900 transition-colors cursor-pointer"
-              title="Chat-Protokoll leeren"
+              title="Clear Chat Log"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -555,11 +556,11 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
       <div className="sc-glass rounded-xl border border-slate-800 flex-1 flex flex-col min-h-[420px] max-h-[64vh] overflow-hidden">
         {/* Table Header */}
         <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-950/90 border-b border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 select-none">
-          <div className="w-16 shrink-0">Zeit</div>
-          <div className="w-20 shrink-0">Kanal</div>
-          <div className="w-36 shrink-0">Sender (Pilot)</div>
-          <div className="flex-1 min-w-0">Nachricht</div>
-          <div className="w-14 text-right shrink-0">Aktion</div>
+          <div className="w-16 shrink-0">{t('chat.time') || 'Zeit'}</div>
+          <div className="w-20 shrink-0">{t('chat.channel') || 'Kanal'}</div>
+          <div className="w-36 shrink-0">{t('chat.sender') || 'Sender (Pilot)'}</div>
+          <div className="flex-1 min-w-0">{t('chat.message') || 'Nachricht'}</div>
+          <div className="w-14 text-right shrink-0">{t('common.actions') || 'Aktion'}</div>
         </div>
 
         {/* Message Chronicle Rows */}
@@ -567,20 +568,20 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
           {loading && messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500 space-y-3">
               <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-              <p className="text-xs">Lade In-Game Chat-Protokoll...</p>
+              <p className="text-xs">{t('chat.scanning') || 'Lade In-Game Chat-Protokoll...'}</p>
             </div>
           ) : filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 space-y-3">
               <MessageSquare className="w-8 h-8 text-slate-700" />
               <p className="text-xs font-semibold text-slate-400">
                 {messages.length === 0
-                  ? 'Noch keine Chat-Nachrichten erfasst.'
-                  : 'Keine Nachrichten für den aktuellen Filter gefunden.'}
+                  ? (t('chat.noMessages') || 'Noch keine Chat-Nachrichten erfasst.')
+                  : (t('chat.noFilteredMessages') || 'Keine Nachrichten für den aktuellen Filter gefunden.')}
               </p>
               <p className="text-[11px] text-slate-600 max-w-md text-center">
                 {messages.length === 0
-                  ? 'Der optische Chat-Scanner überwacht den Star Citizen Chat-Bereich links oben im Spiel. Drücke "Scan", wähle den Bereich oder starte den Scanner.'
-                  : 'Passe die Suchkriterien oder Kanäle an.'}
+                  ? (t('chat.noMessagesHint') || 'Nutze die automatische Texterkennung oder scanne den Bildschirm, um Ingame-Chat zu erfassen.')
+                  : ''}
               </p>
               {messages.length === 0 && (
                 <div className="flex items-center space-x-2 pt-2">
@@ -590,7 +591,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                     className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-cyan-950/50 cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${scanningNow ? 'animate-spin' : ''}`} />
-                    <span>Jetzt Chat scannen</span>
+                    <span>{t('chat.scanScreen') || 'Jetzt Chat scannen'}</span>
                   </button>
                   <button
                     onClick={handleSelectRegion}
@@ -598,7 +599,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                     className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs border border-slate-700 flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Crop className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Chat-Bereich auswählen</span>
+                    <span>{t('chat.selectRegion') || 'Chat-Bereich auswählen'}</span>
                   </button>
                 </div>
               )}
@@ -657,7 +658,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                     <button
                       onClick={(e) => handleOpenDossier(msg.sender, e)}
                       className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline truncate flex items-center space-x-1 text-left text-xs"
-                      title="Citizen Dossier aufrufen"
+                      title={t('chat.openDossier') || 'Citizen Dossier aufrufen'}
                     >
                       <User className="w-3 h-3 shrink-0 opacity-70" />
                       <span className="truncate">{msg.sender}</span>
@@ -680,8 +681,8 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                       }`}
                       title={
                         msg.isFlagged
-                          ? 'Markierung für Support-Report aufheben'
-                          : 'Als Vorfall / Beweis markieren'
+                          ? (t('chat.unflag') || 'Markierung aufheben')
+                          : (t('chat.flagSuspect') || 'Als Vorfall / Beweis markieren')
                       }
                     >
                       {msg.isFlagged ? (
@@ -694,7 +695,7 @@ export const ChatLogView: React.FC<ChatLogViewProps> = ({ initialSession }) => {
                     <button
                       onClick={() => handleOpenReportModal(msg.sender, msg)}
                       className="p-1 rounded text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      title="Diesen Vorfall direkt an CIG melden"
+                      title={t('chat.createReport') || 'Diesen Vorfall melden'}
                     >
                       <ShieldAlert className="w-3.5 h-3.5" />
                     </button>
