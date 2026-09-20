@@ -197,6 +197,31 @@ public sealed class PluginHttpServer : IDisposable
                 return;
             }
 
+            // 3. Serve cached wiki vehicle images: /cache/images/{fileName}
+            if (rawUrl.StartsWith("/cache/images/", StringComparison.OrdinalIgnoreCase))
+            {
+                var fileName = rawUrl.Substring("/cache/images/".Length).TrimStart('/');
+                var cacheDir = Path.Combine(Settings.Dir, "cache", "wiki", "images");
+                var targetFile = Path.GetFullPath(Path.Combine(cacheDir, fileName));
+
+                // Path traversal guard
+                if (!targetFile.StartsWith(Path.GetFullPath(cacheDir), StringComparison.OrdinalIgnoreCase) || !File.Exists(targetFile))
+                {
+                    response.StatusCode = 404;
+                    response.Close();
+                    return;
+                }
+
+                var ext = Path.GetExtension(targetFile);
+                response.ContentType = MimeTypes.TryGetValue(ext, out var mime) ? mime : "image/webp";
+                response.AddHeader("Cache-Control", "public, max-age=86400");
+                using var fs = File.OpenRead(targetFile);
+                response.ContentLength64 = fs.Length;
+                await fs.CopyToAsync(response.OutputStream);
+                response.Close();
+                return;
+            }
+
             // Default fallback response
             response.StatusCode = 200;
             response.ContentType = "text/plain; charset=utf-8";

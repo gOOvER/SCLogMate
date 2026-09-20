@@ -4908,7 +4908,7 @@ public class PhotinoBridge
                 var (catComps, _, _) = ResolveShipComponents(s.NormalizedName, null);
                 var shortCatName = s.NormalizedName.Split('·')[0].Trim();
                 var catWiki = Database.GetCachedWikiVehicle(s.NormalizedName) ?? Database.GetCachedWikiVehicle(shortCatName);
-                var catImg = WikiImageCache.ResolveBestImage(catWiki?.ImageUrl, catWiki?.ThumbnailUrl);
+                var catImg = !string.IsNullOrEmpty(catWiki?.ThumbnailUrl) ? catWiki.ThumbnailUrl : catWiki?.ImageUrl;
                 return new CatalogShipDto
                 {
                     Name = s.NormalizedName,

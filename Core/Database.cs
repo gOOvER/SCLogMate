@@ -3553,8 +3553,15 @@ public static class Database
         EnsureInitialized();
         if (string.IsNullOrWhiteSpace(name)) return null;
         var clean = name.Trim();
-        if (clean.Contains(" · ")) clean = clean.Split(" · ")[0].Trim();
+        var mfg = "";
+        if (clean.Contains(" · "))
+        {
+            var parts = clean.Split(" · ");
+            clean = parts[0].Trim();
+            if (parts.Length > 1) mfg = parts[1].Trim();
+        }
         if (clean.Contains('(')) clean = clean.Split('(')[0].Trim();
+        var mfgPrefix = !string.IsNullOrEmpty(mfg) ? $"{mfg} {clean}".Trim() : clean;
         try
         {
             using var db = new SqliteConnection(Conn);
@@ -3568,12 +3575,24 @@ public static class Database
                 FROM wiki_vehicles_cache 
                 WHERE name = $raw COLLATE NOCASE 
                    OR name = $clean COLLATE NOCASE 
+                   OR name = $mfgPrefix COLLATE NOCASE
                    OR name LIKE $likePrefix COLLATE NOCASE
+                   OR name LIKE $likeContains COLLATE NOCASE
+                ORDER BY 
+                   CASE 
+                     WHEN name = $raw COLLATE NOCASE THEN 1
+                     WHEN name = $clean COLLATE NOCASE THEN 2
+                     WHEN name = $mfgPrefix COLLATE NOCASE THEN 3
+                     WHEN name LIKE $likePrefix COLLATE NOCASE THEN 4
+                     ELSE 5
+                   END
                 LIMIT 1;
             ";
             cmd.Parameters.AddWithValue("$raw", name.Trim());
             cmd.Parameters.AddWithValue("$clean", clean);
+            cmd.Parameters.AddWithValue("$mfgPrefix", mfgPrefix);
             cmd.Parameters.AddWithValue("$likePrefix", clean + "%");
+            cmd.Parameters.AddWithValue("$likeContains", "%" + clean + "%");
             using var reader = cmd.ExecuteReader();
             if (reader.Read())
             {

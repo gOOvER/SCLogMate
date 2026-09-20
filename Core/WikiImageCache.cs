@@ -80,55 +80,70 @@ public static class WikiImageCache
     }
 
     /// <summary>
-    /// Prüft, ob entweder die Haupt-Bild-URL oder das Thumbnail bereits im lokalen Disk-Cache liegt.
-    /// Falls ja, wird sofort die Base64 Data-URI zurückgegeben (schnell, offline, kein Hotlink-Block).
-    /// Andernfalls wird der Hintergrund-Download angestoßen und die beste Remote-URL geliefert.
+    /// Prüft, ob das Thumbnail oder Haupt-Bild bereits im lokalen Disk-Cache liegt.
+    /// Falls ja, wird die lokale Loopback-HTTP-URL ("http://127.0.0.1:{port}/cache/images/...")
+    /// oder eine schlanke Base64-Data-URI geliefert (verzögerungsfrei, offline, kein IPC-Overhead).
+    /// Andernfalls wird der Hintergrund-Download für das schlanke Thumbnail angestoßen.
     /// </summary>
     public static string? ResolveBestImage(string? imageUrl, string? thumbnailUrl)
     {
-        // 1. Zuerst Disk-Cache für ImageUrl prüfen
-        if (!string.IsNullOrWhiteSpace(imageUrl))
-        {
-            var p = GetLocalCachePath(imageUrl);
-            if (File.Exists(p))
-            {
-                try
-                {
-                    var bytes = File.ReadAllBytes(p);
-                    if (bytes.Length > 0)
-                    {
-                        var mime = GetMimeType(p);
-                        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
-                    }
-                }
-                catch { }
-            }
-        }
-
-        // 2. Disk-Cache für ThumbnailUrl prüfen
+        // 1. Zuerst Disk-Cache für ThumbnailUrl prüfen (schneller, optimierte Größe)
         if (!string.IsNullOrWhiteSpace(thumbnailUrl))
         {
             var p = GetLocalCachePath(thumbnailUrl);
             if (File.Exists(p))
             {
-                try
-                {
-                    var bytes = File.ReadAllBytes(p);
-                    if (bytes.Length > 0)
-                    {
-                        var mime = GetMimeType(p);
-                        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
-                    }
-                }
-                catch { }
+                var uri = GetServeUri(p);
+                if (!string.IsNullOrEmpty(uri)) return uri;
             }
         }
 
-        // 3. Wenn noch nicht gecacht: Beide URLs im Hintergrund laden
-        if (!string.IsNullOrWhiteSpace(imageUrl)) PrefetchImage(imageUrl);
-        if (!string.IsNullOrWhiteSpace(thumbnailUrl)) PrefetchImage(thumbnailUrl);
+        // 2. Disk-Cache für ImageUrl prüfen
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            var p = GetLocalCachePath(imageUrl);
+            if (File.Exists(p))
+            {
+                var uri = GetServeUri(p);
+                if (!string.IsNullOrEmpty(uri)) return uri;
+            }
+        }
 
-        return !string.IsNullOrWhiteSpace(imageUrl) ? imageUrl : thumbnailUrl;
+        // 3. Wenn noch nicht gecacht: Vorrangig schlankes Thumbnail im Hintergrund laden
+        if (!string.IsNullOrWhiteSpace(thumbnailUrl))
+        {
+            PrefetchImage(thumbnailUrl);
+        }
+        else if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            PrefetchImage(imageUrl);
+        }
+
+        return !string.IsNullOrWhiteSpace(thumbnailUrl) ? thumbnailUrl : imageUrl;
+    }
+
+    private static string? GetServeUri(string localFilePath)
+    {
+        try
+        {
+            var port = Plugins.PluginManager.Instance.ServerPort;
+            if (port > 0)
+            {
+                var fileName = Path.GetFileName(localFilePath);
+                return $"http://127.0.0.1:{port}/cache/images/{fileName}";
+            }
+
+            var fi = new FileInfo(localFilePath);
+            if (fi.Length > 0 && fi.Length < 1_500_000)
+            {
+                var bytes = File.ReadAllBytes(localFilePath);
+                var mime = GetMimeType(localFilePath);
+                return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+            }
+        }
+        catch { }
+
+        return null;
     }
 
     /// <summary>
@@ -146,13 +161,16 @@ public static class WikiImageCache
                 {
                     Directory.CreateDirectory(CacheDir);
                     var bytes = await Http.GetByteArrayAsync(remoteUrl);
-                    if (bytes.Length > 0)
+                    if (bytes != null && bytes.Length > 0)
                     {
                         await File.WriteAllBytesAsync(localPath, bytes);
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.Log($"[WikiImageCache] Download fehlgeschlagen für {remoteUrl}: {ex.Message}");
+            }
         });
     }
 

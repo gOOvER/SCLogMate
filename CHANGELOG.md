@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
 
 ### Fixed
+- **Fleet Wiki Ship Matching & High-Performance Loopback HTTP Image Delivery (`Core/Database.cs`, `Core/WikiImageCache.cs`, `Core/Plugins/PluginHttpServer.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - **Manufacturer-Prefixed Vehicle Matching**: Fixed missing images and specs for MISC ships like Hull B (`Hull B · MISC`) and Cutlass Black where wiki entries are prefixed by manufacturer (`MISC Hull B`). Updated `Database.GetCachedWikiVehicle` with composite manufacturer-prefix and substring match queries.
+  - **Loopback HTTP Image Server Endpoint**: Exposed `/cache/images/{fileName}` on the embedded `PluginHttpServer` loopback server (`http://127.0.0.1:<port>`). Serves cached vehicle photos directly via streaming HTTP with caching headers instead of transmitting 30+ megabytes of Base64 strings across Photino IPC, completely eliminating IPC stalls, UI delays, and temporary blank hangar views.
+  - **Thumbnail Prioritization & Catalog Loop Optimization**: Prioritized lightweight ~40 KB thumbnails over multi-megabyte raw PNGs during background prefetch, and bypassed redundant image resolution in the 150+ ship catalog loop.
 - **Fleet Ship Photo Resolution & Local Data-URI Serving (`Core/WikiImageCache.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/FleetView.tsx`)**:
   - Fixed missing ship photos (such as Origin M80) by adding `WikiImageCache.ResolveBestImage`: cached images on disk are converted into Base64 Data URIs (`data:image/...;base64,...`) for instant offline rendering, avoiding remote WebP hotlink blocks in WebView2.
   - Added a graceful fallback placeholder inside the ship photo hover preview card.
