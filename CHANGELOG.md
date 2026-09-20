@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc4] - 2026-09-20
 ### Fixed
 - **Hangar Queue vs Assignment Voice Trigger Separation (`Core/LogParser.cs`, `Core/AuroraVoiceService.cs`)**:
   - Distinctly classified `Joined hangar queue` / `In Hangar-Warteschlange eingereiht` as `In Hangar-Warteschlange eingereiht` in `LogParser`, separating queue waiting state from actual hangar clearance.
@@ -840,6 +841,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
 
