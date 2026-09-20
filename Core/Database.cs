@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 35; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v35: Korrektur der Versionsbezeichnung für SC 4.10.1 Sessions / Build 12660092)
+    public const int CurrentSchemaVersion = 36; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v36: MOTH & Fleet Loadout Radar, ASOP Loadout Estimate Support & Komponenten-Bereinigung)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -902,6 +902,96 @@ public static class Database
             Exec(db, "PRAGMA user_version = 35;");
             dbSchemaVersion = 35;
             Logger.Log("DB Schema: Migration auf v35 (Korrektur der Versionsbezeichnung & Komponenten-OCR-Bereinigung) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 36)
+        {
+            try
+            {
+                // v36: MOTH & Fleet Komponenten-Bereinigung:
+                // Radar (Agrippa Civ/2/A), Power Plant (Durango Ind/3/A), Shield (Barbican Ind/3/B), Weapons (Tarantula GT-870) und Utilities (Abrade, Cinch, ReadyGrip)
+                using var readCmd = db.CreateCommand();
+                readCmd.CommandText = "SELECT name, components_json FROM fleet_user_ships WHERE name LIKE '%MOTH%' AND components_json IS NOT NULL;";
+                using (var reader = readCmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        var name = reader.GetString(0);
+                        var mothComponents = new List<ScannedShipComponent>
+                        {
+                            new("Cooler", "Cooler 1", "Chill-Max (Ind/3/A)"),
+                            new("Avionics", "Flight Blade", "Flight Blade"),
+                            new("QuantumDrive", "Jump Module", "Excelsior (Civ/2/C)"),
+                            new("PowerPlant", "Power Plant 1", "Durango (Ind/3/A)"),
+                            new("QuantumDrive", "Quantum Drive", "Huracan (Ind/2/B)"),
+                            new("Avionics", "Radar", "Agrippa (Civ/2/A)"),
+                            new("Utility", "Utility 1", "Abrade Scraper"),
+                            new("Utility", "Utility 2", "Cinch Scraper"),
+                            new("Utility", "Utility 3", "ReadyGrip Tractor"),
+                            new("Shield", "Shield Generator 1", "Barbican (Ind/3/B)"),
+                            new("Weapon", "Weapon 1", "Tarantula GT-870")
+                        };
+
+                        using var updateCmd = db.CreateCommand();
+                        updateCmd.CommandText = "UPDATE fleet_user_ships SET components_json = $j, livery = 'MOTH Rockwell' WHERE name = $n;";
+                        updateCmd.Parameters.AddWithValue("$j", JsonSerializer.Serialize(mothComponents, FleetJsonOpts));
+                        updateCmd.Parameters.AddWithValue("$n", name);
+                        updateCmd.ExecuteNonQuery();
+                    }
+                }
+
+                // Schiffe bereinigen, bei denen ein Radar als "Flight Blade" eingetragen war
+                using var scanCmd = db.CreateCommand();
+                scanCmd.CommandText = "SELECT name, components_json FROM fleet_user_ships WHERE components_json LIKE '%Agrippa%' OR components_json LIKE '%Cassandra%';";
+                var shipUpdates = new List<(string ShipName, string NewJson)>();
+                using (var scReader = scanCmd.ExecuteReader())
+                {
+                    while (scReader.Read())
+                    {
+                        var sName = scReader.GetString(0);
+                        var rawJson = scReader.GetString(1);
+                        try
+                        {
+                            var comps = JsonSerializer.Deserialize<List<ScannedShipComponent>>(rawJson, FleetJsonOpts);
+                            if (comps != null)
+                            {
+                                bool changed = false;
+                                foreach (var c in comps)
+                                {
+                                    if (ScreenshotLoadoutWatcher.IsKnownRadar(c.ComponentName) && c.SlotLabel != "Radar")
+                                    {
+                                        comps.Remove(c);
+                                        comps.Add(new ScannedShipComponent("Avionics", "Radar", c.ComponentName));
+                                        changed = true;
+                                        break;
+                                    }
+                                }
+                                if (changed)
+                                {
+                                    shipUpdates.Add((sName, JsonSerializer.Serialize(comps, FleetJsonOpts)));
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                foreach (var (shipName, newJson) in shipUpdates)
+                {
+                    using var uCmd = db.CreateCommand();
+                    uCmd.CommandText = "UPDATE fleet_user_ships SET components_json = $j WHERE name = $n;";
+                    uCmd.Parameters.AddWithValue("$j", newJson);
+                    uCmd.Parameters.AddWithValue("$n", shipName);
+                    uCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v36 (MOTH & Fleet Loadout Radar/Component update)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 36;");
+            dbSchemaVersion = 36;
+            Logger.Log("DB Schema: Migration auf v36 (MOTH & Fleet Loadout Radar & Komponenten-Bereinigung) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2867,7 +2957,7 @@ public static class Database
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static void SaveFleetShipComponents(string name, string? livery, string componentsJson)
+    public static void SaveFleetShipComponents(string name, string? livery, string componentsJson, bool isFullSnapshot = false)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
         var cat = FleetCatalog.Lookup(name);
@@ -2916,27 +3006,65 @@ public static class Database
                         .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)) && IsValid(c))
                         .ToList() ?? new List<ScannedShipComponent>();
 
-                    var existingList = !string.IsNullOrWhiteSpace(existingRaw)
-                        ? JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw, FleetJsonOpts)?
-                            .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)) && IsValid(c))
-                            .ToList()
-                        : null;
+                    // Wenn ein Voll-Snapshot (z.B. ASOP "LOADOUT ESTIMATE") vorliegt, die Liste direkt als autoritatives Loadout übernehmen
+                    if (isFullSnapshot && newList.Count > 0)
+                    {
+                        finalJson = JsonSerializer.Serialize(newList, FleetJsonOpts);
+                    }
+                    else
+                    {
+                        var existingList = !string.IsNullOrWhiteSpace(existingRaw)
+                            ? JsonSerializer.Deserialize<List<ScannedShipComponent>>(existingRaw, FleetJsonOpts)?
+                                .Where(c => c != null && (!string.IsNullOrWhiteSpace(c.SlotType) || !string.IsNullOrWhiteSpace(c.ComponentName)) && IsValid(c))
+                                .ToList()
+                            : null;
 
-                    var map = new Dictionary<string, ScannedShipComponent>(StringComparer.OrdinalIgnoreCase);
-                    if (existingList != null)
-                    {
-                        foreach (var c in existingList)
+                        string GetKey(ScannedShipComponent c)
                         {
-                            var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
-                            map[key] = c;
+                            var compName = (c.ComponentName ?? "").Trim();
+                            var label = (c.SlotLabel ?? "").Trim();
+                            var type = (c.SlotType ?? "").Trim();
+
+                            if (ScreenshotLoadoutWatcher.IsKnownRadar(compName) || label.Equals("Radar", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return "Avionics_Radar";
+                            }
+
+                            if (type.Equals("Weapons", StringComparison.OrdinalIgnoreCase) ||
+                                type.Equals("Weapon", StringComparison.OrdinalIgnoreCase) ||
+                                type.Equals("Utility", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Weapon", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Gun", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Scraper", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Tractor", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Utility", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Blade", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return $"{type}_{label}_{compName}";
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(label))
+                            {
+                                return label;
+                            }
+
+                            return $"{type}_{compName}";
                         }
+
+                        var map = new Dictionary<string, ScannedShipComponent>(StringComparer.OrdinalIgnoreCase);
+                        if (existingList != null)
+                        {
+                            foreach (var c in existingList)
+                            {
+                                map[GetKey(c)] = c;
+                            }
+                        }
+                        foreach (var c in newList)
+                        {
+                            map[GetKey(c)] = c;
+                        }
+                        finalJson = JsonSerializer.Serialize(map.Values.ToList(), FleetJsonOpts);
                     }
-                    foreach (var c in newList)
-                    {
-                        var key = !string.IsNullOrWhiteSpace(c.SlotLabel) ? c.SlotLabel : $"{c.SlotType}_{c.ComponentName}";
-                        map[key] = c;
-                    }
-                    finalJson = JsonSerializer.Serialize(map.Values.ToList(), FleetJsonOpts);
                 }
                 catch (Exception ex)
                 {

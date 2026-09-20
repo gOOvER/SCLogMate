@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 
@@ -22,7 +23,8 @@ public sealed record ScreenshotLoadoutResult(
     string? Livery,
     IReadOnlyList<ScannedShipComponent> Components,
     string? SourceFile,
-    string? Message
+    string? Message,
+    bool IsFullSnapshot = false
 );
 
 /// <summary>
@@ -157,7 +159,10 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             .Where(l => !string.IsNullOrWhiteSpace(l))
             .ToList();
 
-        // 1. Prüfen, ob es sich um VLM oder Fleet Manager handelt
+        // 1. Prüfen, ob es sich um VLM, ASOP Fleet Manager oder LOADOUT ESTIMATE handelt
+        bool isLoadoutEstimate = ocrText.Contains("LOADOUT ESTIMATE", StringComparison.OrdinalIgnoreCase) ||
+                                 (ocrText.Contains("REPLACEMENT FEE", StringComparison.OrdinalIgnoreCase) && ocrText.Contains("FLEET MANAGE", StringComparison.OrdinalIgnoreCase));
+
         bool isVlm = ocrText.Contains("Vehicle Loadout", StringComparison.OrdinalIgnoreCase) ||
                      ocrText.Contains("Loadout Manager", StringComparison.OrdinalIgnoreCase) ||
                      ocrText.Contains("VLM", StringComparison.OrdinalIgnoreCase);
@@ -170,9 +175,10 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                              ocrText.Contains("Power Plant", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Shield", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Quantum Drive", StringComparison.OrdinalIgnoreCase) ||
-                             ocrText.Contains("Weapon", StringComparison.OrdinalIgnoreCase);
+                             ocrText.Contains("Weapon", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Radar", StringComparison.OrdinalIgnoreCase);
 
-        if (!isVlm && !isFleetManager && !hasComponents)
+        if (!isLoadoutEstimate && !isVlm && !isFleetManager && !hasComponents)
         {
             return new(false, null, null, Array.Empty<ScannedShipComponent>(), sourceFile, "Kein Schiffs-Ausrüstungsbildschirm erkannt.");
         }
@@ -182,9 +188,26 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
         // 3. Lackierung / Livery ermitteln
         string? livery = DetectLivery(lines);
+        if (isLoadoutEstimate && string.IsNullOrWhiteSpace(livery))
+        {
+            foreach (var l in lines)
+            {
+                var clean = l.Trim();
+                if (clean.EndsWith("Rockwell", StringComparison.OrdinalIgnoreCase) ||
+                    clean.EndsWith("Paint", StringComparison.OrdinalIgnoreCase) ||
+                    clean.EndsWith("Livery", StringComparison.OrdinalIgnoreCase) ||
+                    clean.EndsWith("Skin", StringComparison.OrdinalIgnoreCase))
+                {
+                    livery = clean;
+                    break;
+                }
+            }
+        }
 
         // 4. Komponenten parsen
-        var components = ParseComponents(lines);
+        var components = isLoadoutEstimate
+            ? ParseLoadoutEstimateComponents(lines)
+            : ParseComponents(lines);
 
         if (components.Count == 0 && string.IsNullOrWhiteSpace(shipName))
         {
@@ -197,7 +220,8 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             Livery: livery,
             Components: components,
             SourceFile: sourceFile,
-            Message: $"Erfolgreich eingelesen: {shipName ?? "Schiff"} ({components.Count} Komponenten erkannt)"
+            Message: $"Erfolgreich eingelesen: {shipName ?? "Schiff"} ({components.Count} Komponenten erkannt)",
+            IsFullSnapshot: isLoadoutEstimate
         );
     }
 
@@ -333,10 +357,10 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 slotType = "Turret";
                 slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(cleanLine, @"^Radar", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"(?:^|\b)Radar(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Avionics";
-                slotLabel = "Radar";
+                slotLabel = CleanSlotLabel(cleanLine, "Radar");
             }
             else if (Regex.IsMatch(cleanLine, @"^Flight\s*Blade", RegexOptions.IgnoreCase))
             {
@@ -432,6 +456,13 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                         }
                     }
 
+                    // Disambiguate Radar vs Flight Blade in Avionics
+                    if (IsKnownRadar(compLine))
+                    {
+                        slotType = "Avionics";
+                        slotLabel = "Radar";
+                    }
+
                     compLine = NormalizeComponentName(compLine);
                     result.Add(new ScannedShipComponent(slotType, slotLabel, compLine));
                 }
@@ -464,6 +495,212 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         name = Regex.Replace(name, @"\(CiV/", "(Civ/");
 
         return name.Trim();
+    }
+
+    public static bool IsKnownRadar(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var lower = name.ToLowerInvariant();
+        return lower.Contains("agrippa") ||
+               lower.Contains("cassandra") ||
+               lower.Contains("circe") ||
+               lower.Contains("milvus") ||
+               lower.Contains("lanner") ||
+               lower.Contains("sparrow") ||
+               lower.Contains("gyrfalcon") ||
+               lower.Contains("echohawk") ||
+               lower.Contains("nightshade") ||
+               lower.Contains("fulgur") ||
+               lower.Contains("predator") ||
+               lower.Contains("spook") ||
+               lower.Contains("perses") ||
+               lower.Contains("tarsus") ||
+               lower.Contains("radar");
+    }
+
+    /// <summary>
+    /// Parst Komponenten aus dem übersichtlichen ASOP "LOADOUT ESTIMATE" Terminal-Popup (Versicherungs-/Loadout-Übersicht).
+    /// </summary>
+    private static List<ScannedShipComponent> ParseLoadoutEstimateComponents(List<string> lines)
+    {
+        var result = new List<ScannedShipComponent>();
+        var noise = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "LOADOUT ESTIMATE", "FLEET MANAGE", "FLEET MANAGER", "><", "NAME", "OTY", "QTY", "TYPE",
+            "TOTAL ITEMS", "REPLACEMENT", "FEE", "FEE O", "COOLDOWN", "TIMER", "SUBMIT",
+            "MEDIUM SALVAGE", "LIGHT FIGHTER", "MEDIUM FREIGHT", "HEAVY FIGHTER", "LIGHT FREIGHT",
+            "HEAVY FREIGHT", "EXPLORATION", "MINING", "SALVAGE", "GUNSHIP", "CORVETTE", "CARRIER",
+            "Misc.", "Fuse", "Flair", "Flair Item", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+        };
+
+        int coolerCount = 0;
+        int powerPlantCount = 0;
+        int shieldCount = 0;
+        int weaponCount = 0;
+        int utilityCount = 0;
+
+        foreach (var line in lines)
+        {
+            var clean = Regex.Replace(line, @"^[\s\-L><|•·\*\.]+\s*", "").Trim();
+            if (clean.Length < 3 || noise.Contains(clean)) continue;
+            if (Regex.IsMatch(clean, @"^[0-9:\. n¤,]+$")) continue;
+
+            // Reine Spalten-/Typenbezeichner überspringen
+            if (clean.Equals("Cooler", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Quantum Drive", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Quantum Drives", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Jump Module", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Shield Generator", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Radar", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Scraper Beam", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Scraper Bearn", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Gun", StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals("Liveries", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Schiffsnamen oder Lackierungszeilen überspringen (werden separat erfasst)
+            if (clean.StartsWith("ARGO", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("RSI", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("DRAKE", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("AEGIS", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("ANVIL", StringComparison.OrdinalIgnoreCase) ||
+                clean.StartsWith("MISC", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("Livery", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("Paint", StringComparison.OrdinalIgnoreCase) ||
+                clean.EndsWith("Rockwell", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string? slotType = null;
+            string? slotLabel = null;
+
+            // 1. Radar
+            if (IsKnownRadar(clean))
+            {
+                slotType = "Avionics";
+                slotLabel = "Radar";
+            }
+            // 2. Flight Blade
+            else if (clean.Contains("Flight Blade", StringComparison.OrdinalIgnoreCase) || clean.Contains("Engine", StringComparison.OrdinalIgnoreCase))
+            {
+                if (result.Any(c => c.SlotLabel == "Flight Blade")) continue;
+                slotType = "Avionics";
+                slotLabel = "Flight Blade";
+            }
+            // 3. Jump Module
+            else if (clean.Contains("Excelsior", StringComparison.OrdinalIgnoreCase) || clean.Contains("Jump Module", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "QuantumDrive";
+                slotLabel = "Jump Module";
+            }
+            // 4. Quantum Drive
+            else if (clean.Contains("Huracan", StringComparison.OrdinalIgnoreCase) || clean.Contains("Bolt", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Atlas", StringComparison.OrdinalIgnoreCase) || clean.Contains("Voyage", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Crossfield", StringComparison.OrdinalIgnoreCase) || clean.Contains("Beacon", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Siren", StringComparison.OrdinalIgnoreCase) || clean.Contains("Goliath", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "QuantumDrive";
+                slotLabel = "Quantum Drive";
+            }
+            // 5. Cooler
+            else if (clean.Contains("Chill-Max", StringComparison.OrdinalIgnoreCase) || clean.Contains("Chili-Max", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Aufeis", StringComparison.OrdinalIgnoreCase) || clean.Contains("Glacier", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("IceBox", StringComparison.OrdinalIgnoreCase) || clean.Contains("Polar", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("SnowPack", StringComparison.OrdinalIgnoreCase) || clean.Contains("ThermaMax", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("FrostStar", StringComparison.OrdinalIgnoreCase) || clean.Contains("Eco", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Cooler", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "Cooler";
+                coolerCount++;
+                slotLabel = coolerCount > 1 ? $"Cooler {coolerCount}" : "Cooler 1";
+            }
+            // 6. Power Plant
+            else if (clean.Contains("Durango", StringComparison.OrdinalIgnoreCase) || clean.Contains("Ginzel", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Gin-zel", StringComparison.OrdinalIgnoreCase) || clean.Contains("FullForce", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("QuadraCell", StringComparison.OrdinalIgnoreCase) || clean.Contains("SuperNova", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Bolide", StringComparison.OrdinalIgnoreCase) || clean.Contains("Power Plant", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "PowerPlant";
+                powerPlantCount++;
+                slotLabel = powerPlantCount > 1 ? $"Power Plant {powerPlantCount}" : "Power Plant 1";
+            }
+            // 7. Shield Generator
+            else if (clean.Contains("Barbican", StringComparison.OrdinalIgnoreCase) || clean.Contains("Akura", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("FullStop", StringComparison.OrdinalIgnoreCase) || clean.Contains("Funstop", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("FR-", StringComparison.OrdinalIgnoreCase) || clean.Contains("Palisade", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Rampart", StringComparison.OrdinalIgnoreCase) || clean.Contains("Mirage", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("AllStop", StringComparison.OrdinalIgnoreCase) || clean.Contains("STOP", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "Shield";
+                shieldCount++;
+                slotLabel = shieldCount > 1 ? $"Shield Generator {shieldCount}" : "Shield Generator 1";
+            }
+            // 8. Utility (Scraper, Tractor, Mining)
+            else if (clean.Contains("Scraper", StringComparison.OrdinalIgnoreCase) || clean.Contains("Abrade", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Cinch", StringComparison.OrdinalIgnoreCase) || clean.Contains("Tractor", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("ReadyGrip", StringComparison.OrdinalIgnoreCase) || clean.Contains("Baier", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Mining", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "Utility";
+                utilityCount++;
+                slotLabel = $"Utility {utilityCount}";
+            }
+            // 9. Weapons (Guns, Repeaters, Cannons)
+            else if (clean.Contains("Tarantula", StringComparison.OrdinalIgnoreCase) || clean.Contains("Badger", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Rhino", StringComparison.OrdinalIgnoreCase) || clean.Contains("Panther", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("CF-", StringComparison.OrdinalIgnoreCase) || clean.Contains("Repeater", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Cannon", StringComparison.OrdinalIgnoreCase) || clean.Contains("Gatling", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("GT-", StringComparison.OrdinalIgnoreCase) || clean.Contains("Laser", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Ballistic", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "Weapon";
+                weaponCount++;
+                slotLabel = $"Weapon {weaponCount}";
+            }
+
+            if (slotType != null && slotLabel != null)
+            {
+                var normalized = NormalizeComponentName(clean);
+                result.Add(new ScannedShipComponent(slotType, slotLabel, normalized));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Speichert ein Bild aus der Windows-Zwischenablage als temporäre Datei auf der Festplatte.
+    /// </summary>
+    public static async Task<string?> SaveClipboardImageToFileAsync()
+    {
+        try
+        {
+            var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+            if (content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Bitmap))
+            {
+                var bitmapRef = await content.GetBitmapAsync();
+                using var stream = await bitmapRef.OpenReadAsync();
+                var decoder = await BitmapDecoder.CreateAsync(stream);
+                using var sBmp = await decoder.GetSoftwareBitmapAsync();
+
+                var tempPath = Path.Combine(Path.GetTempPath(), $"sclogmate_clipboard_{DateTime.UtcNow.Ticks}.png");
+                using var fileStream = File.Create(tempPath);
+                var randomAccessStream = fileStream.AsRandomAccessStream();
+                var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, randomAccessStream);
+                encoder.SetSoftwareBitmap(sBmp);
+                await encoder.FlushAsync();
+                return tempPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("SaveClipboardImageToFileAsync", ex);
+        }
+        return null;
     }
 
     private static string CleanSlotLabel(string raw, string prefix)

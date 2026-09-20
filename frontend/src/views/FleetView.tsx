@@ -19,6 +19,7 @@ import {
   Scale,
   Wrench,
   Palette,
+  Clipboard,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
 import { ShipCompareModal } from '../components/ShipCompareModal';
@@ -160,6 +161,37 @@ export const FleetView: React.FC<FleetViewProps> = ({
       setTimeout(() => setScreenshotFeedback(null), 8000);
     }
   };
+
+  const handleScanClipboard = async () => {
+    setIsScanningScreenshot(true);
+    setScreenshotFeedback('Scanne Zwischenablage (OCR läuft)...');
+    try {
+      const res = await bridge.scanClipboardLoadout();
+      if (res.success) {
+        setScreenshotFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
+        fetchFleet();
+      } else {
+        setScreenshotFeedback(`✕ ${res.message || 'Kein Ausrüstungsbild in der Zwischenablage erkannt'}`);
+      }
+    } catch (err: any) {
+      setScreenshotFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
+    } finally {
+      setIsScanningScreenshot(false);
+      setTimeout(() => setScreenshotFeedback(null), 8000);
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      // Wenn der Fokus in einem Eingabefeld liegt, natives Pasten nicht abfangen
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (isScanningScreenshot) return;
+      handleScanClipboard();
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isScanningScreenshot]);
 
   // Actions
   const handleToggleHangar = async (shipName: string) => {
@@ -374,6 +406,21 @@ export const FleetView: React.FC<FleetViewProps> = ({
             >
               <Camera className={`w-3.5 h-3.5 ${isScanningScreenshot ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
               <span>{isScanningScreenshot ? 'Scanne...' : 'Screenshot OCR'}</span>
+            </button>
+
+            {/* 📋 Screenshot aus Zwischenablage scannen */}
+            <button
+              onClick={handleScanClipboard}
+              disabled={isScanningScreenshot}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition shadow-sm cursor-pointer border ${
+                isScanningScreenshot
+                  ? 'bg-slate-800 text-slate-400 border-slate-700'
+                  : 'bg-[#091a2e] hover:bg-[#0f2947] text-cyan-300 border-cyan-800/60 hover:border-cyan-500'
+              }`}
+              title="Screenshot direkt aus der Zwischenablage einlesen (oder einfach Strg+V drücken)"
+            >
+              <Clipboard className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Zwischenablage (Strg+V)</span>
             </button>
 
             {screenshotFeedback && (

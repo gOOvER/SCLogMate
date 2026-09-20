@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **ASOP Terminal "LOADOUT ESTIMATE" & Windows Clipboard Loadout Scanning (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/`)**:
+  - **Native ASOP "LOADOUT ESTIMATE" Terminal Support**: Added full OCR recognition for Star Citizen ASOP Fleet Manager terminal insurance claim popups ("LOADOUT ESTIMATE" table with NAME, QTY, TYPE columns). Captures the vessel's complete loadout (all 21 items across all slots including Coolers, Power Plants, Quantum Drives, Jump Modules, Radars, Shields, Weapons, Scrapers/Tractors, and Liveries) in a single screenshot without needing to switch tabs.
+  - **Authoritative Full-Snapshot Merge**: Added `isFullSnapshot` mode to `SaveFleetShipComponents`, allowing ASOP terminal loadout estimates to authoritatively represent the active vessel configuration.
+  - **Direct Windows Clipboard Scanning & Paste (`Ctrl+V`)**: Added native WinRT `Clipboard.GetContent()` image extraction and `scan_clipboard_loadout` RPC endpoint. Users can now press `Ctrl+V` or click "Zwischenablage (Strg+V)" in Fleet View and the Loadout Modal to scan screenshots copied via `Win+Shift+S`, Snipping Tool, or PrintScreen—bypassing CryEngine in-game screenshot buffer blackouts.
+  - **Dedicated Radar Slot Icon**: Integrated the Lucide `Radar` icon into `ShipLoadoutModal.tsx` for visual distinction from standard avionics/computers.
 - **Hybrid Plugin System for Custom Dashboards, HUD Widgets & Extensions (`Core/Plugins/`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/`)**:
   - **Embedded Loopback HTTP Plugin Server (`Core/Plugins/PluginHttpServer.cs`)**: Serves plugin static assets (HTML/JS/CSS/media) on `http://127.0.0.1:<port>` with robust MIME detection, full CORS headers (`Access-Control-Allow-Origin: *`), and streaming support for OBS Studio Browser Sources and external web browsers.
   - **Auto-Injected JavaScript Plugin SDK (`/sclogmate.js`)**: Automatically delivers the official client SDK via the embedded HTTP server. Provides simple, asynchronous helper functions (`SCLogMate.getTelemetry()`, `SCLogMate.getSessions()`, `SCLogMate.getFleet()`, `SCLogMate.getStatus()`, `SCLogMate.showNotification()`, `SCLogMate.on()`) over bidirectional `postMessage` RPC.
@@ -17,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Settings Plugin Management Tab (`frontend/src/views/SettingsPluginsTab.tsx`, `frontend/src/views/SettingsView.tsx`)**: Added a dedicated `🧩 Plugins & Widgets` tab in Settings allowing users to toggle plugins on/off, reload manifests without restarting the app, view plugin directories, and copy OBS source URLs.
 
 ### Fixed
+- **Ship Radar Component Detection & Merge Collision Fix (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Database.cs`)**:
+  - **Radar Component Recognition**: Added known radar pattern recognition (`Agrippa`, `Cassandra`, `Circe`, `Milvus`, `Lanner`, `Sparrow`, etc.) and refined regex to prevent radar modules from being misattributed as `Flight Blade`.
+  - **Component Overwrite & Slot Collision Prevention**: Fixed slot key resolution in `Database.SaveFleetShipComponents` where multiple avionics or weapon components collided on identical keys (e.g. `Flight Blade` overwriting `Agrippa`). Radars now resolve to isolated `Avionics_Radar` keys, and multi-slotted weapons/utilities include component identifiers.
+  - **Database Migration v36**: Added schema migration v36 to restore radar (`Agrippa (Civ/2/A)`), power plant (`Durango (Ind/3/A)`), shields, and utilities for `MOTH · Argo`, and correct any ships with radars incorrectly saved as flight blades.
 - **Ship Loadout OCR Normalization & Typo Correction (`frontend/src/components/ShipLoadoutModal.tsx`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Database.cs`)**:
   - Corrected OCR misread component names and garbled specification brackets in the Ship Loadout modal (e.g. `Gin-zel (Inci/MC)` corrected to `Ginzel (Ind/3/C)`, `Chili-Max` to `Chill-Max`, `5CA 'Akura•` to `5CA 'Akura'`, and `Funstop` to `FullStop`).
   - Added frontend `normalizeDisplayComponentName` to render clean component titles in the loadout modal cards, and enhanced `cleanComponentName` for SCWiki lookup.

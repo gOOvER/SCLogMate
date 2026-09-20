@@ -1458,6 +1458,10 @@ class PhotinoBridge {
     return this.sendRequest<ScreenshotLoadoutResult>('scan_screenshot_loadout', { filePath }, timeoutMs);
   }
 
+  public scanClipboardLoadout(timeoutMs = 90000): Promise<ScreenshotLoadoutResult> {
+    return this.sendRequest<ScreenshotLoadoutResult>('scan_clipboard_loadout', {}, timeoutMs);
+  }
+
   public clearShipComponents(shipName: string): Promise<FleetResponseDto> {
     return this.sendRequest<FleetResponseDto>('clear_ship_components', { shipName });
   }

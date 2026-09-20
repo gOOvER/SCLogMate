@@ -19,6 +19,8 @@ import {
   BookOpen,
   ExternalLink,
   Coins,
+  Radar,
+  Clipboard,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from './PipsAnalyzerBadge';
 
@@ -99,8 +101,9 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
       case 'jumpmodule':
         return <Radio className="w-3.5 h-3.5 text-cyan-400" />;
       case 'avionics':
-      case 'radar':
         return <Radio className="w-3.5 h-3.5 text-indigo-400" />;
+      case 'radar':
+        return <Radar className="w-3.5 h-3.5 text-indigo-400" />;
       case 'shield':
         return <Shield className="w-3.5 h-3.5 text-blue-400" />;
       case 'cooler':
@@ -166,7 +169,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
         setFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         onRefreshFleet();
       } else {
-        setFeedback(`✕ ${res.message || 'Kein VLM-Screenshot erkannt'}`);
+        setFeedback(`✕ ${res.message || 'Kein VLM/ASOP-Screenshot erkannt'}`);
       }
     } catch (err: any) {
       setFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
@@ -175,6 +178,37 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
       setTimeout(() => setFeedback(null), 8000);
     }
   };
+
+  const handleScanClipboard = async () => {
+    setIsScanning(true);
+    setFeedback('Scanne Zwischenablage (OCR läuft)...');
+    try {
+      const res = await bridge.scanClipboardLoadout();
+      if (res.success) {
+        setFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
+        onRefreshFleet();
+      } else {
+        setFeedback(`✕ ${res.message || 'Kein Ausrüstungsbild in der Zwischenablage erkannt'}`);
+      }
+    } catch (err: any) {
+      setFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
+    } finally {
+      setIsScanning(false);
+      setTimeout(() => setFeedback(null), 8000);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handlePaste = (e: ClipboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (isScanning) return;
+      handleScanClipboard();
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isOpen, isScanning]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
@@ -428,6 +462,16 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
             >
               <Camera className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
               <span>{isScanning ? 'Scanne Screenshot...' : 'Screenshot scannen'}</span>
+            </button>
+
+            <button
+              onClick={handleScanClipboard}
+              disabled={isScanning}
+              className="px-3 py-1.5 rounded-md bg-[#091a2e] hover:bg-[#0f2947] border border-cyan-800 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+              title="Screenshot direkt aus der Zwischenablage scannen (oder einfach Strg+V drücken)"
+            >
+              <Clipboard className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Aus Zwischenablage (Strg+V)</span>
             </button>
 
             {isCustomScanned && (

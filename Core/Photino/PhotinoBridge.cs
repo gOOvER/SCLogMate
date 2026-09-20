@@ -1162,7 +1162,7 @@ public class PhotinoBridge
                     var compsJson = res.Components != null && res.Components.Count > 0
                         ? JsonSerializer.Serialize(res.Components, JsonOpts)
                         : "[]";
-                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson);
+                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson, res.IsFullSnapshot);
                     Broadcast("FLEET_UPDATED", GetFleetResponse());
                 }
             }
@@ -1852,6 +1852,33 @@ public class PhotinoBridge
                         }
                         if (string.IsNullOrWhiteSpace(filePath))
                         {
+                            // 1. Zuerst prüfen, ob ein Bild in der Windows-Zwischenablage liegt (z.B. Win+Shift+S / Snipping Tool / PrtScn)
+                            try
+                            {
+                                var clipFile = await ScreenshotLoadoutWatcher.SaveClipboardImageToFileAsync();
+                                if (!string.IsNullOrWhiteSpace(clipFile) && File.Exists(clipFile))
+                                {
+                                    var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile);
+                                    if (clipRes.Success && !string.IsNullOrWhiteSpace(clipRes.ShipName) &&
+                                        ((clipRes.Components != null && clipRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(clipRes.Livery)))
+                                    {
+                                        var compsJson = clipRes.Components != null && clipRes.Components.Count > 0
+                                            ? JsonSerializer.Serialize(clipRes.Components, JsonOpts)
+                                            : "[]";
+                                        Database.SaveFleetShipComponents(clipRes.ShipName, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
+                                        Broadcast("FLEET_UPDATED", GetFleetResponse());
+                                        SendResponse(req.Id, "scan_screenshot_loadout_response", clipRes with {
+                                            Message = $"[Zwischenablage] {clipRes.ShipName}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
+                                        });
+                                        break;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Clipboard loadout scan check: {ex.Message}");
+                            }
+
                             var scFolder = _screenshotWatcher.WatchedFolder ?? ScreenshotLoadoutWatcher.DetectStarCitizenScreenshotFolder();
                             if (!string.IsNullOrEmpty(scFolder) && Directory.Exists(scFolder))
                             {
@@ -1887,12 +1914,12 @@ public class PhotinoBridge
                                                 if (res.Components != null && res.Components.Count > 0)
                                                 {
                                                     var compsJson = JsonSerializer.Serialize(res.Components, JsonOpts);
-                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson);
+                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson, res.IsFullSnapshot);
                                                     totalComponents += res.Components.Count;
                                                 }
                                                 else if (!string.IsNullOrWhiteSpace(res.Livery))
                                                 {
-                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, "[]");
+                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, "[]", res.IsFullSnapshot);
                                                 }
                                                 processedShips.Add(res.ShipName);
                                             }
@@ -1937,7 +1964,7 @@ public class PhotinoBridge
                                     var compsJson = scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0
                                         ? JsonSerializer.Serialize(scrLoadoutRes.Components, JsonOpts)
                                         : "[]";
-                                    Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson);
+                                    Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson, scrLoadoutRes.IsFullSnapshot);
                                     Broadcast("FLEET_UPDATED", GetFleetResponse());
                                 }
                                 catch (Exception ex)
@@ -1946,6 +1973,45 @@ public class PhotinoBridge
                                 }
                             }
                             SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes);
+                        }
+                        break;
+                    }
+
+                case "scan_clipboard_loadout":
+                    {
+                        try
+                        {
+                            var clipFile = await ScreenshotLoadoutWatcher.SaveClipboardImageToFileAsync();
+                            if (string.IsNullOrWhiteSpace(clipFile) || !File.Exists(clipFile))
+                            {
+                                SendResponse(req.Id, "scan_clipboard_loadout_response", new ScreenshotLoadoutResult(false, null, null, Array.Empty<ScannedShipComponent>(), null, "Kein Bild in der Windows-Zwischenablage gefunden. Kopiere einen Screenshot mit Win+Shift+S oder Drucken."));
+                                break;
+                            }
+
+                            var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile);
+                            if (clipRes.Success && !string.IsNullOrWhiteSpace(clipRes.ShipName) &&
+                                ((clipRes.Components != null && clipRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(clipRes.Livery)))
+                            {
+                                var compsJson = clipRes.Components != null && clipRes.Components.Count > 0
+                                    ? JsonSerializer.Serialize(clipRes.Components, JsonOpts)
+                                    : "[]";
+                                Database.SaveFleetShipComponents(clipRes.ShipName, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
+                                Broadcast("FLEET_UPDATED", GetFleetResponse());
+                                SendResponse(req.Id, "scan_clipboard_loadout_response", clipRes with {
+                                    Message = $"[Zwischenablage] {clipRes.ShipName}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
+                                });
+                            }
+                            else
+                            {
+                                SendResponse(req.Id, "scan_clipboard_loadout_response", clipRes with {
+                                    Message = clipRes.Message ?? "Kein Schiffs-Ausrüstungsbildschirm in der Zwischenablage erkannt."
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("scan_clipboard_loadout", ex);
+                            SendResponse(req.Id, "scan_clipboard_loadout_response", new ScreenshotLoadoutResult(false, null, null, Array.Empty<ScannedShipComponent>(), null, $"Fehler beim Lesen der Zwischenablage: {ex.Message}"));
                         }
                         break;
                     }
