@@ -1,7 +1,7 @@
 {
   "name": "sclogmate-frontend",
   "private": true,
-  "version": "1.0.0-rc3",
+  "version": "1.0.0-rc4",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
