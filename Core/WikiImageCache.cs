@@ -80,6 +80,58 @@ public static class WikiImageCache
     }
 
     /// <summary>
+    /// Prüft, ob entweder die Haupt-Bild-URL oder das Thumbnail bereits im lokalen Disk-Cache liegt.
+    /// Falls ja, wird sofort die Base64 Data-URI zurückgegeben (schnell, offline, kein Hotlink-Block).
+    /// Andernfalls wird der Hintergrund-Download angestoßen und die beste Remote-URL geliefert.
+    /// </summary>
+    public static string? ResolveBestImage(string? imageUrl, string? thumbnailUrl)
+    {
+        // 1. Zuerst Disk-Cache für ImageUrl prüfen
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            var p = GetLocalCachePath(imageUrl);
+            if (File.Exists(p))
+            {
+                try
+                {
+                    var bytes = File.ReadAllBytes(p);
+                    if (bytes.Length > 0)
+                    {
+                        var mime = GetMimeType(p);
+                        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+                    }
+                }
+                catch { }
+            }
+        }
+
+        // 2. Disk-Cache für ThumbnailUrl prüfen
+        if (!string.IsNullOrWhiteSpace(thumbnailUrl))
+        {
+            var p = GetLocalCachePath(thumbnailUrl);
+            if (File.Exists(p))
+            {
+                try
+                {
+                    var bytes = File.ReadAllBytes(p);
+                    if (bytes.Length > 0)
+                    {
+                        var mime = GetMimeType(p);
+                        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+                    }
+                }
+                catch { }
+            }
+        }
+
+        // 3. Wenn noch nicht gecacht: Beide URLs im Hintergrund laden
+        if (!string.IsNullOrWhiteSpace(imageUrl)) PrefetchImage(imageUrl);
+        if (!string.IsNullOrWhiteSpace(thumbnailUrl)) PrefetchImage(thumbnailUrl);
+
+        return !string.IsNullOrWhiteSpace(imageUrl) ? imageUrl : thumbnailUrl;
+    }
+
+    /// <summary>
     /// Lädt ein Bild asynchron in den Disk-Cache ohne UI-Blockade.
     /// </summary>
     public static void PrefetchImage(string? remoteUrl)

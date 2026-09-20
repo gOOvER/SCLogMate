@@ -4790,7 +4790,7 @@ public class PhotinoBridge
             var wikiVeh = Database.GetCachedWikiVehicle(canonicalName) 
                        ?? Database.GetCachedWikiVehicle(shortName)
                        ?? Database.GetCachedWikiVehicle(stat.Ship);
-            var imgUrl = !string.IsNullOrEmpty(wikiVeh?.ThumbnailUrl) ? wikiVeh.ThumbnailUrl : wikiVeh?.ImageUrl;
+            var imgUrl = WikiImageCache.ResolveBestImage(wikiVeh?.ImageUrl, wikiVeh?.ThumbnailUrl);
             if (wikiVeh == null)
             {
                 WikiApiClient.PrefetchVehicle(shortName);
@@ -4864,7 +4864,7 @@ public class PhotinoBridge
                 var wikiVeh = Database.GetCachedWikiVehicle(canonicalName) 
                            ?? Database.GetCachedWikiVehicle(shortName)
                            ?? Database.GetCachedWikiVehicle(shipName);
-                var imgUrl = !string.IsNullOrEmpty(wikiVeh?.ThumbnailUrl) ? wikiVeh.ThumbnailUrl : wikiVeh?.ImageUrl;
+                var imgUrl = WikiImageCache.ResolveBestImage(wikiVeh?.ImageUrl, wikiVeh?.ThumbnailUrl);
                 if (wikiVeh == null)
                 {
                     WikiApiClient.PrefetchVehicle(shortName);
@@ -4908,7 +4908,7 @@ public class PhotinoBridge
                 var (catComps, _, _) = ResolveShipComponents(s.NormalizedName, null);
                 var shortCatName = s.NormalizedName.Split('·')[0].Trim();
                 var catWiki = Database.GetCachedWikiVehicle(s.NormalizedName) ?? Database.GetCachedWikiVehicle(shortCatName);
-                var catImg = !string.IsNullOrEmpty(catWiki?.ThumbnailUrl) ? catWiki.ThumbnailUrl : catWiki?.ImageUrl;
+                var catImg = WikiImageCache.ResolveBestImage(catWiki?.ImageUrl, catWiki?.ThumbnailUrl);
                 return new CatalogShipDto
                 {
                     Name = s.NormalizedName,

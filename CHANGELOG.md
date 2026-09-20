@@ -7,11 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- **Fleet View Lead-Pips Column & Ship Photo Hover Preview (`frontend/src/views/FleetView.tsx`, `frontend/src/components/ShipLoadoutModal.tsx`, `Core/Photino/PhotinoBridge.cs`, `Core/WikiApiClient.cs`)**:
-  - **Dedicated Lead-Pips Column**: Moved weapon pip convergence analyzer badge into a dedicated `🎯 Lead-Pips` table column, displaying full-size status pills (`• 1 Pip · Synchr.`, `• 2 Pips · Geteilt`) with combat advice tooltips.
+- **Fleet View Ship Photo Hover Preview & Offline Vehicle Caching (`frontend/src/views/FleetView.tsx`, `frontend/src/components/ShipLoadoutModal.tsx`, `Core/Photino/PhotinoBridge.cs`, `Core/WikiApiClient.cs`)**:
   - **Ship Photo Hover Preview Card**: Hovering over ship names in Fleet View now opens a glassmorphic floating preview card displaying the vessel's official Star Citizen Wiki photo, role badge, manufacturer badge, and flight mission count.
   - **Ship Loadout Modal Header Thumbnail**: Added ship image thumbnail preview to the header of the Ship Loadout modal.
   - **Local Star Citizen Wiki Vehicle Caching (`Core/Database.cs`, `Core/WikiApiClient.cs`)**: Implemented local SQLite vehicle specification and image URL caching with background prefetching, ensuring instant ship image resolution and offline support.
+
+### Removed
+- **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
+
+### Changed
+- **Fleet Telemetry Terminology & UI Badges (`frontend/src/views/FleetView.tsx`)**:
+  - Replaced ambiguous `QUANTUM` label with `QT-SPRÜNGE` (Quantum-Travel Überlicht-Sprünge) in the telemetry cluster, featuring a dedicated `Zap` icon and explicit system lore tooltip.
+  - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
+
+### Fixed
+- **Fleet Ship Photo Resolution & Local Data-URI Serving (`Core/WikiImageCache.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/FleetView.tsx`)**:
+  - Fixed missing ship photos (such as Origin M80) by adding `WikiImageCache.ResolveBestImage`: cached images on disk are converted into Base64 Data URIs (`data:image/...;base64,...`) for instant offline rendering, avoiding remote WebP hotlink blocks in WebView2.
+  - Added a graceful fallback placeholder inside the ship photo hover preview card.
 - **ASOP Terminal "LOADOUT ESTIMATE" & Windows Clipboard Loadout Scanning (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/`)**:
   - **Native ASOP "LOADOUT ESTIMATE" Terminal Support**: Added full OCR recognition for Star Citizen ASOP Fleet Manager terminal insurance claim popups ("LOADOUT ESTIMATE" table with NAME, QTY, TYPE columns). Captures the vessel's complete loadout (all 21 items across all slots including Coolers, Power Plants, Quantum Drives, Jump Modules, Radars, Shields, Weapons, Scrapers/Tractors, and Liveries) in a single screenshot without needing to switch tabs.
   - **Authoritative Full-Snapshot Merge**: Added `isFullSnapshot` mode to `SaveFleetShipComponents`, allowing ASOP terminal loadout estimates to authoritatively represent the active vessel configuration.

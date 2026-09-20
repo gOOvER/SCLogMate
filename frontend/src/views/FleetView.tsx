@@ -23,7 +23,6 @@ import {
   Eye,
   Zap,
 } from 'lucide-react';
-import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
 import { ShipCompareModal } from '../components/ShipCompareModal';
 import { ShipLoadoutModal } from '../components/ShipLoadoutModal';
 
@@ -577,8 +576,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
             <thead>
               <tr className="border-b border-cyan-950/80 bg-[#051122]/95 text-slate-400 text-[11px] font-mono font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 shadow-sm">
                 <th className="py-3 px-3.5 w-32">Status &amp; Hangar</th>
-                <th className="py-3 px-3.5 min-w-[210px]">Schiff &amp; Hersteller</th>
-                <th className="py-3 px-3.5 w-36" title="Vorhaltepunkte aller Bordwaffen für Dogfights (Pips)">🎯 Lead-Pips</th>
+                <th className="py-3 px-3.5 min-w-[220px]">Schiff &amp; Hersteller</th>
                 <th className="py-3 px-3.5 w-44">Herkunft / Pledge</th>
                 <th className="py-3 px-3.5 w-44">Rolle / Marktwert</th>
                 <th className="py-3 px-3.5 w-36">Versicherung</th>
@@ -589,7 +587,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
             <tbody className="divide-y divide-[#102235]/60">
               {filteredShips.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-20 text-center">
+                  <td colSpan={7} className="py-20 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-[#07192C] border border-cyan-800/60 flex items-center justify-center text-cyan-400">
                         <Warehouse className="w-6 h-6" />
@@ -708,12 +706,16 @@ export const FleetView: React.FC<FleetViewProps> = ({
                                   <img
                                     src={ship.imageUrl || ship.thumbnailUrl || ''}
                                     alt={ship.name}
-                                    className="w-full h-full object-cover object-center"
+                                    className="w-full h-full object-cover object-center relative z-1"
                                     loading="lazy"
                                     onError={(e) => {
                                       (e.target as HTMLElement).style.display = 'none';
                                     }}
                                   />
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-2 text-center bg-[#030914]">
+                                    <Rocket className="w-7 h-7 text-cyan-500/40 mb-1" />
+                                    <span className="text-[10px] font-mono text-cyan-300/70 truncate max-w-[90%]">{ship.name}</span>
+                                  </div>
                                   <div className="absolute inset-0 bg-gradient-to-t from-[#040d1a] via-transparent to-transparent opacity-80" />
                                   <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                                     <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/75 text-cyan-300 border border-cyan-500/30 backdrop-blur-sm">
@@ -804,18 +806,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </div>
                       </td>
 
-                      {/* 3. 🎯 Lead-Pips */}
-                      <td className="py-3 px-3.5">
-                        {ship.pipsResult && ship.pipsResult.rating !== 'NoGuns' && (ship.pipsResult.pipCount ?? 0) > 0 ? (
-                          <div className="inline-block">
-                            <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={false} />
-                          </div>
-                        ) : (
-                          <span className="text-slate-600 font-mono text-[11px] select-none" title="Keine Bordwaffen erfasst">—</span>
-                        )}
-                      </td>
-
-                      {/* 4. Herkunft / Pledge */}
+                      {/* 3. Herkunft / Pledge */}
                       <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2">
                           {isEditingPledge ? (
@@ -867,7 +858,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </div>
                       </td>
 
-                      {/* 5. Rolle / Typ */}
+                      {/* 4. Rolle / Typ */}
                       <td className="py-3 px-3.5">
                         <span className="text-cyan-300 font-medium text-xs truncate block max-w-[180px]" data-tooltip={ship.role}>
                           {ship.role}
@@ -879,7 +870,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </span>
                       </td>
 
-                      {/* 6. Versicherung */}
+                      {/* 5. Versicherung */}
                       <td className="py-3 px-3.5">
                         <button
                           onClick={() => handleCycleInsurance(ship.name)}
@@ -890,7 +881,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </button>
                       </td>
 
-                      {/* 7. Flug-Einsätze */}
+                      {/* 6. Flug-Einsätze */}
                       <td className="py-3 px-3.5 font-mono">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5">
@@ -915,7 +906,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </div>
                       </td>
 
-                      {/* 8. Aktionen */}
+                      {/* 7. Aktionen */}
                       <td className="py-3 px-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Ausrüstung & Komponenten */}
