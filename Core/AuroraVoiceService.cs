@@ -822,6 +822,8 @@ public partial class AuroraVoiceService : IDisposable
             !line.Contains("AImodule_ATC", StringComparison.OrdinalIgnoreCase) &&
             !line.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase) &&
             !line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Warteschlange", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Your place:", StringComparison.OrdinalIgnoreCase) &&
             (
                 (line.Contains("Added notification", StringComparison.OrdinalIgnoreCase) &&
                  (line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
@@ -981,11 +983,13 @@ public partial class AuroraVoiceService : IDisposable
         }
         else if (e.Kind == EventKind.Hangar && AtcAndLandingEnabled)
         {
-            // Nur bei echten ATC Lande-/Startfreigaben oder Zuweisungen – NIEMALS bei Fracht- oder Schiffsaufzügen!
+            // Nur bei echten ATC Lande-/Startfreigaben oder Zuweisungen – NIEMALS bei Fracht- oder Schiffsaufzügen und NIEMALS bei Warteschlange!
             if (!string.IsNullOrEmpty(e.Detail) &&
                 !e.Detail.Contains("aufzug", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("elevator", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("Warteschlange", StringComparison.OrdinalIgnoreCase) &&
+                !e.Detail.Contains("queue", StringComparison.OrdinalIgnoreCase) &&
                 (e.Detail.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
                  e.Detail.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
                  e.Detail.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||

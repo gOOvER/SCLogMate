@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Hangar Queue vs Assignment Voice Trigger Separation (`Core/LogParser.cs`, `Core/AuroraVoiceService.cs`)**:
+  - Distinctly classified `Joined hangar queue` / `In Hangar-Warteschlange eingereiht` as `In Hangar-Warteschlange eingereiht` in `LogParser`, separating queue waiting state from actual hangar clearance.
+  - Guarded `AuroraVoiceService` line processing and live parsed event dispatcher to prevent premature ATC landing voice triggers while the player is still waiting in the hangar queue (`Your place: 1`), only triggering landing clearance when `Hangar Request Completed` / `Landefreigabe` is actually confirmed by the station.
+
 ### Added
 - **Interactive Component Links & SCWiki Dossier Integration (`frontend/src/components/ShipLoadoutModal.tsx`, `Core/WikiApiClient.cs`)**:
   - **Clickable Loadout Components**: Each component in the Ship Loadout modal is now an interactive card that can be clicked to directly open the in-app SCWiki dossier modal, displaying full technical specs, manufacturer details, 3D render, and game store locations with aUEC prices.
