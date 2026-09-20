@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Guarded `AuroraVoiceService` line processing and live parsed event dispatcher to prevent premature ATC landing voice triggers while the player is still waiting in the hangar queue (`Your place: 1`), only triggering landing clearance when `Hangar Request Completed` / `Landefreigabe` is actually confirmed by the station.
 
 ### Added
+- **Comprehensive VoiceAttack & Aurora Audio Integration (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
+  - **Destination-Specific Quantum & Arrival Audio**: Connected 50 dedicated destination audio tracks across Stanton major cities & spaceports (Area18, Orison, Lorville, New Babbage, Seraphim, Everus Harbor, Port Tressler, Baijini Point, Pyro/Stanton/Nyx Gateways), Stanton moons & GrimHEX (13 bodies), Stanton L-Point refineries (9 stations: CRU-L1, ARC-L1, HUR-L1..5, MIC-L1/2), and Pyro destinations (13 locations: Terminus, Ruin Station, Patch City, Orbituary, Bloom, Monox, Checkmate, etc.).
+  - **Intelligent Quantum Arrival Prioritization**: Replaces generic quantum arrival sounds with exact destination-specific voice lines whenever entering a recognized location, falling back to generic quantum arrival only when no specific audio track exists.
+  - **Freight Elevator & Cargo Terminal Audio**: Triggered voice confirmation lines (*"Frachtbeladung angefordert"*, *"Frachtterminal kontaktiert"*) when freight elevators change state (`LoadingPlatformManager_FreightElevator`) or cargo transfer is initiated.
+  - **Starmap Route Plotted**: Plays route ready audio lines (*"Navigation abgeschlossen – Route bereit"*, *"Kurs gesetzt"*) whenever Starmap calculates and locks a navigation path.
+  - **Auto-Land Execution**: Plays automatic landing confirmation audio when autoland is engaged or completed on hangars/pads.
+  - **Snub-Craft Docking & Undocking**: Triggers dedicated uncoupling/undocking and docking audio lines for parasitic/snub vessels (e.g. Constellation Merlin/Archimedes).
+  - **Emergency Systems (Self-Destruct & Ejection)**: Triggers voice warnings for self-destruct countdowns and ejection seat triggers.
 - **Interactive Component Links & SCWiki Dossier Integration (`frontend/src/components/ShipLoadoutModal.tsx`, `Core/WikiApiClient.cs`)**:
   - **Clickable Loadout Components**: Each component in the Ship Loadout modal is now an interactive card that can be clicked to directly open the in-app SCWiki dossier modal, displaying full technical specs, manufacturer details, 3D render, and game store locations with aUEC prices.
   - **Quick Action Links**: Added hover quick action buttons to every component card for in-app SCWiki dossier lookup and external browser navigation to `star-citizen.wiki`.
