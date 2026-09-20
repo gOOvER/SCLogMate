@@ -225,6 +225,8 @@ export interface FleetShipDto {
   livery?: string | null;
   componentsUpdatedAt?: string | null;
   components?: ScannedShipComponent[];
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface CatalogShipDto {
@@ -236,6 +238,8 @@ export interface CatalogShipDto {
   defaultInsurance: string;
   pipsResult?: PipsEvaluationResult;
   components?: ScannedShipComponent[];
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export type ScannedShipComponentDto = ScannedShipComponent;
@@ -1408,6 +1412,14 @@ class PhotinoBridge {
 
   public getWikiSpecs(name: string): Promise<WikiInfo | null> {
     return this.sendRequest<WikiInfo | null>('get_wiki_specs', { name });
+  }
+
+  public syncWikiCache(): Promise<{ success: boolean; count: number; message: string }> {
+    return this.sendRequest<{ success: boolean; count: number; message: string }>('sync_wiki_cache');
+  }
+
+  public getWikiCacheStatus(): Promise<{ vehicleCount: number }> {
+    return this.sendRequest<{ vehicleCount: number }>('get_wiki_cache_status');
   }
 
   public getChatMessages(filters?: {

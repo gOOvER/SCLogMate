@@ -20,6 +20,8 @@ import {
   Wrench,
   Palette,
   Clipboard,
+  Eye,
+  Zap,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from '../components/PipsAnalyzerBadge';
 import { ShipCompareModal } from '../components/ShipCompareModal';
@@ -474,14 +476,15 @@ export const FleetView: React.FC<FleetViewProps> = ({
               </span>
             </div>
 
-            {/* QUANTUM */}
+            {/* QT-SPRÜNGE */}
             <div
               className="bg-[#140A28]/90 border border-[#3B1C70] rounded-lg px-2.5 py-1 flex items-center gap-2 shadow-sm"
-              title="Erfolgreich durchgeführte Quantum Travel Sprünge"
+              title="Quantum-Travel Überlicht-Sprünge (QT) durch das Stanton- und Pyro-System"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400">
-                QUANTUM
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                QT-SPRÜNGE
               </span>
               <span className="text-xs font-mono font-bold text-purple-300">
                 {(fleetData?.totalQuantumJumps ?? 0).toLocaleString()}
@@ -573,19 +576,20 @@ export const FleetView: React.FC<FleetViewProps> = ({
           <table className="w-full min-w-[950px] text-left text-xs border-collapse font-sans">
             <thead>
               <tr className="border-b border-cyan-950/80 bg-[#051122]/95 text-slate-400 text-[11px] font-mono font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 shadow-sm">
-                <th className="py-3 px-3.5 w-36">Status &amp; Hangar</th>
-                <th className="py-3 px-3.5 min-w-[220px]">Schiff &amp; Hersteller</th>
-                <th className="py-3 px-3.5 w-48">Herkunft / Pledge</th>
-                <th className="py-3 px-3.5 w-48">Rolle / Marktwert</th>
+                <th className="py-3 px-3.5 w-32">Status &amp; Hangar</th>
+                <th className="py-3 px-3.5 min-w-[210px]">Schiff &amp; Hersteller</th>
+                <th className="py-3 px-3.5 w-36" title="Vorhaltepunkte aller Bordwaffen für Dogfights (Pips)">🎯 Lead-Pips</th>
+                <th className="py-3 px-3.5 w-44">Herkunft / Pledge</th>
+                <th className="py-3 px-3.5 w-44">Rolle / Marktwert</th>
                 <th className="py-3 px-3.5 w-36">Versicherung</th>
-                <th className="py-3 px-3.5 w-40">Flug-Einsätze</th>
+                <th className="py-3 px-3.5 w-48">Flug-Einsätze</th>
                 <th className="py-3 px-3.5 text-right w-36 font-mono">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#102235]/60">
               {filteredShips.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-20 text-center">
+                  <td colSpan={8} className="py-20 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-[#07192C] border border-cyan-800/60 flex items-center justify-center text-cyan-400">
                         <Warehouse className="w-6 h-6" />
@@ -687,11 +691,47 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       {/* 2. Schiff & Hersteller */}
                       <td className="py-3 px-3.5">
                         <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors text-[13px] tracking-wide">
-                              {ship.name.split(/\s*·\s*/)[0].trim()}
-                            </span>
-                            <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={true} />
+                          <div className="relative group/shipname inline-block">
+                            <div className="flex items-center gap-1.5 cursor-pointer">
+                              <span className="font-bold text-slate-100 group-hover/shipname:text-cyan-300 transition-colors text-[13.5px] tracking-wide">
+                                {ship.name.split(/\s*·\s*/)[0].trim()}
+                              </span>
+                              {(ship.imageUrl || ship.thumbnailUrl) && (
+                                <Eye className="w-3 h-3 text-cyan-500/50 group-hover/shipname:text-cyan-400 transition-colors" />
+                              )}
+                            </div>
+
+                            {/* 🌌 High-Tech Ship Preview Hover Card */}
+                            {(ship.imageUrl || ship.thumbnailUrl) && (
+                              <div className="absolute left-0 top-full mt-2 hidden group-hover/shipname:flex flex-col z-50 w-72 p-2.5 rounded-xl bg-[#040d1a]/95 border border-cyan-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.8),0_0_15px_rgba(6,182,212,0.25)] backdrop-blur-md pointer-events-none transition-all animate-in fade-in duration-150">
+                                <div className="relative w-full h-36 rounded-lg overflow-hidden bg-[#02060f] border border-cyan-900/60 flex items-center justify-center">
+                                  <img
+                                    src={ship.imageUrl || ship.thumbnailUrl || ''}
+                                    alt={ship.name}
+                                    className="w-full h-full object-cover object-center"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = 'none';
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-[#040d1a] via-transparent to-transparent opacity-80" />
+                                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/75 text-cyan-300 border border-cyan-500/30 backdrop-blur-sm">
+                                      {ship.manufacturerBadge || 'SHIP'}
+                                    </span>
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/75 text-slate-300 border border-slate-700 backdrop-blur-sm">
+                                      {ship.role}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="mt-2 flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-slate-100 truncate">{ship.name}</span>
+                                  <span className="text-[10px] font-mono text-cyan-400">
+                                    {ship.flightCount} Einsätze
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span
@@ -764,7 +804,18 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </div>
                       </td>
 
-                      {/* 3. Herkunft / Pledge */}
+                      {/* 3. 🎯 Lead-Pips */}
+                      <td className="py-3 px-3.5">
+                        {ship.pipsResult && ship.pipsResult.rating !== 'NoGuns' && (ship.pipsResult.pipCount ?? 0) > 0 ? (
+                          <div className="inline-block">
+                            <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={false} />
+                          </div>
+                        ) : (
+                          <span className="text-slate-600 font-mono text-[11px] select-none" title="Keine Bordwaffen erfasst">—</span>
+                        )}
+                      </td>
+
+                      {/* 4. Herkunft / Pledge */}
                       <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2">
                           {isEditingPledge ? (
@@ -816,7 +867,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </div>
                       </td>
 
-                      {/* 4. Rolle / Typ */}
+                      {/* 5. Rolle / Typ */}
                       <td className="py-3 px-3.5">
                         <span className="text-cyan-300 font-medium text-xs truncate block max-w-[180px]" data-tooltip={ship.role}>
                           {ship.role}
@@ -828,7 +879,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </span>
                       </td>
 
-                      {/* 5. Versicherung */}
+                      {/* 6. Versicherung */}
                       <td className="py-3 px-3.5">
                         <button
                           onClick={() => handleCycleInsurance(ship.name)}
@@ -839,21 +890,32 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         </button>
                       </td>
 
-                      {/* 6. Flug-Einsätze */}
+                      {/* 7. Flug-Einsätze */}
                       <td className="py-3 px-3.5 font-mono">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-100 text-xs">
-                            {ship.flightCount}× <span className="text-slate-400 font-normal">Flüge</span>
-                            <span className="mx-1.5 text-slate-600">·</span>
-                            <span className="text-sky-400">{ship.quantumJumps}</span> <span className="text-slate-400 font-normal">QT</span>
-                          </span>
-                          <span className="text-[10.5px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            {ship.lastFlown !== '—' ? ship.lastFlown : 'Noch nicht geflogen'}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="px-2 py-0.5 rounded bg-sky-950/60 border border-sky-800/50 text-sky-300 text-[11px] font-bold flex items-center gap-1 shadow-xs"
+                              data-tooltip="Dokumentierte Flugeinsätze"
+                            >
+                              <Rocket className="w-3 h-3 text-sky-400" />
+                              <span>{ship.flightCount} Flüge</span>
+                            </span>
+                            <span
+                              className="px-2 py-0.5 rounded bg-purple-950/60 border border-purple-800/50 text-purple-300 text-[11px] font-bold flex items-center gap-1 shadow-xs"
+                              data-tooltip="Quantum-Travel Überlicht-Sprünge (QT)"
+                            >
+                              <Zap className="w-3 h-3 text-purple-400" />
+                              <span>{ship.quantumJumps} Sprünge</span>
+                            </span>
+                          </div>
+                          <span className="text-[10.5px] text-slate-400 font-sans truncate" data-tooltip="Zuletzt geflogen">
+                            {ship.lastFlown !== '—' ? `Zuletzt: ${ship.lastFlown}` : 'Noch nicht geflogen'}
                           </span>
                         </div>
                       </td>
 
-                      {/* 7. Aktionen */}
+                      {/* 8. Aktionen */}
                       <td className="py-3 px-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Ausrüstung & Komponenten */}

@@ -71,6 +71,23 @@ public static class WikiApiClient
     {
         Http.DefaultRequestHeaders.Add("Accept", "application/json");
         Http.DefaultRequestHeaders.Add("User-Agent", "SCLogMate/1.0.0 (+https://github.com/gOOvER/SCLogMate)");
+
+        // Hintergrund-Wärmung des Schiffs-Katalogs, falls die lokale SQLite-Datenbank noch unvollständig ist
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(3000);
+                if (Database.GetCachedWikiVehicleCount() < 100)
+                {
+                    await SyncAllVehiclesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"WikiApiClient Warmup Error: {ex.Message}");
+            }
+        });
     }
 
     public static async Task<WikiInfo?> LookupAsync(string query, bool enrichBase64Image = true)
@@ -256,90 +273,175 @@ public static class WikiApiClient
         return null;
     }
 
-    public static async Task<List<WikiInfo>> SearchWikiAsync(string query, string? category = null, int limit = 25)
+    private static bool _isVehicleSyncRunning;
+    private static readonly System.Threading.Lock _vehicleSyncLock = new();
+
+    public static void PrefetchVehicle(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var clean = CleanSearchTerm(name);
+                var veh = await SearchVehicleAsync(clean);
+                if (veh != null)
+                {
+                    WikiImageCache.PrefetchImage(veh.ImageUrl ?? veh.ThumbnailUrl);
+                }
+            }
+            catch { }
+        });
+    }
+
+    public static async Task<int> SyncAllVehiclesAsync()
+    {
+        lock (_vehicleSyncLock)
+        {
+            if (_isVehicleSyncRunning) return 0;
+            _isVehicleSyncRunning = true;
+        }
+
+        int totalSaved = 0;
+        try
+        {
+            int page = 1;
+            while (true)
+            {
+                var url = $"vehicles?page[size]=50&page[number]={page}";
+                var response = await Http.GetAsync(url);
+                if (!response.IsSuccessStatusCode) break;
+
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("data", out var data) || data.GetArrayLength() == 0) break;
+
+                foreach (var item in data.EnumerateArray())
+                {
+                    var vName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(vName))
+                    {
+                        var parsed = ParseVehicleFromJson(item, vName);
+                        Database.SaveCachedWikiVehicle(parsed);
+                        totalSaved++;
+                    }
+                }
+
+                if (root.TryGetProperty("meta", out var meta) && meta.TryGetProperty("last_page", out var lp))
+                {
+                    if (page >= lp.GetInt32()) break;
+                }
+                page++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"SyncAllVehiclesAsync Fehler: {ex.Message}");
+        }
+        finally
+        {
+            lock (_vehicleSyncLock) { _isVehicleSyncRunning = false; }
+        }
+
+        return totalSaved;
+    }
+
+    public static async Task<List<WikiInfo>> SearchWikiAsync(string query, string? category = null, int limit = 40)
     {
         var results = new List<WikiInfo>();
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // 1. Lokale gecachte Schiffe prüfen
+        // 1. Lokale gecachte Schiffe prüfen (durchsucht Name, Hersteller, Rolle, Fokus und Typ)
         var cachedVehicles = Database.GetAllCachedWikiVehicles();
-        var q = query.Trim().ToLowerInvariant();
+        var q = (query ?? "").Trim().ToLowerInvariant();
 
-        foreach (var v in cachedVehicles)
-        {
-            if (string.IsNullOrWhiteSpace(q) || v.Name.ToLowerInvariant().Contains(q) || v.Manufacturer.ToLowerInvariant().Contains(q) || v.Role.ToLowerInvariant().Contains(q))
-            {
-                if (category == null || category == "all" || category == "ships")
-                {
-                    results.Add(v);
-                    seenNames.Add(v.Name);
-                    if (results.Count >= limit) return results;
-                }
-            }
-        }
-
-        // 2. Remote API Abfrage für Fahrzeuge
         if (category == null || category == "all" || category == "ships")
         {
-            try
+            foreach (var v in cachedVehicles)
             {
-                var url = $"vehicles?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit}";
-                var response = await Http.GetAsync(url);
-                if (response.IsSuccessStatusCode)
+                if (string.IsNullOrWhiteSpace(q) ||
+                    v.Name.ToLowerInvariant().Contains(q) ||
+                    v.Manufacturer.ToLowerInvariant().Contains(q) ||
+                    v.Role.ToLowerInvariant().Contains(q) ||
+                    v.Focus.ToLowerInvariant().Contains(q) ||
+                    v.Type.ToLowerInvariant().Contains(q))
                 {
-                    using var stream = await response.Content.ReadAsStreamAsync();
-                    using var doc = await JsonDocument.ParseAsync(stream);
-                    if (doc.RootElement.TryGetProperty("data", out var vData) && vData.ValueKind == JsonValueKind.Array)
+                    if (seenNames.Add(v.Name))
                     {
-                        foreach (var item in vData.EnumerateArray())
-                        {
-                            var vName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
-                            if (!string.IsNullOrWhiteSpace(vName) && seenNames.Add(vName))
-                            {
-                                var parsed = ParseVehicleFromJson(item, vName);
-                                Database.SaveCachedWikiVehicle(parsed);
-                                results.Add(parsed);
-                                if (results.Count >= limit) break;
-                            }
-                        }
+                        results.Add(v);
+                        if (results.Count >= limit) return results;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"WikiApi Search Vehicles Fehler: {ex.Message}");
             }
         }
 
-        // 3. Remote API Abfrage für Items / Ausrüstung
-        if (results.Count < limit && (category == null || category == "all" || category != "ships"))
+        // Falls wir noch wenige Ergebnisse haben oder ein spezifischer Suchbegriff vorliegt, Remote API anfragen
+        if (results.Count < limit && !string.IsNullOrWhiteSpace(query))
         {
-            try
+            // 2. Remote API Abfrage für Fahrzeuge
+            if (category == null || category == "all" || category == "ships")
             {
-                var url = $"items?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit - results.Count}";
-                var response = await Http.GetAsync(url);
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    using var stream = await response.Content.ReadAsStreamAsync();
-                    using var doc = await JsonDocument.ParseAsync(stream);
-                    if (doc.RootElement.TryGetProperty("data", out var iData) && iData.ValueKind == JsonValueKind.Array)
+                    var url = $"vehicles?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit - results.Count}";
+                    var response = await Http.GetAsync(url);
+                    if (response.IsSuccessStatusCode)
                     {
-                        foreach (var item in iData.EnumerateArray())
+                        using var stream = await response.Content.ReadAsStreamAsync();
+                        using var doc = await JsonDocument.ParseAsync(stream);
+                        if (doc.RootElement.TryGetProperty("data", out var vData) && vData.ValueKind == JsonValueKind.Array)
                         {
-                            var iName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
-                            if (!string.IsNullOrWhiteSpace(iName) && seenNames.Add(iName))
+                            foreach (var item in vData.EnumerateArray())
                             {
-                                var parsed = ParseItemFromJson(item, iName);
-                                results.Add(parsed);
-                                if (results.Count >= limit) break;
+                                var vName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                                if (!string.IsNullOrWhiteSpace(vName) && seenNames.Add(vName))
+                                {
+                                    var parsed = ParseVehicleFromJson(item, vName);
+                                    Database.SaveCachedWikiVehicle(parsed);
+                                    results.Add(parsed);
+                                    if (results.Count >= limit) break;
+                                }
                             }
                         }
                     }
                 }
+                catch (Exception ex)
+                {
+                    Logger.Log($"WikiApi Search Vehicles Fehler: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+
+            // 3. Remote API Abfrage für Items / Ausrüstung
+            if (results.Count < limit && (category == null || category == "all" || category != "ships"))
             {
-                Logger.Log($"WikiApi Search Items Fehler: {ex.Message}");
+                try
+                {
+                    var url = $"items?filter[name]={Uri.EscapeDataString(query)}&page[size]={limit - results.Count}";
+                    var response = await Http.GetAsync(url);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var stream = await response.Content.ReadAsStreamAsync();
+                        using var doc = await JsonDocument.ParseAsync(stream);
+                        if (doc.RootElement.TryGetProperty("data", out var iData) && iData.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in iData.EnumerateArray())
+                            {
+                                var iName = item.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+                                if (!string.IsNullOrWhiteSpace(iName) && seenNames.Add(iName))
+                                {
+                                    var parsed = ParseItemFromJson(item, iName);
+                                    results.Add(parsed);
+                                    if (results.Count >= limit) break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"WikiApi Search Items Fehler: {ex.Message}");
+                }
             }
         }
 

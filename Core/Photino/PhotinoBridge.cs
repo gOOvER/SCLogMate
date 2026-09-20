@@ -383,6 +383,8 @@ public class FleetShipDto
     [JsonPropertyName("livery")] public string? Livery { get; set; }
     [JsonPropertyName("componentsUpdatedAt")] public string? ComponentsUpdatedAt { get; set; }
     [JsonPropertyName("components")] public List<ScannedShipComponent> Components { get; set; } = new();
+    [JsonPropertyName("imageUrl")] public string? ImageUrl { get; set; }
+    [JsonPropertyName("thumbnailUrl")] public string? ThumbnailUrl { get; set; }
 }
 
 public class CatalogShipDto
@@ -395,6 +397,8 @@ public class CatalogShipDto
     [JsonPropertyName("defaultInsurance")] public string DefaultInsurance { get; set; } = "";
     [JsonPropertyName("pipsResult")] public PipsEvaluationResult? PipsResult { get; set; }
     [JsonPropertyName("components")] public List<ScannedShipComponent> Components { get; set; } = new();
+    [JsonPropertyName("imageUrl")] public string? ImageUrl { get; set; }
+    [JsonPropertyName("thumbnailUrl")] public string? ThumbnailUrl { get; set; }
 }
 
 public class ShipComparisonSideDto
@@ -2013,6 +2017,29 @@ public class PhotinoBridge
                             Logger.Error("scan_clipboard_loadout", ex);
                             SendResponse(req.Id, "scan_clipboard_loadout_response", new ScreenshotLoadoutResult(false, null, null, Array.Empty<ScannedShipComponent>(), null, $"Fehler beim Lesen der Zwischenablage: {ex.Message}"));
                         }
+                        break;
+                    }
+
+                case "sync_wiki_cache":
+                    {
+                        try
+                        {
+                            var count = await WikiApiClient.SyncAllVehiclesAsync();
+                            Broadcast("FLEET_UPDATED", GetFleetResponse());
+                            SendResponse(req.Id, "sync_wiki_cache_response", new { success = true, count, message = $"{count} Schiffe erfolgreich im lokalen Wiki-Cache synchronisiert." });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("sync_wiki_cache", ex);
+                            SendResponse(req.Id, "sync_wiki_cache_response", new { success = false, count = 0, message = $"Fehler beim Synchronisieren: {ex.Message}" });
+                        }
+                        break;
+                    }
+
+                case "get_wiki_cache_status":
+                    {
+                        var count = Database.GetCachedWikiVehicleCount();
+                        SendResponse(req.Id, "get_wiki_cache_status_response", new { vehicleCount = count });
                         break;
                     }
 
@@ -4759,6 +4786,16 @@ public class PhotinoBridge
                 .Select(c => c.ComponentName)
                 .ToList();
 
+            var shortName = canonicalName.Split('·')[0].Trim();
+            var wikiVeh = Database.GetCachedWikiVehicle(canonicalName) 
+                       ?? Database.GetCachedWikiVehicle(shortName)
+                       ?? Database.GetCachedWikiVehicle(stat.Ship);
+            var imgUrl = !string.IsNullOrEmpty(wikiVeh?.ThumbnailUrl) ? wikiVeh.ThumbnailUrl : wikiVeh?.ImageUrl;
+            if (wikiVeh == null)
+            {
+                WikiApiClient.PrefetchVehicle(shortName);
+            }
+
             var shipDto = new FleetShipDto
             {
                 Name = canonicalName,
@@ -4777,6 +4814,8 @@ public class PhotinoBridge
                 Livery = liv,
                 ComponentsUpdatedAt = compsTs,
                 Components = comps,
+                ImageUrl = imgUrl,
+                ThumbnailUrl = wikiVeh?.ThumbnailUrl,
             };
 
             if (cd != null)
@@ -4821,6 +4860,16 @@ public class PhotinoBridge
                     .Select(c => c.ComponentName)
                     .ToList();
 
+                var shortName = canonicalName.Split('·')[0].Trim();
+                var wikiVeh = Database.GetCachedWikiVehicle(canonicalName) 
+                           ?? Database.GetCachedWikiVehicle(shortName)
+                           ?? Database.GetCachedWikiVehicle(shipName);
+                var imgUrl = !string.IsNullOrEmpty(wikiVeh?.ThumbnailUrl) ? wikiVeh.ThumbnailUrl : wikiVeh?.ImageUrl;
+                if (wikiVeh == null)
+                {
+                    WikiApiClient.PrefetchVehicle(shortName);
+                }
+
                 ships.Add(new FleetShipDto
                 {
                     Name = canonicalName,
@@ -4844,7 +4893,9 @@ public class PhotinoBridge
                     PipsResult = ocrGuns.Count > 0 ? PipsAnalyzer.EvaluateGuns(ocrGuns) : PipsAnalyzer.EvaluateShip(canonicalName),
                     Livery = liv,
                     ComponentsUpdatedAt = compsTs,
-                    Components = comps
+                    Components = comps,
+                    ImageUrl = imgUrl,
+                    ThumbnailUrl = wikiVeh?.ThumbnailUrl,
                 });
             }
         }
@@ -4855,6 +4906,9 @@ public class PhotinoBridge
             .Select(s =>
             {
                 var (catComps, _, _) = ResolveShipComponents(s.NormalizedName, null);
+                var shortCatName = s.NormalizedName.Split('·')[0].Trim();
+                var catWiki = Database.GetCachedWikiVehicle(s.NormalizedName) ?? Database.GetCachedWikiVehicle(shortCatName);
+                var catImg = !string.IsNullOrEmpty(catWiki?.ThumbnailUrl) ? catWiki.ThumbnailUrl : catWiki?.ImageUrl;
                 return new CatalogShipDto
                 {
                     Name = s.NormalizedName,
@@ -4864,7 +4918,9 @@ public class PhotinoBridge
                     PledgeUsd = s.PledgeValueUsd,
                     DefaultInsurance = s.DefaultInsurance,
                     PipsResult = PipsAnalyzer.EvaluateShip(s.NormalizedName),
-                    Components = catComps
+                    Components = catComps,
+                    ImageUrl = catImg,
+                    ThumbnailUrl = catWiki?.ThumbnailUrl,
                 };
             }).ToList();
 

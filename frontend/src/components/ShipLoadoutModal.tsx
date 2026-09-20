@@ -90,8 +90,13 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: clean }));
   };
 
-  const getSlotIcon = (slotType: string) => {
-    switch (slotType.toLowerCase()) {
+  const getSlotIcon = (slotType: string, slotLabelOrName?: string) => {
+    const sl = (slotLabelOrName || '').toLowerCase();
+    const st = (slotType || '').toLowerCase();
+    if (sl.includes('radar') || st.includes('radar') || sl.includes('agrippa') || sl.includes('cassandra') || sl.includes('circe')) {
+      return <Radar className="w-3.5 h-3.5 text-indigo-400" />;
+    }
+    switch (st) {
       case 'weapon':
         return <Crosshair className="w-3.5 h-3.5 text-amber-400" />;
       case 'turret':
@@ -101,7 +106,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
       case 'jumpmodule':
         return <Radio className="w-3.5 h-3.5 text-cyan-400" />;
       case 'avionics':
-        return <Radio className="w-3.5 h-3.5 text-indigo-400" />;
+        return <Radar className="w-3.5 h-3.5 text-indigo-400" />;
       case 'radar':
         return <Radar className="w-3.5 h-3.5 text-indigo-400" />;
       case 'shield':
@@ -219,9 +224,19 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
         {/* Modal Header */}
         <div className="px-5 py-3.5 border-b border-[#142A45] flex items-center justify-between bg-gradient-to-r from-[#071322] to-[#0A1A2F]">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-950/60 border border-cyan-800/60 text-cyan-400">
-              <Wrench className="w-5 h-5" />
-            </div>
+            {ship.imageUrl || ship.thumbnailUrl ? (
+              <div className="relative w-12 h-10 rounded-lg overflow-hidden border border-cyan-800/60 bg-[#02060f] shrink-0 shadow-sm">
+                <img
+                  src={ship.imageUrl || ship.thumbnailUrl || ''}
+                  alt={ship.name}
+                  className="w-full h-full object-cover object-center"
+                />
+              </div>
+            ) : (
+              <div className="p-2 rounded-lg bg-cyan-950/60 border border-cyan-800/60 text-cyan-400">
+                <Wrench className="w-5 h-5" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-slate-100">{cleanShipName}</h3>
@@ -401,7 +416,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="p-1.5 rounded bg-black/40 shrink-0 group-hover:bg-cyan-950/60 group-hover:text-cyan-300 transition">
-                          {getSlotIcon(c.slotType)}
+                          {getSlotIcon(c.slotType, c.slotLabel || c.componentName)}
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wide block truncate">

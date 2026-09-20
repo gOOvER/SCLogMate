@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Fleet View Lead-Pips Column & Ship Photo Hover Preview (`frontend/src/views/FleetView.tsx`, `frontend/src/components/ShipLoadoutModal.tsx`, `Core/Photino/PhotinoBridge.cs`, `Core/WikiApiClient.cs`)**:
+  - **Dedicated Lead-Pips Column**: Moved weapon pip convergence analyzer badge into a dedicated `🎯 Lead-Pips` table column, displaying full-size status pills (`• 1 Pip · Synchr.`, `• 2 Pips · Geteilt`) with combat advice tooltips.
+  - **Ship Photo Hover Preview Card**: Hovering over ship names in Fleet View now opens a glassmorphic floating preview card displaying the vessel's official Star Citizen Wiki photo, role badge, manufacturer badge, and flight mission count.
+  - **Ship Loadout Modal Header Thumbnail**: Added ship image thumbnail preview to the header of the Ship Loadout modal.
+  - **Local Star Citizen Wiki Vehicle Caching (`Core/Database.cs`, `Core/WikiApiClient.cs`)**: Implemented local SQLite vehicle specification and image URL caching with background prefetching, ensuring instant ship image resolution and offline support.
 - **ASOP Terminal "LOADOUT ESTIMATE" & Windows Clipboard Loadout Scanning (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/`)**:
   - **Native ASOP "LOADOUT ESTIMATE" Terminal Support**: Added full OCR recognition for Star Citizen ASOP Fleet Manager terminal insurance claim popups ("LOADOUT ESTIMATE" table with NAME, QTY, TYPE columns). Captures the vessel's complete loadout (all 21 items across all slots including Coolers, Power Plants, Quantum Drives, Jump Modules, Radars, Shields, Weapons, Scrapers/Tractors, and Liveries) in a single screenshot without needing to switch tabs.
   - **Authoritative Full-Snapshot Merge**: Added `isFullSnapshot` mode to `SaveFleetShipComponents`, allowing ASOP terminal loadout estimates to authoritatively represent the active vessel configuration.
@@ -20,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Interactive Plugin Host View (`frontend/src/views/PluginHostView.tsx`)**: Sandboxed iframe host view with OBS Studio URL copy button, external browser launcher, reload button, and runtime status badges.
   - **Dynamic Navigation Integration (`frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`)**: Discovered and enabled plugins declaring sidebar metadata dynamically appear under the `Erweiterungen` navigation group with custom Lucide icon mappings.
   - **Settings Plugin Management Tab (`frontend/src/views/SettingsPluginsTab.tsx`, `frontend/src/views/SettingsView.tsx`)**: Added a dedicated `🧩 Plugins & Widgets` tab in Settings allowing users to toggle plugins on/off, reload manifests without restarting the app, view plugin directories, and copy OBS source URLs.
+
+### Changed
+- **Fleet Telemetry Terminology & UI Badges (`frontend/src/views/FleetView.tsx`)**:
+  - Replaced ambiguous `QUANTUM` label with `QT-SPRÜNGE` (Quantum-Travel Überlicht-Sprünge) in the telemetry cluster, featuring a dedicated `Zap` icon and explicit system lore tooltip.
+  - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
 
 ### Fixed
 - **Ship Radar Component Detection & Merge Collision Fix (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Database.cs`)**:

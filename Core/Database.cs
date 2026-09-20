@@ -3529,10 +3529,32 @@ public static class Database
         }
     }
 
+    public static int GetCachedWikiVehicleCount()
+    {
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT count(*) FROM wiki_vehicles_cache;";
+            var res = cmd.ExecuteScalar();
+            return res != null && res != DBNull.Value ? Convert.ToInt32(res) : 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetCachedWikiVehicleCount", ex);
+            return 0;
+        }
+    }
+
     public static WikiInfo? GetCachedWikiVehicle(string name)
     {
         EnsureInitialized();
         if (string.IsNullOrWhiteSpace(name)) return null;
+        var clean = name.Trim();
+        if (clean.Contains(" · ")) clean = clean.Split(" · ")[0].Trim();
+        if (clean.Contains('(')) clean = clean.Split('(')[0].Trim();
         try
         {
             using var db = new SqliteConnection(Conn);
@@ -3544,10 +3566,14 @@ public static class Database
                        production_status, description_de, description_en, thumbnail_url, 
                        image_url, web_url, pledge_url, specs_json, stores_json 
                 FROM wiki_vehicles_cache 
-                WHERE name = $name 
+                WHERE name = $raw COLLATE NOCASE 
+                   OR name = $clean COLLATE NOCASE 
+                   OR name LIKE $likePrefix COLLATE NOCASE
                 LIMIT 1;
             ";
-            cmd.Parameters.AddWithValue("$name", name.Trim());
+            cmd.Parameters.AddWithValue("$raw", name.Trim());
+            cmd.Parameters.AddWithValue("$clean", clean);
+            cmd.Parameters.AddWithValue("$likePrefix", clean + "%");
             using var reader = cmd.ExecuteReader();
             if (reader.Read())
             {
