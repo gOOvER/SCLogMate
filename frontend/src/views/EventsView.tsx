@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
+import { useI18n } from '../i18n';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
@@ -43,6 +44,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   onNavigate,
   onOpenWiki,
 }) => {
+  const { t } = useI18n();
   const [events, setEvents] = useState<LogEventItem[]>(initialEvents);
   const [viewMode, setViewMode] = useState<'live' | 'archive' | 'combat'>('live');
   const [archiveSession, setArchiveSession] = useState<string>('__all__');
@@ -291,14 +293,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
             title="In Finanzen & Buchhaltung aufrufen"
           >
             <Coins className="w-2.5 h-2.5 text-emerald-400" />
-            <span>Finanzen</span>
+            <span>{t('events.catFinance')}</span>
           </button>
         );
       case 'combat':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/60 text-rose-300 border border-rose-800/60 shrink-0">
             <Swords className="w-2.5 h-2.5 text-rose-400" />
-            <span>Kampf</span>
+            <span>{t('events.catCombat')}</span>
           </span>
         );
       case 'mission':
@@ -315,7 +317,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             title="Im Auftragsmanager aufrufen"
           >
             <Target className="w-2.5 h-2.5 text-amber-400" />
-            <span>Auftrag</span>
+            <span>{t('events.catMission')}</span>
           </button>
         );
       case 'ship':
@@ -332,7 +334,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             title="Im Hangar aufrufen"
           >
             <Rocket className="w-2.5 h-2.5 text-sky-400" />
-            <span>Schiff</span>
+            <span>{t('events.catShip')}</span>
           </button>
         );
       case 'location':
@@ -349,7 +351,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             title="In Orte & POIs aufrufen"
           >
             <MapPin className="w-2.5 h-2.5 text-cyan-400" />
-            <span>Ort</span>
+            <span>{t('events.catLocation')}</span>
           </button>
         );
       case 'inventory':
@@ -366,14 +368,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
             title="Im Warenlager aufrufen"
           >
             <Package className="w-2.5 h-2.5 text-purple-400" />
-            <span>Lager</span>
+            <span>{t('events.catWarehouse')}</span>
           </button>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-900 text-slate-400 border border-slate-800 shrink-0">
             <Terminal className="w-2.5 h-2.5 text-slate-500" />
-            <span>System</span>
+            <span>{t('events.catSystem')}</span>
           </span>
         );
     }
@@ -418,7 +420,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Live-Stream</span>
+              <span>{t('events.tabLive')}</span>
             </button>
 
             <button
@@ -435,7 +437,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               title="Sitzungsarchiv: Frühere Logdateien auswählen und durchsuchen"
             >
               <Archive className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Sitzungsarchiv</span>
+              <span>{t('events.tabArchive')}</span>
             </button>
 
             <button
@@ -449,7 +451,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               title="Combat- & Gefahren-Analytics: Kit-Verluste, Ursachen, Gefahrenzonen und K/D"
             >
               <Swords className="w-3.5 h-3.5 text-rose-400" />
-              <span>Combat-Analytics</span>
+              <span>{t('events.tabCombat')}</span>
             </button>
           </div>
 
@@ -461,7 +463,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 onChange={(e) => setArchiveSession(e.target.value)}
                 className="appearance-none bg-[#071322] border border-cyan-900/80 hover:border-cyan-500 rounded px-2.5 py-1 pr-7 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-400 transition cursor-pointer max-w-[220px] sm:max-w-xs truncate"
               >
-                <option value="__all__">🌐 Alle Sitzungen (Gesamthistorie)</option>
+                <option value="__all__">{t('events.allSessions')}</option>
                 {sessions.map((s) => (
                   <option key={s.id || s.name} value={s.name}>
                     📁 {s.name} ({s.startTime} · {s.playTime && s.playTime !== '0m' ? `${s.playTime} In-Game` : s.duration}{s.crew && s.crew.length > 0 ? ` · 👥 ${s.crew.length}` : ''})
@@ -475,12 +477,12 @@ export const EventsView: React.FC<EventsViewProps> = ({
           {/* Aktiver Kategorie-Filter (falls über Kontextmenü gesetzt) */}
           {category !== 'Alle' && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/40 text-xs font-mono text-cyan-300 shrink-0">
-              <span>Filter: {category}</span>
+              <span>{t('events.filterPrefix')} {category}</span>
               <button
                 type="button"
                 onClick={() => setCategory('Alle')}
                 className="hover:text-white cursor-pointer ml-0.5"
-                title="Kategorie-Filter aufheben"
+                title={t('events.clearFilter')}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -497,7 +499,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Ereignisse filtern..."
+                placeholder={t('events.searchPlaceholder')}
                 className="bg-[#071322] border border-cyan-900/60 focus:border-cyan-500/80 rounded pl-8 pr-7 py-1 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none w-48 sm:w-56 transition"
               />
               {search && (
@@ -688,7 +690,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               onClick={() => handleSort('timestamp')}
               className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
-              <span>ZEIT</span>
+              <span>{t('events.colTime')}</span>
               {sortCol === 'timestamp' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </div>
 
@@ -696,7 +698,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               onClick={() => handleSort('category')}
               className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
-              <span>TYP</span>
+              <span>{t('events.colType')}</span>
               {sortCol === 'category' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </div>
 
@@ -704,7 +706,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               onClick={() => handleSort('amount')}
               className="flex items-center justify-end gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80 text-right"
             >
-              <span>BETRAG</span>
+              <span>{t('events.colAmount')}</span>
               {sortCol === 'amount' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </div>
 
@@ -712,7 +714,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               onClick={() => handleSort('ship')}
               className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2 border-r border-cyan-950/80"
             >
-              <span>SCHIFF</span>
+              <span>{t('events.colShip')}</span>
               {sortCol === 'ship' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </div>
 
@@ -720,7 +722,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               onClick={() => handleSort('title')}
               className="flex items-center gap-1 cursor-pointer hover:text-cyan-300 px-3 py-2"
             >
-              <span>DETAIL</span>
+              <span>{t('events.colDetail')}</span>
               {sortCol === 'title' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
             </div>
           </div>
@@ -733,7 +735,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                   <Terminal className="w-6 h-6 text-cyan-400 opacity-60" />
                 </div>
                 <div className="text-sm font-semibold text-slate-300 font-mono mb-1">
-                  Keine Ereignisse gefunden
+                  {t('events.noEventsFound')}
                 </div>
                 <div className="text-xs text-slate-500 max-w-sm mb-3">
                   {search
@@ -750,7 +752,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     }}
                     className="px-3 py-1 text-xs font-mono rounded bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-700/60 text-cyan-300 transition cursor-pointer"
                   >
-                    Filter zurücksetzen
+                    {t('events.resetFilters')}
                   </button>
                 )}
               </div>

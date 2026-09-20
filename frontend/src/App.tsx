@@ -38,6 +38,7 @@ import { WikiDossierModal } from './components/WikiDossierModal';
 import { GlobalTooltip } from './components/GlobalTooltip';
 import { HardDrive } from 'lucide-react';
 import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto, PluginDto } from './services/photinoBridge';
+import { useI18n } from './i18n';
 import { PluginHostView } from './views/PluginHostView';
 
 export interface NavTargetContext {
@@ -48,6 +49,7 @@ export interface NavTargetContext {
 }
 
 export const App: React.FC = () => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<NavTabId>('events');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
@@ -521,9 +523,9 @@ export const App: React.FC = () => {
               <HardDrive className="w-3 h-3 text-cyan-400" /> SQLite: sessions.db
             </span>
             <span>·</span>
-            <span>{status?.dbSessionCount ?? sessions.length} Sessions indexiert</span>
+            <span>{t('statusBar.sessionsIndexed', { count: status?.dbSessionCount ?? sessions.length })}</span>
             <span>·</span>
-            <span>{warehouseTotal} Lagerartikel</span>
+            <span>{t('statusBar.warehouseItems', { count: warehouseTotal })}</span>
           </div>
           <div className="flex items-center gap-3">
             <span

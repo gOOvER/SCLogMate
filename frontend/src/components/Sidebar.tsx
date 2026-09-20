@@ -30,6 +30,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { PluginDto } from '../services/photinoBridge';
+import { useI18n } from '../i18n';
 
 export type NavTabId =
   | 'events'
@@ -107,6 +108,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   autoLoadCount,
   plugins = [],
 }) => {
+  const { t } = useI18n();
+
   const pluginItems: NavItem[] = (plugins || [])
     .filter((p) => p.enabled && p.sidebar)
     .sort((a, b) => (a.sidebar?.order ?? 99) - (b.sidebar?.order ?? 99))
@@ -118,50 +121,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navGroups: NavGroup[] = [
     {
-      title: 'Hauptfunktionen',
+      title: t('nav.categoryCore'),
       items: [
-        { id: 'events', label: 'Ereignisse', icon: Scroll, badge: liveEventCount },
-        // { id: 'chat', label: 'Chat-Protokoll', icon: MessageSquare },
-        { id: 'finances', label: 'Finanzen', icon: Coins },
-        { id: 'missions', label: 'Missionen', icon: Target },
-        { id: 'reputation', label: 'Ruf & Fraktionen', icon: Award },
+        { id: 'events', label: t('nav.events'), icon: Scroll, badge: liveEventCount },
+        // { id: 'chat', label: t('nav.chat'), icon: MessageSquare },
+        { id: 'finances', label: t('nav.finances'), icon: Coins },
+        { id: 'missions', label: t('nav.missions'), icon: Target },
+        { id: 'reputation', label: t('nav.reputation'), icon: Award },
       ],
     },
     {
-      title: 'Universum & Raum',
+      title: t('nav.categoryUniverse'),
       items: [
-        { id: 'starmap', label: 'Sternenkarte', icon: Radar },
-        { id: 'places', label: 'Orte & POIs', icon: Compass },
-        { id: 'blackbox', label: 'Flugschreiber', icon: MapPin },
-        { id: 'orescanner', label: 'Erz-Scanner', icon: Pickaxe },
-        { id: 'refinery', label: 'Raffinerie', icon: Flame, badge: refineryCount },
+        { id: 'starmap', label: t('nav.starmap'), icon: Radar },
+        { id: 'places', label: t('nav.places'), icon: Compass },
+        { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
+        { id: 'orescanner', label: t('nav.orescanner'), icon: Pickaxe },
+        { id: 'refinery', label: t('nav.refinery'), icon: Flame, badge: refineryCount },
       ],
     },
     {
-      title: 'Hangar & Inventar',
+      title: t('nav.categoryHangar'),
       items: [
-        { id: 'market', label: 'Markt', icon: ShoppingBag, badge: autoLoadCount },
-        { id: 'fleet', label: 'Hangar', icon: Rocket },
-        { id: 'wiki', label: 'Wiki Explorer', icon: BookOpen },
-        { id: 'warehouse', label: 'Warenlager', icon: Box, badge: warehouseCount },
-        { id: 'blueprints', label: 'Baupläne', icon: FileCode2 },
-        { id: 'loadout', label: 'Ausrüstung', icon: Shield },
+        { id: 'market', label: t('nav.market'), icon: ShoppingBag, badge: autoLoadCount },
+        { id: 'fleet', label: t('nav.fleet'), icon: Rocket },
+        { id: 'wiki', label: t('nav.wiki'), icon: BookOpen },
+        { id: 'warehouse', label: t('nav.warehouse'), icon: Box, badge: warehouseCount },
+        { id: 'blueprints', label: t('nav.blueprints'), icon: FileCode2 },
+        { id: 'loadout', label: t('nav.loadout'), icon: Shield },
       ],
     },
     ...(pluginItems.length > 0
       ? [
           {
-            title: 'Erweiterungen',
+            title: t('nav.categoryPlugins'),
             items: pluginItems,
           },
         ]
       : []),
     {
-      title: 'System & Optionen',
+      title: t('nav.categorySystem'),
       items: [
-        { id: 'tools', label: 'Werkzeuge', icon: Wrench },
-        { id: 'settings', label: 'Einstellungen', icon: Settings },
-        { id: 'about', label: 'Über', icon: Info },
+        { id: 'tools', label: t('nav.tools'), icon: Wrench },
+        { id: 'settings', label: t('nav.settings'), icon: Settings },
+        { id: 'about', label: t('nav.about'), icon: Info },
       ],
     },
   ];

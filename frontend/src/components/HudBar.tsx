@@ -359,12 +359,12 @@ export const HudBar: React.FC<HudBarProps> = ({
                 {telemetry.isArmistice ? (
                   <>
                     <Shield className="w-2.5 h-2.5 text-emerald-400" />
-                    <span>{t('hud.armistice')}</span>
+                    <span>{t('hud.armisticeActive')}</span>
                   </>
                 ) : (
                   <>
                     <ShieldAlert className="w-2.5 h-2.5 text-rose-400" />
-                    <span>Waffen aktiv</span>
+                    <span>{t('hud.weaponsFree')}</span>
                   </>
                 )}
               </div>
@@ -387,7 +387,15 @@ export const HudBar: React.FC<HudBarProps> = ({
               {telemetry.locationName}
             </div>
             <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 shrink-0">
-              {telemetry.locationType}
+              {(() => {
+                const lt = telemetry.locationType?.toLowerCase();
+                if (lt?.includes('landezone') || lt?.includes('landing zone')) return t('hud.landingZone');
+                if (lt?.includes('raumstation') || lt?.includes('space station')) return t('hud.spaceStation');
+                if (lt?.includes('außenposten') || lt?.includes('outpost')) return t('hud.outpost');
+                if (lt?.includes('asteroid')) return t('hud.asteroidField');
+                if (lt?.includes('schiff') || lt?.includes('fahrzeug') || lt?.includes('vehicle')) return t('hud.shipVehicle');
+                return telemetry.locationType;
+              })()}
             </span>
           </div>
 
@@ -395,7 +403,15 @@ export const HudBar: React.FC<HudBarProps> = ({
           <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
             <span>{telemetry.locationBody}</span>
             <span className="text-slate-600 mx-1.5">·</span>
-            <span className="text-slate-400">{telemetry.jurisdiction}</span>
+            <span className="text-slate-400">
+              {(() => {
+                const j = telemetry.jurisdiction;
+                if (j?.includes('UEE Protektorat') || j?.includes('UEE Protectorate')) return t('hud.ueeJurisdiction');
+                if (j?.includes('Gesetzlos') || j?.includes('Lawless')) return t('hud.outlawJurisdiction');
+                if (j?.includes("People's Alliance")) return t('hud.peoplesAlliance');
+                return j;
+              })()}
+            </span>
           </div>
         </div>
 
@@ -441,7 +457,13 @@ export const HudBar: React.FC<HudBarProps> = ({
 
           {/* Subline: Flight Telemetry */}
           <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
-            {telemetry.shipFlightInfo}
+            {(() => {
+              if (!telemetry.shipFlightInfo || telemetry.shipFlightInfo === '—') return '—';
+              return telemetry.shipFlightInfo
+                .replace(/Flugbereit/gi, t('hud.flightReady'))
+                .replace(/(\d+)\s*Flüge/gi, `$1 ${t('hud.flights')}`)
+                .replace(/(\d+)\s*QT-Sprünge/gi, `$1 ${t('hud.qtJumps')}`);
+            })()}
           </div>
         </div>
       </div>
@@ -595,7 +617,7 @@ export const HudBar: React.FC<HudBarProps> = ({
                     }`}
                     title={telemetry.activeMissionTitle}
                   >
-                    {hasMission ? telemetry.activeMissionTitle : 'Kein aktiver Auftrag'}
+                    {hasMission ? telemetry.activeMissionTitle : t('hud.noActiveContract')}
                   </div>
                   {hasMission && telemetry.activeMissionReward > 0 && (
                     <span className="text-xs font-mono font-bold text-emerald-400 shrink-0">
@@ -609,14 +631,14 @@ export const HudBar: React.FC<HudBarProps> = ({
                   <span className="text-slate-400 truncate">
                     {hasMission && telemetry.activeMissionGiver && telemetry.activeMissionGiver !== '—'
                       ? telemetry.activeMissionGiver
-                      : 'Bereit für Auftragsannahme'}
+                      : t('hud.readyForAssignment')}
                   </span>
                   <span
                     className={`text-[10px] font-semibold shrink-0 ml-2 ${
                       hasMission ? 'text-cyan-400' : 'text-slate-500'
                     }`}
                   >
-                    ● {hasMission ? (telemetry.activeMissionStatus || 'Aktiv') : 'Bereit'}
+                    ● {hasMission ? (telemetry.activeMissionStatus || t('hud.active')) : t('hud.ready')}
                   </span>
                 </div>
               </>
