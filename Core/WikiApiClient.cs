@@ -440,8 +440,12 @@ public static class WikiApiClient
     {
         var s = term.Trim();
         if (s.Contains(" · ")) s = s.Split(" · ")[0].Trim();
-        if (s.Contains(" - ")) s = s.Split(" - ")[0].Trim();
+        if (s.Contains(" - ") && !s.StartsWith("CF-", StringComparison.OrdinalIgnoreCase)) s = s.Split(" - ")[0].Trim();
         if (s.Contains('(')) s = s.Split('(')[0].Trim();
+        s = s.Replace("•", "'").Replace("·", "").Trim();
+        if (s.Equals("Chili-Max", StringComparison.OrdinalIgnoreCase)) s = "Chill-Max";
+        if (s.Equals("Gin-zel", StringComparison.OrdinalIgnoreCase)) s = "Ginzel";
+        if (s.StartsWith("5CA", StringComparison.OrdinalIgnoreCase)) s = "5CA 'Akura'";
         return s;
     }
 
@@ -624,9 +628,28 @@ public static class WikiApiClient
         using var doc = await JsonDocument.ParseAsync(stream);
         var root = doc.RootElement;
 
-        if (!root.TryGetProperty("data", out var data) || data.GetArrayLength() == 0) return null;
+        if (root.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
+        {
+            return ParseItemFromJson(data[0], name);
+        }
 
-        return ParseItemFromJson(data[0], name);
+        // Fallback für OCR-Abweichungen oder Bindestriche (z. B. Gin-zel -> Ginzel)
+        if (name.Contains('-') && !name.StartsWith("CF-", StringComparison.OrdinalIgnoreCase))
+        {
+            var noHyphen = name.Replace("-", "");
+            var fbResp = await Http.GetAsync($"items?filter[name]={Uri.EscapeDataString(noHyphen)}");
+            if (fbResp.IsSuccessStatusCode)
+            {
+                using var fbStream = await fbResp.Content.ReadAsStreamAsync();
+                using var fbDoc = await JsonDocument.ParseAsync(fbStream);
+                if (fbDoc.RootElement.TryGetProperty("data", out var fbData) && fbData.GetArrayLength() > 0)
+                {
+                    return ParseItemFromJson(fbData[0], name);
+                }
+            }
+        }
+
+        return null;
     }
 
     private static WikiInfo ParseItemFromJson(JsonElement first, string fallbackName)

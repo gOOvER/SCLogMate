@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Radio,
   Cpu,
+  BookOpen,
+  ExternalLink,
+  Coins,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from './PipsAnalyzerBadge';
 
@@ -40,6 +43,27 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
 
   const components: ScannedShipComponentDto[] = Array.isArray(ship.components) ? ship.components : [];
   const isCustomScanned = Boolean(ship.componentsUpdatedAt);
+
+  const cleanComponentName = (rawName: string): string => {
+    if (!rawName) return '';
+    let name = rawName.trim();
+    if (name.includes('(')) {
+      name = name.split('(')[0].trim();
+    }
+    name = name.replace(/[•·*]/g, '').trim();
+    name = name.replace(/['"]$/, '').trim();
+    if (name.toLowerCase() === 'chili-max') return 'Chill-Max';
+    if (name.toLowerCase() === 'gin-zel') return 'Ginzel';
+    if (name.toLowerCase().startsWith('5ca')) return "5CA 'Akura'";
+    return name;
+  };
+
+  const handleOpenComponentWiki = (compName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const clean = cleanComponentName(compName);
+    if (!clean) return;
+    window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: clean }));
+  };
 
   const getSlotIcon = (slotType: string) => {
     switch (slotType.toLowerCase()) {
@@ -165,13 +189,52 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition cursor-pointer"
-            title="Schließen"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Quick Link: In-App Wiki Dossier */}
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: cleanShipName }));
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-[#071322] hover:bg-cyan-950/70 border border-[#142A45] hover:border-cyan-500/60 text-cyan-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer hover:shadow-[0_0_8px_rgba(6,182,212,0.3)]"
+              title="Star Citizen Wiki Dossier für dieses Schiff öffnen"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">SCWiki</span>
+            </button>
+
+            {/* Quick Link: Erkul Calculator */}
+            <button
+              onClick={() => {
+                bridge.openExternalUrl('https://www.erkul.games/live/calculator');
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-[#071322] hover:bg-amber-950/70 border border-[#142A45] hover:border-amber-500/60 text-amber-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer hover:shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+              title="Erkul Games Loadout Calculator im Browser öffnen"
+            >
+              <Crosshair className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Erkul</span>
+            </button>
+
+            {/* Quick Link: UEX Corp */}
+            <button
+              onClick={() => {
+                bridge.openExternalUrl(`https://uexcorp.space/search?q=${encodeURIComponent(ship.name)}`);
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-[#071322] hover:bg-emerald-950/70 border border-[#142A45] hover:border-emerald-500/60 text-emerald-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer hover:shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+              title="UEX Markt- & Terminaldaten abrufen"
+            >
+              <Coins className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">UEX</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition cursor-pointer ml-1"
+              title="Schließen"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -249,9 +312,14 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
           {/* Components Grid */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
-                Installierte Ausrüstung ({components.length})
-              </span>
+              <div>
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
+                  Installierte Ausrüstung ({components.length})
+                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Klicke auf eine Komponente für Spezifikationen & Händlerstandorte im SCWiki
+                </span>
+              </div>
               {isCustomScanned && (
                 <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> Aus Spiel-Screenshot verifiziert
@@ -265,24 +333,55 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {components.map((c, idx) => (
-                  <div
-                    key={`${c.slotType}-${idx}`}
-                    className={`p-2.5 rounded-lg border flex items-center gap-2.5 transition ${getSlotColor(c.slotType)}`}
-                  >
-                    <div className="p-1.5 rounded bg-black/40 shrink-0">
-                      {getSlotIcon(c.slotType)}
+                {components.map((c, idx) => {
+                  const cleanName = cleanComponentName(c.componentName);
+                  return (
+                    <div
+                      key={`${c.slotType}-${idx}`}
+                      onClick={() => handleOpenComponentWiki(c.componentName)}
+                      className={`group p-2.5 rounded-lg border flex items-center justify-between gap-2.5 transition cursor-pointer hover:border-cyan-400/60 hover:bg-cyan-950/20 hover:shadow-[0_0_12px_rgba(6,182,212,0.15)] ${getSlotColor(c.slotType)}`}
+                      title={`"${cleanName}" anklicken für SCWiki-Dossier (Werte & Händler-Standorte)`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="p-1.5 rounded bg-black/40 shrink-0 group-hover:bg-cyan-950/60 group-hover:text-cyan-300 transition">
+                          {getSlotIcon(c.slotType)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wide block truncate">
+                            {c.slotLabel || c.slotType}
+                          </span>
+                          <span className="text-xs font-bold text-slate-100 truncate block group-hover:text-cyan-200 transition">
+                            {c.componentName}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick Action Buttons */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition">
+                        <button
+                          onClick={(e) => handleOpenComponentWiki(c.componentName, e)}
+                          className="p-1 rounded bg-black/40 hover:bg-cyan-900/70 text-slate-400 hover:text-cyan-300 border border-transparent hover:border-cyan-500/40 transition cursor-pointer"
+                          title={`SCWiki-Dossier für "${cleanName}" öffnen`}
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (cleanName) {
+                              bridge.openExternalUrl(`https://star-citizen.wiki/${encodeURIComponent(cleanName)}`);
+                            }
+                          }}
+                          className="p-1 rounded bg-black/40 hover:bg-blue-900/70 text-slate-400 hover:text-blue-300 border border-transparent hover:border-blue-500/40 transition cursor-pointer"
+                          title={`"${cleanName}" im Star Citizen Wiki Browser aufrufen`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wide block truncate">
-                        {c.slotLabel || c.slotType}
-                      </span>
-                      <span className="text-xs font-bold text-slate-100 truncate block">
-                        {c.componentName}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

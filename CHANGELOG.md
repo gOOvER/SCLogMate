@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Interactive Component Links & SCWiki Dossier Integration (`frontend/src/components/ShipLoadoutModal.tsx`, `Core/WikiApiClient.cs`)**:
+  - **Clickable Loadout Components**: Each component in the Ship Loadout modal is now an interactive card that can be clicked to directly open the in-app SCWiki dossier modal, displaying full technical specs, manufacturer details, 3D render, and game store locations with aUEC prices.
+  - **Quick Action Links**: Added hover quick action buttons to every component card for in-app SCWiki dossier lookup and external browser navigation to `star-citizen.wiki`.
+  - **Header Direct Links**: Added dedicated quick action buttons to the Loadout modal header for the selected ship: in-app SCWiki dossier, Erkul Live Calculator (`erkul.games/live/calculator`), and UEX Corp market terminal search (`uexcorp.space`).
+  - **Component OCR Name Normalization**: Enhanced `cleanComponentName` and `WikiApiClient.CleanSearchTerm` to handle bracketed specs (`(Ind/3/A)`, `(Civ/2/C)`), OCR font variations (`Chili-Max` -> `Chill-Max`, `Gin-zel` -> `Ginzel`, `5CA 'Akura•` -> `5CA 'Akura'`), and hyphenated fallback searches.
 - **Argo MOTH Catalog Support (`Core/FleetCatalog.cs`, `Core/PipsAnalyzer.cs`)**:
   - Added full fleet catalog entry for the new `ARGO MOTH` industrial salvage vessel, including default specs, pledge values, and stock armament (CF-227 Badger Repeaters) for pip calculations.
 - **Batch Multi-Screenshot Loadout Scanning (`Core/Photino/PhotinoBridge.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
