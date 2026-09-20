@@ -25,8 +25,8 @@ if ($cl -match $verPat) {
   $cl = $cl -replace '(?m)^## \[Unreleased\]\s*', "## [Unreleased]`r`n`r`n## [$ver] - $date`r`n"
   Set-Content $clPath $cl -Encoding UTF8
   git add CHANGELOG.md
-  git commit -m "changelog: $tag" 2>&1 | Out-Null
-  git push origin refs/heads/main 2>&1 | Out-Null
+  git commit -m "changelog: $tag"
+  git push origin refs/heads/main
 } else {
   $body = "Siehe Commits."
 }
