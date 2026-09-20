@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Global Sci-Fi Tooltip System (`frontend/src/components/GlobalTooltip.tsx`, `frontend/src/App.tsx`)**:
+  - **Replaced Buggy Native WebView2 Tooltips**: Implemented a centralized, high-performance `GlobalTooltip` component that intercepts native `title` attributes and `data-tooltip` elements. This completely resolves the Windows WebView2 bug where tooltips would render only once and fail to show again on subsequent hovers.
+  - **Star Citizen Sci-Fi Aesthetics**: Styled all tooltips with dark glassmorphic backgrounds (`#030914`), cyan neon borders (`border-cyan-500/40`), glowing cyan radar pulse dots, and responsive auto-flipping/clamping to ensure tooltips never overflow viewport boundaries.
 - **Interactive Ship & Mission Cross-Linking across Live-Log and Finances (`frontend/src/views/EventsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/views/FleetView.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/views/WarehouseView.tsx`, `frontend/src/views/PlacesView.tsx`, `frontend/src/App.tsx`)**:
   - **Live-Log & Events Table Links (`EventsView.tsx`)**:
     - Made the **Ship** column clickable with a dedicated rocket icon badge. Clicking any ship (e.g. Drake Corsair, Drake Vulture) instantly navigates to the Fleet tab (`fleet`) and sets the search filter to that ship.
@@ -22,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
 ### Changed
+- **Fleet View Table Modernization (`frontend/src/views/FleetView.tsx`)**:
+  - **Enhanced Row Cards and Hover States**: Added glowing border indicators (`border-l-emerald-400` for active ships, `hover:border-l-cyan-400` on hover), refined cell padding, and high-contrast typography.
+  - **Polished Status & Acquisition Badges**: Modernized `AKTIV` HUD badge with pulsing radar indicator, styled explicit activation button, refined star toggle button, and upgraded Pledge/In-Game/Rental badges with subtle sci-fi gradients.
+  - **Interactive Action Buttons**: Replaced flat icon buttons with themed glassmorphic actions (Loadout, Compare, Wiki, UEX, Notes) with distinct hover glows and integrated custom tooltips.
 - **Citizen Dossier Alignment and Layout Overhaul (`frontend/src/components/PilotDossierModal.tsx`)**:
   - **Strict Two-Column Grid Alignment (`PILOTENSTATUS`)**: Replaced loose `justify-between` flex rows with a structured two-column grid (`grid-cols-[115px_1fr]`). Labels (`Handle`, `Rang & Titel`, `Registriert`, `Sprachen`) and their respective values now align in clean, vertical columns, eliminating awkward multi-line line breaks and staggered text.
   - **Expanded Modal Width (`max-w-2xl`)**: Increased modal container width from `max-w-xl` (576px) to `max-w-2xl` (672px) to give both Pilot Status and Hauptorganisation cards sufficient breathing room.

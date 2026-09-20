@@ -518,14 +518,14 @@ export const FleetView: React.FC<FleetViewProps> = ({
         <div className="flex-1 overflow-auto">
           <table className="w-full min-w-[950px] text-left text-xs border-collapse font-sans">
             <thead>
-              <tr className="border-b border-[#14263B] bg-[#061224] text-slate-400 text-[10.5px] font-mono font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10">
-                <th className="py-2.5 px-3 w-36">Status &amp; Hangar</th>
-                <th className="py-2.5 px-3 min-w-[220px]">Schiff &amp; Hersteller</th>
-                <th className="py-2.5 px-3 w-48">Herkunft / Pledge</th>
-                <th className="py-2.5 px-3 w-44">Rolle / Typ</th>
-                <th className="py-2.5 px-3 w-36">Versicherung</th>
-                <th className="py-2.5 px-3 w-36">Flug-Einsätze</th>
-                <th className="py-2.5 px-3 text-right w-28 font-mono">Aktionen</th>
+              <tr className="border-b border-cyan-950/80 bg-[#051122]/95 text-slate-400 text-[11px] font-mono font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 shadow-sm">
+                <th className="py-3 px-3.5 w-36">Status &amp; Hangar</th>
+                <th className="py-3 px-3.5 min-w-[220px]">Schiff &amp; Hersteller</th>
+                <th className="py-3 px-3.5 w-48">Herkunft / Pledge</th>
+                <th className="py-3 px-3.5 w-48">Rolle / Marktwert</th>
+                <th className="py-3 px-3.5 w-36">Versicherung</th>
+                <th className="py-3 px-3.5 w-40">Flug-Einsätze</th>
+                <th className="py-3 px-3.5 text-right w-36 font-mono">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#102235]/60">
@@ -547,7 +547,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       {activeTab === 'hangar' && (
                         <button
                           onClick={() => setIsAddModalOpen(true)}
-                          className="mt-1 px-4 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow"
+                          className="mt-1 px-4 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Schiff jetzt hinzufügen</span>
@@ -564,58 +564,60 @@ export const FleetView: React.FC<FleetViewProps> = ({
                   // Insurance color
                   const insColor =
                     ship.insuranceType.includes('LTI')
-                      ? 'text-purple-400 border-purple-500/50 bg-purple-950/40'
+                      ? 'text-purple-300 border-purple-500/60 bg-purple-950/50 shadow-[0_0_8px_rgba(168,85,247,0.2)] hover:border-purple-400'
                       : ship.insuranceType.includes('120')
-                      ? 'text-cyan-400 border-cyan-500/50 bg-cyan-950/40'
+                      ? 'text-cyan-300 border-cyan-500/60 bg-cyan-950/50 shadow-[0_0_8px_rgba(6,182,212,0.2)] hover:border-cyan-400'
                       : ship.insuranceType.includes('24') || ship.insuranceType.includes('12')
-                      ? 'text-blue-400 border-blue-500/50 bg-blue-950/40'
-                      : 'text-slate-400 border-slate-700 bg-slate-900/40';
+                      ? 'text-blue-300 border-blue-500/50 bg-blue-950/40 hover:border-blue-400'
+                      : 'text-slate-300 border-slate-700 bg-slate-900/50 hover:border-slate-500';
 
                   // Acquisition color & label
                   const acqBadge =
                     ship.acquisitionType === 'Pledge Store'
-                      ? { label: `$${ship.pledgeValueUsd} USD`, color: 'text-amber-400 border-amber-600/50 bg-amber-950/40' }
+                      ? { label: `$${ship.pledgeValueUsd} USD`, color: 'text-amber-300 border-amber-500/50 bg-gradient-to-r from-amber-950/70 to-amber-900/40 shadow-[0_0_8px_rgba(245,158,11,0.15)] hover:border-amber-400' }
                       : ship.acquisitionType === 'In-Game (aUEC)'
-                      ? { label: '🪙 In-Game Kauf', color: 'text-emerald-400 border-emerald-600/50 bg-emerald-950/40' }
+                      ? { label: '🪙 In-Game Kauf', color: 'text-emerald-300 border-emerald-500/50 bg-gradient-to-r from-emerald-950/70 to-emerald-900/40 shadow-[0_0_8px_rgba(16,185,129,0.15)] hover:border-emerald-400' }
                       : ship.acquisitionType === 'Miete (Rental)'
-                      ? { label: '🎟 Gemietet', color: 'text-sky-400 border-sky-600/50 bg-sky-950/40' }
-                      : { label: '👥 Geliehen', color: 'text-slate-400 border-slate-700 bg-slate-900/40' };
+                      ? { label: '🎟 Gemietet', color: 'text-sky-300 border-sky-500/50 bg-gradient-to-r from-sky-950/70 to-sky-900/40 shadow-[0_0_8px_rgba(14,165,233,0.15)] hover:border-sky-400' }
+                      : { label: '👥 Geliehen', color: 'text-slate-300 border-slate-700 bg-slate-900/60 hover:border-slate-500' };
 
                   return (
                     <tr
                       key={ship.name}
-                      className={`hover:bg-[#07172A]/70 transition-colors group ${
-                        ship.isCurrent ? 'bg-cyan-950/20' : ''
+                      className={`transition-all duration-150 group border-l-[3px] ${
+                        ship.isCurrent
+                          ? 'border-l-emerald-400 bg-emerald-950/20 shadow-[inset_0_0_20px_rgba(16,185,129,0.06)]'
+                          : 'border-l-transparent hover:border-l-cyan-400 hover:bg-[#071a30]/80'
                       }`}
                     >
                       {/* 1. Status & Hangar */}
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2">
                           {/* Active / Idle pill */}
                           {ship.isCurrent ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 flex items-center gap-1 shadow-sm">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.35)]">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                               AKTIV
                             </span>
                           ) : (
                             <button
                               onClick={() => handleSetCurrentShip(ship.name)}
-                              className="opacity-40 group-hover:opacity-100 hover:text-cyan-300 text-slate-500 transition px-1.5 py-0.5 rounded text-[9.5px] font-mono border border-transparent hover:border-cyan-800/60 hover:bg-cyan-950/40 cursor-pointer"
-                              title="Dieses Schiff als aktives Schiff für HUD und Log erfassen"
+                              className="px-2 py-0.5 rounded text-[10px] font-mono border border-slate-800 bg-[#061224] hover:bg-cyan-950/60 hover:border-cyan-600 hover:text-cyan-300 text-slate-400 transition cursor-pointer"
+                              data-tooltip="Als aktives Schiff für HUD und Live-Log setzen"
                             >
-                              Als aktiv
+                              Aktivieren
                             </button>
                           )}
 
                           {/* Star Toggle Button */}
                           <button
                             onClick={() => handleToggleHangar(ship.name)}
-                            className={`p-1 rounded transition border cursor-pointer ${
+                            className={`p-1.5 rounded-lg transition border cursor-pointer ${
                               ship.isInHangar
-                                ? 'bg-amber-950/40 border-amber-600/50 text-amber-400 hover:bg-amber-900/50'
-                                : 'bg-[#091522] border-slate-700/60 text-slate-500 hover:text-amber-400 hover:border-amber-600/40'
+                                ? 'bg-amber-950/50 border-amber-500/60 text-amber-400 hover:bg-amber-900/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                : 'bg-[#061224] border-slate-800 text-slate-500 hover:text-amber-400 hover:border-amber-600/50 hover:bg-amber-950/20'
                             }`}
-                            title={
+                            data-tooltip={
                               ship.isInHangar
                                 ? 'Im persönlichen Hangar (Klicken zum Entfernen)'
                                 : 'Nicht im Hangar (Klicken zum Hinzufügen)'
@@ -627,39 +629,39 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       </td>
 
                       {/* 2. Schiff & Hersteller */}
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-3.5">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition text-xs">
+                            <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors text-[13px] tracking-wide">
                               {ship.name}
                             </span>
                             <PipsAnalyzerBadge pipsResult={ship.pipsResult} compact={true} />
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-2 mt-0.5">
                             <span
-                              className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border"
+                              className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border shadow-xs"
                               style={{
-                                borderColor: ship.manufacturerColor || '#38BDF8',
+                                borderColor: ship.manufacturerColor ? `${ship.manufacturerColor}80` : '#0284c7',
                                 color: ship.manufacturerColor || '#38BDF8',
-                                backgroundColor: '#071322',
+                                backgroundColor: '#051224',
                               }}
                             >
                               {ship.manufacturerBadge || 'SHIP'}
                             </span>
-                            <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                            <span className="text-[11.5px] text-slate-400 truncate max-w-[160px] font-sans">
                               {ship.manufacturer}
                             </span>
                           </div>
 
                           {/* Livery / Lackierung & Loadout Button */}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             {ship.livery && (
                               <span
-                                className="px-1.5 py-0.2 rounded text-[9.5px] font-mono border border-purple-500/40 bg-purple-950/30 text-purple-300 flex items-center gap-1"
-                                title={`Lackierung: ${ship.livery}`}
+                                className="px-2 py-0.5 rounded text-[9.5px] font-mono border border-purple-500/40 bg-purple-950/40 text-purple-300 flex items-center gap-1 shadow-xs"
+                                data-tooltip={`Lackierung: ${ship.livery}`}
                               >
                                 <Palette className="w-2.5 h-2.5 text-purple-400" />
-                                <span className="truncate max-w-[120px]">{ship.livery}</span>
+                                <span className="truncate max-w-[130px]">{ship.livery}</span>
                               </span>
                             )}
 
@@ -669,13 +671,13 @@ export const FleetView: React.FC<FleetViewProps> = ({
                                   setSelectedLoadoutShip(ship);
                                   setIsLoadoutModalOpen(true);
                                 }}
-                                className="px-1.5 py-0.2 rounded text-[9.5px] font-mono border border-cyan-800/60 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 flex items-center gap-1 transition cursor-pointer"
-                                title="Ausrüstung & Komponenten im Detail ansehen"
+                                className="px-2 py-0.5 rounded text-[9.5px] font-mono border border-cyan-800/60 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 flex items-center gap-1.5 transition cursor-pointer shadow-xs hover:border-cyan-500 hover:shadow-[0_0_8px_rgba(6,182,212,0.25)]"
+                                data-tooltip="Komponenten, Ausrüstung & VLM-Loadout im Detail ansehen"
                               >
                                 <Wrench className="w-2.5 h-2.5 text-cyan-400" />
                                 <span>{ship.components.length} Ausrüstung</span>
                                 {ship.componentsUpdatedAt && (
-                                  <span className="text-emerald-400 font-bold" title="Aus VLM-Screenshot erfasst">
+                                  <span className="text-emerald-400 font-bold" data-tooltip="Erfolgreich via OCR/VLM erfasst">
                                     ✓
                                   </span>
                                 )}
@@ -690,8 +692,8 @@ export const FleetView: React.FC<FleetViewProps> = ({
                                 setEditingNotesShip(ship.name);
                                 setNotesInputVal(ship.customNotes);
                               }}
-                              className="text-[10px] text-slate-500 italic mt-0.5 hover:text-cyan-400 cursor-pointer truncate max-w-[220px]"
-                              title={ship.customNotes}
+                              className="text-[10.5px] text-slate-400 italic mt-1 hover:text-cyan-300 cursor-pointer truncate max-w-[220px] transition-colors"
+                              data-tooltip={ship.customNotes}
                             >
                               📝 {ship.customNotes}
                             </span>
@@ -700,8 +702,8 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       </td>
 
                       {/* 3. Herkunft / Pledge */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-1.5">
+                      <td className="py-3 px-3.5">
+                        <div className="flex items-center gap-2">
                           {isEditingPledge ? (
                             <div className="flex items-center gap-1 font-mono">
                               <span className="text-amber-400 font-bold">$</span>
@@ -715,14 +717,14 @@ export const FleetView: React.FC<FleetViewProps> = ({
                               <button
                                 onClick={() => handleSavePledge(ship.name)}
                                 className="p-1 rounded bg-emerald-950 border border-emerald-600 text-emerald-400 hover:bg-emerald-900 cursor-pointer"
-                                title="Speichern"
+                                data-tooltip="Speichern"
                               >
                                 <Check className="w-3 h-3" />
                               </button>
                               <button
                                 onClick={() => setEditingPledgeShip(null)}
                                 className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 cursor-pointer"
-                                title="Abbrechen"
+                                data-tooltip="Abbrechen"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -731,8 +733,8 @@ export const FleetView: React.FC<FleetViewProps> = ({
                             <>
                               <button
                                 onClick={() => handleCycleAcquisition(ship.name)}
-                                className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold border transition cursor-pointer ${acqBadge.color}`}
-                                title="Klicken zum Durchschalten: 💵 Pledge Store ➔ 🪙 In-Game Kauf ➔ 🎟 Miete ➔ 👥 Geliehen"
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold border transition cursor-pointer ${acqBadge.color}`}
+                                data-tooltip="Klicken zum Durchschalten: 💵 Pledge Store ➔ 🪙 In-Game Kauf ➔ 🎟 Miete ➔ 👥 Geliehen"
                               >
                                 {acqBadge.label}
                               </button>
@@ -740,10 +742,10 @@ export const FleetView: React.FC<FleetViewProps> = ({
                               {ship.isPledgeBought && (
                                 <button
                                   onClick={() => handleStartEditPledge(ship)}
-                                  className="p-1 rounded bg-[#091522] border border-slate-700/60 text-slate-400 hover:text-amber-400 hover:border-amber-600/40 cursor-pointer transition opacity-70 hover:opacity-100"
-                                  title="Pledgewert ($) anpassen"
+                                  className="p-1.5 rounded-md bg-[#061224] border border-slate-800 text-slate-400 hover:text-amber-300 hover:border-amber-500/50 cursor-pointer transition opacity-60 group-hover:opacity-100"
+                                  data-tooltip="Pledgewert ($) manuell anpassen"
                                 >
-                                  <Edit2 className="w-2.5 h-2.5" />
+                                  <Edit2 className="w-3 h-3" />
                                 </button>
                               )}
                             </>
@@ -752,11 +754,11 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       </td>
 
                       {/* 4. Rolle / Typ */}
-                      <td className="py-2.5 px-3">
-                        <span className="text-cyan-400/90 font-medium text-xs truncate block max-w-[170px]" title={ship.role}>
+                      <td className="py-3 px-3.5">
+                        <span className="text-cyan-300 font-medium text-xs truncate block max-w-[180px]" data-tooltip={ship.role}>
                           {ship.role}
                         </span>
-                        <span className="text-[10px] font-mono text-slate-500">
+                        <span className="text-[10.5px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
                           {ship.estimatedValueAuec > 0
                             ? `~${(ship.estimatedValueAuec / 1000000).toFixed(1)}M aUEC`
                             : 'Kein UEX Preis'}
@@ -764,32 +766,32 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       </td>
 
                       {/* 5. Versicherung */}
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-3.5">
                         <button
                           onClick={() => handleCycleInsurance(ship.name)}
-                          className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-semibold border transition cursor-pointer ${insColor}`}
-                          title="Klicken zum Durchschalten: LTI ➔ 120M (IAE) ➔ 24M ➔ 12M ➔ 6M"
+                          className={`px-2.5 py-1 rounded-md text-[10.5px] font-mono font-semibold border transition cursor-pointer ${insColor}`}
+                          data-tooltip="Klicken zum Durchschalten: LTI ➔ 120M (IAE) ➔ 24M ➔ 12M ➔ 6M"
                         >
                           {ship.insuranceType || 'LTI (Lifetime)'}
                         </button>
                       </td>
 
                       {/* 6. Flug-Einsätze */}
-                      <td className="py-2.5 px-3 font-mono">
+                      <td className="py-3 px-3.5 font-mono">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-200 text-xs">
-                            {ship.flightCount}× <span className="text-slate-500 font-normal">Flüge</span>
-                            <span className="mx-1 text-slate-600">·</span>
-                            <span className="text-sky-400">{ship.quantumJumps}</span> <span className="text-slate-500 font-normal">QT</span>
+                          <span className="font-bold text-slate-100 text-xs">
+                            {ship.flightCount}× <span className="text-slate-400 font-normal">Flüge</span>
+                            <span className="mx-1.5 text-slate-600">·</span>
+                            <span className="text-sky-400">{ship.quantumJumps}</span> <span className="text-slate-400 font-normal">QT</span>
                           </span>
-                          <span className="text-[10px] text-slate-500 mt-0.5">
+                          <span className="text-[10.5px] text-slate-400 mt-0.5 flex items-center gap-1">
                             {ship.lastFlown !== '—' ? ship.lastFlown : 'Noch nicht geflogen'}
                           </span>
                         </div>
                       </td>
 
                       {/* 7. Aktionen */}
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-3 px-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Ausrüstung & Komponenten */}
                           <button
@@ -797,23 +799,23 @@ export const FleetView: React.FC<FleetViewProps> = ({
                               setSelectedLoadoutShip(ship);
                               setIsLoadoutModalOpen(true);
                             }}
-                            className="p-1.5 rounded bg-[#071322] hover:bg-cyan-950/60 border border-[#14263B] hover:border-cyan-700 text-cyan-400 transition cursor-pointer"
-                            title="Ausrüstung, Komponenten & Lackierung im Detail ansehen"
+                            className="p-1.5 rounded-lg bg-[#061224] hover:bg-cyan-950/70 border border-[#14263B] hover:border-cyan-500 text-cyan-400 hover:text-cyan-200 hover:shadow-[0_0_10px_rgba(6,182,212,0.3)] transition cursor-pointer"
+                            data-tooltip="Ausrüstung, Komponenten & VLM-Loadout ansehen"
                           >
-                            <Wrench className="w-3 h-3" />
+                            <Wrench className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Vergleichen */}
                           <button
                             onClick={() => {
                               setCompareShipA(ship.name);
-                              setCompareShipB(ships.find(s => s.name !== ship.name)?.name || fleetData?.catalog[0]?.name);
+                              setCompareShipB(ships.find((s) => s.name !== ship.name)?.name || fleetData?.catalog[0]?.name);
                               setIsCompareModalOpen(true);
                             }}
-                            className="p-1.5 rounded bg-[#071322] hover:bg-indigo-950/60 border border-[#14263B] hover:border-indigo-700 text-indigo-400 transition cursor-pointer"
-                            title="Dieses Schiff im Side-by-Side Vergleich analysieren"
+                            className="p-1.5 rounded-lg bg-[#061224] hover:bg-indigo-950/70 border border-[#14263B] hover:border-indigo-500 text-indigo-400 hover:text-indigo-200 hover:shadow-[0_0_10px_rgba(99,102,241,0.3)] transition cursor-pointer"
+                            data-tooltip="Schiff im Side-by-Side Vergleich gegenüberstellen"
                           >
-                            <Scale className="w-3 h-3" />
+                            <Scale className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Wiki */}
@@ -821,10 +823,10 @@ export const FleetView: React.FC<FleetViewProps> = ({
                             onClick={() => {
                               window.dispatchEvent(new CustomEvent('open-wiki-dossier', { detail: ship.name }));
                             }}
-                            className="p-1.5 rounded bg-[#071322] hover:bg-cyan-950/60 border border-[#14263B] hover:border-cyan-700 text-cyan-400 transition cursor-pointer"
-                            title="Star Citizen Wiki Dossier öffnen"
+                            className="p-1.5 rounded-lg bg-[#061224] hover:bg-sky-950/70 border border-[#14263B] hover:border-sky-500 text-sky-400 hover:text-sky-200 hover:shadow-[0_0_10px_rgba(14,165,233,0.3)] transition cursor-pointer"
+                            data-tooltip="Star Citizen Wiki Dossier öffnen"
                           >
-                            <ExternalLink className="w-3 h-3" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </button>
 
                           {/* UEX */}
@@ -832,10 +834,10 @@ export const FleetView: React.FC<FleetViewProps> = ({
                             onClick={() => {
                               bridge.openExternalUrl(`https://uexcorp.space/search?q=${encodeURIComponent(ship.name)}`);
                             }}
-                            className="p-1.5 rounded bg-[#071322] hover:bg-amber-950/60 border border-[#14263B] hover:border-amber-700 text-amber-400 transition cursor-pointer"
-                            title="UEX Händlerpreise & Standorte prüfen"
+                            className="p-1.5 rounded-lg bg-[#061224] hover:bg-amber-950/70 border border-[#14263B] hover:border-amber-500 text-amber-400 hover:text-amber-200 hover:shadow-[0_0_10px_rgba(245,158,11,0.3)] transition cursor-pointer"
+                            data-tooltip="UEX Marktpreise & Händlerstandorte abrufen"
                           >
-                            <Coins className="w-3 h-3" />
+                            <Coins className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Notes */}
@@ -844,10 +846,10 @@ export const FleetView: React.FC<FleetViewProps> = ({
                               setEditingNotesShip(ship.name);
                               setNotesInputVal(ship.customNotes || '');
                             }}
-                            className="p-1.5 rounded bg-[#071322] hover:bg-slate-800 border border-[#14263B] text-slate-400 hover:text-slate-200 transition cursor-pointer"
-                            title="Notiz / Schiffsbeschreibung bearbeiten"
+                            className="p-1.5 rounded-lg bg-[#061224] hover:bg-slate-800 border border-[#14263B] hover:border-slate-500 text-slate-400 hover:text-white transition cursor-pointer"
+                            data-tooltip="Persönliche Notiz bearbeiten"
                           >
-                            <Edit2 className="w-3 h-3" />
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>

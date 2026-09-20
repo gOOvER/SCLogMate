@@ -35,6 +35,7 @@ import { WikiExplorerView } from './views/WikiExplorerView';
 import { DbUpdateModal } from './components/DbUpdateModal';
 import { UpdateModal } from './components/UpdateModal';
 import { WikiDossierModal } from './components/WikiDossierModal';
+import { GlobalTooltip } from './components/GlobalTooltip';
 import { HardDrive } from 'lucide-react';
 import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto } from './services/photinoBridge';
 
@@ -473,6 +474,8 @@ export const App: React.FC = () => {
           query={wikiModalQuery}
           onClose={() => setWikiModalOpen(false)}
         />
+
+        <GlobalTooltip />
 
         {/* Bottom Statusbar */}
         <footer className="flex items-center justify-between px-5 py-1.5 border-t border-cyan-950/60 bg-[#020610]/95 text-[11px] font-mono text-slate-500 shrink-0">
