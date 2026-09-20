@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Aurora False-Positive Navigation Voice Trigger Elimination (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
+  - Removed speculative Starmap route plotting and `CSCItemNavigation::PostInitialize` / `Local Route Guard` matchers that falsely triggered *"Routenplanung abgeschlossen"* / *"Kurs gesetzt"* audio cues immediately upon quantum arrival, during mission objective transitions, or whenever CryEngine entity streaming rerouted navigation guards.
+  - Purged unverified background triggers (freight elevator idle entity streaming, autoland, snub uncoupling) to maintain strictly authentic, verified game event voice callouts matching the official Aurora Log-Wächter catalog.
 
 ## [1.0.0-rc4] - 2026-09-20
 ### Fixed

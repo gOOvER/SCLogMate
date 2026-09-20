@@ -1745,32 +1745,6 @@ public partial class LogParser
             }
         }
 
-        // Starmap-Route geplottet
-        if ((line.Contains("CSCItemNavigation::GetStarmapRouteSegmentData", StringComparison.OrdinalIgnoreCase) ||
-             line.Contains("CSCItemNavigation::PostInitialize", StringComparison.OrdinalIgnoreCase)) &&
-            line.Contains("FinalStop=", StringComparison.OrdinalIgnoreCase) &&
-            !line.Contains("No Route loaded", StringComparison.OrdinalIgnoreCase) &&
-            !line.Contains("FinalStop=-1", StringComparison.OrdinalIgnoreCase) &&
-            !line.Contains("FinalStop=0", StringComparison.OrdinalIgnoreCase))
-        {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Location, Detail = "Navigationsroute berechnet" };
-        }
-
-        // Automatisches Landen
-        if (line.Contains("AutoLand", StringComparison.OrdinalIgnoreCase) || line.Contains("Automated Landing", StringComparison.OrdinalIgnoreCase))
-        {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Automatisches Landen aktiv" };
-        }
-
-        // Selbstzerstörungs-Countdown & Schleudersitz
-        if (line.Contains("SelfDestruct initiated", StringComparison.OrdinalIgnoreCase) || line.Contains("Self-Destruct initiated", StringComparison.OrdinalIgnoreCase))
-        {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = "Selbstzerstörungssequenz eingeleitet" };
-        }
-        if (line.Contains("Ejection initiated", StringComparison.OrdinalIgnoreCase) || line.Contains("EjectSeat", StringComparison.OrdinalIgnoreCase))
-        {
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.ShipLoss, Detail = "Schleudersitz ausgelöst" };
-        }
 
         // Schiffsverlust (Zerstörung / Selbstzerstörung)
         if (line.Contains("VehicleDestroyed", StringComparison.OrdinalIgnoreCase) || line.Contains("Vehicle destroyed", StringComparison.OrdinalIgnoreCase) || line.Contains("Self-Destruct", StringComparison.OrdinalIgnoreCase) || line.Contains("Vehicle Exploded", StringComparison.OrdinalIgnoreCase))

@@ -95,18 +95,6 @@ public partial class AuroraVoiceService : IDisposable
     private readonly List<string> _powerOffSounds = new();
     private readonly List<string> _doorOpenSounds = new();
     private readonly List<string> _doorCloseSounds = new();
-    private readonly Dictionary<string, string> _stantonMoonsSounds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, string> _stantonRefineriesSounds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, string> _destinationSounds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<string> _freightElevatorSounds = new();
-    private readonly List<string> _routeReadySounds = new();
-    private readonly List<string> _autoLandSounds = new();
-    private readonly List<string> _snubUndockSounds = new();
-    private readonly List<string> _snubDockSounds = new();
-    private readonly List<string> _selfDestructSounds = new();
-    private readonly List<string> _ejectSounds = new();
-    private readonly List<string> _sensorScanSounds = new();
-    private readonly List<string> _countermeasureSounds = new();
 
     // Spam cooldowns & variant history (category/name -> last trigger timestamp)
     private readonly ConcurrentDictionary<string, DateTime> _lastTriggerTime = new(StringComparer.OrdinalIgnoreCase);
@@ -344,18 +332,6 @@ public partial class AuroraVoiceService : IDisposable
         _powerOffSounds.Clear();
         _doorOpenSounds.Clear();
         _doorCloseSounds.Clear();
-        _stantonMoonsSounds.Clear();
-        _stantonRefineriesSounds.Clear();
-        _destinationSounds.Clear();
-        _freightElevatorSounds.Clear();
-        _routeReadySounds.Clear();
-        _autoLandSounds.Clear();
-        _snubUndockSounds.Clear();
-        _snubDockSounds.Clear();
-        _selfDestructSounds.Clear();
-        _ejectSounds.Clear();
-        _sensorScanSounds.Clear();
-        _countermeasureSounds.Clear();
 
         // 1. Original Ship Greetings (64 files -> 32 families)
         var origShipDir = Path.Combine(baseDir, "Willkommen an bord + schiffsnamen");
@@ -564,138 +540,6 @@ public partial class AuroraVoiceService : IDisposable
             var sprungDir = Path.Combine(befehleDir, "Sprung einleiten");
             if (Directory.Exists(sprungDir))
                 _quantumInitiatedSounds.AddRange(Directory.GetFiles(sprungDir, "*.mp3").OrderBy(f => f));
-
-            // Navigation abgeschlossen (Route bereit)
-            var navAbgDir = Path.Combine(befehleDir, "Navigation abgeschlossen");
-            if (Directory.Exists(navAbgDir))
-                _routeReadySounds.AddRange(Directory.GetFiles(navAbgDir, "*.mp3").OrderBy(f => f));
-
-            // Navigation gestartet (Stanton Hauptstädte, Raumstationen & Gateways)
-            var navGestDir = Path.Combine(befehleDir, "Navigation gestartet");
-            if (Directory.Exists(navGestDir))
-            {
-                foreach (var f in Directory.GetFiles(navGestDir, "*.mp3"))
-                {
-                    var name = Path.GetFileNameWithoutExtension(f);
-                    if (name.Contains("Area18", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Area18"] = f; _destinationSounds["Area 18"] = f; }
-                    else if (name.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["ArcCorp"] = f; _destinationSounds["Arc Corp"] = f; }
-                    else if (name.Contains("Orison", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Orison"] = f; }
-                    else if (name.Contains("Crusader", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Crusader"] = f; }
-                    else if (name.Contains("Lorville", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Lorville"] = f; }
-                    else if (name.Contains("Hurston", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Hurston"] = f; }
-                    else if (name.Contains("New_Babbage", StringComparison.OrdinalIgnoreCase) || name.Contains("New Babbage", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["New Babbage"] = f; _destinationSounds["NewBabbage"] = f; }
-                    else if (name.Contains("microTech", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["microTech"] = f; }
-                    else if (name.Contains("Baijini", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Baijini Point"] = f; _destinationSounds["Baijini"] = f; }
-                    else if (name.Contains("Seraphim", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Seraphim Station"] = f; _destinationSounds["Seraphim"] = f; }
-                    else if (name.Contains("Everus", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Everus Harbor"] = f; _destinationSounds["Everus"] = f; }
-                    else if (name.Contains("Tressler", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Port Tressler"] = f; _destinationSounds["Tressler"] = f; }
-                    else if (name.Contains("Pyro_Gateway", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Pyro Gateway"] = f; _destinationSounds["Gateway to Pyro"] = f; }
-                    else if (name.Contains("Stanton_Gateway", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Stanton Gateway"] = f; }
-                    else if (name.Contains("Nyx_Gateway", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Nyx Gateway"] = f; }
-                }
-            }
-
-            // Navigation pyro (Pyro Stationen & Himmelskörper)
-            var pyroDir = Path.Combine(befehleDir, "Navigation pyro");
-            if (Directory.Exists(pyroDir))
-            {
-                foreach (var f in Directory.GetFiles(pyroDir, "*.mp3"))
-                {
-                    var name = Path.GetFileNameWithoutExtension(f);
-                    if (name.Contains("Terminus", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Terminus"] = f;
-                    else if (name.Contains("Ruin", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Ruin Station"] = f; _destinationSounds["Ruin"] = f; }
-                    else if (name.Contains("Patch_City", StringComparison.OrdinalIgnoreCase) || name.Contains("Patch City", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Patch City"] = f;
-                    else if (name.Contains("Orbituary", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Orbituary"] = f;
-                    else if (name.Contains("Monox", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Monox"] = f; _destinationSounds["Pyro II"] = f; }
-                    else if (name.Contains("Checkmate", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Checkmate"] = f;
-                    else if (name.Contains("Bloom", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Bloom"] = f; _destinationSounds["Pyro III"] = f; }
-                    else if (name.Contains("Pyro_IV", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Pyro IV"] = f;
-                    else if (name.Contains("Pyro_V", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Pyro V"] = f;
-                    else if (name.Contains("Pyro_I", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Pyro I"] = f;
-                    else if (name.Contains("endgame", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Endgame"] = f;
-                    else if (name.Contains("gaslight", StringComparison.OrdinalIgnoreCase)) _destinationSounds["Gaslight"] = f;
-                    else if (name.Contains("rats nest", StringComparison.OrdinalIgnoreCase)) { _destinationSounds["Rat's Nest"] = f; _destinationSounds["Rats Nest"] = f; }
-                }
-            }
-
-            // Stanton Monde (Zielankunft-Ansagen)
-            var mondeDir = Path.Combine(befehleDir, "stanton monde");
-            if (Directory.Exists(mondeDir))
-            {
-                foreach (var f in Directory.GetFiles(mondeDir, "*.mp3"))
-                {
-                    var moon = Path.GetFileNameWithoutExtension(f).Trim();
-                    _stantonMoonsSounds[moon] = f;
-                    _destinationSounds[moon] = f;
-                    if (moon.Equals("GrimHEX", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _stantonMoonsSounds["Grim HEX"] = f;
-                        _stantonMoonsSounds["Grim-HEX"] = f;
-                        _destinationSounds["Grim HEX"] = f;
-                        _destinationSounds["Grim-HEX"] = f;
-                    }
-                }
-            }
-
-            // Stanton Raffinerien (Zielankunft-Ansagen)
-            var raffDir = Path.Combine(befehleDir, "raffinerien stanton");
-            if (Directory.Exists(raffDir))
-            {
-                foreach (var f in Directory.GetFiles(raffDir, "*.mp3"))
-                {
-                    var name = Path.GetFileNameWithoutExtension(f).Trim();
-                    _stantonRefineriesSounds[name] = f;
-                    _destinationSounds[name] = f;
-                    if (name.Contains("Ambitious Dream", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["CRU-L1"] = f; _destinationSounds["CRU-L1"] = f; }
-                    else if (name.Contains("Faint Glen", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["CRU-L5"] = f; _destinationSounds["CRU-L5"] = f; }
-                    else if (name.Contains("Green Glade", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["HUR-L1"] = f; _destinationSounds["HUR-L1"] = f; }
-                    else if (name.Contains("Faithful Dream", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["HUR-L2"] = f; _destinationSounds["HUR-L2"] = f; }
-                    else if (name.Contains("Lively Pathway", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["HUR-L3"] = f; _destinationSounds["HUR-L3"] = f; }
-                    else if (name.Contains("Long Forest", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["HUR-L5"] = f; _destinationSounds["HUR-L5"] = f; }
-                    else if (name.Contains("Shallow Frontier", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["MIC-L1"] = f; _destinationSounds["MIC-L1"] = f; }
-                    else if (name.Contains("Modern Icarus", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["MIC-L2"] = f; _destinationSounds["MIC-L2"] = f; }
-                    else if (name.Contains("wide forest", StringComparison.OrdinalIgnoreCase) || name.Contains("arc l1", StringComparison.OrdinalIgnoreCase)) { _stantonRefineriesSounds["ARC-L1"] = f; _destinationSounds["ARC-L1"] = f; }
-                }
-            }
-
-            // Frachtaufzug & Frachtterminal
-            var cargoReqDir = Path.Combine(befehleDir, "alt gr + N", "frachbeladung anforden");
-            if (Directory.Exists(cargoReqDir))
-                _freightElevatorSounds.AddRange(Directory.GetFiles(cargoReqDir, "*.mp3").OrderBy(f => f));
-            var cargoTermDir = Path.Combine(befehleDir, "Frachtterminal kontaktieren");
-            if (Directory.Exists(cargoTermDir))
-                _freightElevatorSounds.AddRange(Directory.GetFiles(cargoTermDir, "*.mp3").OrderBy(f => f));
-
-            // Automatisch Landen
-            var autoLandDir = Path.Combine(befehleDir, "Automatisch Landen");
-            if (Directory.Exists(autoLandDir))
-                _autoLandSounds.AddRange(Directory.GetFiles(autoLandDir, "*.mp3").OrderBy(f => f));
-
-            // Snub-Docking (Abkoppeln & Ankoppeln)
-            var snubUndockDir = Path.Combine(befehleDir, "alt gr + N", "ABKOPPELN");
-            if (Directory.Exists(snubUndockDir))
-                _snubUndockSounds.AddRange(Directory.GetFiles(snubUndockDir, "*.mp3").OrderBy(f => f));
-            var snubDockDir = Path.Combine(befehleDir, "alt gr + N", "ankoppeln");
-            if (Directory.Exists(snubDockDir))
-                _snubDockSounds.AddRange(Directory.GetFiles(snubDockDir, "*.mp3").OrderBy(f => f));
-
-            // Notfälle: Selbstzerstörung & Schleudersitz
-            var selfDestDir = Path.Combine(befehleDir, "selbstzerstörung");
-            if (Directory.Exists(selfDestDir))
-                _selfDestructSounds.AddRange(Directory.GetFiles(selfDestDir, "*.mp3").OrderBy(f => f));
-            var ejectDir = Path.Combine(befehleDir, "schleuder sitz");
-            if (Directory.Exists(ejectDir))
-                _ejectSounds.AddRange(Directory.GetFiles(ejectDir, "*.mp3").OrderBy(f => f));
-
-            // Sensorscan
-            var scanDir = Path.Combine(befehleDir, "Sensorscan");
-            if (Directory.Exists(scanDir))
-                _sensorScanSounds.AddRange(Directory.GetFiles(scanDir, "*.mp3").OrderBy(f => f));
-
-            // Täuschkörper
-            var flareDir = Path.Combine(befehleDir, "Täuschkörper");
-            if (Directory.Exists(flareDir))
-                _countermeasureSounds.AddRange(Directory.GetFiles(flareDir, "*.mp3").OrderBy(f => f));
         }
 
         Logger.Log($"[AuroraVoiceService] Kataloge geladen: Schiffe={_shipSoundsByFamily.Count} Familien, " +
@@ -703,9 +547,6 @@ public partial class AuroraVoiceService : IDisposable
                    $"Monitored(Enter/Leave)={_monitoredSpaceEnterSounds.Count}/{_monitoredSpaceLeaveSounds.Count}, " +
                    $"Sperrzone(Enter/Leave)={_restrictedZoneEnterSounds.Count}/{_restrictedZoneLeaveSounds.Count}, " +
                    $"Rechtsgebiete={_jurisdictionSounds.Count} Zonen, Quantum={_quantumArrivalSounds.Count}+{_quantumInitiatedSounds.Count}, " +
-                   $"Ziele={_destinationSounds.Count}, Fracht={_freightElevatorSounds.Count}, RouteBereit={_routeReadySounds.Count}, " +
-                   $"AutoLand={_autoLandSounds.Count}, Snub(Un/Dock)={_snubUndockSounds.Count}/{_snubDockSounds.Count}, " +
-                   $"Notfall(Selbst/Eject)={_selfDestructSounds.Count}/{_ejectSounds.Count}, " +
                    $"ATC/Landung={_atcLandingSounds.Count}, Andocken={_dockingSounds.Count}, Tanken/Rep={_refuelSounds.Count}/{_repairSounds.Count}, " +
                    $"Blueprints={_blueprintSounds.Count}, Death={_playerDeathSounds.Count}, 30k={_serverErrorSounds.Count}");
     }
@@ -997,16 +838,6 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 13. Täuschkörper / Gegenmaßnahmen
-        if (ShipSystemsEnabled && (
-            line.Contains("Countermeasure", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Decoy deployed", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Noise deployed", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnCountermeasure();
-            return;
-        }
-
         // 14. Server Error (30k)
         if (ServerErrorsEnabled)
         {
@@ -1029,78 +860,6 @@ public partial class AuroraVoiceService : IDisposable
                 return;
             }
         }
-
-        // 16. Frachtaufzug / Frachtterminal
-        if (MaintenanceEnabled && (
-            (line.Contains("LoadingPlatformManager_FreightElevator", StringComparison.OrdinalIgnoreCase) &&
-             (line.Contains("OnLoadingPlatformStateChanged", StringComparison.OrdinalIgnoreCase) ||
-              line.Contains("Platform state changed", StringComparison.OrdinalIgnoreCase))) ||
-            line.Contains("frachbeladung anforden", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Frachtterminal kontaktieren", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnFreightElevator();
-            return;
-        }
-
-        // 17. Navigationsroute geplottet / bereit
-        if (DestinationsEnabled && (
-            (line.Contains("GetStarmapRouteSegmentData", StringComparison.OrdinalIgnoreCase) ||
-             line.Contains("FinalStop=", StringComparison.OrdinalIgnoreCase) ||
-             line.Contains("SetStarmapRoute", StringComparison.OrdinalIgnoreCase)) &&
-            !line.Contains("No Route loaded", StringComparison.OrdinalIgnoreCase) &&
-            !line.Contains("FinalStop=-1", StringComparison.OrdinalIgnoreCase) &&
-            !line.Contains("FinalStop=0", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnNavigationRouteReady();
-            return;
-        }
-
-        // 18. Automatisch Landen
-        if (AtcAndLandingEnabled && (
-            line.Contains("AutoLand", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Autoland", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Automated Landing", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnAutoLand();
-            return;
-        }
-
-        // 19. Snub Docking & Undocking (Abkoppeln / Ankoppeln)
-        if (AtcAndLandingEnabled && (
-            line.Contains("Snub", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Parasite", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Merlin", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Archimedes", StringComparison.OrdinalIgnoreCase)))
-        {
-            if (line.Contains("Undock", StringComparison.OrdinalIgnoreCase) || line.Contains("Abkoppeln", StringComparison.OrdinalIgnoreCase))
-            {
-                OnSnubUndock();
-                return;
-            }
-            if (line.Contains("Dock", StringComparison.OrdinalIgnoreCase) || line.Contains("Ankoppeln", StringComparison.OrdinalIgnoreCase))
-            {
-                OnSnubDock();
-                return;
-            }
-        }
-
-        // 20. Notfälle: Selbstzerstörung & Schleudersitz
-        if (ShipSystemsEnabled && (
-            line.Contains("SelfDestruct", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Self-Destruct", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Selbstzerstörung", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnSelfDestruct();
-            return;
-        }
-        if (ShipSystemsEnabled && (
-            line.Contains("Ejection", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("EjectSeat", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Schleudersitz", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnEject();
-            return;
-        }
     }
 
     public void ProcessLiveEvent(LogEntry e)
@@ -1112,19 +871,6 @@ public partial class AuroraVoiceService : IDisposable
         {
             _lastCrashOrDeathTime = DateTime.UtcNow;
             _greetedShipsAtCurrentStation.Clear();
-            if (ShipSystemsEnabled && !string.IsNullOrEmpty(e.Detail))
-            {
-                if (e.Detail.Contains("Selbstzerstörung", StringComparison.OrdinalIgnoreCase))
-                {
-                    OnSelfDestruct();
-                    return;
-                }
-                if (e.Detail.Contains("Schleudersitz", StringComparison.OrdinalIgnoreCase))
-                {
-                    OnEject();
-                    return;
-                }
-            }
             if (PlayerDeathEnabled)
             {
                 OnPlayerDeath();
@@ -1149,48 +895,13 @@ public partial class AuroraVoiceService : IDisposable
         {
             IsAtStation = false;
             _greetedShipsAtCurrentStation.Clear();
-            bool destPlayed = false;
-            if (DestinationsEnabled && !string.IsNullOrWhiteSpace(e.Detail))
-            {
-                destPlayed = OnDestinationReached(e.Detail);
-            }
-            if (!destPlayed && QuantumArrivalEnabled)
+            if (QuantumArrivalEnabled)
             {
                 OnQuantumArrival();
             }
         }
-        else if (e.Kind == EventKind.Location && DestinationsEnabled)
-        {
-            if (!string.IsNullOrWhiteSpace(e.Detail))
-            {
-                if (e.Detail.Contains("Navigationsroute berechnet", StringComparison.OrdinalIgnoreCase))
-                    OnNavigationRouteReady();
-                else
-                    OnDestinationReached(e.Detail);
-            }
-        }
-        else if (e.Kind == EventKind.Trade && MaintenanceEnabled &&
-                 !string.IsNullOrEmpty(e.Detail) &&
-                 (e.Detail.Contains("Frachtaufzug", StringComparison.OrdinalIgnoreCase) ||
-                  e.Detail.Contains("FreightElevator", StringComparison.OrdinalIgnoreCase)))
-        {
-            OnFreightElevator();
-        }
         else if (e.Kind == EventKind.Hangar)
         {
-            if (!string.IsNullOrEmpty(e.Detail))
-            {
-                if (MaintenanceEnabled && (e.Detail.Contains("Frachtaufzug", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("FreightElevator", StringComparison.OrdinalIgnoreCase)))
-                {
-                    OnFreightElevator();
-                    return;
-                }
-                if (AtcAndLandingEnabled && (e.Detail.Contains("Automatisches Landen", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("AutoLand", StringComparison.OrdinalIgnoreCase)))
-                {
-                    OnAutoLand();
-                    return;
-                }
-            }
 
             // Nur bei echten ATC Lande-/Startfreigaben oder Zuweisungen – NIEMALS bei Fracht- oder Schiffsaufzügen und NIEMALS bei Warteschlange!
             if (AtcAndLandingEnabled &&
@@ -1430,123 +1141,6 @@ public partial class AuroraVoiceService : IDisposable
             PlaySoundWithCooldown("seat_exit", _seatExitSounds, minCooldownSeconds: 20);
     }
 
-    public void OnCountermeasure()
-    {
-        if (!_isEnabled || !_isInstalled || !ShipSystemsEnabled) return;
-        if (_countermeasureSounds.Count > 0)
-            PlaySoundWithCooldown("countermeasure", _countermeasureSounds, minCooldownSeconds: 15);
-    }
-
-    public bool OnDestinationReached(string destinationName)
-    {
-        if (!_isEnabled || !_isInstalled || !DestinationsEnabled) return false;
-        if (string.IsNullOrWhiteSpace(destinationName)) return false;
-
-        // 1. Prüfe auf spezifische Zielorte (Hauptstädte, Raumstationen, Pyro-Orte, Monde, Raffinerien)
-        foreach (var (dest, path) in _destinationSounds)
-        {
-            if (destinationName.Contains(dest, StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.Log($"[AuroraVoiceService] Zielort-Audio für '{dest}' ausgelöst: {Path.GetFileName(path)}");
-                PlaySoundWithCooldown($"dest_{dest}", [path], minCooldownSeconds: 60);
-                return true;
-            }
-        }
-
-        // 2. Prüfe auf Monde in Stanton
-        foreach (var (moon, path) in _stantonMoonsSounds)
-        {
-            if (destinationName.Contains(moon, StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.Log($"[AuroraVoiceService] Mond-Audio für '{moon}' ausgelöst: {Path.GetFileName(path)}");
-                PlaySoundWithCooldown($"moon_{moon}", [path], minCooldownSeconds: 60);
-                return true;
-            }
-        }
-
-        // 3. Prüfe auf Raffineriestationen in Stanton
-        foreach (var (refinery, path) in _stantonRefineriesSounds)
-        {
-            if (destinationName.Contains(refinery, StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.Log($"[AuroraVoiceService] Raffinerie-Audio für '{refinery}' ausgelöst: {Path.GetFileName(path)}");
-                PlaySoundWithCooldown($"refinery_{refinery}", [path], minCooldownSeconds: 60);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public void OnFreightElevator()
-    {
-        if (!_isEnabled || !_isInstalled || !MaintenanceEnabled) return;
-        if (_freightElevatorSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Frachtaufzug-Aktion ausgelöst ({_freightElevatorSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("freight_elevator", _freightElevatorSounds, minCooldownSeconds: 30);
-        }
-    }
-
-    public void OnNavigationRouteReady()
-    {
-        if (!_isEnabled || !_isInstalled || !DestinationsEnabled) return;
-        if (_routeReadySounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Navigationsroute bereit ausgelöst ({_routeReadySounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("route_ready", _routeReadySounds, minCooldownSeconds: 30);
-        }
-    }
-
-    public void OnAutoLand()
-    {
-        if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
-        if (_autoLandSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Automatisches Landen ausgelöst ({_autoLandSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("auto_land", _autoLandSounds, minCooldownSeconds: 30);
-        }
-    }
-
-    public void OnSnubUndock()
-    {
-        if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
-        if (_snubUndockSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Snub-Abkoppeln ausgelöst ({_snubUndockSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("snub_undock", _snubUndockSounds, minCooldownSeconds: 20);
-        }
-    }
-
-    public void OnSnubDock()
-    {
-        if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
-        if (_snubDockSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Snub-Ankoppeln ausgelöst ({_snubDockSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("snub_dock", _snubDockSounds, minCooldownSeconds: 20);
-        }
-    }
-
-    public void OnSelfDestruct()
-    {
-        if (!_isEnabled || !_isInstalled || !ShipSystemsEnabled) return;
-        if (_selfDestructSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Selbstzerstörung ausgelöst ({_selfDestructSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("self_destruct", _selfDestructSounds, minCooldownSeconds: 30);
-        }
-    }
-
-    public void OnEject()
-    {
-        if (!_isEnabled || !_isInstalled || !ShipSystemsEnabled) return;
-        if (_ejectSounds.Count > 0)
-        {
-            Logger.Log($"[AuroraVoiceService] Schleudersitz ausgelöst ({_ejectSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("eject", _ejectSounds, minCooldownSeconds: 30);
-        }
-    }
 
     public void OnBlueprintLearned(string blueprintName)
     {
