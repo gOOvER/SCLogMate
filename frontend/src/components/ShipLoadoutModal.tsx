@@ -108,13 +108,15 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     }
   };
 
+  const cleanShipName = ship.name.split(/\s*·\s*/)[0].trim();
+
   const handleScanScreenshot = async () => {
     setIsScanning(true);
-    setFeedback(null);
+    setFeedback('Scanne Screenshots (OCR läuft)...');
     try {
       const res = await bridge.scanScreenshotLoadout();
       if (res.success) {
-        setFeedback(`✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
+        setFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         onRefreshFleet();
       } else {
         setFeedback(`✕ ${res.message || 'Kein VLM-Screenshot erkannt'}`);
@@ -123,7 +125,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
       setFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
     } finally {
       setIsScanning(false);
-      setTimeout(() => setFeedback(null), 5000);
+      setTimeout(() => setFeedback(null), 8000);
     }
   };
 
@@ -141,7 +143,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-100">{ship.name}</h3>
+                <h3 className="text-base font-bold text-slate-100">{cleanShipName}</h3>
                 <span
                   className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border"
                   style={{

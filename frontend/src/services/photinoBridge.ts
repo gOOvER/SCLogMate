@@ -1425,8 +1425,8 @@ class PhotinoBridge {
     return this.sendRequest<ShipComparisonDataDto>('get_ship_comparison_data', { shipA, shipB });
   }
 
-  public scanScreenshotLoadout(filePath?: string): Promise<ScreenshotLoadoutResult> {
-    return this.sendRequest<ScreenshotLoadoutResult>('scan_screenshot_loadout', { filePath });
+  public scanScreenshotLoadout(filePath?: string, timeoutMs = 90000): Promise<ScreenshotLoadoutResult> {
+    return this.sendRequest<ScreenshotLoadoutResult>('scan_screenshot_loadout', { filePath }, timeoutMs);
   }
 
   public clearShipComponents(shipName: string): Promise<FleetResponseDto> {

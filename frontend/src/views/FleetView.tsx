@@ -144,11 +144,11 @@ export const FleetView: React.FC<FleetViewProps> = ({
 
   const handleScanScreenshot = async () => {
     setIsScanningScreenshot(true);
-    setScreenshotFeedback(null);
+    setScreenshotFeedback('Scanne Screenshots (OCR läuft)...');
     try {
       const res = await bridge.scanScreenshotLoadout();
       if (res.success) {
-        setScreenshotFeedback(`✓ ${res.shipName || 'Schiff'} erkannt (${res.components.length} Komponenten)`);
+        setScreenshotFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         fetchFleet();
       } else {
         setScreenshotFeedback(`✕ ${res.message || 'Kein VLM/Flotten-Screenshot erkannt'}`);
@@ -157,7 +157,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
       setScreenshotFeedback(`✕ Fehler: ${err?.message || 'Scan fehlgeschlagen'}`);
     } finally {
       setIsScanningScreenshot(false);
-      setTimeout(() => setScreenshotFeedback(null), 6000);
+      setTimeout(() => setScreenshotFeedback(null), 8000);
     }
   };
 

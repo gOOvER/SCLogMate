@@ -1858,7 +1858,11 @@ public class PhotinoBridge
                                     var recentFiles = allFiles.Where(f => File.GetLastWriteTimeUtc(f) >= cutoff).ToList();
                                     if (recentFiles.Count < 5)
                                     {
-                                        recentFiles = allFiles.Take(25).ToList();
+                                        recentFiles = allFiles.Take(15).ToList();
+                                    }
+                                    else if (recentFiles.Count > 20)
+                                    {
+                                        recentFiles = recentFiles.Take(20).ToList();
                                     }
 
                                     var processedShips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
