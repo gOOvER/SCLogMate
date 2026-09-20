@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -232,6 +233,9 @@ public class AppSettings
 
     /// <summary>Aurora: Bordsysteme (Sitz, Türen, Triebwerke, Scan) abspielen.</summary>
     public bool AuroraShipSystems { get; set; } = true;
+
+    /// <summary>List of plugin IDs that have been explicitly disabled by the user.</summary>
+    public List<string> DisabledPluginIds { get; set; } = new();
 
     /// <summary>
     /// Aktiviert den Entwickler- &amp; Debug-Modus.

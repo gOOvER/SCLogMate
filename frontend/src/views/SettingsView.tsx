@@ -31,6 +31,7 @@ import {
   Key,
   Trash2,
   Copy,
+  Puzzle,
 } from 'lucide-react';
 import {
   bridge,
@@ -41,11 +42,13 @@ import {
   applyFontFamily,
   FONT_FAMILY_MAP,
   CommunityStatusDto,
+  PluginDto,
 } from '../services/photinoBridge';
+import { SettingsPluginsTab } from './SettingsPluginsTab';
 
 export const SettingsView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<
-    'general' | 'wipe' | 'hud' | 'ocr' | 'uex' | 'audio' | 'database' | 'developer'
+    'general' | 'wipe' | 'hud' | 'ocr' | 'uex' | 'audio' | 'plugins' | 'database' | 'developer'
   >('general');
   const [settings, setSettings] = useState<SettingsDto>({
     logPath: 'J:\\StarCitizen\\LIVE\\logbackups\\game.log',
@@ -101,6 +104,22 @@ export const SettingsView: React.FC = () => {
   const [isPlayingAuroraTest, setIsPlayingAuroraTest] = useState<boolean>(false);
   const [communityStatus, setCommunityStatus] = useState<CommunityStatusDto | null>(null);
   const [isSyncingCommunity, setIsSyncingCommunity] = useState<boolean>(false);
+  const [plugins, setPlugins] = useState<PluginDto[]>([]);
+  const [pluginsServerPort, setPluginsServerPort] = useState<number>(48123);
+  const [pluginsDirectory, setPluginsDirectory] = useState<string>('');
+
+  const loadPlugins = async () => {
+    try {
+      const res = await bridge.getPlugins();
+      if (res) {
+        setPlugins(res.plugins || []);
+        if (res.serverPort) setPluginsServerPort(res.serverPort);
+        if (res.pluginsDirectory) setPluginsDirectory(res.pluginsDirectory);
+      }
+    } catch (err) {
+      console.error('Failed to load plugins:', err);
+    }
+  };
 
   const handlePlayAuroraTestSound = async () => {
     try {
@@ -675,6 +694,7 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     loadSettings();
     loadDbDiag(false);
+    loadPlugins();
   }, []);
 
   useEffect(() => {
@@ -702,8 +722,17 @@ export const SettingsView: React.FC = () => {
     if (activeSubTab === 'database') {
       if (!dbDiag) loadDbDiag();
       loadCommunityStatus();
+    } else if (activeSubTab === 'plugins') {
+      loadPlugins();
     }
   }, [activeSubTab]);
+
+  useEffect(() => {
+    const unbind = bridge.on('PLUGINS_CHANGED', (res: any) => {
+      if (res?.plugins) setPlugins(res.plugins);
+    });
+    return () => unbind();
+  }, []);
 
   if (loading) {
     return (
@@ -776,6 +805,7 @@ export const SettingsView: React.FC = () => {
           { id: 'ocr', label: '👁 mobiGlas & OCR', icon: Radio },
           { id: 'uex', label: '🌐 UEX Integration', icon: Globe },
           { id: 'audio', label: '🎙 VoiceAttack & Aurora', icon: Volume2 },
+          { id: 'plugins', label: '🧩 Plugins & Widgets', icon: Puzzle },
           { id: 'database', label: '💾 Datenbank & Wartung', icon: Database },
           ...(settings.debugMode ? [{ id: 'developer', label: '🧪 Entwickler', icon: Sparkles }] : []),
         ].map((tab) => {
@@ -2297,6 +2327,16 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tab: Plugins & Widgets */}
+      {activeSubTab === 'plugins' && (
+        <SettingsPluginsTab
+          plugins={plugins}
+          serverPort={pluginsServerPort}
+          pluginsDirectory={pluginsDirectory}
+          onRefresh={loadPlugins}
+        />
       )}
 
       {/* Tab 6: SQLite & Datenbank */}

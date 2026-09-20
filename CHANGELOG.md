@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Hybrid Plugin System for Custom Dashboards, HUD Widgets & Extensions (`Core/Plugins/`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/`)**:
+  - **Embedded Loopback HTTP Plugin Server (`Core/Plugins/PluginHttpServer.cs`)**: Serves plugin static assets (HTML/JS/CSS/media) on `http://127.0.0.1:<port>` with robust MIME detection, full CORS headers (`Access-Control-Allow-Origin: *`), and streaming support for OBS Studio Browser Sources and external web browsers.
+  - **Auto-Injected JavaScript Plugin SDK (`/sclogmate.js`)**: Automatically delivers the official client SDK via the embedded HTTP server. Provides simple, asynchronous helper functions (`SCLogMate.getTelemetry()`, `SCLogMate.getSessions()`, `SCLogMate.getFleet()`, `SCLogMate.getStatus()`, `SCLogMate.showNotification()`, `SCLogMate.on()`) over bidirectional `postMessage` RPC.
+  - **Native C# Plugin Loading (`Core/Plugins/PluginManager.cs`, `Core/Plugins/ISCPlugin.cs`)**: Supports optional native C# plugins compiled into DLLs using collectible `PluginAssemblyLoadContext`. Native plugins implement `ISCPlugin` to subscribe to live parsed `LogEntry` streams, register custom RPC handlers, and push events to web views.
+  - **Starter Plugin Auto-Provisioning (`sample-telemetry-widget`)**: Automatically deploys a modern, glassmorphic starter plugin in `%APPDATA%\SCLogMate\Plugins\sample-telemetry-widget` demonstrating real-time telemetry streaming, live log events, RPC queries, and OBS overlay styling.
+  - **Interactive Plugin Host View (`frontend/src/views/PluginHostView.tsx`)**: Sandboxed iframe host view with OBS Studio URL copy button, external browser launcher, reload button, and runtime status badges.
+  - **Dynamic Navigation Integration (`frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`)**: Discovered and enabled plugins declaring sidebar metadata dynamically appear under the `Erweiterungen` navigation group with custom Lucide icon mappings.
+  - **Settings Plugin Management Tab (`frontend/src/views/SettingsPluginsTab.tsx`, `frontend/src/views/SettingsView.tsx`)**: Added a dedicated `🧩 Plugins & Widgets` tab in Settings allowing users to toggle plugins on/off, reload manifests without restarting the app, view plugin directories, and copy OBS source URLs.
+
 ### Fixed
 - **Aurora False-Positive Navigation Voice Trigger Elimination (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
   - Removed speculative Starmap route plotting and `CSCItemNavigation::PostInitialize` / `Local Route Guard` matchers that falsely triggered *"Routenplanung abgeschlossen"* / *"Kurs gesetzt"* audio cues immediately upon quantum arrival, during mission objective transitions, or whenever CryEngine entity streaming rerouted navigation guards.

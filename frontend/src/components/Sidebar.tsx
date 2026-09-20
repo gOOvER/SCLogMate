@@ -20,7 +20,16 @@ import {
   Wrench,
   BookOpen,
   Flame,
+  Puzzle,
+  Activity,
+  Cpu,
+  Terminal,
+  Globe,
+  Tv,
+  BarChart,
+  Layers,
 } from 'lucide-react';
+import { PluginDto } from '../services/photinoBridge';
 
 export type NavTabId =
   | 'events'
@@ -41,7 +50,8 @@ export type NavTabId =
   | 'loadout'
   | 'tools'
   | 'settings'
-  | 'about';
+  | 'about'
+  | (string & {});
 
 interface NavItem {
   id: NavTabId;
@@ -64,6 +74,26 @@ interface SidebarProps {
   liveEventCount?: number;
   refineryCount?: number;
   autoLoadCount?: number;
+  plugins?: PluginDto[];
+}
+
+function getPluginIcon(iconName?: string): React.ElementType {
+  if (!iconName) return Puzzle;
+  switch (iconName.toLowerCase()) {
+    case 'activity': return Activity;
+    case 'cpu': return Cpu;
+    case 'terminal': return Terminal;
+    case 'globe': return Globe;
+    case 'tv': return Tv;
+    case 'radio': return Radar;
+    case 'barchart':
+    case 'chart': return BarChart;
+    case 'layers': return Layers;
+    case 'radar': return Radar;
+    case 'shield': return Shield;
+    case 'target': return Target;
+    default: return Puzzle;
+  }
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -75,7 +105,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   liveEventCount,
   refineryCount,
   autoLoadCount,
+  plugins = [],
 }) => {
+  const pluginItems: NavItem[] = (plugins || [])
+    .filter((p) => p.enabled && p.sidebar)
+    .sort((a, b) => (a.sidebar?.order ?? 99) - (b.sidebar?.order ?? 99))
+    .map((p) => ({
+      id: `plugin:${p.id}` as NavTabId,
+      label: p.sidebar?.label || p.name,
+      icon: getPluginIcon(p.sidebar?.icon),
+    }));
+
   const navGroups: NavGroup[] = [
     {
       title: 'Hauptfunktionen',
@@ -108,6 +148,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'loadout', label: 'Ausrüstung', icon: Shield },
       ],
     },
+    ...(pluginItems.length > 0
+      ? [
+          {
+            title: 'Erweiterungen',
+            items: pluginItems,
+          },
+        ]
+      : []),
     {
       title: 'System & Optionen',
       items: [

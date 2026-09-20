@@ -12,6 +12,7 @@ using Microsoft.Data.Sqlite;
 using Photino.NET;
 using SCLogMate.Core.Ocr;
 using SCLogMate.Core.Overlays;
+using SCLogMate.Core.Plugins;
 using SCLogMate.Models;
 
 namespace SCLogMate.Core.Photino;
@@ -1059,6 +1060,8 @@ public class DbDiagnosticsDto
 
 public class PhotinoBridge
 {
+    public static PhotinoBridge? Current { get; private set; }
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -1298,9 +1301,13 @@ public class PhotinoBridge
 
     public void Initialize(PhotinoWindow window)
     {
+        Current = this;
         _window = window;
         _currentLogPath = Settings.Load().LogPath ?? PathFinder.FindBest();
         Localization.Hint(_currentLogPath);
+
+        // Initialize plugin manager subsystem (discovers plugins, starts HTTP server)
+        PluginManager.Instance.Initialize();
 
         // Register Web Message Handler (Receives client_ready from frontend React app)
         _window.RegisterWebMessageReceivedHandler((sender, rawMessage) =>
@@ -3500,6 +3507,101 @@ public class PhotinoBridge
                         SendResponse(req.Id, "export_player_report_response", new { markdown = sb.ToString() });
                         break;
                     }
+
+                case "get_plugins":
+                    SendResponse(req.Id, "get_plugins_response", new
+                    {
+                        plugins = PluginManager.Instance.GetPlugins(),
+                        serverPort = PluginManager.Instance.ServerPort,
+                        pluginsDirectory = PluginManager.Instance.PluginsDirectory
+                    });
+                    break;
+
+                case "toggle_plugin":
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("pluginId", out var pidProp))
+                    {
+                        var pid = pidProp.GetString() ?? "";
+                        var enabled = req.Payload.Value.TryGetProperty("enabled", out var enProp) && enProp.GetBoolean();
+                        PluginManager.Instance.TogglePlugin(pid, enabled);
+                        SendResponse(req.Id, "toggle_plugin_response", new { success = true });
+                        Broadcast("PLUGINS_CHANGED", new { plugins = PluginManager.Instance.GetPlugins() });
+                    }
+                    else
+                    {
+                        SendError(req.Id, "Missing pluginId parameter");
+                    }
+                    break;
+
+                case "reload_plugins":
+                    PluginManager.Instance.ReloadPlugins();
+                    SendResponse(req.Id, "reload_plugins_response", new
+                    {
+                        plugins = PluginManager.Instance.GetPlugins(),
+                        serverPort = PluginManager.Instance.ServerPort,
+                        pluginsDirectory = PluginManager.Instance.PluginsDirectory
+                    });
+                    Broadcast("PLUGINS_CHANGED", new { plugins = PluginManager.Instance.GetPlugins() });
+                    break;
+
+                case "open_plugins_folder":
+                    PluginManager.Instance.OpenPluginsFolder();
+                    SendResponse(req.Id, "open_plugins_folder_response", new { success = true });
+                    break;
+
+                case "plugin_rpc":
+                    if (req.Payload.HasValue)
+                    {
+                        var pId = req.Payload.Value.TryGetProperty("pluginId", out var pidVal) ? pidVal.GetString() : null;
+                        var pAct = req.Payload.Value.TryGetProperty("action", out var actVal) ? actVal.GetString() : null;
+                        var pData = req.Payload.Value.TryGetProperty("payload", out var plVal) ? plVal : default;
+
+                        if (string.IsNullOrEmpty(pAct))
+                        {
+                            SendError(req.Id, "Action missing in plugin_rpc");
+                            break;
+                        }
+
+                        try
+                        {
+                            object? rpcResult = null;
+                            switch (pAct.ToLowerInvariant())
+                            {
+                                case "get_telemetry":
+                                    rpcResult = GetHudTelemetry();
+                                    break;
+                                case "get_sessions":
+                                    rpcResult = GetSessions();
+                                    break;
+                                case "get_hangar":
+                                case "get_fleet":
+                                    rpcResult = GetExecHangarSnapshot();
+                                    break;
+                                case "get_status":
+                                    rpcResult = GetAppStatus();
+                                    break;
+                                case "show_notification":
+                                    if (pData.ValueKind == JsonValueKind.Object && pData.TryGetProperty("message", out var msgProp))
+                                    {
+                                        var nMsg = msgProp.GetString() ?? "";
+                                        var nTitle = pData.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "SCLogMate Plugin" : "SCLogMate Plugin";
+                                        _toastOverlay.ShowToast("🧩", nTitle, nMsg);
+                                        rpcResult = new { success = true };
+                                    }
+                                    break;
+                                default:
+                                    // Dispatch to custom registered RPC handlers (e.g. from native C# plugin backend)
+                                    rpcResult = PluginManager.Instance.HandleRpcAction(pAct, pData);
+                                    break;
+                            }
+                            SendResponse(req.Id, "plugin_rpc_response", new { success = true, result = rpcResult });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error($"[PhotinoBridge] Error handling plugin RPC '{pAct}' for plugin '{pId}'", ex);
+                            SendResponse(req.Id, "plugin_rpc_response", new { success = false, error = ex.Message });
+                        }
+                    }
+                    break;
 
                 default:
                     SendResponse(req.Id, $"{req.Type}_ack", new { success = true });
@@ -6535,6 +6637,7 @@ public class PhotinoBridge
             if (isLive)
             {
                 _auroraService.ProcessLiveEvent(entry);
+                PluginManager.Instance.BroadcastLogEvent(entry);
             }
 
             _lastEventTime = entry.Time;

@@ -37,7 +37,8 @@ import { UpdateModal } from './components/UpdateModal';
 import { WikiDossierModal } from './components/WikiDossierModal';
 import { GlobalTooltip } from './components/GlobalTooltip';
 import { HardDrive } from 'lucide-react';
-import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto } from './services/photinoBridge';
+import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto, PluginDto } from './services/photinoBridge';
+import { PluginHostView } from './views/PluginHostView';
 
 export interface NavTargetContext {
   search?: string;
@@ -59,6 +60,8 @@ export const App: React.FC = () => {
   const [warehouseTotal, setWarehouseTotal] = useState<number>(0);
   const [refineryCount, setRefineryCount] = useState<number>(0);
   const [autoLoadCount, setAutoLoadCount] = useState<number>(0);
+  const [plugins, setPlugins] = useState<PluginDto[]>([]);
+  const [pluginsServerPort, setPluginsServerPort] = useState<number>(48123);
   const [loading, setLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
@@ -137,6 +140,15 @@ export const App: React.FC = () => {
       }
       if (autoLoadsRes && Array.isArray(autoLoadsRes)) {
         setAutoLoadCount(autoLoadsRes.length);
+      }
+      try {
+        const pRes = await bridge.getPlugins();
+        if (pRes) {
+          setPlugins(pRes.plugins || []);
+          if (pRes.serverPort) setPluginsServerPort(pRes.serverPort);
+        }
+      } catch (pErr) {
+        console.error('Failed to load plugins:', pErr);
       }
     } catch (err) {
       console.error('Failed to load initial data:', err);
@@ -240,6 +252,10 @@ export const App: React.FC = () => {
     };
     window.addEventListener('open-wiki-dossier', onOpenWikiEvent);
 
+    const unbindPlugins = bridge.on('PLUGINS_CHANGED', (res: any) => {
+      if (res?.plugins) setPlugins(res.plugins);
+    });
+
     return () => {
       unbindLog();
       unbindLiveLoaded();
@@ -251,6 +267,7 @@ export const App: React.FC = () => {
       unbindUpdate();
       unbindAutoLoad();
       unbindAutoLoadDone();
+      unbindPlugins();
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('open-wiki-dossier', onOpenWikiEvent);
     };
@@ -316,6 +333,7 @@ export const App: React.FC = () => {
         liveEventCount={events.length > 0 ? events.length : undefined}
         refineryCount={refineryCount > 0 ? refineryCount : undefined}
         autoLoadCount={autoLoadCount > 0 ? autoLoadCount : undefined}
+        plugins={plugins}
       />
 
       {/* Main App Container */}
@@ -452,6 +470,25 @@ export const App: React.FC = () => {
           {activeTab === 'settings' && <SettingsView />}
 
           {activeTab === 'about' && <AboutView />}
+
+          {activeTab.startsWith('plugin:') && (() => {
+            const pId = activeTab.slice(7);
+            const currentPlugin = plugins.find((p) => p.id === pId);
+            if (!currentPlugin) {
+              return (
+                <div className="flex flex-col items-center justify-center h-96 text-slate-400 space-y-3">
+                  <p className="text-sm">Plugin "{pId}" nicht gefunden oder deaktiviert.</p>
+                  <button
+                    onClick={() => handleSelectTab('settings')}
+                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
+                  >
+                    Zu den Plugin-Einstellungen
+                  </button>
+                </div>
+              );
+            }
+            return <PluginHostView plugin={currentPlugin} serverPort={pluginsServerPort} />;
+          })()}
         </main>
 
         {/* Database Migration & Scan Progress Modal */}

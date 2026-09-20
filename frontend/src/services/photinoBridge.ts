@@ -1236,6 +1236,35 @@ export interface CargoFitResultDto {
   compatibleFleetShips: FleetFitMatchDto[];
 }
 
+export interface PluginSidebarDto {
+  label: string;
+  icon?: string;
+  group?: string;
+  order?: number;
+}
+
+export interface PluginDto {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description?: string;
+  homepage?: string;
+  entry: string;
+  backendDll?: string;
+  permissions?: string[];
+  sidebar?: PluginSidebarDto;
+  enabled: boolean;
+  hasBackend: boolean;
+  pluginDirectory: string;
+}
+
+export interface GetPluginsResultDto {
+  plugins: PluginDto[];
+  serverPort: number;
+  pluginsDirectory: string;
+}
+
 type EventListener = (payload: any) => void;
 
 class PhotinoBridge {
@@ -1465,9 +1494,64 @@ class PhotinoBridge {
     return this.sendRequest<CargoFitResultDto>('calculate_cargo_fit', { shipName, crates });
   }
 
+  public getPlugins(): Promise<GetPluginsResultDto> {
+    return this.sendRequest<GetPluginsResultDto>('get_plugins');
+  }
+
+  public togglePlugin(pluginId: string, enabled: boolean): Promise<{ success: boolean }> {
+    return this.sendRequest<{ success: boolean }>('toggle_plugin', { pluginId, enabled });
+  }
+
+  public reloadPlugins(): Promise<GetPluginsResultDto> {
+    return this.sendRequest<GetPluginsResultDto>('reload_plugins');
+  }
+
+  public openPluginsFolder(): Promise<{ success: boolean }> {
+    return this.sendRequest<{ success: boolean }>('open_plugins_folder');
+  }
+
+  public pluginRpc<T = any>(pluginId: string, action: string, payload?: any): Promise<{ success: boolean; result?: T; error?: string }> {
+    return this.sendRequest<{ success: boolean; result?: T; error?: string }>('plugin_rpc', { pluginId, action, payload });
+  }
+
   // Mock implementation for browser-only development
   private async handleMockRequest(type: string, payload?: any): Promise<any> {
     switch (type) {
+      case 'get_plugins':
+      case 'reload_plugins':
+        return {
+          serverPort: 48123,
+          pluginsDirectory: 'C:\\Users\\Mock\\AppData\\Roaming\\SCLogMate\\Plugins',
+          plugins: [
+            {
+              id: 'sample-telemetry-widget',
+              name: 'Sample Telemetry Widget',
+              version: '1.0.0',
+              author: 'SCLogMate Team',
+              description: 'Demonstrates real-time telemetry streaming and HUD interaction for plugins.',
+              entry: 'index.html',
+              enabled: true,
+              hasBackend: false,
+              pluginDirectory: 'C:\\Users\\Mock\\AppData\\Roaming\\SCLogMate\\Plugins\\sample-telemetry-widget',
+              sidebar: {
+                label: 'Telemetry Widget',
+                icon: 'Activity',
+                group: 'Erweiterungen',
+                order: 10
+              }
+            }
+          ]
+        } as GetPluginsResultDto;
+
+      case 'toggle_plugin':
+        return { success: true };
+
+      case 'open_plugins_folder':
+        return { success: true };
+
+      case 'plugin_rpc':
+        return { success: true, result: { message: 'Mock RPC handled' } };
+
       case 'get_community_status':
         return {
           isEnabled: true,
