@@ -3744,7 +3744,7 @@ public class PhotinoBridge
         if (!string.IsNullOrWhiteSpace(shard) && shard != "—" && shard != "Alle Sessions")
         {
             var sLower = shard.ToLowerInvariant();
-            if (sLower.Contains("euw") || sLower.Contains("euc") || sLower.Contains("eu") || sLower.Contains("fra") || sLower.Contains("lon"))
+            if (sLower.Contains("euw") || sLower.Contains("euc") || sLower.Contains("eun") || sLower.Contains("eu") || sLower.Contains("fra") || sLower.Contains("lon"))
             {
                 regionFlag = "🇪🇺";
                 regionCode = "EU";
@@ -3756,13 +3756,13 @@ public class PhotinoBridge
                 regionCode = "US";
                 regionName = "USA / Nordamerika";
             }
-            else if (sLower.Contains("aus") || sLower.Contains("oce") || sLower.Contains("ap") || sLower.Contains("syd"))
+            else if (sLower.Contains("apse") || sLower.Contains("aus") || sLower.Contains("oce") || sLower.Contains("syd"))
             {
                 regionFlag = "🇦🇺";
                 regionCode = "AUS";
                 regionName = "Australien / APAC";
             }
-            else if (sLower.Contains("asia") || sLower.Contains("jp") || sLower.Contains("sg") || sLower.Contains("tyo"))
+            else if (sLower.Contains("ape") || sLower.Contains("apne") || sLower.Contains("aps") || sLower.Contains("asia") || sLower.Contains("jp") || sLower.Contains("sg") || sLower.Contains("tyo") || sLower.Contains("hkg"))
             {
                 regionFlag = "🌏";
                 regionCode = "ASIA";
@@ -5299,24 +5299,28 @@ public class PhotinoBridge
         {
             var p = targetParser ?? _parser;
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            if (fs.Length > 50_000)
+            long offset = Math.Max(0, fs.Length - 5_000_000);
+            if (offset > 0) fs.Seek(offset, SeekOrigin.Begin);
+
+            using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
+            if (offset > 0) reader.ReadLine(); // discard potential partial line
+
+            string? line;
+            string? latestShard = null;
+            while ((line = reader.ReadLine()) != null)
             {
-                long offset = Math.Max(0, fs.Length - 150_000);
-                fs.Seek(offset, SeekOrigin.Begin);
-                using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
-                reader.ReadLine(); // discard potential partial line
-                string? line;
-                while ((line = reader.ReadLine()) != null)
+                if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"shard\[(?<s>[^\]]+)\]");
+                    if (m.Success)
                     {
-                        var m = System.Text.RegularExpressions.Regex.Match(line, @"shard\[(?<s>[^\]]+)\]");
-                        if (m.Success)
-                        {
-                            p.Meta["shard"] = m.Groups["s"].Value;
-                        }
+                        latestShard = m.Groups["s"].Value;
                     }
                 }
+            }
+            if (!string.IsNullOrEmpty(latestShard))
+            {
+                p.Meta["shard"] = latestShard;
             }
         }
         catch { }
@@ -5380,6 +5384,7 @@ public class PhotinoBridge
                 _liveEvents.Clear();
             }
 
+            _parser.Reset();
             ScanLogHeaderAndMeta(path, _parser);
             ScanLogTailForShard(path, _parser);
 
@@ -6630,6 +6635,10 @@ public class PhotinoBridge
             {
                 _walletCapture.ProcessLine(rawLine);
                 _auroraService.ProcessLiveLine(rawLine);
+                if (_isWebviewReady && rawLine.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && rawLine.Contains("shard[", StringComparison.OrdinalIgnoreCase))
+                {
+                    Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                }
             }
             var entry = _parser.Feed(rawLine);
             if (entry == null) return;

@@ -2808,13 +2808,13 @@ public partial class MainViewModel : ObservableObject
         get
         {
             var shard = ServerShardName.ToLowerInvariant();
-            if (shard.Contains("euw") || shard.Contains("euc") || shard.Contains("eu") || shard.Contains("fra") || shard.Contains("lon"))
+            if (shard.Contains("euw") || shard.Contains("euc") || shard.Contains("eun") || shard.Contains("eu") || shard.Contains("fra") || shard.Contains("lon"))
                 return ("🇪🇺", "EU", "Europa");
             if (shard.Contains("use") || shard.Contains("usw") || shard.Contains("us") || shard.Contains("na") || shard.Contains("va"))
                 return ("🇺🇸", "US", "USA / Nordamerika");
-            if (shard.Contains("aus") || shard.Contains("oce") || shard.Contains("ap") || shard.Contains("syd"))
+            if (shard.Contains("apse") || shard.Contains("aus") || shard.Contains("oce") || shard.Contains("syd"))
                 return ("🇦🇺", "AUS", "Australien / APAC");
-            if (shard.Contains("asia") || shard.Contains("jp") || shard.Contains("sg") || shard.Contains("tyo"))
+            if (shard.Contains("ape") || shard.Contains("apne") || shard.Contains("aps") || shard.Contains("asia") || shard.Contains("jp") || shard.Contains("sg") || shard.Contains("tyo") || shard.Contains("hkg"))
                 return ("🌏", "ASIA", "Asien");
             if (ServerShardName != "—")
                 return ("🌐", "PU", "Persistent Universe");

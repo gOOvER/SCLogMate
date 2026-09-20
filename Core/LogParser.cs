@@ -397,6 +397,50 @@ public partial class LogParser
     /// <summary>Session-Metadaten (Build, Hardware, Charakter, Shard, …).</summary>
     public Dictionary<string, string> Meta { get; } = new();
 
+    public void Reset()
+    {
+        _pendWho = null;
+        _pendDir = 0;
+        _pendingLines = 0;
+        _lastLoot = null;
+        _lastLoc = null;
+        _currentSystem = "Stanton";
+        _lastShip = null;
+        _pendingQtDestination = null;
+        _lastQt = DateTime.MinValue;
+        _lastNotif = null;
+        _lastParty = null;
+        _loadoutSeen.Clear();
+        _channelSeen.Clear();
+        _gearSeen.Clear();
+        _missionsDone.Clear();
+        _missionsTaken.Clear();
+        _seenBlueprints.Clear();
+        _metaComplete = false;
+        Meta.Clear();
+        ConfirmedPurchases.Clear();
+        CargoTrades.Clear();
+        LedgerRecords.Clear();
+        LocationVisits.Clear();
+        QuantumDestinations.Clear();
+        WarehouseMovements.Clear();
+        _locationIdToInfo.Clear();
+        _missionDropoffItems.Clear();
+        _crewMembers.Clear();
+        _currentShipCrew.Clear();
+        CurrentShipOwner = null;
+        _pendingPurchase = null;
+        _pendingLocationName = null;
+        _pendingRawLoc = null;
+        _firstTime = null;
+        _lastSeenTime = null;
+        _currentRules = null;
+        _rulesSince = null;
+        _inGameDuration = TimeSpan.Zero;
+        _menuDuration = TimeSpan.Zero;
+        ExpiredPendingTransfers = 0;
+    }
+
     // Tracking für Contracts, Spending, Ledger, Cargo und Places
     public sealed record PendingPurchase(DateTime Timestamp, string Shop, string Item, string Guid, decimal Price, int Qty);
     private PendingPurchase? _pendingPurchase;
@@ -2653,24 +2697,78 @@ public partial class LogParser
 
     void CaptureMeta(string line)
     {
+        // 0. Dynamisches Shard-Tracking: Shards ändern sich dynamisch während des Spiels
+        // (Server-Mesh-Wechsel, Crash-Recovery, Server-Hop, Beitritt zur Party).
+        // Darf NIEMALS durch _metaComplete blockiert werden!
+        if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
+        {
+            var mShard = ShardRegex().Match(line);
+            if (mShard.Success)
+            {
+                Meta["shard"] = mShard.Groups["s"].Value;
+            }
+        }
+
         if (_metaComplete) return;
 
-        // 1. Echte Star Citizen Spielversion aus Branch ermitteln (z.B. "sc-alpha-4.10.0-hotfix" -> "4.10.0")
+        // 1. Echte Star Citizen Spielversion ermitteln (inkl. Point-Releases wie 4.10.1)
+        if (!Meta.ContainsKey("build") && line.Contains("Changelist:", StringComparison.Ordinal))
+        {
+            var bld = After(line, "Changelist:");
+            Meta["build"] = bld;
+            if (GameVersionResolver.TryResolveVersion(bld, out var ver))
+            {
+                Meta["base_version"] = ver;
+            }
+            UpdateFullVersion();
+        }
+        else if (!Meta.ContainsKey("build") && line.Contains("build_version[", StringComparison.Ordinal))
+        {
+            var mBld = Regex.Match(line, @"build_version\[(\d+)\]");
+            if (mBld.Success)
+            {
+                var bld = mBld.Groups[1].Value;
+                Meta["build"] = bld;
+                if (GameVersionResolver.TryResolveVersion(bld, out var ver))
+                {
+                    Meta["base_version"] = ver;
+                }
+                UpdateFullVersion();
+            }
+        }
+
         if (line.Contains("Branch:", StringComparison.Ordinal))
         {
             var rawBranch = After(line, "Branch:");
-            var m = BranchVersionRegex().Match(rawBranch);
-            if (m.Success)
+            // Nur aus Branch ableiten, wenn nicht bereits eine präzisere Patch-Version vorliegt (z.B. 4.10.1)
+            if (!Meta.ContainsKey("base_version") || Meta["base_version"].EndsWith(".0", StringComparison.Ordinal))
             {
-                Meta["base_version"] = m.Groups[1].Value;
-            }
-            else if (!string.IsNullOrWhiteSpace(rawBranch))
-            {
-                var clean = rawBranch.Replace("sc-alpha-", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("sc-live-", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("sc-", "", StringComparison.OrdinalIgnoreCase);
-                var idxHyphen = clean.IndexOf('-');
-                Meta["base_version"] = idxHyphen > 0 ? clean[..idxHyphen] : clean;
+                string? resolvedVer = null;
+                if (Meta.TryGetValue("build", out var knownBuild))
+                {
+                    GameVersionResolver.TryResolveVersion(knownBuild, out resolvedVer);
+                }
+
+                if (!string.IsNullOrEmpty(resolvedVer))
+                {
+                    Meta["base_version"] = resolvedVer;
+                }
+                else
+                {
+                    var m = BranchVersionRegex().Match(rawBranch);
+                    if (m.Success)
+                    {
+                        Meta["base_version"] = m.Groups[1].Value;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(rawBranch))
+                    {
+                        var clean = rawBranch.Replace("sc-alpha-", "", StringComparison.OrdinalIgnoreCase)
+                                             .Replace("sc-live-", "", StringComparison.OrdinalIgnoreCase)
+                                             .Replace("sc-", "", StringComparison.OrdinalIgnoreCase);
+                        var idxHyphen = clean.IndexOf('-');
+                        Meta["base_version"] = idxHyphen > 0 ? clean[..idxHyphen] : clean;
+                    }
+                }
             }
             Meta["branch"] = rawBranch;
             UpdateFullVersion();
@@ -2690,20 +2788,11 @@ public partial class LogParser
         }
         else if (!Meta.ContainsKey("file_version") && line.Contains("FileVersion:", StringComparison.Ordinal))
         {
-            Meta["file_version"] = After(line, "FileVersion:");
-        }
-
-        if (!Meta.ContainsKey("build") && line.Contains("Changelist:", StringComparison.Ordinal))
-        {
-            Meta["build"] = After(line, "Changelist:");
-            UpdateFullVersion();
-        }
-        else if (!Meta.ContainsKey("build") && line.Contains("build_version[", StringComparison.Ordinal))
-        {
-            var mBld = Regex.Match(line, @"build_version\[(\d+)\]");
-            if (mBld.Success)
+            var fv = After(line, "FileVersion:");
+            Meta["file_version"] = fv;
+            if (GameVersionResolver.TryResolveFromWindowsVersion(fv, out var ver))
             {
-                Meta["build"] = mBld.Groups[1].Value;
+                Meta["base_version"] = ver;
                 UpdateFullVersion();
             }
         }
@@ -2740,12 +2829,6 @@ public partial class LogParser
                     Meta["character"] = mn.Groups["n"].Value;
                 }
             }
-        }
-        
-        var mShard = ShardRegex().Match(line);
-        if (mShard.Success)
-        {
-            Meta["shard"] = mShard.Groups["s"].Value;
         }
 
         if (Meta.Count >= 7 && Meta.ContainsKey("shard") && Meta.ContainsKey("character") && Meta.ContainsKey("version") && !Meta["version"].StartsWith("1.0.", StringComparison.Ordinal))

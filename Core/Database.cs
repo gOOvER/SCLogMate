@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 34; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v34: Bereinigung von OCR-Fehlerfassungen in fleet_user_ships components_json & Case-Insensitive JSON-Korrektur)
+    public const int CurrentSchemaVersion = 35; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v35: Korrektur der Versionsbezeichnung für SC 4.10.1 Sessions / Build 12660092)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -864,6 +864,24 @@ public static class Database
             Exec(db, "PRAGMA user_version = 34;");
             dbSchemaVersion = 34;
             Logger.Log("DB Schema: Migration auf v34 (Bereinigung fehlerhafter Komponenten in fleet_user_ships) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 35)
+        {
+            try
+            {
+                // v35: Fix Star Citizen 4.10.1 version string in sessions table (Build 12660092)
+                Exec(db, @"UPDATE sessions 
+                           SET version = REPLACE(version, '4.10.0', '4.10.1') 
+                           WHERE (name LIKE '%12660092%' OR version LIKE '%12660092%') AND version LIKE '4.10.0%';");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v35 (SC 4.10.1 version string correction)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 35;");
+            dbSchemaVersion = 35;
+            Logger.Log("DB Schema: Migration auf v35 (Korrektur der Versionsbezeichnung für SC 4.10.1 Sessions) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

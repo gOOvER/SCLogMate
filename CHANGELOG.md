@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Settings Plugin Management Tab (`frontend/src/views/SettingsPluginsTab.tsx`, `frontend/src/views/SettingsView.tsx`)**: Added a dedicated `🧩 Plugins & Widgets` tab in Settings allowing users to toggle plugins on/off, reload manifests without restarting the app, view plugin directories, and copy OBS source URLs.
 
 ### Fixed
+- **Accurate Star Citizen Version Resolution & Point-Release Parsing (`Core/GameVersionResolver.cs`, `Core/LogParser.cs`, `Core/Database.cs`)**:
+  - Implemented `GameVersionResolver` to dynamically discover authoritative Star Citizen patch versions (e.g. `4.10.1` instead of `4.10.0`) from official RSI Launcher logs and Windows PE FileVersion headers (`4.10.193.11644`).
+  - Resolved CIG's practice of retaining stale branch names (e.g. `sc-alpha-4.10.0`) across point releases by mapping build `12660092` directly to `4.10.1`, displaying `SC 4.10.1-LIVE` in the HUD and status bars.
+  - Added SQLite schema migration v35 to update existing historical sessions for Star Citizen 4.10.1 (Build 12660092).
+- **Server Region & Dynamic Shard Detection Fix (`Core/Photino/PhotinoBridge.cs`, `ViewModels/MainViewModel.cs`, `Core/LogParser.cs`)**:
+  - Fixed false-positive Australia (`AUS`) detection caused by overly broad `ap` matching against Asia-Pacific shards (`pub_ape1a_...` for Tokyo/Hong Kong). Narrowed Australia to `apse` / `aus` / `oce` / `syd` and added explicit Asia mapping for `ape` / `apne` / `aps` / `asia` / `jp` / `sg` / `tyo` / `hkg`.
+  - Unblocked continuous Shard tracking in `LogParser.CaptureMeta`: `<Join PU>` lines are now parsed at any time regardless of `_metaComplete`, ensuring mid-session server hops, recovery, and regional switches immediately update active shard and region info.
+  - Expanded `ScanLogTailForShard` buffer scanning up to 5 MB so earlier server connections in large logs are reliably detected, and added `_parser.Reset()` upon starting log tailing.
+  - Added instant `HUD_UPDATE` event broadcast on live PU server joins so the HUD reflects region and shard changes in real-time.
 - **Aurora False-Positive Navigation Voice Trigger Elimination (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
   - Removed speculative Starmap route plotting and `CSCItemNavigation::PostInitialize` / `Local Route Guard` matchers that falsely triggered *"Routenplanung abgeschlossen"* / *"Kurs gesetzt"* audio cues immediately upon quantum arrival, during mission objective transitions, or whenever CryEngine entity streaming rerouted navigation guards.
   - Purged unverified background triggers (freight elevator idle entity streaming, autoland, snub uncoupling) to maintain strictly authentic, verified game event voice callouts matching the official Aurora Log-Wächter catalog.
