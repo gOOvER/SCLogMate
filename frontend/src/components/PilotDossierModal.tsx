@@ -38,7 +38,7 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="sc-glass rounded-2xl w-full max-w-xl border border-cyan-500/40 shadow-2xl shadow-cyan-950/60 p-6 relative overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="sc-glass rounded-2xl w-full max-w-2xl border border-cyan-500/40 shadow-2xl shadow-cyan-950/60 p-6 relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* Glowing Header Accent Bar */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
 
@@ -101,49 +101,49 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
           {/* Pilot Info Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Primary Details Card */}
-            <div className="bg-[#051122]/90 border border-cyan-950 rounded-xl p-3.5 flex flex-col justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+            <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5 pb-1.5 border-b border-cyan-950/80">
                 <Shield className="w-3.5 h-3.5 text-cyan-400" />
                 PILOTENSTATUS
               </span>
 
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between border-b border-cyan-950/60 pb-1.5">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <User className="w-3 h-3 text-slate-500" />
-                    Handle Name:
+              <div className="space-y-1 text-xs font-mono">
+                <div className="grid grid-cols-[115px_1fr] items-center gap-2 py-1.5 border-b border-cyan-950/40">
+                  <span className="text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <User className="w-3.5 h-3.5 text-cyan-500/70 shrink-0" />
+                    Handle:
                   </span>
-                  <span className="font-bold text-white tracking-wide">
+                  <span className="font-bold text-white tracking-wide truncate" title={profile.handle}>
                     {profile.handle}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-cyan-950/60 pb-1.5">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                    Rang & Ehrentitel:
+                <div className="grid grid-cols-[115px_1fr] items-center gap-2 py-1.5 border-b border-cyan-950/40">
+                  <span className="text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
+                    Rang &amp; Titel:
                   </span>
-                  <span className="font-semibold text-amber-300">
+                  <span className="font-semibold text-amber-300 truncate" title={profile.title || 'Civilian'}>
                     {profile.title || 'Civilian'}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-cyan-950/60 pb-1.5">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-slate-500" />
-                    Enlisted (Registriert):
+                <div className="grid grid-cols-[115px_1fr] items-center gap-2 py-1.5 border-b border-cyan-950/40">
+                  <span className="text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    Registriert:
                   </span>
-                  <span className="text-slate-200">
+                  <span className="text-slate-200 whitespace-nowrap">
                     {profile.enlisted || '—'}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Languages className="w-3 h-3 text-slate-500" />
-                    Sprachen (Fluency):
+                <div className="grid grid-cols-[115px_1fr] items-center gap-2 py-1.5">
+                  <span className="text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Languages className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    Sprachen:
                   </span>
-                  <span className="text-cyan-300">
+                  <span className="text-cyan-300 truncate" title={profile.fluency || 'English'}>
                     {profile.fluency || 'English'}
                   </span>
                 </div>
@@ -151,16 +151,16 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
             </div>
 
             {/* Organization Card */}
-            <div className="bg-[#051122]/90 border border-cyan-950 rounded-xl p-3.5 flex flex-col justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+            <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5 pb-1.5 border-b border-cyan-950/80">
                 <Building2 className="w-3.5 h-3.5 text-cyan-400" />
                 HAUPTORGANISATION
               </span>
 
               {profile.orgName ? (
-                <div className="flex items-center gap-3 my-auto">
-                  {profile.orgLogoUrl && (
-                    <div className="w-14 h-14 rounded-lg bg-black/60 border border-cyan-800/50 p-1 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3.5 my-auto py-1">
+                  {profile.orgLogoUrl ? (
+                    <div className="w-14 h-14 rounded-xl bg-black/70 border border-cyan-800/50 p-1.5 flex items-center justify-center shrink-0 shadow-sm shadow-cyan-950/60">
                       <img
                         src={profile.orgLogoUrl}
                         alt={profile.orgName}
@@ -170,20 +170,24 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
                         }}
                       />
                     </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-cyan-950/30 border border-cyan-800/40 flex items-center justify-center text-cyan-500/60 shrink-0">
+                      <Building2 className="w-6 h-6" />
+                    </div>
                   )}
 
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-slate-100 font-mono truncate">
+                  <div className="min-w-0 flex-1 space-y-1.5 font-mono">
+                    <div className="text-sm font-bold text-slate-100 truncate tracking-wide" title={profile.orgName}>
                       {profile.orgName}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] font-mono">
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
                       {profile.orgSid && (
-                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-700/60 text-cyan-300 font-bold text-[10px]">
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 font-bold text-[10px] tracking-wider">
                           [{profile.orgSid}]
                         </span>
                       )}
                       {profile.orgRank && (
-                        <span className="text-slate-400">
+                        <span className="text-slate-300 text-xs truncate" title={profile.orgRank}>
                           {profile.orgRank}
                         </span>
                       )}
@@ -191,7 +195,7 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center py-4 text-xs font-mono text-slate-500 italic">
+                <div className="flex items-center justify-center py-6 text-xs font-mono text-slate-500 italic">
                   Keine Hauptorganisation hinterlegt
                 </div>
               )}
@@ -200,20 +204,20 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
 
           {/* Website Link (if present) */}
           {profile.website && (
-            <div className="bg-[#051122]/90 border border-cyan-950 rounded-xl p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <Globe className="w-4 h-4 text-cyan-400" />
-                <span className="text-slate-400">Webseite:</span>
-                <span className="text-cyan-300 font-medium truncate max-w-[280px]">
+            <div className="bg-[#051122]/90 border border-cyan-950/80 rounded-xl p-3 flex items-center justify-between shadow-inner">
+              <div className="flex items-center gap-2.5 text-xs font-mono min-w-0 mr-3">
+                <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span className="text-slate-400 shrink-0">Webseite:</span>
+                <span className="text-cyan-300 font-medium truncate" title={profile.website}>
                   {profile.website}
                 </span>
               </div>
               <button
                 onClick={handleOpenWebsite}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-bold text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800/60 transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold text-cyan-300 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 transition cursor-pointer shrink-0"
               >
                 <span>Öffnen</span>
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
           )}

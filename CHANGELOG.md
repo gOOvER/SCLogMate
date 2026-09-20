@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Enhanced `FleetView` to automatically switch between Hangar and History tabs if a navigated ship was flown historically but is not currently in the player's active hangar.
     - Enhanced `MissionsView` to automatically switch to the History tab if a navigated contract was completed or logged in historical records.
 
+### Changed
+- **Citizen Dossier Alignment and Layout Overhaul (`frontend/src/components/PilotDossierModal.tsx`)**:
+  - **Strict Two-Column Grid Alignment (`PILOTENSTATUS`)**: Replaced loose `justify-between` flex rows with a structured two-column grid (`grid-cols-[115px_1fr]`). Labels (`Handle`, `Rang & Titel`, `Registriert`, `Sprachen`) and their respective values now align in clean, vertical columns, eliminating awkward multi-line line breaks and staggered text.
+  - **Expanded Modal Width (`max-w-2xl`)**: Increased modal container width from `max-w-xl` (576px) to `max-w-2xl` (672px) to give both Pilot Status and Hauptorganisation cards sufficient breathing room.
+  - **Harmonized Organization Card and Website Bar**: Polished organization branding, SID badge, rank display, and external website links with cohesive padding and border styling.
+
 ### Fixed
 - **Tab Auto-Switch Loop and User Selection Override Fix (`frontend/src/views/MissionsView.tsx`, `frontend/src/views/FleetView.tsx`)**:
   - **Eliminated Tab Reversion on Background Updates (`MissionsView.tsx`)**: Fixed an issue where clicking other tabs (such as `Aktive Aufträge` or `Auftragskatalog`) in the mission manager would immediately snap back to `Verlauf (History)`. The auto-switch effect had `data` in its dependency array, which re-evaluated and forced `activeTab` back to `'history'` on every periodic HUD update or background mission data fetch.
