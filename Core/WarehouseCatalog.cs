@@ -56,6 +56,10 @@ public static class WarehouseCatalog
         if (FleetCatalog.IsKnownCatalogShip(candidateShip) || FleetCatalog.IsKnownCatalogShip(raw))
         {
             var ship = FleetCatalog.Lookup(candidateShip);
+            if (ship == null || ship.Role == "Nicht-Schiff" || ship.Role == "Unbekannt")
+            {
+                ship = FleetCatalog.Lookup(raw);
+            }
             if (ship != null && ship.Role != "Nicht-Schiff" && ship.Role != "Raumschiff" && ship.Role != "Unbekannt")
             {
                 return (ship.NormalizedName, de ? "Schiff & Fahrzeug" : "Ship & Vehicle");

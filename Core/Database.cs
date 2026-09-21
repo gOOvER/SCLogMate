@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 37; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v37: Hangar-Eigentum & Herkunftsschutz gegen versehentliche Hangar-Entfernung)
+    public const int CurrentSchemaVersion = 38; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v38: Bereinigung von Schiffskäufen RAFT & Hull B aus Lagerbestand, Events und Wiki-Cache)
     public const int CurrentParserVersion = 39; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v39: Kanonische Standortnamen in Shop- & Lagerbewegungen ohne redundante Himmelskörper-Suffixe)
 
     public static bool WasParserResetRequired { get; set; }
@@ -1023,6 +1023,45 @@ public static class Database
             Exec(db, "PRAGMA user_version = 37;");
             dbSchemaVersion = 37;
             Logger.Log("DB Schema: Migration auf v37 (Hangar-Eigentum & Herkunftsschutz) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 38)
+        {
+            try
+            {
+                // v38: Bereinigung von fehlerhaft als "Aegis Gladius - Decoy Launcher" aufgelösten Schiffskäufen (ARGO RAFT & MISC Hull B):
+                // 1. In events: Detailtexte korrigieren
+                Exec(db, @"
+                    UPDATE events 
+                    SET detail = 'RAFT · Argo  · NewDeal Interior Lorville' 
+                    WHERE kind = 'Purchase' AND amount = -3366563 AND detail LIKE '%Decoy Launcher%';
+
+                    UPDATE events 
+                    SET detail = 'Hull B · MISC  · NewDeal Interior Lorville' 
+                    WHERE kind = 'Purchase' AND amount = -7541100 AND detail LIKE '%Decoy Launcher%';
+                ");
+
+                // 2. In wiki_items_cache: Falsche Cache-Einträge entfernen
+                Exec(db, @"
+                    DELETE FROM wiki_items_cache 
+                    WHERE class_name IN ('ARGO_RAFT', 'MISC_Hull_B') 
+                       OR (name LIKE '%Gladius - Decoy%' AND class_name NOT LIKE '%Decoy%');
+                ");
+
+                // 3. In warehouse_items: Schiffe gehören in die Flotte und nicht ins Warenlager
+                Exec(db, @"
+                    DELETE FROM warehouse_items 
+                    WHERE item_class IN ('ARGO_RAFT', 'MISC_Hull_B') 
+                       OR (item_name LIKE '%Gladius - Decoy%' AND (item_class LIKE '%RAFT%' OR item_class LIKE '%Hull%'));
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v38 (Bereinigung Schiffskäufe RAFT & Hull B)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 38;");
+            dbSchemaVersion = 38;
+            Logger.Log("DB Schema: Migration auf v38 (Bereinigung Schiffskäufe RAFT & Hull B aus Events, Lager & Wiki-Cache) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

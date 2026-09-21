@@ -187,6 +187,14 @@ public static class WikiApiClient
         if (FleetCatalog.IsKnownCatalogShip(candidateShip) || FleetCatalog.IsKnownCatalogShip(normalized) || FleetCatalog.IsKnownCatalogShip(raw))
         {
             var ship = FleetCatalog.Lookup(candidateShip);
+            if (ship == null || ship.Role == "Nicht-Schiff" || ship.Role == "Unbekannt")
+            {
+                ship = FleetCatalog.Lookup(normalized);
+            }
+            if (ship == null || ship.Role == "Nicht-Schiff" || ship.Role == "Unbekannt")
+            {
+                ship = FleetCatalog.Lookup(raw);
+            }
             if (ship != null && ship.Role != "Nicht-Schiff" && ship.Role != "Raumschiff" && ship.Role != "Unbekannt")
             {
                 var shipInfo = new WikiInfo

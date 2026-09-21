@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
 
 ### Fixed
+- **Ship Purchase Misidentification & Decoy Launcher Cleanup (`Core/Database.cs`, `Core/FleetCatalog.cs`, `Core/WarehouseCatalog.cs`, `Core/WikiApiClient.cs`)**:
+  - **Database Migration v38**: Fixed corrupted purchase events in the financial ledger where terminal purchases for `ARGO_RAFT` (-3,366,563 aUEC) and `MISC_Hull_B` (-7,541,100 aUEC) at NewDeal Lorville were erroneously displayed as `Aegis Gladius - Decoy Launcher` due to legacy fuzzy prefix matching in the wiki API cache.
+  - **Warehouse Inventory & Wiki Cache Cleanup**: Removed misclassified ship records from `warehouse_items` and purged poisoned decoy launcher cache records from `wiki_items_cache`.
+  - **Catalog Pricing & Fallback Matching**: Updated Hull B (7,541,100 aUEC) and RAFT (3,366,563 aUEC) catalog values to match live in-game 3.24 terminal pricing, and strengthened ship lookup fallbacks in `WarehouseCatalog` and `WikiApiClient`.
 - **Full UI Internationalization (i18n) & English Localization (`frontend/src/i18n/`, `frontend/src/views/`, `frontend/src/components/`, `frontend/src/App.tsx`)**:
   - **Comprehensive Multi-Language Support**: Fixed untranslated German strings across all views (`EventsView`, `FleetView`, `BlackboxView`, `BlueprintsView`, `FinancesView`, `LoadoutView`, `MarketView`, `MissionsView`, `OreScannerView`, `PlacesView`, `RefineryView`, `ReputationView`, `SettingsView`, `StarmapView`, `ToolsView`, `WarehouseView`, `WikiExplorerView`, `AboutView`, `ChatLogView`) and modals (`ShipCompareModal`, `ShipLoadoutModal`) when English (`EN`) is selected.
   - **Interactive Runtime Language Switcher**: Connected the language selection dropdown in `SettingsView` directly to the `useI18n()` context, dynamically switching all interface strings between German and English instantly without requiring an application restart.
