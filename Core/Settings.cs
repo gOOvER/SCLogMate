@@ -28,15 +28,6 @@ public class AppSettings
     /// <summary>Vom Nutzer ausgewählter mobiGlas Auftragsmanager-Bereich (Contract Manager).</summary>
     public ScanRegion? ContractRegion { get; set; }
 
-    /// <summary>Aktiviert die automatische OCR-Erfassung des Star Citizen In-Game Chatfensters.</summary>
-    public bool ChatOcrEnabled { get; set; } = false;
-
-    /// <summary>Polling-Intervall für Chat-OCR in Millisekunden.</summary>
-    public int ChatOcrIntervalMs { get; set; } = 3500;
-
-    /// <summary>Vom Nutzer ausgewählter Chatfenster-Bereich auf dem Bildschirm.</summary>
-    public ScanRegion? ChatRegion { get; set; }
-
     /// <summary>Vom Nutzer ausgewählter Raffinerie-Kiosk Bereich auf dem Bildschirm.</summary>
     public ScanRegion? RefineryRegion { get; set; }
 

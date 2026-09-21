@@ -278,7 +278,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleSelectRegion = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
+  const handleSelectRegion = async (target: 'wallet' | 'contract' | 'rs') => {
     try {
       setIsSelectingRegion(target);
       showToast('Bildschirm-Auswahl gestartet: Ziehe mit der Maus ein Rechteck...');
@@ -303,7 +303,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleTestScan = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
+  const handleTestScan = async (target: 'wallet' | 'contract' | 'rs') => {
     try {
       setIsTestingScan(target);
       setTestScanResult(null);
@@ -334,7 +334,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleResetRegion = async (target: 'wallet' | 'contract' | 'rs' | 'chat') => {
+  const handleResetRegion = async (target: 'wallet' | 'contract' | 'rs') => {
     try {
       const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: null });
       if (cfg) {
@@ -371,7 +371,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleApplyManualCoords = async (target: 'wallet' | 'contract' | 'rs' | 'chat', coords: ScanRegionDto) => {
+  const handleApplyManualCoords = async (target: 'wallet' | 'contract' | 'rs', coords: ScanRegionDto) => {
     try {
       const cfg = await bridge.sendRequest<OcrRegionsConfig>('save_ocr_region', { target, region: coords });
       if (cfg) setOcrConfig(cfg);

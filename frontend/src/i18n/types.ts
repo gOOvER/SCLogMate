@@ -93,7 +93,6 @@ export interface Translations {
     categorySystem: string;
     dashboard: string;
     events: string;
-    chat: string;
     sessions: string;
     finances: string;
     warehouse: string;
@@ -400,13 +399,6 @@ export interface Translations {
     credits: string;
     license: string;
     website: string;
-    [key: string]: any;
-  };
-  chat?: {
-    title: string;
-    channels: string;
-    ocrLog: string;
-    searchChat: string;
     [key: string]: any;
   };
   [key: string]: any;

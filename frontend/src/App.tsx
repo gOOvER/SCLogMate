@@ -14,7 +14,6 @@ import { MasterHeader } from './components/MasterHeader';
 import { SessionBar } from './components/SessionBar';
 import { HudBar } from './components/HudBar';
 import { EventsView } from './views/EventsView';
-import { ChatLogView } from './views/ChatLogView';
 import { FinancesView } from './views/FinancesView';
 import { WarehouseView } from './views/WarehouseView';
 import { FleetView } from './views/FleetView';
@@ -415,8 +414,6 @@ export const App: React.FC = () => {
               onOpenWiki={handleOpenWiki}
             />
           )}
-
-          {activeTab === 'chat' && <ChatLogView />}
 
           {activeTab === 'finances' && (
             <FinancesView

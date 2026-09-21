@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Local Star Citizen Wiki Vehicle Caching (`Core/Database.cs`, `Core/WikiApiClient.cs`)**: Implemented local SQLite vehicle specification and image URL caching with background prefetching, ensuring instant ship image resolution and offline support.
 
 ### Removed
+- **In-Game Chat OCR Subsystem & Chat Log View (`Core/Ocr/ChatOcrScanner.cs`, `Core/Ocr/ChatParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `frontend/src/views/ChatLogView.tsx`, `frontend/src/components/PlayerReportModal.tsx`)**:
+  - **Complete Chat System Deprecation**: Removed the high-maintenance in-game chat OCR scanner (`ChatOcrScanner.cs`), chat parser (`ChatParser.cs`), background polling timer (3.5s interval), and chat view (`ChatLogView.tsx`) to reduce system resource overhead, eliminate OCR lock contention, and keep the application focused on core flight logging and economy tracking.
+  - **Database Schema Migration v39 (`Core/Database.cs`)**: Dropped the obsolete `chat_messages` table and its indexes (`ix_chat_timestamp`, `ix_chat_sender`, `ix_chat_channel`, `ix_chat_session`), incrementing `CurrentSchemaVersion` to 39.
+  - **Player Report Modal Deprecation (`frontend/src/components/PlayerReportModal.tsx`)**: Removed the dedicated chat incident report generation modal and backend export endpoint (`export_player_report`).
+  - **Settings & Bridge Cleanup (`Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/services/photinoBridge.ts`, `frontend/src/i18n/`)**: Removed `ChatOcrEnabled`, `ChatOcrIntervalMs`, and `ChatRegion` from settings, RPC endpoints (`get_chat_messages`, `scan_chat_now`, `toggle_chat_ocr`, `flag_chat_message`, `clear_chat_messages`), and associated translations.
 - **Orphaned Placeholder View (`frontend/src/views/PlaceholderView.tsx`)**: Removed deprecated and unused placeholder view component leftover from early development stages.
 - **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
 

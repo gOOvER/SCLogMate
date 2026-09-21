@@ -34,7 +34,6 @@ import { useI18n } from '../i18n';
 
 export type NavTabId =
   | 'events'
-  | 'chat'
   | 'finances'
   | 'missions'
   | 'reputation'
@@ -124,7 +123,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: t('nav.categoryCore'),
       items: [
         { id: 'events', label: t('nav.events'), icon: Scroll, badge: liveEventCount },
-        // { id: 'chat', label: t('nav.chat'), icon: MessageSquare },
         { id: 'finances', label: t('nav.finances'), icon: Coins },
         { id: 'missions', label: t('nav.missions'), icon: Target },
         { id: 'reputation', label: t('nav.reputation'), icon: Award },
