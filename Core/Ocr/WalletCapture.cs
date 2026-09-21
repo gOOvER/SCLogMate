@@ -24,6 +24,7 @@ public sealed class WalletCapture : IDisposable
     private readonly OcrEngineService _ocrEngine;
     private readonly Func<ScanRegion?> _regionProvider;
     private readonly Func<bool> _isEnabled;
+    private readonly Func<long>? _currentBalanceProvider;
     private int _busy;
     private CancellationTokenSource? _cts;
 
@@ -33,11 +34,12 @@ public sealed class WalletCapture : IDisposable
     /// <summary>Status des letzten Burst-Laufs (z.B. "confirmed", "timeout", "no_region").</summary>
     public string? LastOutcome { get; private set; }
 
-    public WalletCapture(OcrEngineService ocrEngine, Func<ScanRegion?> regionProvider, Func<bool> isEnabled)
+    public WalletCapture(OcrEngineService ocrEngine, Func<ScanRegion?> regionProvider, Func<bool> isEnabled, Func<long>? currentBalanceProvider = null)
     {
         _ocrEngine = ocrEngine;
         _regionProvider = regionProvider;
         _isEnabled = isEnabled;
+        _currentBalanceProvider = currentBalanceProvider;
     }
 
     /// <summary>Prüft jede Logzeile auf das mobiGlas-Signal.</summary>
@@ -153,6 +155,28 @@ public sealed class WalletCapture : IDisposable
                     // Ein Wert mit weniger Stellen als ein bereits im selben Burst gesehener Wert darf nicht bestätigt werden.
                     int valDigits = val.ToString().Length;
                     int maxSeenDigits = seen.Count > 0 ? seen.Max(x => x.ToString().Length) : 0;
+
+                    // Plausibilitäts-Schutz: Verhindert, dass während des mobiGlas Fade-Ins nur abgeschnittene Endziffern erfasst werden (z. B. "385" statt "11.812.385")
+                    long currentBal = _currentBalanceProvider?.Invoke() ?? 0;
+                    if (currentBal > 50_000 && val < currentBal)
+                    {
+                        long modulus = (long)Math.Pow(10, valDigits);
+                        if (currentBal % modulus == val)
+                        {
+                            Logger.Log($"OCR Grab {grab}: '{bestText?.Trim()}' -> {val:N0} aUEC verworfen (Fade-In Teilausschnitt von {currentBal:N0} aUEC).");
+                            seen.Add(val);
+                            await Task.Delay(GrabSpacing, ct).ConfigureAwait(false);
+                            continue;
+                        }
+
+                        if (val < currentBal * 0.15 && valDigits < currentBal.ToString().Length)
+                        {
+                            Logger.Log($"OCR Grab {grab}: '{bestText?.Trim()}' -> {val:N0} aUEC verworfen (Plausibilitätswarnung: extremer Einbruch gegenüber {currentBal:N0} aUEC).");
+                            seen.Add(val);
+                            await Task.Delay(GrabSpacing, ct).ConfigureAwait(false);
+                            continue;
+                        }
+                    }
 
                     if (valDigits >= maxSeenDigits && seen.Contains(val))
                     {

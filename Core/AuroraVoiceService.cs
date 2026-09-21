@@ -1104,8 +1104,10 @@ public partial class AuroraVoiceService : IDisposable
         if (!_isEnabled || !_isInstalled || !AtcAndLandingEnabled) return;
         if (_atcLandingSounds.Count > 0)
         {
-            Logger.Log($"[AuroraVoiceService] ATC / Hangar-Zuweisung ausgelöst ({_atcLandingSounds.Count} Sounds verfügbar).");
-            PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 45);
+            if (PlaySoundWithCooldown("atc_landing", _atcLandingSounds, minCooldownSeconds: 45))
+            {
+                Logger.Log($"[AuroraVoiceService] ATC / Hangar-Zuweisung ausgelöst ({_atcLandingSounds.Count} Sounds verfügbar).");
+            }
         }
         else
         {
@@ -1203,13 +1205,13 @@ public partial class AuroraVoiceService : IDisposable
         return null;
     }
 
-    private void PlaySoundWithCooldown(string key, List<string> soundOptions, int delayMs = 0, int minCooldownSeconds = CooldownSeconds)
+    private bool PlaySoundWithCooldown(string key, List<string> soundOptions, int delayMs = 0, int minCooldownSeconds = CooldownSeconds)
     {
         var now = DateTime.UtcNow;
         if (_lastTriggerTime.TryGetValue(key, out var lastTime))
         {
             if ((now - lastTime).TotalSeconds < minCooldownSeconds)
-                return;
+                return false;
         }
 
         _lastTriggerTime[key] = now;
@@ -1222,6 +1224,7 @@ public partial class AuroraVoiceService : IDisposable
         _lastPlayedSound[key] = selected;
 
         PlayFileAsync(selected, delayMs);
+        return true;
     }
 
     private void PlayFileAsync(string filePath, int delayMs)

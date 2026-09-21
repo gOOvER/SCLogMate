@@ -277,6 +277,7 @@ export interface MissionsResponseDto {
   active: MissionItemDto[];
   history: MissionItemDto[];
   catalog: MissionItemDto[];
+  totalCompleted?: number;
 }
 
 export interface FactionReputationDto {

@@ -2299,6 +2299,52 @@ public static class Database
         return list;
     }
 
+    /// <summary>Liefert alle echten Missionsabschlüsse und Belohnungen (chronologisch absteigend, neueste zuerst).</summary>
+    public static List<LogEntry> AllMissionHistoryEvents(int limit = 1000)
+    {
+        var list = new List<LogEntry>();
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        c.CommandText = @"SELECT time, kind, amount, detail, ship FROM events
+                          WHERE kind = 'MissionReward'
+                             OR kind = 'MissionDone'
+                             OR (kind = 'Mission' AND (detail LIKE 'Contract Complete%' OR detail LIKE 'Auftrag abgeschlossen%'))
+                          ORDER BY time DESC
+                          LIMIT $limit";
+        c.Parameters.AddWithValue("$limit", limit);
+        using var r = c.ExecuteReader();
+        while (r.Read())
+        {
+            DateTime.TryParse(r.GetString(0), CultureInfo.InvariantCulture,
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t);
+            Enum.TryParse<EventKind>(r.GetString(1), out var kind);
+            list.Add(new LogEntry
+            {
+                Time = t,
+                Kind = kind,
+                Amount = r.GetInt64(2),
+                Detail = r.IsDBNull(3) ? "" : r.GetString(3),
+                Ship = r.IsDBNull(4) ? null : r.GetString(4)
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Gibt die Gesamtanzahl aller jemals im Log erfassten abgeschlossenen Missionen zurück.</summary>
+    public static int GetCompletedMissionsCount()
+    {
+        using var db = new SqliteConnection(Conn);
+        db.Open();
+        using var c = db.CreateCommand();
+        c.CommandText = @"SELECT COUNT(*) FROM events
+                          WHERE kind = 'MissionReward'
+                             OR kind = 'MissionDone'
+                             OR (kind = 'Mission' AND (detail LIKE 'Contract Complete%' OR detail LIKE 'Auftrag abgeschlossen%'))";
+        var res = c.ExecuteScalar();
+        return res != null && res != DBNull.Value ? Convert.ToInt32(res) : 0;
+    }
+
     /// <summary>Neueste N Geld-Events (chronologisch absteigend, neueste zuerst).</summary>
     public static List<LogEntry> RecentMoneyEvents(int n)
     {

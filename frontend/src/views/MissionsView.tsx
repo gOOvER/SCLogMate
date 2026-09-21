@@ -191,7 +191,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             <CheckCircle2 className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-cyan-300">
-            {data.history.length} <span className="text-xs font-normal text-slate-400">im Log erfasst</span>
+            {formatNumber(data.totalCompleted ?? data.history.length)} <span className="text-xs font-normal text-slate-400">im Log erfasst</span>
           </div>
           <div className="mt-1 text-xs text-slate-400">Historische Missionsabschlüsse &amp; Belohnungen</div>
         </div>
@@ -237,7 +237,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" /> {t('missions.tabHistory')} ({data.history.length})
+            <Clock className="w-3.5 h-3.5" /> {t('missions.tabHistory')} ({formatNumber(data.totalCompleted ?? data.history.length)})
           </button>
 
           <button

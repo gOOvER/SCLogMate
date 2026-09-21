@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Local Star Citizen Wiki Vehicle Caching (`Core/Database.cs`, `Core/WikiApiClient.cs`)**: Implemented local SQLite vehicle specification and image URL caching with background prefetching, ensuring instant ship image resolution and offline support.
 
 ### Removed
+- **Orphaned Placeholder View (`frontend/src/views/PlaceholderView.tsx`)**: Removed deprecated and unused placeholder view component leftover from early development stages.
 - **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
 
 ### Changed
@@ -21,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
 
 ### Fixed
+- **Wallet OCR mobiGlas Fade-In Truncation Guard (`Core/Ocr/WalletCapture.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Implemented dual-layer plausibility protection against partial reads during mobiGlas UI fade-in/slide animations where only trailing digits are captured (e.g. `385` instead of `11,812,385`).
+  - Added trailing modulus validation (`currentBalance % 10^digits == scannedValue`) and dramatic drop guards (>85% drop with fewer digits) in both `WalletCapture` burst evaluation and `OnBalanceCaptured`, preventing accidental wallet balance overwrites.
+- **Mission History Uncapped Query & Accurate Completion Counts (`Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - **Removed Hardcoded 100-Entry Limit**: Replaced the legacy `Database.LoadRecentEvents(2500)...Take(100)` logic with dedicated `AllMissionHistoryEvents` and `GetCompletedMissionsCount` SQL queries, removing the artificial 100-item cap and displaying the actual total completed missions count (e.g. 525+).
+  - **Cleaned Title & Objective Noise**: Filtered out raw internal objective events (`Journal Entry Added`, `Objective Complete`, `Downloading`) from mission history, and cleanly parsed mission names, contractors, and rewards.
+- **ATC Voice Announcement Cooldown Logging (`Core/AuroraVoiceService.cs`)**:
+  - Debounced ATC landing voice announcement logging so that rapid back-to-back ATC signals within the same second only log once when audio playback is accepted.
 - **Ship Purchase Misidentification & Decoy Launcher Cleanup (`Core/Database.cs`, `Core/FleetCatalog.cs`, `Core/WarehouseCatalog.cs`, `Core/WikiApiClient.cs`)**:
   - **Database Migration v38**: Fixed corrupted purchase events in the financial ledger where terminal purchases for `ARGO_RAFT` (-3,366,563 aUEC) and `MISC_Hull_B` (-7,541,100 aUEC) at NewDeal Lorville were erroneously displayed as `Aegis Gladius - Decoy Launcher` due to legacy fuzzy prefix matching in the wiki API cache.
   - **Warehouse Inventory & Wiki Cache Cleanup**: Removed misclassified ship records from `warehouse_items` and purged poisoned decoy launcher cache records from `wiki_items_cache`.

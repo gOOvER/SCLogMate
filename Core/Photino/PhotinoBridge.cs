@@ -1141,7 +1141,8 @@ public class PhotinoBridge
         _walletCapture = new WalletCapture(
             _ocrEngine,
             () => Settings.Load().WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(),
-            () => Settings.Load().AutoOcrEnabled);
+            () => Settings.Load().AutoOcrEnabled,
+            () => Settings.Load().Balance);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
 
         _chatScanner = new ChatOcrScanner(
@@ -1276,6 +1277,25 @@ public class PhotinoBridge
 
         var s = Settings.Load();
         long oldBalance = s.Balance;
+
+        // Plausibilitäts-Schutz: Verhindert, dass während des mobiGlas Fade-Ins nur abgeschnittene Endziffern erfasst werden (z. B. "385" statt "11.812.385")
+        if (oldBalance > 50_000 && newBalance < oldBalance)
+        {
+            int newDigits = newBalance.ToString().Length;
+            long modulus = (long)Math.Pow(10, newDigits);
+            if (oldBalance % modulus == newBalance)
+            {
+                Logger.Log($"[WalletOCR] Abgewiesen: {newBalance:N0} aUEC ist ein unvollständiger Fade-In Teilausschnitt des bisherigen Kontostands ({oldBalance:N0} aUEC).");
+                return;
+            }
+
+            if (newBalance < oldBalance * 0.15 && newDigits < oldBalance.ToString().Length)
+            {
+                Logger.Log($"[WalletOCR] Plausibilitätswarnung: Extremer Abfall von {oldBalance:N0} auf {newBalance:N0} aUEC ohne Ausgabenbeleg abgewiesen.");
+                return;
+            }
+        }
+
         s.Balance = newBalance;
         s.BalanceSetAt = DateTime.UtcNow;
         Settings.Save(s);
@@ -5158,43 +5178,69 @@ public class PhotinoBridge
             }
         }
 
-        var history = Database.LoadRecentEvents(2500)
-            .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken or EventKind.MissionReward)
-            .Reverse()
-            .Take(100)
-            .Select(e =>
+        int totalCompleted = Database.GetCompletedMissionsCount();
+        var rawHistory = Database.AllMissionHistoryEvents(limit: 1000);
+
+        var history = rawHistory.Select(e =>
+        {
+            var rawDetail = e.Detail ?? e.KindText;
+            var cleanTitle = rawDetail;
+            string contractor = "Star Citizen Auftragsmanager";
+            string missionType = "Auftrag";
+
+            // Präfixe wie "Contract Complete: ", "Auftrag abgeschlossen: " bereinigen
+            if (cleanTitle.StartsWith("Contract Complete: ", StringComparison.OrdinalIgnoreCase))
+                cleanTitle = cleanTitle.Substring("Contract Complete: ".Length).Trim();
+            else if (cleanTitle.StartsWith("Auftrag abgeschlossen: ", StringComparison.OrdinalIgnoreCase))
+                cleanTitle = cleanTitle.Substring("Auftrag abgeschlossen: ".Length).Trim();
+
+            if (cleanTitle.Contains(':'))
             {
-                bool isDone = e.Kind == EventKind.MissionReward ||
-                              e.Kind == EventKind.MissionDone ||
-                              (e.Kind == EventKind.Mission && (e.Detail != null && (e.Detail.Contains("Complete", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase))));
-
-                var title = e.Detail ?? e.KindText;
-                string contractor = "Star Citizen Auftragsmanager";
-                if (title.Contains(" · "))
+                var parts = cleanTitle.Split(':', 2);
+                if (!string.IsNullOrWhiteSpace(parts[0]))
                 {
-                    var parts = title.Split(" · ");
-                    if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[0]))
-                    {
-                        contractor = parts[0].Trim();
-                    }
+                    contractor = parts[0].Trim();
+                    cleanTitle = parts[1].Trim();
                 }
-
-                return new MissionItemDto
+            }
+            else if (cleanTitle.Contains(" · "))
+            {
+                var parts = cleanTitle.Split(" · ");
+                if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[0]))
                 {
-                    Id = Guid.NewGuid().ToString("N"),
-                    Title = title,
-                    Contractor = contractor,
-                    BaseReward = (int)e.Amount,
-                    IsCompleted = isDone,
-                    Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
-                };
-            }).ToList();
+                    contractor = parts[0].Trim();
+                }
+            }
+
+            // Typ ableiten
+            var low = cleanTitle.ToLowerInvariant();
+            if (low.Contains("salvage") || low.Contains("bergung") || low.Contains("claim")) missionType = "Bergung & Salvage";
+            else if (low.Contains("deliver") || low.Contains("lieferung") || low.Contains("supply") || low.Contains("materials") || low.Contains("cargo")) missionType = "Fracht & Transport";
+            else if (low.Contains("bounty") || low.Contains("eliminate") || low.Contains("kopfgeld") || low.Contains("neutralis")) missionType = "Kopfgeldjagd";
+            else if (low.Contains("retrieval") || low.Contains("recover")) missionType = "Bergung";
+            else if (low.Contains("refuel") || low.Contains("betankung")) missionType = "Service & Wartung";
+
+            return new MissionItemDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Title = cleanTitle,
+                Contractor = contractor,
+                Faction = contractor,
+                MissionType = missionType,
+                BaseReward = (int)e.Amount,
+                IsCompleted = true,
+                StarSystems = "Stanton",
+                Description = e.Amount > 0 ? $"Erfolgreich abgeschlossen • Belohnung: +{e.Amount:N0} aUEC" : "Auftrag erfolgreich abgeschlossen",
+                Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
+            };
+        }).ToList();
 
         return new
         {
             active = activeContracts,
             history,
             catalog,
+            totalCompleted = Math.Max(totalCompleted, history.Count)
         };
     }
 
