@@ -253,6 +253,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool toastRefineryEnabled = true;
     [ObservableProperty] private bool toastElevatorEnabled = true;
     [ObservableProperty] private bool toastShipDestructionEnabled = true;
+    [ObservableProperty] private bool toastCrimeEnabled = true;
     [ObservableProperty] private bool toastSoundEnabled = false;
     private Views.AchievementToastWindow? _toastWindow;
 
@@ -3448,6 +3449,7 @@ public partial class MainViewModel : ObservableObject
         ToastRefineryEnabled = _settings.ToastRefineryEnabled;
         ToastElevatorEnabled = _settings.ToastElevatorEnabled;
         ToastShipDestructionEnabled = _settings.ToastShipDestructionEnabled;
+        ToastCrimeEnabled = _settings.ToastCrimeEnabled;
         ToastSoundEnabled = _settings.ToastSoundEnabled;
         OverlayLocked = _settings.OverlayLocked;
         OverlayClickThrough = _settings.OverlayClickThrough;
@@ -4255,6 +4257,12 @@ public partial class MainViewModel : ObservableObject
                     if (isLive && e.Detail.Contains("bereit", StringComparison.OrdinalIgnoreCase))
                     {
                         TriggerAchievementToast(AchievementToastData.ForElevatorReady(e.Detail, e.Ship ?? CurrentLocation));
+                    }
+                    break;
+                case EventKind.Crime:
+                    if (isLive && e.Detail.Contains("Verbrechen gegen dich", StringComparison.OrdinalIgnoreCase))
+                    {
+                        TriggerAchievementToast(AchievementToastData.ForCrimeAgainstPlayer(e.Detail));
                     }
                     break;
                 case EventKind.Mission:
@@ -5510,6 +5518,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnToastRefineryEnabledChanged(bool value) { _settings.ToastRefineryEnabled = value; Settings.Save(_settings); }
     partial void OnToastElevatorEnabledChanged(bool value) { _settings.ToastElevatorEnabled = value; Settings.Save(_settings); }
     partial void OnToastShipDestructionEnabledChanged(bool value) { _settings.ToastShipDestructionEnabled = value; Settings.Save(_settings); }
+    partial void OnToastCrimeEnabledChanged(bool value) { _settings.ToastCrimeEnabled = value; Settings.Save(_settings); }
     partial void OnToastSoundEnabledChanged(bool value) { _settings.ToastSoundEnabled = value; Settings.Save(_settings); }
     partial void OnOverlayLockedChanged(bool value) { _settings.OverlayLocked = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
     partial void OnOverlayClickThroughChanged(bool value) { _settings.OverlayClickThrough = value; Settings.Save(_settings); _overlayWindow?.ApplyWindowStyles(); }
@@ -5532,6 +5541,7 @@ public partial class MainViewModel : ObservableObject
         if (toast.Type == AchievementToastType.RefineryCompleted && !ToastRefineryEnabled) return;
         if (toast.Type == AchievementToastType.ElevatorReady && !ToastElevatorEnabled) return;
         if (toast.Type == AchievementToastType.ShipDestroyed && !ToastShipDestructionEnabled) return;
+        if (toast.Type == AchievementToastType.CrimeAgainstPlayer && !ToastCrimeEnabled) return;
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -5550,7 +5560,7 @@ public partial class MainViewModel : ObservableObject
     public void TestAchievementToast()
     {
         _testToastCounter++;
-        switch (_testToastCounter % 6)
+        switch (_testToastCounter % 7)
         {
             case 1:
                 TriggerAchievementToast(AchievementToastData.ForBlueprint("Strata Helmet Levski Edition"));
@@ -5567,8 +5577,11 @@ public partial class MainViewModel : ObservableObject
             case 5:
                 TriggerAchievementToast(AchievementToastData.ForElevatorReady("Frachtaufzug 02", "Area18 Riker Spaceport"));
                 break;
-            case 0:
+            case 6:
                 TriggerAchievementToast(AchievementToastData.ForShipDestroyed("Drake Cutlass Black", claimAvailable: true));
+                break;
+            case 0:
+                TriggerAchievementToast(AchievementToastData.ForCrimeAgainstPlayer("Destruction of Vehicle", "RexDieKralle"));
                 break;
         }
         Status = "✦ Toast-Banner Test ausgelöst – klicke und ziehe das Banner zum Verschieben!";

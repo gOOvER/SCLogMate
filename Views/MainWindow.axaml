@@ -5002,7 +5002,10 @@
                           <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding ToastShipDestructionEnabled}" Margin="0,2">
                             <TextBlock Text="💥 Schiffszerstörung &amp; Notfall-Claims" FontSize="11" Foreground="#F87171" FontWeight="SemiBold" />
                           </CheckBox>
-                          <CheckBox Grid.Row="3" Grid.Column="0" IsChecked="{Binding ToastSoundEnabled}" Margin="0,4,0,0">
+                          <CheckBox Grid.Row="3" Grid.Column="0" IsChecked="{Binding ToastCrimeEnabled}" Margin="0,2">
+                            <TextBlock Text="⚔ Verbrechen gegen dich (feindliche Spieler)" FontSize="11" Foreground="#F87171" FontWeight="SemiBold" />
+                          </CheckBox>
+                          <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ToastSoundEnabled}" Margin="0,2">
                             <TextBlock Text="🔊 Subtiler Audio-Soundeffekt bei Toast-Meldungen" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold" />
                           </CheckBox>
                         </Grid>

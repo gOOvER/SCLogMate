@@ -80,6 +80,9 @@ public class AppSettings
     /// <summary>Toast bei Schiffszerstörung oder Versicherungs-Claims anzeigen.</summary>
     public bool ToastShipDestructionEnabled { get; set; } = true;
 
+    /// <summary>Toast bei Verbrechen feindlicher Spieler gegen den eigenen Charakter anzeigen.</summary>
+    public bool ToastCrimeEnabled { get; set; } = true;
+
     /// <summary>Subtiler Soundeffekt bei Benachrichtigungen abspielen.</summary>
     public bool ToastSoundEnabled { get; set; } = false;
 

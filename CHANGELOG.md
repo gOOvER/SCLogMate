@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Crime Against Player Toast Notifications (`Models/AchievementToastData.cs`, `ViewModels/MainViewModel.cs`, `Views/MainWindow.axaml`, `Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Added real-time in-game toast notifications for crimes committed against the player by hostile players (e.g. `Destruction of Vehicle`, `Homicide`).
+  - Added new `CrimeAgainstPlayer` toast type with high-contrast red warning styling (`#3B0808` / `#EF4444` / `#DC2626`) and distinct `⚔` emblem.
+  - Added configurable toggle `ToastCrimeEnabled` in application settings, Avalonia settings UI checkbox, and Photino web overlay settings bridge.
+  - Included Crime Against Player banner in test toast cycle for interactive preview and screen positioning.
 - **Uncaptured Game Event Detection & Ship Recognition (`Core/LogParser.cs`, `Core/Ships.cs`, `Core/FleetCatalog.cs`)**:
   - **Crimes Against Player**: Added parsing for `<who> committed <crime> against you` notifications, recording player victimization events (e.g. `Destruction of Vehicle`, `Homicide`) under `EventKind.Crime`.
   - **Quantum Travel Calibration**: Parsed party and solo quantum travel calibrations (`Quantenreise-Kalibrierung von ... eingeleitet/abgeschlossen`, `Quantum Travel Calibration Started/Complete By ...`) under `EventKind.Quantum`.

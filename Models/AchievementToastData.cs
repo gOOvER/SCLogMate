@@ -13,7 +13,8 @@ public enum AchievementToastType
     ElevatorReady,
     ShipDestroyed,
     Loot,
-    Milestone
+    Milestone,
+    CrimeAgainstPlayer
 }
 
 public partial class AchievementToastData : ObservableObject
@@ -157,5 +158,49 @@ public partial class AchievementToastData : ObservableObject
             SubtitleColor = "#38BDF8",
             GlowBorderColor = "#0284C7"
         };
+    }
+
+    public static AchievementToastData ForCrimeAgainstPlayer(string crime, string perpetrator)
+    {
+        return new AchievementToastData
+        {
+            Type = AchievementToastType.CrimeAgainstPlayer,
+            HeaderText = "VERBRECHEN GEGEN DICH",
+            Title = string.IsNullOrWhiteSpace(crime) ? "Straftat registriert" : crime,
+            Subtitle = string.IsNullOrWhiteSpace(perpetrator) ? "Verbrechen gegen dich registriert" : $"Täter: {perpetrator}",
+            IconText = "⚔",
+            BadgeBg = "#3B0808",
+            BadgeBorder = "#EF4444",
+            BadgeColor = "#F87171",
+            TextColor = "#FEF2F2",
+            SubtitleColor = "#FCA5A5",
+            GlowBorderColor = "#DC2626"
+        };
+    }
+
+    public static AchievementToastData ForCrimeAgainstPlayer(string detail)
+    {
+        string crime = "Straftat";
+        string perpetrator = "";
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            var text = detail.Replace("⚔", "").Trim();
+            if (text.StartsWith("Verbrechen gegen dich:", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text.Substring("Verbrechen gegen dich:".Length).Trim();
+            }
+            int lastParenOpen = text.LastIndexOf('(');
+            int lastParenClose = text.LastIndexOf(')');
+            if (lastParenOpen > 0 && lastParenClose > lastParenOpen)
+            {
+                crime = text[..lastParenOpen].Trim();
+                perpetrator = text.Substring(lastParenOpen + 1, lastParenClose - lastParenOpen - 1).Trim();
+            }
+            else
+            {
+                crime = text;
+            }
+        }
+        return ForCrimeAgainstPlayer(crime, perpetrator);
     }
 }

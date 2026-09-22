@@ -869,6 +869,7 @@ public class SettingsDto
     [JsonPropertyName("toastRefineryEnabled")] public bool ToastRefineryEnabled { get; set; } = true;
     [JsonPropertyName("toastElevatorEnabled")] public bool ToastElevatorEnabled { get; set; } = true;
     [JsonPropertyName("toastShipDestructionEnabled")] public bool ToastShipDestructionEnabled { get; set; } = true;
+    [JsonPropertyName("toastCrimeEnabled")] public bool ToastCrimeEnabled { get; set; } = true;
     [JsonPropertyName("auroraInstalled")] public bool AuroraInstalled { get; set; }
     [JsonPropertyName("auroraPath")] public string? AuroraPath { get; set; }
     [JsonPropertyName("auroraCustomPath")] public string? AuroraCustomPath { get; set; }
@@ -6094,6 +6095,7 @@ public class PhotinoBridge
             ToastRefineryEnabled = s.ToastRefineryEnabled,
             ToastElevatorEnabled = s.ToastElevatorEnabled,
             ToastShipDestructionEnabled = s.ToastShipDestructionEnabled,
+            ToastCrimeEnabled = s.ToastCrimeEnabled,
             AuroraInstalled = _auroraService.IsInstalled,
             AuroraPath = _auroraService.AuroraDirectory ?? "Nicht installiert",
             AuroraCustomPath = s.AuroraCustomPath,
@@ -6157,6 +6159,7 @@ public class PhotinoBridge
         s.ToastRefineryEnabled = dto.ToastRefineryEnabled;
         s.ToastElevatorEnabled = dto.ToastElevatorEnabled;
         s.ToastShipDestructionEnabled = dto.ToastShipDestructionEnabled;
+        s.ToastCrimeEnabled = dto.ToastCrimeEnabled;
         s.AuroraIntegrationEnabled = dto.AuroraIntegrationEnabled;
         s.AuroraVolume = dto.AuroraVolume;
         s.AuroraCustomPath = dto.AuroraCustomPath;
@@ -6727,6 +6730,11 @@ public class PhotinoBridge
             else if (s.ToastReputationEnabled && dto.Title != null && dto.Title.Contains("Ruf", StringComparison.OrdinalIgnoreCase))
             {
                 _toastOverlay.ShowToast("🎖️", "RUF GESTIEGEN", dto.Title, dto.Description ?? "", 0x00EED322u);
+            }
+            else if (s.ToastCrimeEnabled && entry.Kind == EventKind.Crime && (entry.Detail?.Contains("Verbrechen gegen dich", StringComparison.OrdinalIgnoreCase) == true))
+            {
+                var toast = AchievementToastData.ForCrimeAgainstPlayer(entry.Detail);
+                _toastOverlay.ShowToast("⚔", toast.HeaderText, toast.Title, toast.Subtitle, 0x004444EFu);
             }
         }
         catch (Exception ex)
