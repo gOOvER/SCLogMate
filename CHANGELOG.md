@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Uncaptured Game Event Detection & Ship Recognition (`Core/LogParser.cs`, `Core/Ships.cs`, `Core/FleetCatalog.cs`)**:
+  - **Crimes Against Player**: Added parsing for `<who> committed <crime> against you` notifications, recording player victimization events (e.g. `Destruction of Vehicle`, `Homicide`) under `EventKind.Crime`.
+  - **Quantum Travel Calibration**: Parsed party and solo quantum travel calibrations (`Quantenreise-Kalibrierung von ... eingeleitet/abgeschlossen`, `Quantum Travel Calibration Started/Complete By ...`) under `EventKind.Quantum`.
+  - **Ship-to-Ship Refueling**: Added event detection for Starfarer refueling states (`Refuel Request Complete`, `Refuel Request Accepted`, `Dock With Refueler`, `Undock From Refueler`, `Refueling Process`) under `EventKind.Maintenance`.
+  - **Mining HUD Modes**: Added tracking for mining fracture laser and scanning modes (`Mining - Fracture`, `Mining - Scanning`) under `EventKind.Vehicle`.
+  - **Restricted Area Relocations**: Parsed impound relocations and departure notifications (`Restricted Area ... relocated`, `Leaving Restricted Area`) under `EventKind.Impound` and `EventKind.Jurisdiction`.
+  - **Comm-Array Typo Tolerance**: Added tolerance for CIG's German localization typo `Kontrollierter Raum daktiviert` alongside `deaktiviert`.
+  - **Expanded Ship & Fleet Recognition**: Added ship entries and aliases for Anvil Asgard, Aegis Tiburon, MISC Starlancer MAX/TAC, GLSN Basher & Shiv, Argo ATLS GEO, Drake Golem / Golem OX, and sanitized CIG localization key prefixes (`@vehicle_`, `NameDRAK_`, `nameMISC_`, `NameRSI_`).
 - **Fleet View Ship Photo Hover Preview & Offline Vehicle Caching (`frontend/src/views/FleetView.tsx`, `frontend/src/components/ShipLoadoutModal.tsx`, `Core/Photino/PhotinoBridge.cs`, `Core/WikiApiClient.cs`)**:
   - **Ship Photo Hover Preview Card**: Hovering over ship names in Fleet View now opens a glassmorphic floating preview card displaying the vessel's official Star Citizen Wiki photo, role badge, manufacturer badge, and flight mission count.
   - **Ship Loadout Modal Header Thumbnail**: Added ship image thumbnail preview to the header of the Ship Loadout modal.

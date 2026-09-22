@@ -231,6 +231,14 @@ public partial class LogParser
     [GeneratedRegex(@"Added notification ""(?:Begangene Straftat|Crime committed|Infraction committed|Homicide committed|Felony committed):\s*(?<crime>[^""]+)")]
     private static partial Regex CrimeLineRegex();
 
+    // Straftat gegen den Spieler (z. B. durch feindlichen Spieler oder Griefer)
+    [GeneratedRegex(@"Added notification ""(?<who>[^""]+?)\s+(?:committed\s+(?<crime>.+?)\s+against you|hat\s+(?<crime>.+?)\s+gegen dich begangen)")]
+    private static partial Regex CrimeAgainstPlayerRegex();
+
+    // Quantum-Travel Kalibrierung (Gruppe / Solo)
+    [GeneratedRegex(@"Added notification ""(?:Quantenreise-Kalibrierung von\s+(?<who>[^""]+?)\s+(?<status>eingeleitet|abgeschlossen)|Quantum Travel Calibration\s+(?<status>Started|Complete|Completed)\s+By\s+(?<who>[^""]+?)(?:""|$))")]
+    private static partial Regex QtCalibrationRegex();
+
     // Veredelungs-/Refinery-Auftrag abgeschlossen.
     [GeneratedRegex(@"Added notification ""(?:Ein Auftrag zur Veredelung wurde abgeschlossen|Ein Raffinerie-Arbeitsauftrag wurde abgeschlossen|A refining job has completed|Refining order completed|Refinery job complete|A Refinery Work Order has been Completed)(?<txt>[^""]*)")]
     private static partial Regex RefineryLineRegex();
@@ -1294,11 +1302,16 @@ public partial class LogParser
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = $"🏴 Ungesetzlicher Sektor ({_currentSystem})" };
                 }
-                if (text.Contains("Entered Monitored Space", StringComparison.OrdinalIgnoreCase) || text.Contains("Kontrollierten Raum betreten", StringComparison.OrdinalIgnoreCase))
+                if (text.Contains("Entered Monitored Space", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Kontrollierten Raum betreten", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Kontrollierter Raum aktiviert", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "📡 Überwachter Raum (Comm-Array aktiv)" };
                 }
-                if (text.Contains("Exited Monitored Space", StringComparison.OrdinalIgnoreCase) || text.Contains("Kontrollierten Raum verlassen", StringComparison.OrdinalIgnoreCase))
+                if (text.Contains("Exited Monitored Space", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Kontrollierten Raum verlassen", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Kontrollierter Raum deaktiviert", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Kontrollierter Raum daktiviert", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "📡 Unüberwachter Raum (Kein Comm-Array)" };
                 }
@@ -1313,6 +1326,69 @@ public partial class LogParser
                     text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
+                }
+
+                // Sperrzonen & Strafversetzung (Restricted Area)
+                if (text.Contains("relocated", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("umgesetzt", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("relocation", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Impound, Detail = "⛔ Sperrzone: Zwangsumbettung (Relocated)" };
+                }
+                if (text.Contains("Leaving Restricted Area", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Sperrgebiet verlassen", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Sperrbereich verlassen", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Sperrgebiet verlassen" };
+                }
+
+                // Betankung (Starfarer / Ship-to-Ship Refueling)
+                if (text.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankung abgeschlossen" };
+                }
+                if (text.Contains("Refuel Request Accepted", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankungsanforderung akzeptiert", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankungsanfrage akzeptiert" };
+                }
+                if (text.Contains("Dock With Refueler", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Am Tanker andocken", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Andocken an Tanker" };
+                }
+                if (text.Contains("Undock From Refueler", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Vom Tanker abdocken", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Vom Tanker abgedockt" };
+                }
+                if (text.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankungsvorgang", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankungsvorgang aktiv" };
+                }
+
+                // Bergbau (Mining HUD)
+                if (text.Contains("Mining - Fracture", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Bergbau - Bruch", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_lastNotif != "Mining - Fracture")
+                    {
+                        _lastNotif = "Mining - Fracture";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = "⚡ Bergbau: Bruch-Laser aktiv" };
+                    }
+                    return null;
+                }
+                if (text.Contains("Mining - Scanning", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Bergbau - Scan", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_lastNotif != "Mining - Scanning")
+                    {
+                        _lastNotif = "Mining - Scanning";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = "🔍 Bergbau: Scan-Modus aktiv" };
+                    }
+                    return null;
                 }
             }
 
@@ -2474,6 +2550,26 @@ public partial class LogParser
                     Confirmed = true
                 });
                 return new LogEntry { Time = ts, Kind = EventKind.Fine, Amount = -amt, Detail = $"Strafe gezahlt: {amt:N0} aUEC" };
+            }
+
+            // Straftat gegen den Spieler
+            var cap = CrimeAgainstPlayerRegex().Match(line);
+            if (cap.Success)
+            {
+                var who = cap.Groups["who"].Value.Trim();
+                var crime = cap.Groups["crime"].Value.Trim();
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Crime, Detail = $"⚔ Verbrechen gegen dich: {crime} ({who})" };
+            }
+
+            // QT-Kalibrierung (Gruppe / Solo)
+            var qtc = QtCalibrationRegex().Match(line);
+            if (qtc.Success)
+            {
+                var who = qtc.Groups["who"].Value.Trim();
+                var status = qtc.Groups["status"].Value.Trim();
+                bool isStart = status.StartsWith("eingeleitet", StringComparison.OrdinalIgnoreCase) || status.StartsWith("Started", StringComparison.OrdinalIgnoreCase);
+                string action = isStart ? "eingeleitet" : "abgeschlossen";
+                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Quantum, Detail = $"⚡ QT-Kalibrierung {action} ({who})" };
             }
 
             // Begangene Straftat (Crimestat)

@@ -40,6 +40,8 @@ public static class FleetCatalog
         ["Ironclad"] = new("Ironclad · Drake", "Drake Interplanetary", "DRAKE", "#2DD4BF", "Schwerer Panzer-Frachter", 28_000_000, 450, "LTI (Lifetime)"),
         ["Ironclad Assault"] = new("Ironclad Assault · Drake", "Drake Interplanetary", "DRAKE", "#2DD4BF", "Gepanzerte Landungsfestung", 32_000_000, 535, "LTI (Lifetime)"),
         ["Kraken"] = new("Kraken · Drake", "Drake Interplanetary", "DRAKE", "#2DD4BF", "Fliegender Flugzeugträger", 120_000_000, 1650, "LTI (Lifetime)"),
+        ["Golem"] = new("Golem · Drake", "Drake Interplanetary", "DRAKE", "#2DD4BF", "Schweres Boden-Arbeitsfahrzeug", 850_000, 55, "LTI (Lifetime)"),
+        ["Golem OX"] = new("Golem OX · Drake", "Drake Interplanetary", "DRAKE", "#2DD4BF", "Schweres Boden-Arbeitsfahrzeug", 950_000, 60, "LTI (Lifetime)"),
 
         // Aegis Dynamics (#F87171)
         ["Avenger Titan"] = new("Avenger Titan · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Leichter Mehrzweck-Frachter", 1_250_000, 60, "120 Monate (IAE)"),
@@ -63,12 +65,17 @@ public static class FleetCatalog
         ["Reclaimer"] = new("Reclaimer · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Industrielles Bergungsschiff", 28_000_000, 400, "LTI (Lifetime)"),
         ["Redeemer"] = new("Redeemer · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Gepanzertes Gunship", 9_800_000, 330, "120 Monate (IAE)"),
         ["Vulcan"] = new("Vulcan · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Reparatur, Betankung & Re-Arm", 5_800_000, 200, "LTI (Lifetime)"),
+        ["Tiburon"] = new("Tiburon · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Spezial-Einsatzschiff", 4_200_000, 210, "120 Monate (IAE)"),
         ["Nautilus"] = new("Nautilus · Aegis", "Aegis Dynamics", "AEGIS", "#F87171", "Minenleger & Abfangkreuzer", 26_000_000, 725, "LTI (Lifetime)"),
 
         // Crusader Industries (#38BDF8)
         ["C1 Spirit"] = new("C1 Spirit · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "Mittlerer Frachttransporter", 3_150_000, 125, "LTI (Lifetime)"),
         ["A1 Spirit"] = new("A1 Spirit · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "Präzisions-Bomber", 3_650_000, 175, "LTI (Lifetime)"),
-        ["E1 Spirit"] = new("E1 Spirit · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "VIP-Personentransport", 3_450_000, 150, "LTI (Lifetime)"),
+        ["Spirt E1"] = new("E1 Spirit · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "VIP-Personentransport", 3_450_000, 150, "LTI (Lifetime)"),
+
+        // GLSN (#F59E0B)
+        ["Basher"] = new("Basher · GLSN", "GLSN", "GLSN", "#F59E0B", "Modifizierter Abfangjäger", 1_750_000, 110, "120 Monate (IAE)"),
+        ["Shiv"] = new("Shiv · GLSN", "GLSN", "GLSN", "#F59E0B", "Modifizierter schwerer Jäger", 2_450_000, 140, "120 Monate (IAE)"),
         ["Mercury Star Runner"] = new("Mercury Star Runner · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "Daten- & Kurierfrachter", 7_950_000, 260, "120 Monate (IAE)"),
         ["MSR"] = new("Mercury Star Runner · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "Daten- & Kurierfrachter", 7_950_000, 260, "120 Monate (IAE)"),
         ["C2 Hercules"] = new("C2 Hercules · Crusader", "Crusader Industries", "CRUSADER", "#38BDF8", "Schwerer Großraum-Frachter", 19_800_000, 400, "120 Monate (IAE)"),
@@ -98,6 +105,7 @@ public static class FleetCatalog
         ["Carrack"] = new("Carrack · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Militärisches Erkundungsschiff", 45_000_000, 600, "LTI (Lifetime)"),
         ["Crucible"] = new("Crucible · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Fliegende Raumschiff-Werkstatt", 14_000_000, 350, "LTI (Lifetime)"),
         ["Liberator"] = new("Liberator · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Militärischer Fahrzeugträger", 22_000_000, 575, "LTI (Lifetime)"),
+        ["Asgard"] = new("Asgard · Anvil", "Anvil Aerospace", "ANVIL", "#FB923C", "Schweres Kampfschiff", 18_000_000, 450, "LTI (Lifetime)"),
 
         // RSI - Roberts Space Industries (#60A5FA)
         ["Aurora MR"] = new("Aurora MR · RSI", "RSI", "RSI", "#60A5FA", "Starter / Leichter Transporter", 450_000, 30, "6 Monate"),
@@ -145,6 +153,8 @@ public static class FleetCatalog
         ["Starfarer Gemini"] = new("Starfarer Gemini · MISC", "MISC", "MISC", "#A78BFA", "Militärischer Tanker & Raketenschiff", 17_500_000, 340, "120 Monate (IAE)"),
         ["Expanse"] = new("Expanse · MISC", "MISC", "MISC", "#A78BFA", "Mobile Erz-Raffinerie", 4_200_000, 150, "LTI (Lifetime)"),
         ["Odyssey"] = new("Odyssey · MISC", "MISC", "MISC", "#A78BFA", "Autonomes Erkundungsschiff & Hangar", 38_000_000, 700, "LTI (Lifetime)"),
+        ["Starlancer MAX"] = new("Starlancer MAX · MISC", "MISC", "MISC", "#A78BFA", "Schwerer Frachter (224 SCU)", 6_800_000, 230, "LTI (Lifetime)"),
+        ["Starlancer TAC"] = new("Starlancer TAC · MISC", "MISC", "MISC", "#A78BFA", "Schweres Kampf- & Gunship", 8_200_000, 275, "LTI (Lifetime)"),
 
         // Origin Jumpworks (#E2E8F0)
         ["100i"] = new("100i · Origin", "Origin Jumpworks", "ORIGIN", "#E2E8F0", "Touring Starter", 1_100_000, 50, "LTI (Lifetime)"),
@@ -169,6 +179,7 @@ public static class FleetCatalog
         ["MPUV Personnel"] = new("MPUV Personnel · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Personenshuttle", 450_000, 35, "LTI (Lifetime)"),
         ["MPUV Tractor"] = new("MPUV Tractor · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Traktorstrahl-Shuttle", 550_000, 40, "LTI (Lifetime)"),
         ["CSV-SM"] = new("CSV-SM · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Boden-Frachtfahrzeug", 250_000, 45, "LTI (Lifetime)"),
+        ["ATLS GEO"] = new("ATLS GEO · Argo", "Argo Astronautics", "ARGO", "#F59E0B", "Exoskelett Bergbauanzug", 450_000, 40, "LTI (Lifetime)"),
 
         // Mirai (#38BDF8)
         ["Fury"] = new("Fury · Mirai", "Mirai", "MIRAI", "#38BDF8", "Snub-Kampffighter", 1_250_000, 55, "LTI (Lifetime)"),
@@ -358,6 +369,7 @@ public static class FleetCatalog
         else if (clean.Contains("Origin", StringComparison.OrdinalIgnoreCase)) { mfg = "Origin Jumpworks"; badge = "ORIGIN"; color = "#E2E8F0"; role = "Luxus & Touring"; price = 4_000_000; usd = 150; }
         else if (clean.Contains("Argo", StringComparison.OrdinalIgnoreCase)) { mfg = "Argo Astronautics"; badge = "ARGO"; color = "#F59E0B"; role = "Industrie & Bergung"; price = 2_800_000; usd = 110; }
         else if (clean.Contains("Mirai", StringComparison.OrdinalIgnoreCase)) { mfg = "Mirai"; badge = "MIRAI"; color = "#38BDF8"; role = "High-Tech Snub"; price = 1_200_000; usd = 50; }
+        else if (clean.Contains("GLSN", StringComparison.OrdinalIgnoreCase)) { mfg = "GLSN"; badge = "GLSN"; color = "#F59E0B"; role = "Modifiziertes Raumschiff"; price = 2_000_000; usd = 100; }
 
         return new(clean, mfg, badge, color, role, price, usd, "120 Monate (IAE)");
     }
