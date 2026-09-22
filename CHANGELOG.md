@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
 
 ### Fixed
+- **False-Positive Ship and Freight Elevator Events (`Core/LogParser.cs`)**:
+  - Removed `LoadingPlatformManager` ambient event tracking (`CSCLoadingPlatformManager::OnLoadingPlatformStateChanged`) which generated false-positive `"Schiffsaufzug bereit"` and `"Frachtaufzug bereit"` events in the Live-Stream and triggered elevator achievement toasts whenever any remote spaceport or station hangar platform changed state in the streaming replication sphere.
 - **Wallet OCR mobiGlas Fade-In Truncation Guard (`Core/Ocr/WalletCapture.cs`, `Core/Photino/PhotinoBridge.cs`)**:
   - Implemented dual-layer plausibility protection against partial reads during mobiGlas UI fade-in/slide animations where only trailing digits are captured (e.g. `385` instead of `11,812,385`).
   - Added trailing modulus validation (`currentBalance % 10^digits == scannedValue`) and dramatic drop guards (>85% drop with fewer digits) in both `WalletCapture` burst evaluation and `OnBalanceCaptured`, preventing accidental wallet balance overwrites.

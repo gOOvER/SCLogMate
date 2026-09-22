@@ -302,9 +302,6 @@ public partial class LogParser
     [GeneratedRegex(@"Player spawned in zone '(?<loc>[^']+)'")]
     private static partial Regex PlayerSpawnZoneRegex();
 
-    // SC 4.x Fracht- & Schiffs-Aufzüge (Freight & Ship Elevators)
-    [GeneratedRegex(@"CSCLoadingPlatformManager::OnLoadingPlatformStateChanged.*?\[LoadingPlatformManager_(?<type>FreightElevator|ShipElevator)[^\]]*\].*?Platform state changed to (?<state>\w+)")]
-    private static partial Regex ElevatorStateRegex();
 
     // ATC Landefreigabe & Hangar-Zuweisung
     [GeneratedRegex(@"(?:Landing Request Granted|Hangar Assignment|Assigned to Hangar|Landing gear down).*?(?<hangar>Hangar\s*(?:[A-Za-z0-9_]+|\d+)|Pad\s*\d+)")]
@@ -460,8 +457,6 @@ public partial class LogParser
     public List<WarehouseMovementRecord> WarehouseMovements { get; } = new();
     private readonly Dictionary<string, (string ItemClass, string MissionId)> _missionDropoffItems = new(StringComparer.OrdinalIgnoreCase);
 
-    private DateTime _lastElevatorMoveTime = DateTime.MinValue;
-    private string? _lastElevatorType;
 
     private readonly System.Threading.Lock _stateLock = new();
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
@@ -1749,40 +1744,6 @@ public partial class LogParser
             }
         }
 
-        // SC 4.x Fracht- & Schiffs-Aufzüge
-        if (line.Contains("LoadingPlatformManager", StringComparison.Ordinal))
-        {
-            var elv = ElevatorStateRegex().Match(line);
-            if (elv.Success)
-            {
-                var type = elv.Groups["type"].Value;
-                var state = elv.Groups["state"].Value;
-                var typeName = type == "FreightElevator" ? "Frachtaufzug" : "Schiffsaufzug";
-
-                if (state.Equals("RaisingPlatform", StringComparison.OrdinalIgnoreCase) ||
-                    state.Equals("LoweringPlatform", StringComparison.OrdinalIgnoreCase) ||
-                    state.Equals("Moving", StringComparison.OrdinalIgnoreCase))
-                {
-                    _lastElevatorMoveTime = ParseTs(line);
-                    _lastElevatorType = typeName;
-                }
-                else if (state.Equals("OpenIdle", StringComparison.OrdinalIgnoreCase) &&
-                         _lastElevatorMoveTime != DateTime.MinValue &&
-                         (ParseTs(line) - _lastElevatorMoveTime).TotalSeconds < 90)
-                {
-                    _lastElevatorMoveTime = DateTime.MinValue;
-                    var loc = _pendingLocationName ?? (_lastLoc ?? "Hangar");
-                    return new LogEntry
-                    {
-                        Time = ParseTs(line),
-                        Kind = EventKind.Hangar,
-                        Detail = $"{_lastElevatorType ?? typeName} bereit ({loc})",
-                        Ship = null
-                    };
-                }
-                return null;
-            }
-        }
 
         // ATC Landefreigabe & Hangar-Zuweisung
         if (line.Contains("Landing", StringComparison.OrdinalIgnoreCase) || line.Contains("Hangar", StringComparison.OrdinalIgnoreCase) || line.Contains("Pad", StringComparison.OrdinalIgnoreCase))
