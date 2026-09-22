@@ -13,10 +13,32 @@ public partial class MainWindow : Window
         AvaloniaXamlLoader.Load(this);
         UiServices.TopLevel = this;   // für Datei-Dialoge im ViewModel
         Closing += OnMainWindowClosing;
+
+        try
+        {
+            var s = Core.Settings.Load();
+            if (s.WindowWidth >= 1200) Width = s.WindowWidth;
+            if (s.WindowHeight >= 700) Height = s.WindowHeight;
+            if (s.WindowMaximized) WindowState = WindowState.Maximized;
+        }
+        catch { }
     }
 
     private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
     {
+        try
+        {
+            var s = Core.Settings.Load();
+            s.WindowMaximized = WindowState == WindowState.Maximized;
+            if (WindowState != WindowState.Maximized && Bounds.Width >= 1200 && Bounds.Height >= 700)
+            {
+                s.WindowWidth = (int)Bounds.Width;
+                s.WindowHeight = (int)Bounds.Height;
+            }
+            Core.Settings.Save(s);
+        }
+        catch { }
+
         if (IsExplicitExit) return;
 
         var vm = DataContext as ViewModels.MainViewModel;

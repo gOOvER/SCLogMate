@@ -113,6 +113,15 @@ public class AppSettings
     /// <summary>Vom Nutzer gewählter Cloud-Sync-Pfad (z. B. OneDrive, Dropbox, Nextcloud).</summary>
     public string? CloudStoragePath { get; set; }
 
+    /// <summary>Gespeicherte Fensterbreite beim Start (Standard 1680 für optimale Darstellung).</summary>
+    public int WindowWidth { get; set; } = 1680;
+
+    /// <summary>Gespeicherte Fensterhöhe beim Start (Standard 980).</summary>
+    public int WindowHeight { get; set; } = 980;
+
+    /// <summary>Ob das Hauptfenster maximiert gestartet werden soll.</summary>
+    public bool WindowMaximized { get; set; } = false;
+
     /// <summary>Automatische Synchronisation neuer Logs, user.cfg-Snapshots und Keybinds in die Cloud.</summary>
     public bool AutoCloudSyncEnabled { get; set; } = true;
 

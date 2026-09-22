@@ -220,13 +220,75 @@ internal static partial class Program
         // Startmenü-Verknüpfung für Windows Shell Icon-Cache registrieren
         EnsureStartMenuShortcut(iconPath);
 
+        var settings = Settings.Load();
+
+        int screenW = GetSystemMetrics(0); // SM_CXSCREEN
+        int screenH = GetSystemMetrics(1); // SM_CYSCREEN
+
+        // Großzügige Standard-Fenstergröße: Verhindert gequetschte Tabellen und unschöne Umbrüche von Anfang an
+        int width = settings.WindowWidth >= 1200 ? settings.WindowWidth : 0;
+        int height = settings.WindowHeight >= 700 ? settings.WindowHeight : 0;
+
+        if (width == 0 || height == 0)
+        {
+            if (screenW >= 2560 && screenH >= 1440)
+            {
+                width = 1920;
+                height = 1140;
+            }
+            else if (screenW >= 1920 && screenH >= 1080)
+            {
+                width = 1680;
+                height = 980;
+            }
+            else if (screenW > 0 && screenH > 0)
+            {
+                width = Math.Max(1200, (int)(screenW * 0.90));
+                height = Math.Max(720, (int)(screenH * 0.90));
+            }
+            else
+            {
+                width = 1680;
+                height = 980;
+            }
+        }
+
+        // Sicherstellen, dass das Fenster auf dem primären Monitor Platz hat
+        if (screenW > 0 && screenH > 0)
+        {
+            width = Math.Min(width, Math.Max(1200, screenW - 60));
+            height = Math.Min(height, Math.Max(700, screenH - 80));
+        }
+
         var window = new Photino.NET.PhotinoWindow()
             .SetTitle("SCLogMate — Star Citizen Live Companion")
             .SetUseOsDefaultSize(false)
-            .SetSize(1440, 900)
-            .SetMinSize(1024, 700)
+            .SetSize(width, height)
+            .SetMinSize(1200, 720)
             .SetNotificationRegistrationId(Guid.NewGuid().ToString())
             .Center();
+
+        if (settings.WindowMaximized)
+        {
+            try { window.SetMaximized(true); } catch { }
+        }
+
+        window.RegisterWindowClosingHandler((sender, e) =>
+        {
+            try
+            {
+                var s = Settings.Load();
+                s.WindowMaximized = window.Maximized;
+                if (!window.Maximized && window.Size.Width >= 1200 && window.Size.Height >= 700)
+                {
+                    s.WindowWidth = window.Size.Width;
+                    s.WindowHeight = window.Size.Height;
+                }
+                Settings.Save(s);
+            }
+            catch { }
+            return false;
+        });
 
         try { Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory; } catch { }
 

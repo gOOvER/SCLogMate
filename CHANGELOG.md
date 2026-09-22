@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
 
 ### Changed
+- **Default Application Window Dimensions & Persistence (`Program.cs`, `Views/MainWindow.axaml`, `Views/MainWindow.axaml.cs`, `Core/Settings.cs`)**:
+  - Increased default startup window size from 1440×900 to 1680×980 (scaling dynamically up to 1920×1140 on 1440p/4K displays) and raised minimum dimensions to 1200×720, ensuring all telemetry clusters, data tables, and navigation elements render cleanly with ample breathing room from the start.
+  - Implemented automatic window size and maximized state persistence (`WindowWidth`, `WindowHeight`, `WindowMaximized` in `Settings.cs`), restoring the user's custom window size and position across application restarts.
 - **Fleet Telemetry Terminology & UI Badges (`frontend/src/views/FleetView.tsx`)**:
   - Replaced ambiguous `QUANTUM` label with `QT-SPRÜNGE` (Quantum-Travel Überlicht-Sprünge) in the telemetry cluster, featuring a dedicated `Zap` icon and explicit system lore tooltip.
   - Transformed the `Flug-Einsätze` table column into high-contrast badge pills (`[🚀 X Flüge]` and `[⚡ Y Sprünge]`), accompanied by clean relative "Zuletzt geflogen" timestamps.
