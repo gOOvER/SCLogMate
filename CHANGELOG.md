@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
 
 ### Changed
+- **Dependency Updates (`SCLogMate.csproj`, `frontend/package.json`, `frontend/package-lock.json`)**:
+  - Updated .NET NuGet packages: Avalonia ecosystem (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter`, `Avalonia.Controls.DataGrid`) to `11.2.5`, `Microsoft.Data.Sqlite` to `10.0.12`, and `System.Security.Cryptography.ProtectedData` to `10.0.12`.
+  - Updated Frontend npm packages: `lucide-react` to `1.47.0`, `tailwind-merge` to `3.7.0`, `@tailwindcss/vite` and `tailwindcss` to `4.3.3`, `typescript` to `5.7.3`, `vite` to `6.4.3`, and `@types/node` to `22.20.4`.
 - **Default Application Window Dimensions & Persistence (`Program.cs`, `Views/MainWindow.axaml`, `Views/MainWindow.axaml.cs`, `Core/Settings.cs`)**:
   - Increased default startup window size from 1440×900 to 1680×980 (scaling dynamically up to 1920×1140 on 1440p/4K displays) and raised minimum dimensions to 1200×720, ensuring all telemetry clusters, data tables, and navigation elements render cleanly with ample breathing room from the start.
   - Implemented automatic window size and maximized state persistence (`WindowWidth`, `WindowHeight`, `WindowMaximized` in `Settings.cs`), restoring the user's custom window size and position across application restarts.
