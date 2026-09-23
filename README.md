@@ -23,14 +23,6 @@ From real-time financial ledgers and mobiGlas wallet OCR reconciliation to fleet
 
 ---
 
-> ℹ️ **Fork Notice & Acknowledgments**:  
-> **SCLogMate** originated as a heavily modernized and expanded evolution of [**SCLogReader**](https://github.com/miwidot/SCLogReader) by [**miwidot**](https://github.com/miwidot). Sincere thanks to **miwidot** for creating the foundational log-parsing engine and base architecture!
-
-> ⚠️ **Unofficial Community Tool**:  
-> Not affiliated with, endorsed by, or authorized by Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). SCLogMate reads **strictly read-only** from your local `Game.log` and Windows screen/clipboard capture APIs—**100% AntiCheat compliant and safe to use**.
-
----
-
 ## ✨ Features & Highlights (English)
 
 ### 🖥️ Native In-Game Overlays & HUD
@@ -139,7 +131,7 @@ Or execute the included automated release script:
 
 ## 📜 Disclaimer & License (English)
 
-This is an unofficial, community-made tool and is **not affiliated with, endorsed by, or authorized by** Cloud Imperium Games (CIG) or Roberts Space Industries (RSI).
+This is an unofficial, community-made tool and is **not affiliated with, endorsed by, or authorized by** Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). SCLogMate reads **strictly read-only** from your local `Game.log` and Windows screen/clipboard capture APIs—**100% AntiCheat compliant and safe to use**.
 
 - Historically based on [SCLogReader](https://github.com/miwidot/SCLogReader) by **miwidot** (versions up to v1.0.0-rc2 under MIT License).
 - Starting from version **v1.0.0-rc3** (complete architectural rewrite & major overhaul) and the official **v1.0.0** release, licensed under the **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
@@ -160,14 +152,6 @@ This is an unofficial, community-made tool and is **not affiliated with, endorse
 **SCLogMate** ist ein eigenständiger Windows-Desktop-Begleiter, der speziell für **Star Citizen 4.x** entwickelt wurde. Basierend auf hochperformantem .NET 10 und einer modernen React 19 Glassmorphism-Oberfläche (Photino.NET), überwacht und interpretiert SCLogMate deine lokale `Game.log` in Echtzeit—völlig ohne Spiel-Hooks und ohne Eingriff in den Speicher.
 
 Vom mitlaufenden Finanzbuch über mobiGlas-Wallet-OCR-Abgleich bis hin zu Flottenverwaltung, ASOP-Terminal-Loadout-Scanning, Bergbau-Bruchrechner, 3D-Frachtraumplanung, Raffinerie-Tracking und OBS-Streaming-Widgets ist SCLogMate das unverzichtbare Co-Piloten-System für jeden Star Citizen Piloten.
-
----
-
-> ℹ️ **Fork-Hinweis & Danksagung**:  
-> **SCLogMate** entstand als umfassend modernisierte und stark erweiterte Weiterentwicklung von [**SCLogReader**](https://github.com/miwidot/SCLogReader) von [**miwidot**](https://github.com/miwidot). Herzlichen Dank an **miwidot** für das exzellente Fundament des Log-Parsings und der Basis-Architektur!
-
-> ⚠️ **Inoffizielles Community-Tool**:  
-> Nicht mit Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI) verbunden. SCLogMate liest **ausschließlich lesend** deine lokale `Game.log` sowie Windows-Screen-/Zwischenablage-APIs—**100% AntiCheat-konform und sicher im Betrieb**.
 
 ---
 
@@ -279,7 +263,7 @@ Oder das automatisierte Release-Skript ausführen:
 
 ## 📜 Disclaimer & Lizenz (Deutsch)
 
-Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
+Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI). SCLogMate liest **ausschließlich lesend** deine lokale `Game.log` sowie Windows-Screen-/Zwischenablage-APIs—**100% AntiCheat-konform und sicher im Betrieb**.
 
 - Basiert historisch auf dem Projekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
 - Ab Version **v1.0.0-rc3** (vollständiger Architektur-Rewrite & Systemüberarbeitung auf React/Photino) sowie dem offiziellen Release **v1.0.0** lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
