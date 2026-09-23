@@ -1,10 +1,11 @@
 # 🛰️ SCLogMate
 
+[![Release](https://img.shields.io/github/v/release/gOOvER/SCLogMate?style=flat&color=38BDF8&label=Release)](https://github.com/gOOvER/SCLogMate/releases/latest)
 [![Build & Release](https://github.com/gOOvER/SCLogMate/actions/workflows/release.yml/badge.svg)](https://github.com/gOOvER/SCLogMate/actions)
-[![Latest Release](https://img.shields.io/github/v/release/gOOvER/SCLogMate?include_prereleases&style=flat&color=38BDF8&label=Release)](https://github.com/gOOvER/SCLogMate/releases/latest)
 [![VirusTotal Clean](https://img.shields.io/badge/VirusTotal-Clean%20(0%2F70)-34D399?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/search/SCLogMate)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows&logoColor=white)](https://github.com/gOOvER/SCLogMate/releases)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![React 19](https://img.shields.io/badge/React-19.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL_3.0-blue.svg)](LICENSE)
 
 [🇬🇧 English](#-english) &nbsp;|&nbsp; [🇩🇪 Deutsch](#-deutsch)
@@ -14,133 +15,125 @@
 <a name="-english"></a>
 # 🇬🇧 English
 
-**The modern, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
+**The ultimate Star Citizen Live Log Companion, Industrial Suite & Analytics Assistant.**
 
-SCLogMate analyzes your Star Citizen `Game.log` in real-time: Finances, contracts, fleet, cargo trading, crafting blueprints, party/crew, combat kills, locations, and more. Features an In-Game Mini-HUD, animated achievement toast banners, native Windows mobiGlas OCR, and persistent SQLite archiving.
+**SCLogMate** is a standalone Windows desktop companion designed specifically for **Star Citizen 4.x**. Built upon high-performance .NET 10 and a modern React 19 glassmorphic interface (Photino.NET), SCLogMate continuously monitors and interprets your local `Game.log` in real-time without hooking game memory or violating AntiCheat policies.
 
-Single standalone Windows `.exe`, no installation required, no .NET runtime setup needed.
+From real-time financial ledgers and mobiGlas wallet OCR reconciliation to fleet management, ASOP terminal loadout scanning, mining crack calculators, 3D cargo packing, refinery tracking, and OBS streaming widgets—SCLogMate is the pilot's essential co-pilot for navigating the Verse.
 
 ---
 
 > ℹ️ **Fork Notice & Acknowledgments**:  
-> **SCLogMate** is an extensively expanded and modernized fork of the original project [**SCLogReader**](https://github.com/miwidot/SCLogReader) by [**miwidot**](https://github.com/miwidot).  
-> Huge thanks to **miwidot** for providing the rock-solid foundation of log parsing and base architecture!
+> **SCLogMate** originated as a heavily modernized and expanded evolution of [**SCLogReader**](https://github.com/miwidot/SCLogReader) by [**miwidot**](https://github.com/miwidot). Sincere thanks to **miwidot** for creating the foundational log-parsing engine and base architecture!
 
----
-
-> ⚠️ **Unofficial Community Project.** Not affiliated with, endorsed by, or authorized by Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). Reads exclusively your local `Game.log` file (**read-only**) — no game process hooks, no memory access, **100% AntiCheat compliant**.
+> ⚠️ **Unofficial Community Tool**:  
+> Not affiliated with, endorsed by, or authorized by Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). SCLogMate reads **strictly read-only** from your local `Game.log` and Windows screen/clipboard capture APIs—**100% AntiCheat compliant and safe to use**.
 
 ---
 
 ## ✨ Features & Highlights (English)
 
-### ✦ In-Game Overlays (Gaming-Style)
-- **Achievement & Reward Toast Banner**:
-  - Pops up on newly learned blueprints (`⬡ BLUEPRINT LEARNED`), contract completions (`★ MISSION COMPLETE: +aUEC`), reputation promotions, and refinery jobs.
-  - Dynamic stacked list: Multiple sequential rewards queue neatly underneath rather than overwriting each other.
-  - Operates completely autonomously and independently from the Mini-HUD, smoothly fades out after ~5.5 seconds.
-  - Freely draggable anywhere on screen via Drag & Drop (position saved persistently).
-  - Never steals focus from gameplay (`WS_EX_NOACTIVATE` — no input lag while flying or shooting).
-- **Floating Mini-HUD Overlay**:
-  - Freely repositionable in-game HUD displaying live balance, location, armistice status, focused contract, and server ping.
+### 🖥️ Native In-Game Overlays & HUD
+- **Floating Mini-HUD (`Alt + H`)**:
+  - Always-on-top, click-through, glassmorphic HUD overlay positioned directly over full-screen Star Citizen.
+  - Live aUEC balance & session delta, current ship, active armistice/jurisdiction status, and server latency.
+- **Achievement & Notification Toast Overlay**:
+  - Unobtrusive, non-activating (`WS_EX_NOACTIVATE`) toast banners that queue cleanly on screen.
+  - Triggers on: Learned Blueprints, Completed Contracts, Reputation Promotions, Refinery Batch Completion, Freight/Ship Elevator Readiness, Ship Destruction, and **Crimes Committed Against You** (e.g. Homicide, Vehicle Destruction by hostile players).
+- **RS Radar Signature Decoder**:
+  - Optical recognition of Star Citizen ping signatures (e.g., `1.800`, `7.200`, `8.000`) with zero-character recovery (`Ø`).
+  - Distinguishes between valuable ship ores, ROC gems, hand gems, and salvage panels with market price estimations.
+  - Synthesized 16-bit PCM Sci-Fi sonar alert chime (0 ms latency) and optional Windows TTS voice alerts.
 
-### 📋 Contract & Mission Manager
-- **Built-in Master Mission Catalog (`scunpacked-data`)**:
-  - Complete SC 4.x PU mission database featuring contractors (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch*, etc.), factions (*Alliance Aid*, *Ling Family*, *Headhunters*, *Rough Animals*), standard rewards, reputation XP, star systems, and crafting blueprint drops.
-  - Searchable mission browser tab with instant category filtering.
-- **Zero-OCR Log-Matching & Auto-Sync**:
-  - Automatically identifies `Accepted`, `Complete`, `Abandoned`, and `Failed` missions from game telemetry.
-  - Completed or abandoned missions are immediately cleared from active contract tracking and the SQLite database in real-time.
+### 🚀 Fleet Management & ASOP Loadout OCR
+- **Hangar & Flight Chronicle**: Track sorties flown, quantum jumps, ship origins (Pledge Store, aUEC Purchase, Rental, Borrowed/Org), and personal pledge values.
+- **1-Click ASOP Terminal Loadout Scanning**:
+  - Captures complete 21-component loadouts directly from ASOP Fleet Manager "LOADOUT ESTIMATE" screens.
+  - Supports Windows Clipboard scanning (`Ctrl + V`) to bypass CryEngine full-screen capture limitations.
+- **Ship Loadout Inspector**:
+  - Detailed component inspection modal: Power plants, coolers, quantum drives, shields, and weapons.
+  - Calculates power draw headroom, thermal dissipation limits, quantum range, and weapon lead-pip convergence.
+- **Offline Wiki Vehicle Caching**:
+  - Local SQLite vehicle database with high-resolution ship renders served via an internal loopback HTTP server.
 
-### ⬡ Crafting Blueprint Catalog
-- **Complete SC 4.x Blueprint Database**:
-  - Weapons, armor, multi-tools, ammunition, ship components, and medical gear.
-  - Progress tracker (`X of Y learned`, percentage overview), category filters, and acquisition date tracking.
+### 🗺️ Starmap & Jump Gate Navigation
+- **Vector Route Calculator**: Dynamically calculates flight distance in Gigameters (GM) and estimates transit times based on your equipped Quantum Drive (S1 Atlas/VK-00, S2 Crossfield, S3 TS-2).
+- **Inter-System Jump Gates**: Visual transit points connecting **Stanton**, **Pyro**, and **Nyx**.
+- **Lagrange Network (L1 – L5)**: Complete coverage of all R&R rest stops, cargo hubs, refineries, and medical facilities.
+- **Dynamic Armistice Resolver**: Real-time armistice zone detection (🟢 Armistice Safe / 🔴 Weapons Free).
 
-### 👁 mobiGlas Screenreader (Windows Native OCR)
-- **Automated aUEC Balance & Contract Capture**:
-  - Reads your genuine live aUEC balance via native Windows OCR whenever opening mobiGlas (`F1`).
-  - Dual-read misread protection and cross-grab confirmation for error-free wallet updates.
-  - Multi-monitor area calibration (`⊕ Area`) with DPI-aware hardware pixel scaling and in-game indicator box.
+### ⛏️ Industrial Suite: Mining, Salvage & Refining
+- **Refinery Job Manager (`RefineryView`)**:
+  - Live job tracking across all stations in Stanton, Pyro & Nyx with real-time countdown timers.
+  - Yield and cost simulator comparing 7 refining methods (Dinyx, Ferron, Cormack, Electrostatic, Pyroxeres, Gaskin-Kandah, Thermite).
+  - Terminal screenshot OCR scanner for instant batch capture.
+  - Desktop toast alerts when batches finish refining.
+- **Rock Breaking Calculator ("Can I Crack It?")**:
+  - Calculates required laser power (MW) against rock mass, resistance, and instability for Prospector and MOLE mining lasers.
+- **Cargo-Fit Grid Packer**:
+  - 3D/2D visual cargo hold container optimizer for standard SCU crates (1, 2, 4, 8, 16, 24, 32 SCU) with ship bay height constraints.
 
-### 📡 RS Radar Signature Scanner & In-Game Overlay
-- **Real-Time Mining & Salvage Ping Decoding**:
-  - Live optical recognition of Star Citizen radar RS signature pings (e.g. `1.800`, `7.200`, `8.000`) for instant identification of valuable deposits, asteroids, and salvage panels.
-  - Slashed-zero (`Ø`) character context recovery for reliable readings even during fast flight.
-  - Transparent market rate guidance and realistic panel yield calculations.
-- **Target Watchlist & Multi-Sensory Alert System**:
-  - Configurable material watchlist with category filters (`⭐ High-Value`, `🪨 Schiffserze`, `🚗 ROC-Gems`, `💎 Hand-Gems`, `🏗️ Salvage`) and instant search.
-  - In-RAM synthesized 16-bit PCM Sci-Fi sonar chime alert (0 ms latency, no external sound files required) and optional native Windows TTS speech.
-  - Smart contact-tracking & repeat suppression (no spamming on sustained pings).
-  - Compact modern Sci-Fi HUD overlay with ambient alert border glow and quick controls.
+### 📦 Planetary Warehouse & Inventory
+- **Multi-Location Inventory**: Tracks items across planetary landing zones, stations, and cargo centers.
+- **Freight Elevator Integration**: Quickly log item transfers, dismantling, and stock movements.
 
-### 🎙️ Aurora AI Voice Co-Pilot & Audio Integration
-- Atmospheric synthesized voice announcements for quantum jumps, docking, combat kills, safe zone transitions, and radar contact alerts.
-- Sequential asynchronous audio channel preventing sound overlap or cut-offs.
-- Integrated VoiceAttack sound pack support with automatic path resolution.
+### 💰 Economy, Ledger & mobiGlas Wallet OCR
+- **Live Running Balance**: Automatic transaction ledger capturing shop purchases, commodity trading, refinery fees, and mission payouts.
+- **mobiGlas OCR Reconciliation**: Automatically detects hidden game expenses (repairs, fuel, re-arm, hospital fees, ship expedites) whenever you open mobiGlas (`F1`), with dual-read validation and modulus anti-truncation guards.
+- **UEX Corp API 2.0 Integration**: Live commodity pricing, trading margins, and terminal data.
 
-### 💰 Economy, Cargo & Maintenance Expense Tracking
-- Running balance calculations for every store purchase, sale, commodity run, reward, or fine.
-- **Unlogged Expense Tracking & Wallet-Delta Auto-Reconciliation**:
-  - Automatically captures hidden expenses (repairs, hydrogen/quantum refuel, rearm, clinic visits, claim expedites, cargo fees) via mobiGlas wallet OCR balance reconciliation.
-  - Manual quick-expense booking bar (`➕ Ausgabe erfassen`) with 1-click presets and location prefill.
-- In-depth financial analytics, profit margins, and commodity market prices.
-- **UEX Corp API 2.0 Integration**: Connect your personal UEX Bearer Token for live trade terminal and pricing data.
+### 📋 Contracts, Blueprints & Reputation
+- **Master Mission Database (`scunpacked-data`)**: Over 500+ SC 4.x missions with contractors, factions, and rewards.
+- **Automatic Reputation Tracking**: Derives faction rankings and promotion levels based on completed contracts.
+- **Crafting Blueprint Tracker**: SC 4.x blueprints categorized with learned progress indicators.
 
-### 🛠️ System Tools, Keybind Vault & Database Diagnostics
-- **Structured Tools Hub**: System shader cache cleaner (DirectX & Vulkan), crash dump cleanup, and live hardware telemetry.
-- **Keybind & Config Vault**: Standalone popouts for versioned `actionmaps.xml` keybinding backups, `user.cfg` editing with rollback, and ZIP log bundle export.
-- **SQLite Database Diagnostics & Repair**: Real-time schema versioning (`v39`), parser integrity checks, WAL status, physical DB validation (`PRAGMA quick_check`), and one-click database repair actions.
-- **Dedicated Diagnostics Logging**: Automated recording of unhandled notifications and uncataloged vehicles to `SCLogMate.unknown.log`.
+### 🧩 Hybrid Plugin System & OBS Studio Overlays
+- **Embedded Loopback HTTP Server**: Serves widgets and web applications locally with full CORS headers.
+- **JavaScript Plugin SDK (`/sclogmate.js`)**: Real-time bidirectional telemetry streaming for OBS Studio Browser Sources.
+- **Native C# Extensions**: Supports modular C# assemblies (`ISCPlugin`) for custom logic.
 
-### 🚀 Fleet, Starmap & Navigation
-- Fleets flown, insurance tier cycling (LTI, 120M, 24M, 12M, 6M), custom pledge values, and canonical model harmonization (e.g. Origin M80, Argo MOLE).
-- **Automated Catalog Sync Tools**: Synchronized with `scunpacked-data` covering modern Star Citizen vehicles and ground chassis.
-- **Star Citizen Wiki Integration**: In-app vehicle inspection modal with HD imagery, manufacturer specifications, and lore.
-- **Official Versioning Header**: Displays clean official game releases (e.g. `4.10.1-LIVE.12660092`) and shard latency telemetry.
-- **Starmap & Armistice Resolver**: Full support for Stanton, Pyro, and Nyx (including *Keeger Depot*, *Wikelo Emporium*, hangars, caves, and contested zones) with live armistice zone state detection (🟢 Safe / 🔴 Unprotected).
-
----
-
-## ⬇️ Download & Quick Start (English)
-
-1. Download the latest **[`SCLogMate.exe` from Releases](https://github.com/gOOvER/SCLogMate/releases/latest)**.
-2. Run the `.exe` (portable, single-file, no installation).
-3. Your Star Citizen log path will be detected automatically.
-4. Check the **[CHANGELOG](CHANGELOG.md)** for release notes.
+### 🌐 Internationalization (i18n)
+- Seamless live switching between **English (EN)** and **German (DE)** across all views, HUD elements, tables, and dialogs.
 
 ---
 
 ## 🏗️ Technical Specifications
 
-- **Framework**: .NET 10 (Win-x64, Native ReadyToRun single-file self-contained)
-- **UI**: Photino.NET 4.0 + React 19 / TypeScript / Vite, Win32 Native Layered Overlays (Mini-HUD, Toasts, RS Radar)
-- **Concurrency**: C# 13 / .NET 10 `System.Threading.Lock` primitives
-- **OCR**: Windows.Media.Ocr (Native Windows 10/11 Engine)
-- **Storage & Index**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`, Schema v39)
-- **RegEx Core**: Zero-Allocation C# Source Generator Expressions (`[GeneratedRegex]`)
+- **Runtime**: .NET 10 (Win-x64, Native ReadyToRun single-file standalone executable)
+- **GUI Framework**: Photino.NET 4.0 + React 19.3 / TypeScript 5.7 / Vite 6.4 / Tailwind CSS 4.3
+- **Overlays**: Win32 Native Layered Windows (`WS_EX_LAYERED`, `WS_EX_TRANSPARENT`, `WS_EX_NOACTIVATE`)
+- **Database**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`, Schema v39)
+- **OCR Engine**: Windows.Media.Ocr (Native Windows 10/11 runtime)
+- **Audio Engine**: Aurora AI voice announcements + synthesized 16-bit PCM procedural sonar audio
 
-Build via PowerShell / .NET CLI:
+### Building from Source
+
+Prerequisites:
+- [.NET 10 SDK](https://dotnet.microsoft.com/)
+- [Node.js (LTS v22+)](https://nodejs.org/)
+
 ```powershell
-# Build frontend web assets, then publish self-contained single-file executable:
-cd frontend; npm run build; cd ..
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+# 1. Clone repository
+git clone https://github.com/gOOvER/SCLogMate.git
+cd SCLogMate
+
+# 2. Build React frontend web assets
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. Publish single-file executable (CPU throttled with 4 cores)
+dotnet publish -c Release -r win-x64 --self-contained true -m:4 `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
+  -o ./publish
 ```
-Or run the all-in-one release script:
+
+Or execute the included automated release script:
 ```powershell
 .\release.ps1 -SkipSign
 ```
-
----
-
-## 📜 Disclaimer & License (English)
-
-This is an unofficial, community-made tool and is **not affiliated with** Cloud Imperium Games (CIG) or Roberts Space Industries (RSI).
-
-- Historically based on [SCLogReader](https://github.com/miwidot/SCLogReader) by **miwidot** (versions up to v1.0.0-rc2 under MIT License).
-- Starting from version **v1.0.0-rc3** (complete architectural rewrite & major overhaul), licensed under the **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
-- Game data powered by [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
-- Trade telemetry powered by [UEX Corp](https://uexcorp.space).
 
 ---
 
@@ -151,108 +144,133 @@ This is an unofficial, community-made tool and is **not affiliated with** Cloud 
 <a name="-deutsch"></a>
 # 🇩🇪 Deutsch
 
-**Der moderne, all-in-one Star Citizen Live Log Companion & Analytics Assistant.**
+**Der ultimative Star Citizen Live Log Companion, Industrie-Suite & Analyse-Assistent.**
 
-SCLogMate wertet deine Star Citizen `Game.log` in Echtzeit aus: Finanzen, Aufträge, Flotte, Frachthandel, Crafting-Baupläne, Crew, Kills, Standorte und vieles mehr. Mit In-Game Mini-HUD, animierten Achievement-Toast-Bannern, nativer mobiGlas-OCR und persistentem SQLite-Archiv.
+**SCLogMate** ist ein eigenständiger Windows-Desktop-Begleiter, der speziell für **Star Citizen 4.x** entwickelt wurde. Basierend auf hochperformantem .NET 10 und einer modernen React 19 Glassmorphism-Oberfläche (Photino.NET), überwacht und interpretiert SCLogMate deine lokale `Game.log` in Echtzeit—völlig ohne Spiel-Hooks und ohne Eingriff in den Speicher.
 
-Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforderlich.
+Vom mitlaufenden Finanzbuch über mobiGlas-Wallet-OCR-Abgleich bis hin zu Flottenverwaltung, ASOP-Terminal-Loadout-Scanning, Bergbau-Bruchrechner, 3D-Frachtraumplanung, Raffinerie-Tracking und OBS-Streaming-Widgets ist SCLogMate das unverzichtbare Co-Piloten-System für jeden Star Citizen Piloten.
 
 ---
 
 > ℹ️ **Fork-Hinweis & Danksagung**:  
-> **SCLogMate** ist ein umfassend erweiterter und modernisierter Fork des ursprünglichen Projekts [**SCLogReader**](https://github.com/miwidot/SCLogReader) von [**miwidot**](https://github.com/miwidot).  
-> Ein großes Dankeschön an **miwidot** für das exzellente Fundament des Log-Parsings und der Basis-Architektur!
+> **SCLogMate** entstand als umfassend modernisierte und stark erweiterte Weiterentwicklung von [**SCLogReader**](https://github.com/miwidot/SCLogReader) von [**miwidot**](https://github.com/miwidot). Herzlichen Dank an **miwidot** für das exzellente Fundament des Log-Parsings und der Basis-Architektur!
 
----
-
-> ⚠️ **Inoffizielles Community-Projekt.** Nicht mit Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI) verbunden oder autorisiert. Liest ausschließlich lokal deine `Game.log` (**read-only**) — kein Eingriff in den Spielprozess, kein Memory-Hook, **100% AntiCheat-konform**.
+> ⚠️ **Inoffizielles Community-Tool**:  
+> Nicht mit Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI) verbunden. SCLogMate liest **ausschließlich lesend** deine lokale `Game.log` sowie Windows-Screen-/Zwischenablage-APIs—**100% AntiCheat-konform und sicher im Betrieb**.
 
 ---
 
 ## ✨ Features & Highlights (Deutsch)
 
-### ✦ In-Game Overlays (Gaming-Style)
-- **Achievement & Reward Toast Banner**:
-  - Plopt bei neuen Bauplänen (`⬡ BAUPLAN ERLERNT`), Missionsabschlüssen (`★ AUFTRAG ABGESCHLOSSEN: +aUEC`), Rufaufstiegen und Veredelungen auf.
-  - Dynamisch gestapelte Liste: Mehrere aufeinanderfolgende Erfolge überschreiben sich nicht, sondern reihen sich sauber untereinander ein.
-  - Läuft völlig autonom und unabhängig vom Mini-HUD, fadet nach ~5,5 Sekunden sanft aus.
-  - Frei per Drag & Drop auf dem Bildschirm verschiebbar (Position wird dauerhaft gespeichert).
-  - Stört das Gameplay nicht (`WS_EX_NOACTIVATE` — kein Fokusverlust beim Fliegen oder Kämpfen).
-- **Floating Mini-HUD Overlay**:
-  - Frei positionierbares In-Game Overlay mit Kontostand, Standort, Schutzzonen-Status, fokussiertem Auftrag und Live-Server-Ping.
+### 🖥️ Native In-Game Overlays & HUD
+- **Frei positionierbares Mini-HUD (`Alt + H`)**:
+  - Always-On-Top, transparenter Glassmorphism-HUD direkt über dem Star Citizen Vollbildspiel.
+  - Live aUEC-Saldo, Session-Delta, Schiffszustand, Sicherheitszonen-Status und Shard-Latenz.
+- **Achievement & Belohnungs-Toast-Overlay**:
+  - Nicht-fokussierende (`WS_EX_NOACTIVATE`) Toast-Banner, die sich ordentlich stapeln und nach wenigen Sekunden sanft ausblenden.
+  - Erscheint bei: Erlernten Bauplänen, Missionsabschlüssen, Fraktions-Beförderungen, fertigen Raffinerie-Aufträgen, Fracht-/Schiffsaufzügen, Schiffszerstörung und **Verbrechen feindlicher Spieler gegen dich** (`⚔ Crime Against Player`).
+- **RS Radar-Signatur-Decoder**:
+  - Optische Signatur-Erkennung (z. B. `1.800`, `7.200`, `8.000`) inklusive automatischer Wiederherstellung von durchgestrichenen Nullen (`Ø`).
+  - Schnelle Unterscheidung zwischen Schiffserzen, ROC-Gems, Hand-Gems und Salvage-Panels mit Echtzeit-Marktwertschätzung.
+  - Generierter 16-Bit-PCM Sci-Fi Sonar-Sound (0 ms Latenz) und optionale Windows-TTS-Sprachausgabe.
 
-### 📋 Auftrags- & Missions-Manager
-- **Integrierter Master-Missionskatalog (`scunpacked-data`)**:
-  - Vollständige SC 4.x PU-Missionsdatenbank mit Auftraggebern (*Recco Battaglia*, *Vaughn*, *Wallace Klim*, *Miles Eckhart*, *Twitch* etc.), Fraktionen (*Alliance Aid*, *Ling Family*, *Headhunters*, *Rough Animals*), Standard-Belohnungen, Ruf-XP, Sonnensystemen und Bauplan-Drops.
-  - Durchsuchbarer Missions-Browser im Tab *❖ Missionen*.
-- **Zero-OCR Log-Matching & Auto-Sync**:
-  - Erkennt angenommene (`Accepted`), abgeschlossene (`Complete`), abgebrochene (`Abandoned`) und fehlgeschlagene (`Failed`) Aufträge automatisch.
-  - Abgeschlossene oder abgebrochene Missionen werden in Echtzeit aus der Liste aktiver Aufträge ausgetragen.
+### 🚀 Flottenverwaltung & ASOP Loadout OCR
+- **Hangar & Flugchronik**: Erfassung von geflogenen Schiffen, Einsätzen, Quantum-Sprüngen, Erwerbsstatus (Pledge Store, In-Game aUEC, Gemietet, Geliehen/Org) und Pledge-Werten.
+- **1-Klick ASOP Loadout-Scanner**:
+  - Liest vollständige 21-Komponenten-Ausrüstungen direkt aus dem "LOADOUT ESTIMATE"-Bildschirm des ASOP-Terminals aus.
+  - Unterstützt das Scannen direkt aus der Windows-Zwischenablage (`Strg + V`), um CryEngine-Vollbild-Screenshotsperren zu umgehen.
+- **Schiffsausrüstungs-Inspektor**:
+  - Detailliertes Komponenten-Modal: Generatoren, Kühler, Quantum Drives, Schilde und Waffen.
+  - Analyse von Energie-Headroom, Kühlleistung, Sprungreichweite und Waffen-Lead-Pip-Konvergenz.
+- **Lokaler Offline-Wiki-Fahrzeugcache**:
+  - Lokale SQLite-Schiffsdatenbank mit HD-Bildern, die über einen internen Loopback-HTTP-Server blitzschnell und offline gerendert werden.
 
-### ⬡ Bauplan-Datenbank (Crafting Blueprints)
-- **Vollständiger SC 4.x Bauplan-Katalog**:
-  - Rüstung, Waffen, Werkzeuge, Munition, Komponenten und Medizin.
-  - Fortschrittsanzeige (`X von Y erlernt`, Prozentanzeige), Kategorie-Filter und Datums-Tracking gefundener Baupläne.
+### 🗺️ Sternenkarte & Sprungtor-Navigation
+- **Vektor-Routenrechner**: Berechnet Distanzen in Gigametern (GM) und prognostiziert Flugzeiten abhängig vom installierten Sprungantrieb (S1 Atlas/VK-00, S2 Crossfield, S3 TS-2).
+- **Inter-System Sprungtore**: Visuelle Verbindungskorridore zwischen **Stanton**, **Pyro** und **Nyx**.
+- **Lagrange-Netzwerk (L1 – L5)**: Vollständige Erfassung aller Raumstationen, Frachtzentren, Raffinerien und Kliniken.
+- **Sicherheitszonen-Resolver**: Automatische Erkennung von UEE-Waffenstillstandszonen (🟢 Waffenruhe / 🔴 Gesetzlos).
 
-### 👁 mobiGlas Screenreader (Windows Native OCR)
-- **Automatischer aUEC Kontostand- & Auftrags-Scan**:
-  - Liest beim Öffnen des mobiGlas (`F1`) den echten Kontostand per Windows Native OCR ab.
-  - Fehlleseschutz mit Plausibilitätsprüfung (Cross-Grab & Dual-Read) gegen OCR-Fehlinterpretationen.
-  - Multi-Monitor Bereichsauswahl (`⊕ Bereich`) mit pixelgenauer DPI-Synchronisation und In-Game Scan-Box.
+### ⛏️ Industrie-Suite: Bergbau, Bergung & Veredelung
+- **Raffinerie-Auftragsmanager (`RefineryView`)**:
+  - Auftragsüberwachung über alle Raffinerien in Stanton, Pyro & Nyx mit Live-Sekunden-Countdowns.
+  - Ertrags- und Kostensimulator für 7 Veredelungsmethoden (Dinyx, Ferron, Cormack, Electrostatic, Pyroxeres, Gaskin-Kandah, Thermite).
+  - Terminal-Screenshot-OCR-Erfassung für blitzschnelles Buchen ohne Tipparbeit.
+  - Desktop-Toast-Meldung bei Auftragsfertigstellung.
+- **Gesteinsbruch-Rechner ("Can I Crack It?")**:
+  - Berechnet die erforderliche Laserleistung (MW) anhand von Gesteinsmasse, Resistenz und Instabilität für Prospector- und MOLE-Laser.
+- **Cargo-Fit Frachtraum-Planer**:
+  - 3D/2D-Visualisierung zur optimalen Beladung von SCU-Containern (1, 2, 4, 8, 16, 24, 32 SCU) unter Berücksichtigung von Schiffsbuchthöhen.
 
-### 📡 RS Radar-Signatur-Scanner & In-Game Overlay
-- **Echtzeit-Dekodierung von Bergbau- & Bergungs-Pings**:
-  - Optische Erkennung von Star Citizen Radar-Signaturen (z. B. `1.800`, `7.200`, `8.000`) zur sofortigen Identifikation wertvoller Erzvorkommen, Asteroiden und Salvage-Panels.
-  - Erkennung und Wiederherstellung von durchgestrichenen Nullen (`Ø`) der SC-Schriftart für zuverlässiges Lesen im rasanten Flug.
-  - Reale Marktpreis-Orientierung und realistische Panel-Ertragsberechnung.
-- **Ziel-Watchlist & Sensorisches Alarmsystem**:
-  - Konfigurierbare Rohstoff-Suchliste mit Kategoriefiltern (`⭐ High-Value`, `🪨 Schiffserze`, `🚗 ROC-Gems`, `💎 Hand-Gems`, `🏗️ Salvage`) und Volltextsuche.
-  - Im RAM generierter 16-Bit-PCM Sci-Fi Sonar-Chime-Alarm (0 ms Latenz, keine externen Sounddateien nötig) und optionale Windows TTS-Sprachausgabe.
-  - Intelligente Kontakthaltung & Wiederholungsunterdrückung (kein Spam bei andauernden Radar-Pings).
-  - Modernes, kompaktes HUD-Overlay mit sanftem Amber-Gold-Warnleuchten und Schnellsteuerungs-Pills.
+### 📦 Planetenlager & Inventar (Warehouse)
+- **Standortbezogene Bestandsübersicht**: Verwalte Gegenstände, Erze und Ausrüstung an allen Raumhäfen und Stationen.
+- **Frachtaufzug-Aktionen**: Buchen von Frachtaufzug-Entnahmen, Zerlegungen und Lagerbereinigungen mit einem Klick.
 
-### 🎙️ Aurora KI-Sprachausgabe & Audio-Integration
-- Atmosphärische Sprachansagen bei Quantum-Sprüngen, Landungen, Abschüssen, Sicherheitszonen-Wechseln und Radar-Signalfunden.
-- Sequenzieller, asynchroner Audio-Kanal ohne Überlagerungen oder Sound-Abschneiden.
-- Direkte Unterstützung für VoiceAttack-Soundpacks inklusive automatischer Pfaderkennung.
+### 💰 Finanzen, Transaktionsbuch & mobiGlas-Wallet-OCR
+- **Laufendes Transaktionsbuch**: Automatische Erfassung aller Terminalkäufe, Warenverkäufe, Gebühren und Missionsbelohnungen.
+- **mobiGlas-Wallet-Delta-Abgleich**: Erkennt ungeloggte Ausgaben (Reparaturen, Betankung, Munition, Krankenhausaufenthalte, Schiffs-Claims) beim Öffnen des mobiGlas (`F1`) mit Plausibilitätsprüfungen gegen Lesefehler.
+- **UEX Corp API 2.0 Integration**: Live-Warenpreise, Handelsmargen und Terminal-Verfügbarkeiten.
 
-### 💰 Finanzen, Fracht & Ausgabenerfassung
-- Mitlaufender Kontostand bei jedem Kauf, Verkauf, Handel, Belohnungseingang oder Bußgeld.
-- **Erfassung versteckter Ausgaben & mobiGlas-Wallet-Delta-Abgleich**:
-  - Erfasst automatisch Reparaturen, Wasserstoff-/Quantum-Tanken, Munition, Klinikbesuche, Schiffs-Claims und Ladegebühren über den mobiGlas-OCR-Delta-Abgleich.
-  - Manuelle Schnellerfassung im Ausgaben-Tab (`➕ Ausgabe erfassen`) mit 1-Klick-Presets und automatischer Orts-/Schiffsvorbelegung.
-- Detaillierte Finanz-Statistiken, Margen-Rechner und Marktpreise je Ware.
-- **UEX Corp API 2.0 Integration**: Hinterlegung des persönlichen UEX Bearer Tokens für Live-Handelsdaten und Terminals.
+### 📋 Aufträge, Baupläne & Ansehen (Reputation)
+- **Master-Missionskatalog (`scunpacked-data`)**: Über 500+ SC 4.x PU-Aufträge mit Auftraggebern, Fraktionen und Belohnungen.
+- **Automatisches Rufstufen-Tracking**: Berechnet Fraktionsstufen und Rangfortschritte anhand abgeschlossener Missionen.
+- **Crafting-Bauplan-Datenbank**: Vollständiger SC 4.x Bauplan-Katalog mit Fortschrittsanzeige gelernter Rezepte.
 
-### 🛠️ Werkzeuge, Keybind-Tresor & Datenbank-Diagnose
-- **Strukturierter Werkzeug-Hub**: Shader-Cache-Bereinigung (DirectX & Vulkan), Bereinigung alter Crash-Dumps und Live-Hardware-Telemetrie.
-- **Keybind- & Config-Tresor**: Standalone-Fenster für versionierte `actionmaps.xml`-Backups, Bearbeitung der `user.cfg` mit Rollback und ZIP-Log-Bündel-Export.
-- **SQLite Datenbank-Diagnose & Reparatur**: Live-Prüfung von Schema-Version (`v39`), Parser-Konsistenz, WAL-Modus, physischer Integrität (`PRAGMA quick_check`) und 1-Klick-Reparatur.
-- **Dediziertes Diagnose-Log**: Automatische Erfassung unbekannter Benachrichtigungen und Schiffe in `SCLogMate.unknown.log`.
+### 🧩 Hybrides Plugin-System & OBS Studio Overlays
+- **Integrierter Loopback-HTTP-Server**: Liefert Web-Widgets lokal mit vollständigen CORS-Headern aus.
+- **JavaScript Plugin SDK (`/sclogmate.js`)**: Echtzeit-Telemetrie per Bidirektional-IPC für OBS Studio Browser Sources.
+- **Native C#-Erweiterungen**: Unterstützt ladbare C#-Plugins (`ISCPlugin`) für individuelle Logik.
 
-### 🚀 Flotte, Starmap & Standorte
-- Geflogene Schiffe, Durchklicken von Versicherungsstufen (LTI, 120M, 24M, 12M, 6M), Pledge-Werte und kanonische Modell-Harmonisierung (z. B. Origin M80, Argo MOLE).
-- **Automatisierte Katalog-Synchronisation**: Anbindung an `scunpacked-data` für vollständige Schiffs- und Bodenfahrzeug-Datensätze.
-- **Star Citizen Wiki Integration**: Detailanzeigen mit HD-Schiffsbildern, Herstellern und technischen Daten.
-- **Offizieller Versions-Header**: Anzeige der echten Spielversion (z. B. `4.10.1-LIVE.12660092`) und Shard-Latenz.
-- **Starmap & Schutzzonen-Resolver**: Stanton, Pyro und Nyx (inkl. *Keeger Depot*, *Wikelo Emporium*, Hangars, Höhlen und Contested Zones) mit Live-Erkennung von Waffenstillstandszonen (🟢 Grün / 🔴 Rot).
+### 🌐 Zweisprachige Benutzeroberfläche (i18n)
+- Nahtloses Umschalten zur Laufzeit zwischen **Deutsch (DE)** und **Englisch (EN)** für alle Ansichten, Tabellen, Menüs und Tooltips.
 
 ---
 
-## ⬇️ Download & Installation (Deutsch)
+## 🏗️ Technische Spezifikationen
 
-1. Lade die neueste **[`SCLogMate.exe` aus den Releases](https://github.com/gOOvER/SCLogMate/releases/latest)** herunter.
-2. Starte die `.exe` (portabel, Single-File, keine Installation nötig).
-3. Dein Star Citizen Installationspfad wird automatisch erkannt.
-4. Alle Änderungen und Updates findest du im **[CHANGELOG](CHANGELOG.md)**.
+- **Runtime**: .NET 10 (Win-x64, Native ReadyToRun Single-File-Executable)
+- **Frontend-Stack**: Photino.NET 4.0 + React 19.3 / TypeScript 5.7 / Vite 6.4 / Tailwind CSS 4.3
+- **Overlays**: Native Win32 Layered Windows (`WS_EX_LAYERED`, `WS_EX_TRANSPARENT`, `WS_EX_NOACTIVATE`)
+- **Datenbank**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`, Schema v39)
+- **OCR Engine**: Windows.Media.Ocr (Natives Windows 10/11 Subsystem)
+- **Audio Engine**: Aurora KI-Sprachansagen + prozedural generiertes 16-Bit-PCM Sonar-Audio
+
+### Selbst kompilieren
+
+Voraussetzungen:
+- [.NET 10 SDK](https://dotnet.microsoft.com/)
+- [Node.js (LTS v22+)](https://nodejs.org/)
+
+```powershell
+# 1. Repository klonen
+git clone https://github.com/gOOvER/SCLogMate.git
+cd SCLogMate
+
+# 2. React Frontend bauen
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. Single-File Exe veröffentlichen (CPU gedrosselt auf 4 Kerne)
+dotnet publish -c Release -r win-x64 --self-contained true -m:4 `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false `
+  -o ./publish
+```
+
+Oder das automatisierte Release-Skript ausführen:
+```powershell
+.\release.ps1 -SkipSign
+```
 
 ---
 
-## 📜 Disclaimer & Lizenz (Deutsch)
+## 📜 Disclaimer & Lizenz
 
 Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
 
-- Basiert historisch auf dem Projekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
-- Ab Version **v1.0.0-rc3** (vollständiger Architektur-Rewrite & Systemüberarbeitung) lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
-- Externe Spieldaten via [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
-- Externe Handelsdaten via [UEX Corp](https://uexcorp.space).
+- Basiert historisch auf [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
+- Ab Version **v1.0.0** lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
+- Spieldaten bereitgestellt durch [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
+- Handels-Telemetrie bereitgestellt durch [UEX Corp](https://uexcorp.space).
