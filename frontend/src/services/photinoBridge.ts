@@ -1710,7 +1710,7 @@ class PhotinoBridge {
       case 'toggle_auto_ocr':
         return {
           isGameRunning: true,
-          pilotName: 'Commander Torsten',
+          pilotName: 'Commander gOOvER',
           pilotAvatarUrl: 'https://robertsspaceindustries.com/media/000zndy8xaqxjr/heap_infobox/OldNoob.jpg',
           pilotTitle: 'High Admiral',
           pilotOrgName: 'Stellanebula Project',
