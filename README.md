@@ -137,6 +137,17 @@ Or execute the included automated release script:
 
 ---
 
+## 📜 Disclaimer & License (English)
+
+This is an unofficial, community-made tool and is **not affiliated with, endorsed by, or authorized by** Cloud Imperium Games (CIG) or Roberts Space Industries (RSI).
+
+- Historically based on [SCLogReader](https://github.com/miwidot/SCLogReader) by **miwidot** (versions up to v1.0.0-rc2 under MIT License).
+- Starting from version **v1.0.0-rc3** (complete architectural rewrite & major overhaul) and the official **v1.0.0** release, licensed under the **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
+- Game data powered by [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
+- Trade telemetry powered by [UEX Corp](https://uexcorp.space).
+
+---
+
 <br/>
 
 ---
@@ -266,11 +277,11 @@ Oder das automatisierte Release-Skript ausführen:
 
 ---
 
-## 📜 Disclaimer & Lizenz
+## 📜 Disclaimer & Lizenz (Deutsch)
 
 Dies ist ein inoffizielles, von Fans erstelltes Community-Tool und steht in **keiner Verbindung** zu Cloud Imperium Games (CIG) oder Roberts Space Industries (RSI).
 
-- Basiert historisch auf [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
-- Ab Version **v1.0.0** lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
-- Spieldaten bereitgestellt durch [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
-- Handels-Telemetrie bereitgestellt durch [UEX Corp](https://uexcorp.space).
+- Basiert historisch auf dem Projekt [SCLogReader](https://github.com/miwidot/SCLogReader) von **miwidot** (Versionen bis v1.0.0-rc2 unter MIT-Lizenz).
+- Ab Version **v1.0.0-rc3** (vollständiger Architektur-Rewrite & Systemüberarbeitung auf React/Photino) sowie dem offiziellen Release **v1.0.0** lizenziert unter der **[GNU Affero General Public License v3.0 (AGPLv3)](LICENSE)**.
+- Externe Spieldaten bereitgestellt durch [scunpacked-data](https://github.com/StarCitizenWiki/scunpacked-data) & [Star Citizen Wiki](https://star-citizen.wiki).
+- Externe Handelsdaten via [UEX Corp](https://uexcorp.space).
