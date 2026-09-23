@@ -36,6 +36,14 @@ $notes = "$body`r`n`r`n---`r`n📋 Vollständiges Changelog: https://github.com/
 $notesFile = Join-Path $env:TEMP "sclm_notes_$ver.md"
 Set-Content $notesFile $notes -Encoding UTF8
 
+# Frontend bauen (npm run build), damit aktuelle Web-Assets eingebettet werden
+Write-Host "==> Frontend bauen (npm run build)" -ForegroundColor Cyan
+Push-Location (Join-Path $root 'frontend')
+$env:PATH = "C:\Users\goove\AppData\Local\Author Software\nvm\.nodejs;C:\Users\goove\AppData\Local\Author Software\nvm;$env:PATH"
+npm run build
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Frontend-Build fehlgeschlagen.' }
+Pop-Location
+
 # Single-file exe bauen (CPU gedrosselt, damit das System flüssig bleibt)
 Stop-Process -Name SCLogMate -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
@@ -58,7 +66,12 @@ if (-not $SkipSign) {
 }
 
 # Tag + Release
-git tag $tag 2>$null
-git push origin $tag
-gh release create $tag $exe --repo gOOvER/SCLogMate --title $tag --notes-file $notesFile --prerelease
+git tag -f $tag
+git push origin "refs/tags/$tag" --force
+$isPrerelease = $ver -match '-(alpha|beta|rc)'
+$ghArgs = @('release', 'create', $tag, $exe, '--repo', 'gOOvER/SCLogMate', '--title', $tag, '--notes-file', $notesFile)
+if ($isPrerelease) {
+  $ghArgs += '--prerelease'
+}
+& gh @ghArgs
 Write-Host "==> Release $tag erstellt: https://github.com/gOOvER/SCLogMate/releases/tag/$tag" -ForegroundColor Cyan

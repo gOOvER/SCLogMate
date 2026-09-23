@@ -286,31 +286,31 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
 
 ---
 
-## 📦 10. Release Candidate 3 (RC3) — Checkliste & Offene Punkte vor Release
+## 📦 10. Offizielles Release 1.0.0 (v1.0.0) — Checkliste & Meilenstein
 
-### 🚨 Bekannte Probleme & Stolpersteine
-1. **Mehrdeutiger Git-Tag `main`**:
-   - Ein veralteter Tag `refs/tags/main` führt bei einfachem `git push` zu `error: src refspec main matches more than one`.
-   - *Fix:* `git tag -d main` und `git push origin :refs/tags/main` ausführen bzw. in `release.ps1` explizit `git push origin refs/heads/main` verwenden.
-2. **Item-Instanz-IDs im `SCLogMate.unknown.log`**:
-   - CIG hängt an Inventar-Gegenstände bei Abfragen numerische Instanz-IDs an (`grin_multitool_..._776193770765`).
-   - *Fix:* Vor dem Aufruf in `WikiApiClient.cs` Trailing-IDs (`_\d{4,}$`) abtrennen und Player-Noise (`necksock`, `FP_Visor`) filtern.
-3. **In-Game Chat-OCR Status**:
-   - Chat-OCR ist für ein Rework (Absender-Spalte, besseres Thresholding) im Backlog (Schritt 9). In den RC3-Release-Notes als vorübergehend pausiert vermerken.
-4. **Code-Signing (`sign.ps1`)**:
-   - Vor Ausführung von `release.ps1` sicherstellen, dass SimplySign Desktop eingeloggt ist (oder `release.ps1 -SkipSign` verwenden).
+### 🚨 Gelöste Probleme & Vorbereitungen
+1. **Bereinigung des geerbten `v1.0.0` Tags**:
+   - Der alte, vor dem Fork stammende Tag `v1.0.0` auf Commit `69906c7` wurde lokal und auf GitHub remote gelöscht (`git tag -d v1.0.0` und `git push origin :refs/tags/v1.0.0`), sodass der neue Release-Tag sauber auf das echte 1.0.0 Release gesetzt wird.
+2. **Automatisierter Frontend-Build in `release.ps1`**:
+   - `release.ps1` baut nun automatisch das React-Frontend (`npm run build` in `frontend/`), bevor die Single-File Exe gebaut wird.
+3. **Prerelease-Flag in `release.ps1`**:
+   - Für die finale `1.0.0` wird `--prerelease` nicht mehr gesetzt (nur noch für Tags mit `-alpha`, `-beta` oder `-rc`).
+4. **Abhängigkeiten**:
+   - Alle .NET NuGet-Pakete (Avalonia 11.2.5, SQLite 10.0.12) und npm-Pakete (React 19.3, Vite 6.4, Tailwind 4.3, Lucide 1.47) sind auf dem neuesten Stand.
 
-### 📋 ToDo-Checkliste vor dem Release
-- [x] **Phase 1: Bereinigung & Feinschliff**
-  - [x] Git-Tag `main` löschen (`git tag -d main` & `git push origin :refs/tags/main`).
-  - [x] `release.ps1` absichern (expliziter Push auf `refs/heads/main`).
-  - [x] `WikiApiClient.cs`: Item-Instanz-IDs (`_\d{4,}$`) vor Wiki-Lookup abschneiden und Player-Noise filtern.
-- [x] **Phase 2: Dokumentation & Changelog-Stempelung**
-  - [x] `CHANGELOG.md`: Den aktuellen Block `## [Unreleased]` für `## [1.0.0-rc3] - 2026-09-19` vorbereiten.
-  - [x] Prüfen, ob alle neuen Features (Mining-Rechner, Frachtraum-Planer, Community-Data, Aurora-Toggles, Mission/Salvage-Fixes) vollständig gelistet sind.
-- [x] **Phase 3: Release-Build & Tagging**
-  - [x] `.\release.ps1` ausführen (mit Signierung oder `-SkipSign`).
-  - [x] GitHub-Release `v1.0.0-rc3` überprüfen.
+### 📋 ToDo-Checkliste für v1.0.0
+- [x] **Phase 1: Bereinigung & Dependencies**
+  - [x] Alter Git-Tag `v1.0.0` bereinigt.
+  - [x] Alle NuGet- und npm-Abhängigkeiten auf neueste Versionen aktualisiert.
+  - [x] `release.ps1` um automatischen Frontend-Build und dynamisches `--prerelease` erweitert.
+- [x] **Phase 2: Versionierung & Dokumentation**
+  - [x] `SCLogMate.csproj`: Version auf `1.0.0` gesetzt.
+  - [x] `frontend/package.json`: Version auf `1.0.0` gesetzt.
+  - [x] `README.md`: Technische Spezifikationen (Photino + React 19, SQLite v39) und Versionshinweise aktualisiert.
+  - [x] `CHANGELOG.md`: Ausführliche Release-Dokumentation aller Neuerungen unter `[Unreleased]`.
+- [ ] **Phase 3: Release-Build & Tagging**
+  - [ ] `.\release.ps1 -SkipSign` (oder mit Signierung) ausführen.
+  - [ ] GitHub-Release `v1.0.0` auf GitHub überprüfen.
 
 
 

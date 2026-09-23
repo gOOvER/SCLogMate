@@ -90,14 +90,14 @@ Single standalone Windows `.exe`, no installation required, no .NET runtime setu
 ### 🛠️ System Tools, Keybind Vault & Database Diagnostics
 - **Structured Tools Hub**: System shader cache cleaner (DirectX & Vulkan), crash dump cleanup, and live hardware telemetry.
 - **Keybind & Config Vault**: Standalone popouts for versioned `actionmaps.xml` keybinding backups, `user.cfg` editing with rollback, and ZIP log bundle export.
-- **SQLite Database Diagnostics & Repair**: Real-time schema versioning (`v15`), parser integrity checks, WAL status, physical DB validation (`PRAGMA quick_check`), and one-click database repair actions.
+- **SQLite Database Diagnostics & Repair**: Real-time schema versioning (`v39`), parser integrity checks, WAL status, physical DB validation (`PRAGMA quick_check`), and one-click database repair actions.
 - **Dedicated Diagnostics Logging**: Automated recording of unhandled notifications and uncataloged vehicles to `SCLogMate.unknown.log`.
 
 ### 🚀 Fleet, Starmap & Navigation
 - Fleets flown, insurance tier cycling (LTI, 120M, 24M, 12M, 6M), custom pledge values, and canonical model harmonization (e.g. Origin M80, Argo MOLE).
 - **Automated Catalog Sync Tools**: Synchronized with `scunpacked-data` covering modern Star Citizen vehicles and ground chassis.
 - **Star Citizen Wiki Integration**: In-app vehicle inspection modal with HD imagery, manufacturer specifications, and lore.
-- **Official Versioning Header**: Displays clean official game releases (e.g. `4.10.0-LIVE.12572603`) and shard latency telemetry.
+- **Official Versioning Header**: Displays clean official game releases (e.g. `4.10.1-LIVE.12660092`) and shard latency telemetry.
 - **Starmap & Armistice Resolver**: Full support for Stanton, Pyro, and Nyx (including *Keeger Depot*, *Wikelo Emporium*, hangars, caves, and contested zones) with live armistice zone state detection (🟢 Safe / 🔴 Unprotected).
 
 ---
@@ -113,16 +113,22 @@ Single standalone Windows `.exe`, no installation required, no .NET runtime setu
 
 ## 🏗️ Technical Specifications
 
-- **Framework**: .NET 10 (Win-x64, Native ReadyToRun AOT single-file)
-- **UI**: Avalonia UI 11.2 (Fluent Dark Theme, compiled bindings)
+- **Framework**: .NET 10 (Win-x64, Native ReadyToRun single-file self-contained)
+- **UI**: Photino.NET 4.0 + React 19 / TypeScript / Vite, Win32 Native Layered Overlays (Mini-HUD, Toasts, RS Radar)
 - **Concurrency**: C# 13 / .NET 10 `System.Threading.Lock` primitives
 - **OCR**: Windows.Media.Ocr (Native Windows 10/11 Engine)
-- **Storage & Index**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`)
+- **Storage & Index**: SQLite WAL Mode (`%APPDATA%\SCLogMate\sessions.db`, Schema v39)
 - **RegEx Core**: Zero-Allocation C# Source Generator Expressions (`[GeneratedRegex]`)
 
 Build via PowerShell / .NET CLI:
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -o ./publish
+# Build frontend web assets, then publish self-contained single-file executable:
+cd frontend; npm run build; cd ..
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+```
+Or run the all-in-one release script:
+```powershell
+.\release.ps1 -SkipSign
 ```
 
 ---
@@ -221,14 +227,14 @@ Eine einzige Windows-`.exe`, keine Installation nötig, kein .NET-Setup erforder
 ### 🛠️ Werkzeuge, Keybind-Tresor & Datenbank-Diagnose
 - **Strukturierter Werkzeug-Hub**: Shader-Cache-Bereinigung (DirectX & Vulkan), Bereinigung alter Crash-Dumps und Live-Hardware-Telemetrie.
 - **Keybind- & Config-Tresor**: Standalone-Fenster für versionierte `actionmaps.xml`-Backups, Bearbeitung der `user.cfg` mit Rollback und ZIP-Log-Bündel-Export.
-- **SQLite Datenbank-Diagnose & Reparatur**: Live-Prüfung von Schema-Version (`v15`), Parser-Konsistenz, WAL-Modus, physischer Integrität (`PRAGMA quick_check`) und 1-Klick-Reparatur.
+- **SQLite Datenbank-Diagnose & Reparatur**: Live-Prüfung von Schema-Version (`v39`), Parser-Konsistenz, WAL-Modus, physischer Integrität (`PRAGMA quick_check`) und 1-Klick-Reparatur.
 - **Dediziertes Diagnose-Log**: Automatische Erfassung unbekannter Benachrichtigungen und Schiffe in `SCLogMate.unknown.log`.
 
 ### 🚀 Flotte, Starmap & Standorte
 - Geflogene Schiffe, Durchklicken von Versicherungsstufen (LTI, 120M, 24M, 12M, 6M), Pledge-Werte und kanonische Modell-Harmonisierung (z. B. Origin M80, Argo MOLE).
 - **Automatisierte Katalog-Synchronisation**: Anbindung an `scunpacked-data` für vollständige Schiffs- und Bodenfahrzeug-Datensätze.
 - **Star Citizen Wiki Integration**: Detailanzeigen mit HD-Schiffsbildern, Herstellern und technischen Daten.
-- **Offizieller Versions-Header**: Anzeige der echten Spielversion (z. B. `4.10.0-LIVE.12572603`) und Shard-Latenz.
+- **Offizieller Versions-Header**: Anzeige der echten Spielversion (z. B. `4.10.1-LIVE.12660092`) und Shard-Latenz.
 - **Starmap & Schutzzonen-Resolver**: Stanton, Pyro und Nyx (inkl. *Keeger Depot*, *Wikelo Emporium*, Hangars, Höhlen und Contested Zones) mit Live-Erkennung von Waffenstillstandszonen (🟢 Grün / 🔴 Rot).
 
 ---

@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fleet View Lead-Pips Column (`frontend/src/views/FleetView.tsx`)**: Removed the `🎯 Lead-Pips` table column from Fleet View to restore clean table spacing and balance. Detailed weapon lead pip convergence analysis remains accessible inside the Ship Loadout Modal.
 
 ### Changed
+- **Release Automation & Documentation Updates (`release.ps1`, `README.md`, `ROADMAP.md`, `SCLogMate.csproj`, `frontend/package.json`)**:
+  - Bumped project version to `1.0.0` for official release milestone.
+  - Enhanced `release.ps1` with automated React frontend compilation (`npm run build`) before single-file packaging.
+  - Added smart GitHub release detection in `release.ps1` to only attach `--prerelease` for pre-release tags (`-alpha`, `-beta`, `-rc`).
+  - Updated `README.md` technical specifications for Photino.NET 4.0, React 19, and database schema version v39.
 - **Dependency Updates (`SCLogMate.csproj`, `frontend/package.json`, `frontend/package-lock.json`)**:
   - Updated .NET NuGet packages: Avalonia ecosystem (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter`, `Avalonia.Controls.DataGrid`) to `11.2.5`, `Microsoft.Data.Sqlite` to `10.0.12`, and `System.Security.Cryptography.ProtectedData` to `10.0.12`.
   - Updated Frontend npm packages: `lucide-react` to `1.47.0`, `tailwind-merge` to `3.7.0`, `@tailwindcss/vite` and `tailwindcss` to `4.3.3`, `typescript` to `5.7.3`, `vite` to `6.4.3`, and `@types/node` to `22.20.4`.
