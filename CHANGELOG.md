@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-09-23
 ### Added
 - **Crime Against Player Toast Notifications (`Models/AchievementToastData.cs`, `ViewModels/MainViewModel.cs`, `Views/MainWindow.axaml`, `Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`)**:
   - Added real-time in-game toast notifications for crimes committed against the player by hostile players (e.g. `Destruction of Vehicle`, `Homicide`).
@@ -965,7 +967,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - SQLite session index and raw-log archive.
 
-## [1.0.0] - 2026-06-28
+## [1.0.0-legacy] - 2026-06-28
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
