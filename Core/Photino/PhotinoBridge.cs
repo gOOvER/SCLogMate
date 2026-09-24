@@ -3912,20 +3912,52 @@ public class PhotinoBridge
 
             if (targetSession == "__all__")
             {
-                using var cmdAll = db.CreateCommand();
-                cmdAll.CommandText = @"
-                    SELECT 
-                        COUNT(DISTINCT session) as flights,
-                        COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
-                    FROM events 
-                    WHERE (@ship = '—' OR ship = @ship OR ship LIKE @shipPattern OR detail LIKE @shipPattern);";
-                cmdAll.Parameters.AddWithValue("@ship", shipName);
-                cmdAll.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
-                using var rAll = cmdAll.ExecuteReader();
-                if (rAll.Read())
+                if (shipName != "—" && !string.IsNullOrWhiteSpace(shipName))
                 {
-                    lifeFlights = rAll.IsDBNull(0) ? 0 : rAll.GetInt32(0);
-                    lifeQts = rAll.IsDBNull(1) ? 0 : rAll.GetInt32(1);
+                    try
+                    {
+                        var fleetStats = Database.GetFleetStats();
+                        var match = fleetStats
+                            .Where(s => FleetCatalog.IsValidShipName(s.Ship))
+                            .GroupBy(s =>
+                            {
+                                var cat = FleetCatalog.Lookup(s.Ship);
+                                return cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : s.Ship;
+                            })
+                            .FirstOrDefault(g =>
+                                g.Key.Equals(shipName, StringComparison.OrdinalIgnoreCase) ||
+                                g.Key.Contains(shipName, StringComparison.OrdinalIgnoreCase) ||
+                                shipName.Contains(g.Key, StringComparison.OrdinalIgnoreCase));
+
+                        if (match != null)
+                        {
+                            lifeFlights = match.Sum(x => x.FlightCount);
+                            lifeQts = match.Sum(x => x.QtCount);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.GetHudTelemetry.FleetStatsAll", ex);
+                    }
+                }
+
+                if (lifeFlights == 0 && lifeQts == 0)
+                {
+                    using var cmdAll = db.CreateCommand();
+                    cmdAll.CommandText = @"
+                        SELECT 
+                            COUNT(DISTINCT session) as flights,
+                            COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
+                        FROM events 
+                        WHERE (@ship = '—' OR ship = @ship OR ship LIKE @shipPattern OR detail LIKE @shipPattern);";
+                    cmdAll.Parameters.AddWithValue("@ship", shipName);
+                    cmdAll.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
+                    using var rAll = cmdAll.ExecuteReader();
+                    if (rAll.Read())
+                    {
+                        lifeFlights = rAll.IsDBNull(0) ? 0 : rAll.GetInt32(0);
+                        lifeQts = rAll.IsDBNull(1) ? 0 : rAll.GetInt32(1);
+                    }
                 }
                 sessionSorties = lifeFlights;
                 sessionQts = lifeQts;
@@ -3952,8 +3984,7 @@ public class PhotinoBridge
                     entries = rSess.IsDBNull(2) ? 0 : rSess.GetInt32(2);
                     losses = rSess.IsDBNull(3) ? 0 : rSess.GetInt32(3);
                 }
-                int dbSorties = Math.Max(exits + (entries > exits || dbQts > 0 ? 1 : 0), entries);
-                if (dbSorties == 0 && dbQts > 0) dbSorties = 1;
+                int dbSorties = (entries > 0 || dbQts > 0 || exits > 0) ? Math.Max(1, losses + 1) : 0;
                 if (losses > 0 && entries <= exits && !locState.IsTravelling) status = "Havarie / Claim";
 
                 int liveQts = 0;
@@ -3965,41 +3996,88 @@ public class PhotinoBridge
                         liveQts = _liveEvents.Count(e => e.Kind == "Quantum" || (e.Category == "ship" && (e.Title.Contains("Quantum") || e.Description.Contains("QT-"))));
                         int lExits = _liveEvents.Count(e => e.Kind == "Vehicle" && e.Description.Contains("verlassen"));
                         int lEntries = _liveEvents.Count(e => e.Kind == "Vehicle" && !e.Description.Contains("verlassen"));
-                        liveSorties = Math.Max(lExits + (lEntries > lExits || liveQts > 0 ? 1 : 0), lEntries);
-                        if (liveSorties == 0 && liveQts > 0) liveSorties = 1;
+                        liveSorties = (lEntries > 0 || liveQts > 0 || lExits > 0) ? 1 : 0;
                     }
                 }
 
                 sessionQts = Math.Max(liveQts, dbQts);
                 sessionSorties = Math.Max(liveSorties, dbSorties);
 
-                // Query lifetime stats for ship
-                if (shipName != "—")
+                // Query lifetime stats for ship matching Fleet tab
+                if (shipName != "—" && !string.IsNullOrWhiteSpace(shipName))
                 {
-                    using var cmdLife = db.CreateCommand();
-                    cmdLife.CommandText = @"
-                        SELECT 
-                            COUNT(DISTINCT session) as flights,
-                            COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
-                        FROM events 
-                        WHERE (ship = @ship OR ship LIKE @shipPattern);";
-                    cmdLife.Parameters.AddWithValue("@ship", shipName);
-                    cmdLife.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
-                    using var rLife = cmdLife.ExecuteReader();
-                    if (rLife.Read())
+                    try
                     {
-                        lifeFlights = rLife.IsDBNull(0) ? 0 : rLife.GetInt32(0);
-                        lifeQts = rLife.IsDBNull(1) ? 0 : rLife.GetInt32(1);
+                        var fleetStats = Database.GetFleetStats();
+                        var match = fleetStats
+                            .Where(s => FleetCatalog.IsValidShipName(s.Ship))
+                            .GroupBy(s =>
+                            {
+                                var cat = FleetCatalog.Lookup(s.Ship);
+                                return cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : s.Ship;
+                            })
+                            .FirstOrDefault(g =>
+                                g.Key.Equals(shipName, StringComparison.OrdinalIgnoreCase) ||
+                                g.Key.Contains(shipName, StringComparison.OrdinalIgnoreCase) ||
+                                shipName.Contains(g.Key, StringComparison.OrdinalIgnoreCase));
+
+                        if (match != null)
+                        {
+                            lifeFlights = match.Sum(x => x.FlightCount);
+                            lifeQts = match.Sum(x => x.QtCount);
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("PhotinoBridge.GetHudTelemetry.FleetStats", ex);
+                    }
+
+                    if (lifeFlights == 0)
+                    {
+                        using var cmdLife = db.CreateCommand();
+                        cmdLife.CommandText = @"
+                            SELECT 
+                                COUNT(DISTINCT session) as flights,
+                                COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
+                            FROM events 
+                            WHERE (ship = @ship OR ship LIKE @shipPattern OR detail LIKE @shipPattern);";
+                        cmdLife.Parameters.AddWithValue("@ship", shipName);
+                        cmdLife.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
+                        using var rLife = cmdLife.ExecuteReader();
+                        if (rLife.Read())
+                        {
+                            lifeFlights = rLife.IsDBNull(0) ? 0 : rLife.GetInt32(0);
+                            lifeQts = rLife.IsDBNull(1) ? 0 : rLife.GetInt32(1);
+                        }
+                    }
+                }
+
+                if (targetSession == "__live__")
+                {
+                    int liveQtsDiff = Math.Max(0, liveQts - dbQts);
+                    lifeQts += liveQtsDiff;
+                }
+
+                if (lifeFlights == 0 && sessionSorties > 0)
+                {
+                    lifeFlights = sessionSorties;
                 }
             }
 
-            string fText = sessionSorties == 1 ? "1 Flug" : $"{sessionSorties} Flüge";
-            string qText = sessionQts == 1 ? "1 QT-Sprung" : $"{sessionQts} QT-Sprünge";
+            int dispFlights = lifeFlights > 0 ? lifeFlights : sessionSorties;
+            int dispQts = lifeQts > 0 ? lifeQts : sessionQts;
+            string fText = dispFlights == 1 ? "1 Flug" : $"{dispFlights} Flüge";
+            string qText = dispQts == 1 ? "1 QT-Sprung" : $"{dispQts} QT-Sprünge";
             flightInfo = $"{status} · {fText} · {qText}";
+
+            string sessFText = sessionSorties == 1 ? "1 Flug" : $"{sessionSorties} Flüge";
+            string sessQText = sessionQts == 1 ? "1 QT-Sprung" : $"{sessionQts} QT-Sprünge";
+            string lifeFText = lifeFlights == 1 ? "1 Flug" : $"{lifeFlights} Flüge";
+            string lifeQText = lifeQts == 1 ? "1 QT-Sprung" : $"{lifeQts} QT-Sprünge";
+
             flightTooltip = targetSession == "__all__"
-                ? $"Gesamtstatistik ({shipName}): {lifeFlights} Flüge · {lifeQts} QT-Sprünge"
-                : $"Sitzung: {sessionSorties} Flüge · {sessionQts} QT-Sprünge | Gesamt ({shipName}): {lifeFlights} Flüge · {lifeQts} QT-Sprünge";
+                ? $"Gesamtstatistik ({shipName}): {lifeFText} · {lifeQText}"
+                : $"Sitzung: {sessFText} · {sessQText} | Gesamt ({shipName}): {lifeFText} · {lifeQText}";
         }
         catch (Exception ex)
         {

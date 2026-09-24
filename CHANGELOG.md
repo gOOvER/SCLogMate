@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **HUD Flight Telemetry & Live Active Ship Updates (`Core/Photino/PhotinoBridge.cs`, `frontend/src/components/HudBar.tsx`, `frontend/src/services/photinoBridge.ts`, `frontend/src/i18n/`)**:
   - Replaced hardcoded placeholder flight statistics (`Flugbereit · 14 Flüge · 8 QT-Sprünge`) in `GetHudTelemetry` with accurate, real-time dynamic flight data aggregation.
-  - Dynamically computes flight status (`Flugbereit`, `Im Quantum-Flug`, `Im Flug`, `Havarie / Claim`), sortie/flight count, and quantum jump count for the active session and across all sessions.
+  - Display active ship's overall lifetime career statistics (`<Status> · <Flights> Flüge · <QTs> QT-Sprünge`) prominently in the primary HUD card subline, harmonized directly with `Database.GetFleetStats()` from the Hangar/Fleet view.
+  - Corrected session sortie counting logic so standing up or exiting the pilot seat to access interior facilities no longer falsely inflates the session flight count.
   - Added real-time tracking of active ship and sortie counts from in-memory live events (`_liveEvents`) and SQLite database events, updating instantly upon quantum arrivals and ship departures.
   - Added rich flight telemetry tooltip (`shipFlightTooltip`) breaking down session sorties/jumps alongside total career lifetime statistics for the active ship.
   - Enhanced frontend `HudBar` regex replacements to cleanly support both singular and plural forms (`Flug`/`Flüge`, `QT-Sprung`/`QT-Sprünge`) and multi-lingual status indicators.
