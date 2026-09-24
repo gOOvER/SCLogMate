@@ -456,13 +456,20 @@ export const HudBar: React.FC<HudBarProps> = ({
           </div>
 
           {/* Subline: Flight Telemetry */}
-          <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+          <div
+            className="text-[11px] font-mono text-slate-400 truncate mt-0.5"
+            title={telemetry.shipFlightTooltip || undefined}
+          >
             {(() => {
               if (!telemetry.shipFlightInfo || telemetry.shipFlightInfo === '—') return '—';
               return telemetry.shipFlightInfo
                 .replace(/Flugbereit/gi, t('hud.flightReady'))
-                .replace(/(\d+)\s*Flüge/gi, `$1 ${t('hud.flights')}`)
-                .replace(/(\d+)\s*QT-Sprünge/gi, `$1 ${t('hud.qtJumps')}`);
+                .replace(/Im Quantum-Flug/gi, t('hud.inQuantum') || 'Im Quantum-Flug')
+                .replace(/Im Flug/gi, t('hud.inFlight') || 'Im Flug')
+                .replace(/Gelandet/gi, t('hud.landed') || 'Gelandet')
+                .replace(/Havarie \/ Claim/gi, t('hud.destroyed') || 'Havarie / Claim')
+                .replace(/(\d+)\s*(Flüge|Flug)/gi, `$1 ${t('hud.flights')}`)
+                .replace(/(\d+)\s*(QT-Sprünge|QT-Sprung)/gi, `$1 ${t('hud.qtJumps')}`);
             })()}
           </div>
         </div>

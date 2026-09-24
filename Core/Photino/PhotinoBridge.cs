@@ -195,6 +195,7 @@ public class HudTelemetryDto
     [JsonPropertyName("jurisdiction")] public string Jurisdiction { get; set; } = "UEE";
     [JsonPropertyName("shipName")] public string ShipName { get; set; } = "—";
     [JsonPropertyName("shipFlightInfo")] public string ShipFlightInfo { get; set; } = "—";
+    [JsonPropertyName("shipFlightTooltip")] public string? ShipFlightTooltip { get; set; }
     [JsonPropertyName("balance")] public long Balance { get; set; }
     [JsonPropertyName("sessionIncome")] public long SessionIncome { get; set; }
     [JsonPropertyName("sessionSpend")] public long SessionSpend { get; set; }
@@ -3826,33 +3827,184 @@ public class PhotinoBridge
         bool isArmistice = resolvedLoc.IsArmistice;
         string jurisdiction = locSys == "Pyro" ? "Gesetzlos (Outlaw)" : (locSys == "Nyx" ? "People's Alliance" : "UEE Protektorat");
 
-        // Ship
+        // Ship & Flight Telemetry
         string shipName = "—";
+        string sessName = targetSession == "__live__" ? (_activeSessionName ?? "Game.log") : targetSession;
+        string flightInfo = "Flugbereit · 0 Flüge · 0 QT-Sprünge";
+        string? flightTooltip = null;
+
+        if (targetSession == "__live__")
+        {
+            lock (_liveEventsLock)
+            {
+                var liveShipEvent = _liveEvents.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.Ship) && e.Ship != "—" && e.Ship != "--");
+                if (liveShipEvent != null && !string.IsNullOrWhiteSpace(liveShipEvent.Ship)) shipName = liveShipEvent.Ship;
+            }
+        }
+
+        if ((shipName == "—" || string.IsNullOrWhiteSpace(shipName)) && !string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—")
+        {
+            shipName = _currentShip;
+        }
+
         try
         {
             using var db = new SqliteConnection($"Data Source={Database.DatabaseFilePath};Default Timeout=60;");
             db.Open();
-            using var cmd = db.CreateCommand();
-            cmd.CommandText = targetSession == "__all__"
-                ? "SELECT ship FROM events WHERE ship IS NOT NULL AND ship != '' ORDER BY time DESC LIMIT 1;"
-                : "SELECT ship FROM events WHERE (session = @sess OR @sess = '') AND ship IS NOT NULL AND ship != '' ORDER BY time DESC LIMIT 1;";
-            cmd.Parameters.AddWithValue("@sess", targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession);
-            var res = cmd.ExecuteScalar()?.ToString();
-            if (!string.IsNullOrWhiteSpace(res))
+
+            if (shipName == "—" || string.IsNullOrWhiteSpace(shipName))
             {
-                shipName = res;
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = targetSession == "__all__"
+                    ? "SELECT ship FROM events WHERE ship IS NOT NULL AND trim(ship) != '' AND ship != '—' AND kind IN ('Vehicle', 'Quantum', 'ShipLoss', 'Crash') ORDER BY time DESC LIMIT 1;"
+                    : "SELECT ship FROM events WHERE session = @sess AND ship IS NOT NULL AND trim(ship) != '' AND ship != '—' AND kind IN ('Vehicle', 'Quantum', 'ShipLoss', 'Crash') ORDER BY time DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@sess", sessName);
+                var res = cmd.ExecuteScalar()?.ToString();
+                if (!string.IsNullOrWhiteSpace(res))
+                {
+                    shipName = res;
+                }
+                else
+                {
+                    cmd.CommandText = targetSession == "__all__"
+                        ? "SELECT detail FROM events WHERE kind = 'Vehicle' AND detail IS NOT NULL AND trim(detail) != '' ORDER BY time DESC LIMIT 1;"
+                        : "SELECT detail FROM events WHERE session = @sess AND kind = 'Vehicle' AND detail IS NOT NULL AND trim(detail) != '' ORDER BY time DESC LIMIT 1;";
+                    cmd.Parameters.Clear();
+                    cmd.Parameters.AddWithValue("@sess", sessName);
+                    var vRes = cmd.ExecuteScalar()?.ToString();
+                    if (!string.IsNullOrWhiteSpace(vRes)) shipName = vRes;
+                }
+
+                // If still not found for a session, fallback to most recently flown ship across all sessions
+                if ((shipName == "—" || string.IsNullOrWhiteSpace(shipName)) && targetSession != "__all__")
+                {
+                    cmd.CommandText = "SELECT ship FROM events WHERE ship IS NOT NULL AND trim(ship) != '' AND ship != '—' AND kind IN ('Vehicle', 'Quantum', 'ShipLoss', 'Crash') ORDER BY time DESC LIMIT 1;";
+                    cmd.Parameters.Clear();
+                    var fallbackShip = cmd.ExecuteScalar()?.ToString();
+                    if (!string.IsNullOrWhiteSpace(fallbackShip)) shipName = fallbackShip;
+                }
+            }
+
+            if (shipName != "—" && !string.IsNullOrWhiteSpace(shipName))
+            {
+                var catLookup = FleetCatalog.Lookup(shipName);
+                if (catLookup.NormalizedName != "Unbekannt")
+                {
+                    shipName = catLookup.NormalizedName;
+                }
+                if (targetSession == "__live__")
+                {
+                    _currentShip = shipName;
+                }
+            }
+
+            // Flight Status
+            string status = "Flugbereit";
+            if (locState.IsTravelling)
+            {
+                status = "Im Quantum-Flug";
+            }
+
+            int sessionQts = 0;
+            int sessionSorties = 0;
+            int lifeFlights = 0;
+            int lifeQts = 0;
+
+            if (targetSession == "__all__")
+            {
+                using var cmdAll = db.CreateCommand();
+                cmdAll.CommandText = @"
+                    SELECT 
+                        COUNT(DISTINCT session) as flights,
+                        COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
+                    FROM events 
+                    WHERE (@ship = '—' OR ship = @ship OR ship LIKE @shipPattern OR detail LIKE @shipPattern);";
+                cmdAll.Parameters.AddWithValue("@ship", shipName);
+                cmdAll.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
+                using var rAll = cmdAll.ExecuteReader();
+                if (rAll.Read())
+                {
+                    lifeFlights = rAll.IsDBNull(0) ? 0 : rAll.GetInt32(0);
+                    lifeQts = rAll.IsDBNull(1) ? 0 : rAll.GetInt32(1);
+                }
+                sessionSorties = lifeFlights;
+                sessionQts = lifeQts;
             }
             else
             {
-                cmd.CommandText = "SELECT detail FROM events WHERE kind = 'Vehicle' ORDER BY time DESC LIMIT 1;";
-                var vRes = cmd.ExecuteScalar()?.ToString();
-                if (!string.IsNullOrWhiteSpace(vRes)) shipName = vRes;
-            }
-        }
-        catch { }
+                // Query session stats
+                using var cmdSess = db.CreateCommand();
+                cmdSess.CommandText = @"
+                    SELECT 
+                        COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts,
+                        COUNT(CASE WHEN kind = 'Vehicle' AND detail LIKE '%verlassen%' THEN 1 END) as exits,
+                        COUNT(CASE WHEN kind = 'Vehicle' AND (detail IS NULL OR (detail NOT LIKE '%verlassen%' AND detail NOT LIKE '%Clear%')) THEN 1 END) as entries,
+                        COUNT(CASE WHEN kind IN ('ShipLoss', 'Crash') THEN 1 END) as losses
+                    FROM events 
+                    WHERE session = @sess;";
+                cmdSess.Parameters.AddWithValue("@sess", sessName);
+                using var rSess = cmdSess.ExecuteReader();
+                int dbQts = 0, exits = 0, entries = 0, losses = 0;
+                if (rSess.Read())
+                {
+                    dbQts = rSess.IsDBNull(0) ? 0 : rSess.GetInt32(0);
+                    exits = rSess.IsDBNull(1) ? 0 : rSess.GetInt32(1);
+                    entries = rSess.IsDBNull(2) ? 0 : rSess.GetInt32(2);
+                    losses = rSess.IsDBNull(3) ? 0 : rSess.GetInt32(3);
+                }
+                int dbSorties = Math.Max(exits + (entries > exits || dbQts > 0 ? 1 : 0), entries);
+                if (dbSorties == 0 && dbQts > 0) dbSorties = 1;
+                if (losses > 0 && entries <= exits && !locState.IsTravelling) status = "Havarie / Claim";
 
-        if (shipName == "—") shipName = "Anvil Carrack";
-        string flightInfo = "Flugbereit · 14 Flüge · 8 QT-Sprünge";
+                int liveQts = 0;
+                int liveSorties = 0;
+                if (targetSession == "__live__")
+                {
+                    lock (_liveEventsLock)
+                    {
+                        liveQts = _liveEvents.Count(e => e.Kind == "Quantum" || (e.Category == "ship" && (e.Title.Contains("Quantum") || e.Description.Contains("QT-"))));
+                        int lExits = _liveEvents.Count(e => e.Kind == "Vehicle" && e.Description.Contains("verlassen"));
+                        int lEntries = _liveEvents.Count(e => e.Kind == "Vehicle" && !e.Description.Contains("verlassen"));
+                        liveSorties = Math.Max(lExits + (lEntries > lExits || liveQts > 0 ? 1 : 0), lEntries);
+                        if (liveSorties == 0 && liveQts > 0) liveSorties = 1;
+                    }
+                }
+
+                sessionQts = Math.Max(liveQts, dbQts);
+                sessionSorties = Math.Max(liveSorties, dbSorties);
+
+                // Query lifetime stats for ship
+                if (shipName != "—")
+                {
+                    using var cmdLife = db.CreateCommand();
+                    cmdLife.CommandText = @"
+                        SELECT 
+                            COUNT(DISTINCT session) as flights,
+                            COUNT(CASE WHEN kind = 'Quantum' THEN 1 END) as qts
+                        FROM events 
+                        WHERE (ship = @ship OR ship LIKE @shipPattern);";
+                    cmdLife.Parameters.AddWithValue("@ship", shipName);
+                    cmdLife.Parameters.AddWithValue("@shipPattern", $"%{shipName}%");
+                    using var rLife = cmdLife.ExecuteReader();
+                    if (rLife.Read())
+                    {
+                        lifeFlights = rLife.IsDBNull(0) ? 0 : rLife.GetInt32(0);
+                        lifeQts = rLife.IsDBNull(1) ? 0 : rLife.GetInt32(1);
+                    }
+                }
+            }
+
+            string fText = sessionSorties == 1 ? "1 Flug" : $"{sessionSorties} Flüge";
+            string qText = sessionQts == 1 ? "1 QT-Sprung" : $"{sessionQts} QT-Sprünge";
+            flightInfo = $"{status} · {fText} · {qText}";
+            flightTooltip = targetSession == "__all__"
+                ? $"Gesamtstatistik ({shipName}): {lifeFlights} Flüge · {lifeQts} QT-Sprünge"
+                : $"Sitzung: {sessionSorties} Flüge · {sessionQts} QT-Sprünge | Gesamt ({shipName}): {lifeFlights} Flüge · {lifeQts} QT-Sprünge";
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("PhotinoBridge.GetHudTelemetry.ShipCalc", ex);
+        }
 
         // Wallet & Finances
         var settings = Settings.Load();
@@ -3875,7 +4027,6 @@ public class PhotinoBridge
             }
             else
             {
-                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "Game.log") : targetSession;
                 cmd.CommandText = @"
                     SELECT 
                         COALESCE(SUM(CASE WHEN kind IN ('TransferIn', 'MissionReward', 'Sale', 'Trade') THEN amount ELSE 0 END), 0),
@@ -3945,7 +4096,6 @@ public class PhotinoBridge
             }
             else
             {
-                string sessName = targetSession == "__live__" ? (_activeSessionName ?? "") : targetSession;
                 cmd.CommandText = "SELECT start, end FROM sessions WHERE name = @sess LIMIT 1;";
                 cmd.Parameters.AddWithValue("@sess", sessName);
                 using var r = cmd.ExecuteReader();
@@ -4055,8 +4205,9 @@ public class PhotinoBridge
             TravellingToSystem = travellingToSys,
             IsArmistice = isArmistice,
             Jurisdiction = jurisdiction,
-            ShipName = shipName,
+            ShipName = shipName ?? "—",
             ShipFlightInfo = flightInfo,
+            ShipFlightTooltip = flightTooltip,
             Balance = balance,
             SessionIncome = income,
             SessionSpend = spend,
@@ -6660,6 +6811,12 @@ public class PhotinoBridge
             {
                 CheckAndTriggerToast(entry, dto);
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
+
+                if (!string.IsNullOrWhiteSpace(entry.Ship) && entry.Ship != "—" && entry.Kind is EventKind.Vehicle or EventKind.Quantum)
+                {
+                    var cat = FleetCatalog.Lookup(entry.Ship);
+                    _currentShip = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : entry.Ship;
+                }
 
                 bool isFinancial = entry.Amount != 0 && MapCategory(entry.Kind) == "wallet";
                 if (isFinancial)

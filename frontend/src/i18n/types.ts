@@ -72,6 +72,10 @@ export interface Translations {
     openInFleet: string;
     openInWiki: string;
     flightReady: string;
+    inQuantum?: string;
+    inFlight?: string;
+    landed?: string;
+    destroyed?: string;
     readyForAssignment: string;
     ready: string;
     active: string;

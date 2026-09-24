@@ -58,6 +58,7 @@ export interface HudTelemetry {
   jurisdiction: string;
   shipName: string;
   shipFlightInfo: string;
+  shipFlightTooltip?: string;
   balance: number;
   sessionIncome: number;
   sessionSpend: number;
