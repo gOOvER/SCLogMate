@@ -23,11 +23,11 @@ import {
   AlertOctagon,
   Activity,
   Package,
-  Globe,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
 import { useI18n } from '../i18n';
+import { RegionFlag, extractRegionFromText, cleanServerEventDescription } from '../components/RegionFlag';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
@@ -280,13 +280,15 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
   const getCategoryBadge = (cat: string, evItem?: LogEventItem) => {
     switch (cat) {
-      case 'server':
+      case 'server': {
+        const reg = extractRegionFromText(evItem?.description || evItem?.title);
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/60 text-blue-300 border border-blue-800/60 shrink-0">
-            <Globe className="w-2.5 h-2.5 text-blue-400" />
-            <span>{t('events.catServer')}</span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/60 text-blue-300 border border-blue-800/60 shrink-0">
+            <RegionFlag regionCode={reg} className="w-3.5 h-[9.5px] rounded-[1px] overflow-hidden border border-cyan-900/60 shrink-0 shadow-xs relative inline-flex items-center justify-center" />
+            <span>{reg && reg !== 'PU' ? `${reg} Server` : t('events.catServer')}</span>
           </span>
         );
+      }
       case 'wallet':
         return (
           <button
@@ -825,9 +827,24 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
                     {/* Detail Text */}
                     <div className="flex items-center justify-between gap-2 px-3 py-1.5 overflow-hidden min-w-0 group/detail">
-                      <span className={`truncate text-xs ${getDetailColor(e)}`} title={e.description || e.title}>
-                        {e.description || e.title}
-                      </span>
+                      {e.category === 'server' || (e.description && (e.description.includes('Server beigetreten') || e.description.includes('Server verbunden'))) ? (
+                        <div className="flex items-center gap-2 min-w-0 truncate">
+                          <RegionFlag
+                            regionCode={extractRegionFromText(e.description || e.title)}
+                            className="w-4 h-[11px] rounded-[1.5px] overflow-hidden border border-cyan-800/60 shrink-0 shadow-xs relative inline-flex items-center justify-center"
+                          />
+                          <span
+                            className={`truncate text-xs ${getDetailColor(e)}`}
+                            title={cleanServerEventDescription(e.description || e.title)}
+                          >
+                            {cleanServerEventDescription(e.description || e.title)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={`truncate text-xs ${getDetailColor(e)}`} title={e.description || e.title}>
+                          {e.description || e.title}
+                        </span>
+                      )}
                       {e.category === 'mission' ? (
                         <button
                           type="button"
@@ -886,7 +903,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               {/* Drawer Header */}
               <div className="flex items-center justify-between pb-2 border-b border-cyan-950">
                 <div className="flex items-center gap-2">
-                  {getCategoryBadge(selectedEvent.category)}
+                  {getCategoryBadge(selectedEvent.category, selectedEvent)}
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
                     Ereignis-Detail
                   </span>
@@ -902,9 +919,19 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
               {/* Title & Description */}
               <div>
-                <div className="text-sm font-bold text-slate-100 leading-snug">{selectedEvent.title}</div>
+                <div className="text-sm font-bold text-slate-100 leading-snug flex items-center gap-2">
+                  {selectedEvent.category === 'server' && (
+                    <RegionFlag
+                      regionCode={extractRegionFromText(selectedEvent.description || selectedEvent.title)}
+                      className="w-4 h-[11px] rounded-[1.5px] overflow-hidden border border-cyan-800/60 shrink-0 shadow-xs relative inline-flex items-center justify-center"
+                    />
+                  )}
+                  <span>{selectedEvent.title}</span>
+                </div>
                 <div className="mt-1 text-xs text-slate-300 font-sans leading-relaxed">
-                  {selectedEvent.description}
+                  {selectedEvent.category === 'server'
+                    ? cleanServerEventDescription(selectedEvent.description)
+                    : selectedEvent.description}
                 </div>
               </div>
 

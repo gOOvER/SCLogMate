@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reactive ping updates now immediately measure regional server latency when switching shards.
 
 ### Fixed
+- **Server Join Regional Flag Icons in Live Log & Events View (`Core/LogParser.cs`, `frontend/src/components/RegionFlag.tsx`, `frontend/src/components/HudBar.tsx`, `frontend/src/views/EventsView.tsx`)**:
+  - Replaced raw Unicode country flag emojis in server join event details with crisp SVG vector flags (`RegionFlag` component supporting EU, US, Germany, Australia, and Asia).
+  - Resolved Windows DirectWrite/Chromium font limitation where regional indicator emojis failed to render as flags and displayed as broken text letters (e.g. `EU Server beigetreten: EU`).
+  - Added vector regional flag display to the `Server` category badge, live log data grid rows, and event detail inspector drawer.
+  - Implemented `cleanServerEventDescription` and `extractRegionFromText` to normalize server event descriptions and strip legacy broken emoji prefixes.
 - **Aurora Voice Companion - Elimination of Repeated "Willkommen in Nyx" & "Willkommen in Levski" Audio Spams (`Core/AuroraVoiceService.cs`)**:
   - Fixed a critical double-invocation bug where `ProcessLiveLine` triggered `OnJurisdictionChanged("People's Alliance")` and subsequently `ProcessLiveEvent` called `OnJurisdictionChanged("🏛 Rechtsgebiet: People's Alliance (Nyx)")`, which matched the "Nyx" substring and queued "Willkommen in Nyx" directly behind "Willkommen in Levski".
   - Implemented strict SHUD notification filtering for jurisdiction changes so intermediate HUD fade/removal notifications (`<UpdateNotificationItem>`, `Action: Next`, `Action: StartFade`, `Action: Remove`) and chat messages never trigger false or repetitive jurisdiction audio.

@@ -2761,10 +2761,10 @@ public partial class LogParser
 
     private static LogEntry CreateServerJoinEntry(DateTime time, string shardName)
     {
-        var (flag, region, shardNum) = ParseShardDetails(shardName);
+        var (_, region, shardNum) = ParseShardDetails(shardName);
         var detail = string.IsNullOrEmpty(shardNum)
-            ? $"{flag} Server beigetreten: {region} ({shardName})"
-            : $"{flag} Server beigetreten: {region} · Shard {shardNum} ({shardName})";
+            ? $"Server beigetreten: {region} ({shardName})"
+            : $"Server beigetreten: {region} · Shard {shardNum} ({shardName})";
 
         return new LogEntry
         {

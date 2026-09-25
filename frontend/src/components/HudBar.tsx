@@ -3,7 +3,6 @@ import {
   Compass,
   CreditCard,
   ExternalLink,
-  Globe,
   MapPin,
   Rocket,
   Scroll,
@@ -22,6 +21,7 @@ import { HudTelemetry, PilotProfile, bridge } from '../services/photinoBridge';
 import { NavTabId } from './Sidebar';
 import { useI18n } from '../i18n';
 import { PilotDossierModal } from './PilotDossierModal';
+import { RegionFlag } from './RegionFlag';
 
 interface HudBarProps {
   telemetry: HudTelemetry;
@@ -30,96 +30,6 @@ interface HudBarProps {
   onToggleAutoOcr?: () => void;
   onOpenWiki?: (query: string) => void;
 }
-
-const RegionFlag: React.FC<{ regionCode?: string }> = ({ regionCode }) => {
-  const code = (regionCode || '').toUpperCase();
-
-  if (code === 'EU') {
-    return (
-      <span
-        className="inline-flex items-center justify-center w-4 h-[11px] rounded-[1.5px] overflow-hidden bg-[#003399] border border-cyan-900/60 shrink-0 shadow-xs relative"
-        title="Europa (EU)"
-      >
-        <svg viewBox="0 0 16 11" className="w-full h-full block">
-          <circle cx="8" cy="1.8" r="0.8" fill="#FFCC00" />
-          <circle cx="11.4" cy="2.9" r="0.8" fill="#FFCC00" />
-          <circle cx="12.9" cy="5.5" r="0.8" fill="#FFCC00" />
-          <circle cx="11.4" cy="8.1" r="0.8" fill="#FFCC00" />
-          <circle cx="8" cy="9.2" r="0.8" fill="#FFCC00" />
-          <circle cx="4.6" cy="8.1" r="0.8" fill="#FFCC00" />
-          <circle cx="3.1" cy="5.5" r="0.8" fill="#FFCC00" />
-          <circle cx="4.6" cy="2.9" r="0.8" fill="#FFCC00" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (code === 'US') {
-    return (
-      <span
-        className="inline-flex items-center justify-center w-4 h-[11px] rounded-[1.5px] overflow-hidden bg-[#B22234] border border-cyan-900/60 shrink-0 shadow-xs relative"
-        title="USA / Nordamerika (US)"
-      >
-        <svg viewBox="0 0 16 11" className="w-full h-full block">
-          <rect y="1.8" width="16" height="1.8" fill="#FFFFFF" />
-          <rect y="5.4" width="16" height="1.8" fill="#FFFFFF" />
-          <rect y="9.0" width="16" height="1.8" fill="#FFFFFF" />
-          <rect width="7" height="6" fill="#3C3B6E" />
-          <circle cx="2" cy="1.8" r="0.5" fill="#FFFFFF" />
-          <circle cx="5" cy="1.8" r="0.5" fill="#FFFFFF" />
-          <circle cx="3.5" cy="3" r="0.5" fill="#FFFFFF" />
-          <circle cx="2" cy="4.2" r="0.5" fill="#FFFFFF" />
-          <circle cx="5" cy="4.2" r="0.5" fill="#FFFFFF" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (code === 'AUS') {
-    return (
-      <span
-        className="inline-flex items-center justify-center w-4 h-[11px] rounded-[1.5px] overflow-hidden bg-[#00008B] border border-cyan-900/60 shrink-0 shadow-xs relative"
-        title="Australien / APAC (AUS)"
-      >
-        <svg viewBox="0 0 16 11" className="w-full h-full block">
-          <rect width="7" height="5.5" fill="#00247D" />
-          <path d="M 0,0 L 7,5.5 M 7,0 L 0,5.5" stroke="#FFFFFF" strokeWidth="0.8" />
-          <path d="M 0,0 L 7,5.5 M 7,0 L 0,5.5" stroke="#CF142B" strokeWidth="0.4" />
-          <rect x="2.5" width="1.8" height="5.5" fill="#FFFFFF" />
-          <rect y="2" width="7" height="1.8" fill="#FFFFFF" />
-          <rect x="2.9" width="1" height="5.5" fill="#CF142B" />
-          <rect y="2.4" width="7" height="1" fill="#CF142B" />
-          <circle cx="11.5" cy="2.5" r="0.6" fill="#FFFFFF" />
-          <circle cx="13.5" cy="4.5" r="0.6" fill="#FFFFFF" />
-          <circle cx="10.5" cy="6.5" r="0.6" fill="#FFFFFF" />
-          <circle cx="12.5" cy="8.5" r="0.6" fill="#FFFFFF" />
-          <circle cx="3.5" cy="8.2" r="0.8" fill="#FFFFFF" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (code === 'ASIA') {
-    return (
-      <span
-        className="inline-flex items-center justify-center w-4 h-[11px] rounded-[1.5px] overflow-hidden bg-[#0b1b2d] border border-cyan-900/60 shrink-0 shadow-xs"
-        title="Asien (ASIA)"
-      >
-        <Globe className="w-2.5 h-2.5 text-cyan-400" />
-      </span>
-    );
-  }
-
-  // Default / Other / PU
-  return (
-    <span
-      className="inline-flex items-center justify-center w-4 h-[11px] rounded-[1.5px] overflow-hidden bg-[#0b1b2d] border border-cyan-900/60 shrink-0 shadow-xs"
-      title="Persistent Universe"
-    >
-      <Globe className="w-2.5 h-2.5 text-cyan-400" />
-    </span>
-  );
-};
 
 export const HudBar: React.FC<HudBarProps> = ({
   telemetry,
