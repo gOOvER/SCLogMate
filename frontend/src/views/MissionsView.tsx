@@ -356,6 +356,11 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                     {m.description && (
                       <div className="text-[11px] text-slate-400 truncate max-w-md">
                         {m.description}
+                        {m.stepsTotal && m.stepsTotal > 0 ? (
+                          <span className="text-cyan-400 font-mono ml-2">
+                            · {m.progressText || `Schritt ${m.stepsDone ?? 0} von ${m.stepsTotal}`}
+                          </span>
+                        ) : null}
                       </div>
                     )}
                   </td>
@@ -375,7 +380,14 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
                   </td>
                   <td className="py-3 px-4 text-center">
                     {m.isActive ? (
-                      <span className="sc-badge-green text-[10px]">Aktiv</span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="sc-badge-green text-[10px]">Aktiv</span>
+                        {m.stepsTotal && m.stepsTotal > 0 ? (
+                          <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/50 border border-cyan-800/60 px-1.5 py-0.5 rounded shadow-sm">
+                            {m.progressText || `${m.stepsDone ?? 0}/${m.stepsTotal}`}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : m.isCompleted ? (
                       <span className="sc-badge text-[10px]">Erledigt</span>
                     ) : m.isIllegal ? (

@@ -503,6 +503,15 @@ public class MissionItemDto
     [JsonPropertyName("isCompleted")]
     public bool IsCompleted { get; set; }
 
+    [JsonPropertyName("stepsDone")]
+    public int StepsDone { get; set; }
+
+    [JsonPropertyName("stepsTotal")]
+    public int StepsTotal { get; set; }
+
+    [JsonPropertyName("progressText")]
+    public string? ProgressText { get; set; }
+
     [JsonPropertyName("time")]
     public string? Time { get; set; }
 }
@@ -5298,6 +5307,9 @@ public class PhotinoBridge
                 Description = $"{c.Type} • {c.Difficulty} • System: {c.System}",
                 StarSystems = !string.IsNullOrWhiteSpace(c.System) && c.System != "k.A." ? c.System : "Stanton",
                 Time = c.AcceptedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
+                StepsDone = c.StepsDone,
+                StepsTotal = c.StepsTotal,
+                ProgressText = c.StepsText
             });
         }
 

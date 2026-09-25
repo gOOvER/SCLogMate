@@ -89,3 +89,25 @@ public sealed record ConfirmedPurchaseRecord
     public string TimestampText => TimeText;
     public string TotalPriceFormatted => TotalPriceText;
 }
+
+public sealed record ConfirmedSaleRecord
+{
+    public DateTime Timestamp { get; init; }
+    public string ItemName { get; init; } = "";
+    public string Category { get; init; } = "Sonstige";
+    public string Shop { get; init; } = "—";
+    public string Location { get; init; } = "—";
+    public decimal TotalPrice { get; init; }
+    public int Quantity { get; init; }
+    public decimal UnitPrice => Quantity > 0 ? TotalPrice / Quantity : TotalPrice;
+    public bool Confirmed { get; init; } = true;
+
+    public string TimeText => Timestamp.ToLocalTime().ToString("dd.MM.yy HH:mm");
+    public string TotalPriceText => $"{TotalPrice:N0} aUEC";
+    public string UnitPriceText => $"{UnitPrice:N0} aUEC";
+    public string QuantityText => $"×{Quantity}";
+
+    public string ShopName => Shop;
+    public string TimestampText => TimeText;
+    public string TotalPriceFormatted => TotalPriceText;
+}

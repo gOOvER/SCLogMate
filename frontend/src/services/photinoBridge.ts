@@ -257,6 +257,9 @@ export interface MissionItemDto {
   description: string;
   isActive?: boolean;
   isCompleted?: boolean;
+  stepsDone?: number;
+  stepsTotal?: number;
+  progressText?: string;
   time?: string;
 }
 

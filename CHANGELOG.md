@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Kiosk Item Sale Tracking in Ledger & Financial History (`Core/LogParser.cs`, `Models/MarketModels.cs`, `Core/Database.cs`)**:
+  - Implemented end-to-end tracking for selling items (ship components, weapons, armor, containers) at kiosks and shops via `SShopSellRequest` correlated with `RmShopFlowResponse (type[Selling], result[Success])`.
+  - Added `ConfirmedSaleRecord` model and `ConfirmedSales` collection in `LogParser`.
+  - Added automatic "Item verkauft" ledger bookings to `LedgerRecords`, ensuring income from kiosk sales is accounted for in financial overviews and ledger timelines alongside purchases and commodity trading.
+- **Detailed Mission Objective Step Tracking & Progress Badges (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Integrated intermediate mission objective progress tracking from `<ObjectiveUpserted>` events (`MISSION_OBJECTIVE_STATE_COMPLETED`).
+  - Added smart objective label detection identifying specific actions: cargo pickups (`Fracht abgeholt`), deliveries (`Fracht geliefert`), phase completions (`Phase abgeschlossen`), and combat target eliminations (`Ziel eliminiert`).
+  - Emits real-time `EventKind.Mission` log entries in the Live Log and Events View displaying progress counters (e.g. `Teilziel: Fracht abgeholt (1/2) · Junior | Stellar Small Haul`).
+  - Added `stepsDone`, `stepsTotal`, and `progressText` to `MissionItemDto` and displayed dynamic progress badges on active contracts in `MissionsView`.
+
+### Fixed
+- **Premature Contract Completion Bug on Multi-Step Missions (`Core/LogParser.cs`)**:
+  - Fixed a critical issue where completing an initial intermediate objective (such as the first pickup of a multi-drop hauling contract) prematurely marked the entire mission as `Completed`, causing active missions to vanish from the active contracts view.
+  - Contracts now correctly remain `InProgress` until all objective steps are fulfilled or official contract completion notifications are received.
+  - Added `_contractObjectives.Clear()` to `LogParser.Reset()` to prevent cross-session objective state pollution.
+- Bumped SQLite `CurrentParserVersion` to 40 in `Core/Database.cs` to re-index historical sessions with accurate contract states and confirmed sale ledger entries.
 
 ## [1.1.0] - 2026-09-25
 ### Added

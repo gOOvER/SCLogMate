@@ -84,7 +84,7 @@ public partial class LogParser
     private static partial Regex CommodityBuyRegex();
 
     // Shop Response (Kaufbestätigung)
-    [GeneratedRegex(@"(?:Shop Flow Response|RmShopFlowResponse).*?result\[(?<result>[^\]]*)\]")]
+    [GeneratedRegex(@"(?:Shop Flow Response|RmShopFlowResponse).*?result\[(?<result>[^\]]*)\].*?(?:type\[(?<type>[^\]]*)\])?", RegexOptions.IgnoreCase)]
     private static partial Regex ShopResponseRegex();
 
     // Objective Status & Fortschritt
@@ -427,17 +427,20 @@ public partial class LogParser
         _metaComplete = false;
         Meta.Clear();
         ConfirmedPurchases.Clear();
+        ConfirmedSales.Clear();
         CargoTrades.Clear();
         LedgerRecords.Clear();
         LocationVisits.Clear();
         QuantumDestinations.Clear();
         WarehouseMovements.Clear();
+        _contractObjectives.Clear();
         _locationIdToInfo.Clear();
         _missionDropoffItems.Clear();
         _crewMembers.Clear();
         _currentShipCrew.Clear();
         CurrentShipOwner = null;
         _pendingPurchase = null;
+        _pendingSale = null;
         _pendingLocationName = null;
         _pendingRawLoc = null;
         _firstTime = null;
@@ -456,7 +459,11 @@ public partial class LogParser
     public sealed record PendingPurchase(DateTime Timestamp, string Shop, string Item, string Guid, decimal Price, int Qty);
     private PendingPurchase? _pendingPurchase;
 
+    public sealed record PendingSale(DateTime Timestamp, string Shop, string Item, string Guid, decimal Price, int Qty);
+    private PendingSale? _pendingSale;
+
     public List<ConfirmedPurchaseRecord> ConfirmedPurchases { get; } = new();
+    public List<ConfirmedSaleRecord> ConfirmedSales { get; } = new();
     public List<CargoTradeRecord> CargoTrades { get; } = new();
     public List<LedgerRecord> LedgerRecords { get; } = new();
     public List<(DateTime Time, string RawId, string Name, string? System, string? Body, string Kind)> LocationVisits { get; } = new();
@@ -690,39 +697,86 @@ public partial class LogParser
 
         bool isNotif = line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase);
 
-        // Kiosk-Kaufbestätigung (Shop Flow Response)
-        if (_pendingPurchase != null && (line.Contains("Shop Flow Response", StringComparison.OrdinalIgnoreCase) || line.Contains("RmShopFlowResponse", StringComparison.OrdinalIgnoreCase)))
+        // Kiosk-Kaufbestätigung / Verkauf (Shop Flow Response)
+        if ((_pendingPurchase != null || _pendingSale != null) && (line.Contains("Shop Flow Response", StringComparison.OrdinalIgnoreCase) || line.Contains("RmShopFlowResponse", StringComparison.OrdinalIgnoreCase)))
         {
             var sres = ShopResponseRegex().Match(line);
-            if (sres.Success && sres.Groups["result"].Value.Equals("Success", StringComparison.OrdinalIgnoreCase))
+            if (sres.Success)
             {
-                var p = _pendingPurchase;
-                _pendingPurchase = null;
-                var where = PlaceAt(p.Timestamp);
-                var cat = CategorizeItem(p.Guid, p.Item);
-                ConfirmedPurchases.Add(new ConfirmedPurchaseRecord
-                {
-                    Timestamp = p.Timestamp,
-                    ItemName = p.Item,
-                    Category = cat,
-                    Shop = p.Shop,
-                    Location = where,
-                    TotalPrice = p.Price,
-                    Quantity = p.Qty,
-                    Confirmed = true
-                });
+                var result = sres.Groups["result"].Value;
+                var flowType = sres.Groups["type"].Success ? sres.Groups["type"].Value : "";
 
-                LedgerRecords.Add(new LedgerRecord
+                if (result.Equals("Success", StringComparison.OrdinalIgnoreCase))
                 {
-                    Timestamp = p.Timestamp,
-                    Kind = "Item gekauft",
-                    What = p.Qty > 1 ? $"{p.Item} ×{p.Qty}" : p.Item,
-                    Where = where,
-                    Shop = p.Shop,
-                    Amount = -p.Price,
-                    Quantity = p.Qty,
-                    Confirmed = true
-                });
+                    if (_pendingPurchase != null && (string.IsNullOrEmpty(flowType) || flowType.Equals("Buying", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var p = _pendingPurchase;
+                        _pendingPurchase = null;
+                        var where = PlaceAt(p.Timestamp);
+                        var cat = CategorizeItem(p.Guid, p.Item);
+                        ConfirmedPurchases.Add(new ConfirmedPurchaseRecord
+                        {
+                            Timestamp = p.Timestamp,
+                            ItemName = p.Item,
+                            Category = cat,
+                            Shop = p.Shop,
+                            Location = where,
+                            TotalPrice = p.Price,
+                            Quantity = p.Qty,
+                            Confirmed = true
+                        });
+
+                        LedgerRecords.Add(new LedgerRecord
+                        {
+                            Timestamp = p.Timestamp,
+                            Kind = "Item gekauft",
+                            What = p.Qty > 1 ? $"{p.Item} ×{p.Qty}" : p.Item,
+                            Where = where,
+                            Shop = p.Shop,
+                            Amount = -p.Price,
+                            Quantity = p.Qty,
+                            Confirmed = true
+                        });
+                    }
+
+                    if (_pendingSale != null && (string.IsNullOrEmpty(flowType) || flowType.Equals("Selling", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var s = _pendingSale;
+                        _pendingSale = null;
+                        var where = PlaceAt(s.Timestamp);
+                        var cat = CategorizeItem(s.Guid, s.Item);
+                        ConfirmedSales.Add(new ConfirmedSaleRecord
+                        {
+                            Timestamp = s.Timestamp,
+                            ItemName = s.Item,
+                            Category = cat,
+                            Shop = s.Shop,
+                            Location = where,
+                            TotalPrice = s.Price,
+                            Quantity = s.Qty,
+                            Confirmed = true
+                        });
+
+                        LedgerRecords.Add(new LedgerRecord
+                        {
+                            Timestamp = s.Timestamp,
+                            Kind = "Item verkauft",
+                            What = s.Qty > 1 ? $"{s.Item} ×{s.Qty}" : s.Item,
+                            Where = where,
+                            Shop = s.Shop,
+                            Amount = s.Price,
+                            Quantity = s.Qty,
+                            Confirmed = true
+                        });
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(flowType) || flowType.Equals("Buying", StringComparison.OrdinalIgnoreCase))
+                        _pendingPurchase = null;
+                    if (string.IsNullOrEmpty(flowType) || flowType.Equals("Selling", StringComparison.OrdinalIgnoreCase))
+                        _pendingSale = null;
+                }
             }
         }
 
@@ -738,12 +792,14 @@ public partial class LogParser
                 bool isShowInLog = om.Groups["flags"].Success && om.Groups["flags"].Value.Contains("ShowInLog", StringComparison.OrdinalIgnoreCase);
 
                 var dt = ParseTs(line);
-                ContractOutcome outcome = stateStr switch
-                {
-                    "MISSION_OBJECTIVE_STATE_COMPLETED" => ContractOutcome.Completed,
-                    "MISSION_OBJECTIVE_STATE_WITHDRAWN" or "MISSION_OBJECTIVE_STATE_FAILED" => ContractOutcome.Abandoned,
-                    _ => ContractOutcome.InProgress
-                };
+                bool isCompletedState = stateStr.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase);
+                bool isWithdrawnState = stateStr.Equals("MISSION_OBJECTIVE_STATE_WITHDRAWN", StringComparison.OrdinalIgnoreCase) ||
+                                       stateStr.Equals("MISSION_OBJECTIVE_STATE_FAILED", StringComparison.OrdinalIgnoreCase);
+
+                bool isNewCompletion = false;
+                int totalSteps = 0;
+                int doneSteps = 0;
+                ContractRecord? existing = null;
 
                 lock (_stateLock)
                 {
@@ -752,19 +808,42 @@ public partial class LogParser
                         steps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                         _contractObjectives[mId] = steps;
                     }
+
+                    if (isCompletedState)
+                    {
+                        if (!steps.TryGetValue(objId, out var prevStatus) || !prevStatus.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase))
+                        {
+                            isNewCompletion = true;
+                        }
+                    }
+
                     if (isShowInLog || !steps.ContainsKey(objId))
                     {
                         steps[objId] = stateStr;
                     }
 
-                    int totalSteps = steps.Count;
-                    int doneSteps = steps.Values.Count(st => st.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase));
+                    totalSteps = steps.Count;
+                    doneSteps = steps.Values.Count(st => st.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase));
 
-                    if (_contracts.TryGetValue(mId, out var existing))
+                    if (_contracts.TryGetValue(mId, out existing))
                     {
-                        var finalOutcome = existing.Outcome == ContractOutcome.Completed
-                            ? ContractOutcome.Completed
-                            : outcome;
+                        ContractOutcome finalOutcome;
+                        if (existing.Outcome == ContractOutcome.Completed)
+                        {
+                            finalOutcome = ContractOutcome.Completed;
+                        }
+                        else if (isWithdrawnState)
+                        {
+                            finalOutcome = ContractOutcome.Abandoned;
+                        }
+                        else if (totalSteps > 0 && doneSteps >= totalSteps)
+                        {
+                            finalOutcome = ContractOutcome.Completed;
+                        }
+                        else
+                        {
+                            finalOutcome = ContractOutcome.InProgress;
+                        }
 
                         _contracts[mId] = existing with
                         {
@@ -776,6 +855,28 @@ public partial class LogParser
                                 : null
                         };
                     }
+                }
+
+                if (isNewCompletion && (isShowInLog || objId.StartsWith("pickup", StringComparison.OrdinalIgnoreCase) || objId.StartsWith("dropoff", StringComparison.OrdinalIgnoreCase)))
+                {
+                    string label = objId switch
+                    {
+                        _ when objId.StartsWith("pickup", StringComparison.OrdinalIgnoreCase) => "Fracht abgeholt",
+                        _ when objId.StartsWith("dropoff", StringComparison.OrdinalIgnoreCase) => "Fracht geliefert",
+                        _ when objId.StartsWith("phase", StringComparison.OrdinalIgnoreCase) => "Phase abgeschlossen",
+                        _ when objId.StartsWith("kill", StringComparison.OrdinalIgnoreCase) || objId.StartsWith("destroy", StringComparison.OrdinalIgnoreCase) => "Ziel eliminiert",
+                        _ when objId.StartsWith("reach", StringComparison.OrdinalIgnoreCase) || objId.StartsWith("arrive", StringComparison.OrdinalIgnoreCase) => "Ziel erreicht",
+                        _ => "Teilziel erreicht"
+                    };
+
+                    string contractTitle = existing != null && !string.IsNullOrWhiteSpace(existing.Title) ? existing.Title : "Auftrag";
+                    string progress = totalSteps > 0 ? $" ({doneSteps}/{totalSteps})" : "";
+                    return new LogEntry
+                    {
+                        Time = dt,
+                        Kind = EventKind.Mission,
+                        Detail = $"Teilziel: {label}{progress} · {contractTitle}"
+                    };
                 }
             }
         }
@@ -971,6 +1072,8 @@ public partial class LogParser
                     }
                     WarehouseMovements.Add(new WarehouseMovementRecord(ts, targetLoc, locInfo.RawId, locInfo.System, locInfo.ParentBody, rawItem, resolved.Name, resolved.Category, -qty));
                 }
+
+                _pendingSale = new PendingSale(ts, shop, itemName, se.Groups["guid"].Value, price, qty);
 
                 return new LogEntry
                 {
