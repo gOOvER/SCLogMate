@@ -460,6 +460,8 @@ public class FleetResponseDto
     [JsonPropertyName("totalQuantumJumps")] public int TotalQuantumJumps { get; set; }
     [JsonPropertyName("hangarCount")] public int HangarCount { get; set; }
     [JsonPropertyName("flownCount")] public int FlownCount { get; set; }
+    [JsonPropertyName("asopTotalVehicles")] public int? AsopTotalVehicles { get; set; }
+    [JsonPropertyName("asopEntitledVehicles")] public int? AsopEntitledVehicles { get; set; }
 }
 
 public class MissionItemDto
@@ -5132,6 +5134,8 @@ public class PhotinoBridge
             TotalQuantumJumps = ships.Sum(s => s.QuantumJumps),
             HangarCount = hangarShips.Count,
             FlownCount = ships.Count,
+            AsopTotalVehicles = _parser.AsopFleetTotal,
+            AsopEntitledVehicles = _parser.AsopFleetEntitled,
         };
     }
 

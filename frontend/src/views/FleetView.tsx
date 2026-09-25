@@ -500,6 +500,30 @@ export const FleetView: React.FC<FleetViewProps> = ({
                 {(fleetData?.totalQuantumJumps ?? 0).toLocaleString()}
               </span>
             </div>
+
+            {/* ASOP FLOTTE */}
+            {fleetData?.asopTotalVehicles !== undefined && fleetData?.asopTotalVehicles !== null && fleetData.asopTotalVehicles > 0 && (
+              <div
+                className="bg-[#071d2b]/90 border border-[#0d4263] rounded-lg px-2.5 py-1 flex items-center gap-2 shadow-sm"
+                title={`Vom ASOP-Terminal gemeldete Flotte: ${fleetData.asopEntitledVehicles ?? 0} von ${fleetData.asopTotalVehicles} versichert & einsatzbereit`}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  (fleetData.asopEntitledVehicles ?? 0) < fleetData.asopTotalVehicles ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400'
+                }`} />
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400">
+                  ASOP
+                </span>
+                <span className="text-xs font-mono font-bold text-cyan-200">
+                  {fleetData.asopEntitledVehicles ?? 0}/{fleetData.asopTotalVehicles}
+                  <span className="text-[10px] font-normal text-slate-400 ml-1">bereit</span>
+                  {(fleetData.asopEntitledVehicles ?? 0) < fleetData.asopTotalVehicles && (
+                    <span className="text-[10px] font-normal text-amber-400 ml-1">
+                      ({fleetData.asopTotalVehicles - (fleetData.asopEntitledVehicles ?? 0)} Claim)
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

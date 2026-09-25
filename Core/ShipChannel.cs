@@ -148,7 +148,10 @@ public static class ShipChannel
             int atIdx = content.IndexOf(ending, StringComparison.OrdinalIgnoreCase);
             if (atIdx <= 0) continue;
 
-            var handle = content[..atIdx].Trim();
+            var rawHandle = content[..atIdx].Trim();
+            int splitIdx = rawHandle.LastIndexOfAny([' ', '>', ':', '"']);
+            var handle = splitIdx >= 0 ? rawHandle[(splitIdx + 1)..].Trim() : rawHandle;
+
             if (handle.Length == 0 || handle.Contains(' '))
                 continue;
 

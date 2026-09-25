@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Multi-Crew Boarding & Ship Comms Channel Recognition (`Core/ShipChannel.cs`, `Core/LogParser.cs`)**:
+  - Overhauled ship communication channel parsing to detect when crew members board or leave player-owned ships (`Painful_Pilot has joined the channel 'Argo MOTH : gOOvER'`), or when the player boards multi-crew vessels owned by other pilots (`RSI Perseus : GHO5T-04K`).
+  - Stripped preceding timestamps and message prefixes from raw channel log lines so handles are cleanly extracted even outside notification wrappers.
+  - Added channel event debouncing (15s window) to eliminate duplicate events caused by game engine HUD queues and fades.
+  - Accurately tracks active crew members in session metadata, Events View, and Blackbox.
+- **ASOP Fleet & Insurance Entitlement Tracking (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/FleetView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Implemented automatic extraction of ASOP terminal query notices (`<VehicleListQuery>`), capturing total owned fleet vehicles and currently active insurance entitlements.
+  - Added live ASOP telemetry badge in `FleetView` header displaying real-time ready-vs-claim ship count (e.g. `ASOP: 19/21 bereit (2 Claim)`).
+  - Logs session vehicle events when ASOP fleet counts update.
+- **Modern Star Citizen 4.x Hangar Status Detection (`Core/LogParser.cs`)**:
+  - Added recognition for modern 4.x ATC notices including `Joined hangar queue` and `Hangar Request Completed`.
 - **Kiosk Item Sale Tracking in Ledger & Financial History (`Core/LogParser.cs`, `Models/MarketModels.cs`, `Core/Database.cs`)**:
   - Implemented end-to-end tracking for selling items (ship components, weapons, armor, containers) at kiosks and shops via `SShopSellRequest` correlated with `RmShopFlowResponse (type[Selling], result[Success])`.
   - Added `ConfirmedSaleRecord` model and `ConfirmedSales` collection in `LogParser`.
@@ -18,11 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `stepsDone`, `stepsTotal`, and `progressText` to `MissionItemDto` and displayed dynamic progress badges on active contracts in `MissionsView`.
 
 ### Fixed
+- **Party Join/Leave Log Contamination (`Core/LogParser.cs`)**:
+  - Prevented ship channel join/leave notifications from falsely triggering party member join or leave log entries.
 - **Premature Contract Completion Bug on Multi-Step Missions (`Core/LogParser.cs`)**:
   - Fixed a critical issue where completing an initial intermediate objective (such as the first pickup of a multi-drop hauling contract) prematurely marked the entire mission as `Completed`, causing active missions to vanish from the active contracts view.
   - Contracts now correctly remain `InProgress` until all objective steps are fulfilled or official contract completion notifications are received.
   - Added `_contractObjectives.Clear()` to `LogParser.Reset()` to prevent cross-session objective state pollution.
-- Bumped SQLite `CurrentParserVersion` to 40 in `Core/Database.cs` to re-index historical sessions with accurate contract states and confirmed sale ledger entries.
+- Bumped SQLite `CurrentParserVersion` to 41 in `Core/Database.cs` to re-index historical sessions with multi-crew boarding events, ASOP fleet stats, accurate contract states, and confirmed sale ledger entries.
 
 ## [1.1.0] - 2026-09-25
 ### Added

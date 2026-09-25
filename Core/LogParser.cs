@@ -205,13 +205,22 @@ public partial class LogParser
     [GeneratedRegex(@"\[CEntityComponentShipListProvider::SetVehicleSpawn(?:ing|ed)Informations\].*?entityName\s*=\s*(?<ship>[^,\]]+)")]
     private static partial Regex AsopShipSpawnRegex();
 
-    // Comm-Kanal eines Schiffs: [ <Schiff> : <Besitzer> ]
-    [GeneratedRegex(@"(?:Kanal|Channel) \[ (?<ship>.+?) : (?<owner>[^\]]+?) \]")]
-    private static partial Regex ChannelRegex();
+    // ASOP Flottenabfrage (Fahrzeuge & Versicherungsansprüche)
+    [GeneratedRegex(@"<VehicleListQuery>\s+Fetching vehicle list for player\s+(?<pid>\d+)\s+completed\.\s+Retrieved\s+(?<entitled>\d+)\s+entitlements\s+out\s+of\s+(?<total>\d+)\s+vehicules", RegexOptions.IgnoreCase)]
+    private static partial Regex VehicleListQueryRegex();
 
     private readonly HashSet<string> _ownNames =
-        new(StringComparer.OrdinalIgnoreCase) { "MiwiDot", "miwi", "miwitv" };
+        new(StringComparer.OrdinalIgnoreCase) { "MiwiDot", "miwi", "miwitv", "gOOvER", "Torsten" };
     public string? LocalHandle { get; private set; }
+
+    public int? AsopFleetTotal { get; private set; }
+    public int? AsopFleetEntitled { get; private set; }
+    public DateTime? AsopFleetTime { get; private set; }
+    private int _lastAsopLogTotal = -1;
+    private int _lastAsopLogEntitled = -1;
+
+    private string? _lastChannelNoteKey;
+    private DateTime _lastChannelNoteTime;
 
     // Loot: Item ins Inventar gestaut. Nur „Runtime-spawned" = von der Welt gespawnt
     // (echter Loot aus Kisten/Gegnern), nicht Kauf/Umräumen.
@@ -312,7 +321,7 @@ public partial class LogParser
 
 
     // ATC Landefreigabe & Hangar-Zuweisung
-    [GeneratedRegex(@"(?:Landing Request Granted|Hangar Assignment|Assigned to Hangar|Landing gear down).*?(?<hangar>Hangar\s*(?:[A-Za-z0-9_]+|\d+)|Pad\s*\d+)")]
+    [GeneratedRegex(@"(?:Landing Request Granted|Hangar Assignment|Assigned to Hangar|Landing gear down|Hangar Request Completed|Joined hangar queue).*?(?<hangar>Hangar\s*(?:[A-Za-z0-9_]+|\d+)|Pad\s*\d+)?", RegexOptions.IgnoreCase)]
     private static partial Regex AtcHangarRegex();
 
     // Schiffszerstörung / Self-Destruct
@@ -451,6 +460,13 @@ public partial class LogParser
         _menuDuration = TimeSpan.Zero;
         ExpiredPendingTransfers = 0;
         _lastJoinedShard = null;
+        AsopFleetTotal = null;
+        AsopFleetEntitled = null;
+        AsopFleetTime = null;
+        _lastAsopLogTotal = -1;
+        _lastAsopLogEntitled = -1;
+        _lastChannelNoteKey = null;
+        _lastChannelNoteTime = DateTime.MinValue;
     }
 
     private string? _lastJoinedShard;
@@ -1247,6 +1263,41 @@ public partial class LogParser
             }
         }
 
+        // ASOP Flottenabfrage (Fahrzeuge & Versicherungsansprüche)
+        if (line.Contains("<VehicleListQuery>", StringComparison.Ordinal))
+        {
+            var vl = VehicleListQueryRegex().Match(line);
+            if (vl.Success)
+            {
+                int entitled = int.Parse(vl.Groups["entitled"].Value, CultureInfo.InvariantCulture);
+                int total = int.Parse(vl.Groups["total"].Value, CultureInfo.InvariantCulture);
+                var ts = ParseTs(line);
+
+                if (total > 0)
+                {
+                    if (total >= 10 || AsopFleetTotal == null)
+                    {
+                        AsopFleetTotal = total;
+                        AsopFleetEntitled = entitled;
+                        AsopFleetTime = ts;
+                    }
+
+                    if (_lastAsopLogTotal != total || _lastAsopLogEntitled != entitled)
+                    {
+                        _lastAsopLogTotal = total;
+                        _lastAsopLogEntitled = entitled;
+                        string claimText = total > entitled ? $" ({total - entitled} im Claim/Expedite)" : " (alle bereit)";
+                        return new LogEntry
+                        {
+                            Time = ts,
+                            Kind = EventKind.Vehicle,
+                            Detail = $"ASOP Flotte: {entitled} von {total} Schiffen einsatzbereit{claimText}"
+                        };
+                    }
+                }
+            }
+        }
+
         // Fahrzeug-Kontrolle / Cockpit-Sitzwechsel
         if (line.Contains("<Vehicle Control Flow>", StringComparison.Ordinal) || line.Contains("CVehicleMovementBase::", StringComparison.Ordinal))
         {
@@ -1269,18 +1320,28 @@ public partial class LogParser
             }
         }
 
-        if (isNotif)
+        if (isNotif || ShipChannel.IsChannel(line))
         {
             var note = ShipChannel.Read(ParseTs(line), line);
             if (note != null)
             {
+                var noteKey = $"{note.Moment}:{note.Ship}:{note.Owner}:{note.Handle}";
+                var noteTs = note.At;
+                if (noteKey == _lastChannelNoteKey && (noteTs - _lastChannelNoteTime).TotalSeconds < 15)
+                {
+                    return null;
+                }
+                _lastChannelNoteKey = noteKey;
+                _lastChannelNoteTime = noteTs;
+
                 _lastShip = note.Ship;
                 if (note.Moment == ChannelMoment.YouBoarded)
                 {
                     CurrentShipOwner = note.Owner;
                     _currentShipCrew.Clear();
                     bool isMyShip = string.Equals(note.Owner, LocalHandle, StringComparison.OrdinalIgnoreCase)
-                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase);
+                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase)
+                                 || _ownNames.Contains(note.Owner);
                     string desc = isMyShip
                         ? $"Eigenes Schiff betreten: {note.Ship}"
                         : $"Schiff betreten: {note.Ship} (Eigner: {note.Owner})";
@@ -1291,7 +1352,8 @@ public partial class LogParser
                     CurrentShipOwner = null;
                     _currentShipCrew.Clear();
                     bool isMyShip = string.Equals(note.Owner, LocalHandle, StringComparison.OrdinalIgnoreCase)
-                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase);
+                                 || string.Equals(note.Owner, Meta.GetValueOrDefault("character"), StringComparison.OrdinalIgnoreCase)
+                                 || _ownNames.Contains(note.Owner);
                     string desc = isMyShip
                         ? $"Eigenes Schiff verlassen: {note.Ship}"
                         : $"Schiff verlassen: {note.Ship} (Eigner: {note.Owner})";
@@ -1317,7 +1379,10 @@ public partial class LogParser
                     return new LogEntry { Time = note.At, Kind = EventKind.Party, Detail = desc, Ship = note.Ship };
                 }
             }
+        }
 
+        if (isNotif)
+        {
             var gn = GenericNotificationRegex().Match(line);
             if (gn.Success)
             {
@@ -1938,8 +2003,19 @@ public partial class LogParser
             {
                 var ts = ParseTs(line);
                 var hangar = atc.Groups["hangar"].Value.Trim();
-                LocationMachine.ApplyHangarAssignment(hangar, ts);
-                return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+                if (!string.IsNullOrEmpty(hangar))
+                {
+                    LocationMachine.ApplyHangarAssignment(hangar, ts);
+                    return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = $"Landefreigabe: {hangar}" };
+                }
+                else if (line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "Hangar-Anforderung bereit / Tor geöffnet" };
+                }
+                else if (line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "In Hangar-Warteschlange eingereiht" };
+                }
             }
         }
 
@@ -1988,27 +2064,6 @@ public partial class LogParser
         // Entitlement/Miete gestartet
         if (line.Contains("<EntitlementStarted>", StringComparison.Ordinal))
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Entitlement, Detail = "Entitlement/Miete gestartet" };
-
-        // Comm-Kanal -> eigene Schiffe in die Flotte, fremde als Party-Schiff
-        if (line.Contains("Kanal [", StringComparison.Ordinal) || line.Contains("Channel [", StringComparison.Ordinal))
-        {
-            var ch = ChannelRegex().Match(line);
-            if (ch.Success)
-            {
-                var shipName = ch.Groups["ship"].Value.Trim();
-                var owner = ch.Groups["owner"].Value.Trim();
-                if (_ownNames.Contains(owner))
-                {
-                    if (_channelSeen.Add("me|" + shipName))
-                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Detail = shipName, Ship = shipName };
-                }
-                else if (_channelSeen.Add(shipName + "|" + owner))
-                {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"Schiff: {shipName} · {owner}" };
-                }
-                return null;
-            }
-        }
 
         // Getragene Ausrüstung (einmal je Item)
         if (line.Contains("AttachmentReceived> Player[", StringComparison.Ordinal))
@@ -2417,20 +2472,30 @@ public partial class LogParser
             if (pjn.Success)
             {
                 var who = pjn.Groups["who"].Value.Trim();
-                var key = "j:" + who;
-                if (key == _lastParty) return null;
-                _lastParty = key;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                if (!who.Contains("channel", StringComparison.OrdinalIgnoreCase) && !who.Contains("Kanal", StringComparison.OrdinalIgnoreCase))
+                {
+                    var key = "j:" + who;
+                    if (key != _lastParty)
+                    {
+                        _lastParty = key;
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                    }
+                }
             }
             var pln = PartyMemberLeaveNotifRegex().Match(line);
             if (pln.Success)
             {
                 var who = pln.Groups["who"].Value.Trim();
-                if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
-                var key = "l:" + who;
-                if (key == _lastParty) return null;
-                _lastParty = key;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                if (!who.Contains("channel", StringComparison.OrdinalIgnoreCase) && !who.Contains("Kanal", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+                    var key = "l:" + who;
+                    if (key != _lastParty)
+                    {
+                        _lastParty = key;
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                    }
+                }
             }
         }
 

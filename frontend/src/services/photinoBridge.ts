@@ -241,6 +241,8 @@ export interface FleetResponseDto {
   totalQuantumJumps: number;
   hangarCount: number;
   flownCount: number;
+  asopTotalVehicles?: number | null;
+  asopEntitledVehicles?: number | null;
 }
 
 export interface MissionItemDto {
