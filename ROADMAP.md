@@ -312,5 +312,18 @@ Umfassendes Industriemodul für Solo- und Gruppen-Bergbau, Veredelungsaufträge,
   - [ ] `.\release.ps1 -SkipSign` (oder mit Signierung) ausführen.
   - [ ] GitHub-Release `v1.0.0` auf GitHub überprüfen.
 
+---
+
+## 🐧 11. Plattform-Erweiterungen & Nativer Linux-Build (Sehr geringe Priorität)
+
+- [ ] **Nativer Linux-Build (`linux-x64` / Wayland & X11) — Backlog / Langzeit-Evaluierung:**
+  - *Aktueller Stand:* Unter Wine / Proton im selben Präfix wie Star Citizen (Lutris / Bottles / LUG-Helper) läuft die bestehende Windows-Version bereits.
+  - **Projekt-Target:** Umstellung von `net10.0-windows10.0.19041.0` auf Multi-Targeting bzw. plattformneutrales `net10.0` mit bedingten Windows-Kompilaten.
+  - **In-Game Overlays:** Die nativen Win32 GDI Overlays (`NativeHudOverlay`, `NativeToastOverlay`, `NativeRsOverlay`) unter Linux hinter `OperatingSystem.IsWindows()` absichern und alternativ als transparente Avalonia-Fenster (`SystemDecorations="None"`) oder im Photino WebKitGTK-Webview darstellen.
+  - **Sprachausgabe (Aurora Voice):** `Windows.Media.Playback.MediaPlayer` für Linux durch eine plattformunabhängige C#-Audiobibliothek (z. B. `NetCoreAudio`, PulseAudio/PipeWire-Anbindung) ergänzen.
+  - **ScreenCapture & OCR:** Win32 GDI Desktop DC (`BitBlt`) für Linux durch X11 (`XShmGetImage`) oder Wayland Portal (`org.freedesktop.portal.ScreenCast`) ersetzen oder unter Linux optional abschalten.
+  - **Zwischenablage & Dateidialoge:** Win32 `user32.dll` (`OpenClipboard`) und `comdlg32.dll` durch Avalonia's plattformunabhängiges `Clipboard`- und `StorageProvider`-API ersetzen.
+  - **Token-Verschlüsselung:** Windows DPAPI (`ProtectedData.Protect`) unter Linux durch AES/Keyfile absichern.
+
 
 
