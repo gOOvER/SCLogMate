@@ -185,11 +185,19 @@ export const OreScannerView: React.FC = () => {
     try {
       setIsTestingScan(true);
       const res = await bridge.sendRequest<any>('test_ocr_scan', { target: 'rs' });
-      if (res?.success && res.extractedValue != null) {
+      if (res?.success && res.extractedValue != null && res.extractedValue >= 1000) {
         showToast(`✓ RS-Signatur erkannt: ${res.extractedValue.toLocaleString('de-DE')} RS (${res.durationMs}ms)`);
         handleInputChange(res.extractedValue.toString());
       } else if (res?.recognizedText && res.recognizedText !== '(Kein Text erkannt)') {
-        showToast(`Text erfasst: '${res.recognizedText}' (keine RS-Ziffer gefunden)`);
+        // Fallback: Ziffern aus dem erkannten Text extrahieren (z. B. "17,080" oder "3.200")
+        const stripped = res.recognizedText.replace(/[^\d]/g, '');
+        const fallbackVal = parseInt(stripped, 10);
+        if (!isNaN(fallbackVal) && fallbackVal >= 1000 && fallbackVal <= 300000) {
+          showToast(`✓ RS-Signatur erkannt (Fallback): ${fallbackVal.toLocaleString('de-DE')} RS (${res.durationMs || 0}ms)`);
+          handleInputChange(fallbackVal.toString());
+        } else {
+          showToast(`Text erfasst: '${res.recognizedText}' (keine RS-Signatur gefunden)`);
+        }
       } else {
         showToast('⚠️ Keine RS-Signatur im Scanbereich erkannt');
       }

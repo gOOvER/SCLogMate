@@ -6623,23 +6623,35 @@ public class PhotinoBridge
             {
                 return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
             }
-            var text = await _ocrEngine.RecognizeSinglePassAsync(raw, region.Width, region.Height, scale: 2, padding: 8);
+            // 4x Upscaling mit Dual-Pass (invertiert + plain): Erfasst Star Citizen HUD-Ziffern sowohl vor dunklem Weltraum als auch vor hellen Planeten/Atmosphären
+            var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 4, padding: 24, boostContrast: true);
             sw.Stop();
-            long? rsVal = null;
-            if (!string.IsNullOrWhiteSpace(text))
+
+            string recognizedText = !string.IsNullOrWhiteSpace(invText) ? invText.Trim() : (plainText?.Trim() ?? "(Kein Text erkannt)");
+            int? extractedVal = RsOcrScanner.ExtractRsValue(invText ?? "");
+            if (!extractedVal.HasValue && !string.IsNullOrWhiteSpace(plainText))
             {
-                var m = System.Text.RegularExpressions.Regex.Match(text, @"\b(\d{3,6})\b");
-                if (m.Success && long.TryParse(m.Groups[1].Value, out var parsed))
+                extractedVal = RsOcrScanner.ExtractRsValue(plainText);
+            }
+
+            // Fallback: Tausendertrennzeichen (Komma, Punkt, Apostroph) entfernen und Ziffern suchen
+            if (!extractedVal.HasValue && !string.IsNullOrWhiteSpace(recognizedText) && recognizedText != "(Kein Text erkannt)")
+            {
+                var stripped = System.Text.RegularExpressions.Regex.Replace(recognizedText, @"[^\d]", "");
+                if (int.TryParse(stripped, out int directVal) && directVal >= 1000 && directVal <= 300000)
                 {
-                    rsVal = parsed;
+                    extractedVal = directVal;
                 }
             }
+
+            Logger.Log($"[RsOcr-Test] Region={region.Width}x{region.Height}@({region.X},{region.Y}) in {sw.ElapsedMilliseconds}ms: Invertiert='{invText?.Trim()}', Plain='{plainText?.Trim()}' -> RS={extractedVal?.ToString() ?? "null"}");
+
             return new OcrTestResultDto
             {
-                Success = !string.IsNullOrWhiteSpace(text),
+                Success = extractedVal.HasValue || (!string.IsNullOrWhiteSpace(recognizedText) && recognizedText != "(Kein Text erkannt)"),
                 Target = target,
-                RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
-                ExtractedValue = rsVal,
+                RecognizedText = recognizedText,
+                ExtractedValue = extractedVal,
                 DurationMs = (int)sw.ElapsedMilliseconds,
                 Region = region
             };

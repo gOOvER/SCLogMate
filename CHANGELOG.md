@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reactive ping updates now immediately measure regional server latency when switching shards.
 
 ### Fixed
+- **Ore & Salvage Radar Signature HUD OCR Scanner (`Core/Photino/PhotinoBridge.cs`, `frontend/src/views/OreScannerView.tsx`)**:
+  - Fixed an issue where Star Citizen radar signatures containing comma/period thousands separators (e.g. `17,080` RS for 4x Iron clusters or `3,200` RS for Savrilium) failed to extract, leaving the scanner display stuck on the previously recognized value (such as `2000` RS).
+  - Upgraded OCR resolution from low-scale single-pass (`scale: 2, padding: 8`) to high-definition dual-pass (`scale: 4, padding: 24` with contrast boost) to reliably read thin cyan HUD fonts across both deep space and bright planetary atmospheres.
+  - Replaced naive digit regex splitting on commas with `RsOcrScanner.ExtractRsValue` heuristic decoding, correctly preserving thousands values, resolving catalog matches, and handling distance suffix filtering.
+  - Added robust fallback numeric extraction in `PhotinoBridge` and `OreScannerView` to sanitize thousand separators and decode detected signatures seamlessly.
+  - Added comprehensive diagnostics logging (`[RsOcr-Test]`) for HUD test scans.
 - **Server Join Regional Flag Icons in Live Log & Events View (`Core/LogParser.cs`, `frontend/src/components/RegionFlag.tsx`, `frontend/src/components/HudBar.tsx`, `frontend/src/views/EventsView.tsx`)**:
   - Replaced raw Unicode country flag emojis in server join event details with crisp SVG vector flags (`RegionFlag` component supporting EU, US, Germany, Australia, and Asia).
   - Resolved Windows DirectWrite/Chromium font limitation where regional indicator emojis failed to render as flags and displayed as broken text letters (e.g. `EU Server beigetreten: EU`).
