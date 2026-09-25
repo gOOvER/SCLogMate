@@ -14,6 +14,7 @@ using SCLogMate.Core.Ocr;
 using SCLogMate.Core.Overlays;
 using SCLogMate.Core.Plugins;
 using SCLogMate.Models;
+using SCLogMate.Services;
 
 namespace SCLogMate.Core.Photino;
 
@@ -1107,6 +1108,11 @@ public class PhotinoBridge
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
     private System.Threading.Timer? _refineryCheckTimer;
+    private System.Threading.Timer? _serverPingTimer;
+    private int? _currentPingMs;
+    private string? _lastPingTarget;
+    private DateTime _lastPingTime = DateTime.MinValue;
+    private bool _isMeasuringPing;
 
     public PhotinoBridge()
     {
@@ -1168,6 +1174,7 @@ public class PhotinoBridge
         }
 
         _refineryCheckTimer = new System.Threading.Timer(_ => CheckRefineryCompletions(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+        _serverPingTimer = new System.Threading.Timer(_ => TriggerServerPing(), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(20));
 
         // Globaler Hotkey (Alt+H) für Mini-HUD
         GlobalHotkey.HotkeyPressed += () =>
@@ -3576,6 +3583,76 @@ public class PhotinoBridge
         }
     }
 
+    private void TriggerServerPing(string? hintShard = null, string? hintRegion = null)
+    {
+        if (_isMeasuringPing) return;
+
+        bool isGameRunning = false;
+        try
+        {
+            isGameRunning = Process.GetProcessesByName("StarCitizen").Length > 0;
+        }
+        catch { }
+
+        if (!isGameRunning)
+        {
+            if (_currentPingMs != null)
+            {
+                _currentPingMs = null;
+                _lastPingTarget = null;
+                if (_isWebviewReady)
+                {
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                }
+            }
+            return;
+        }
+
+        string shard = hintShard ?? "";
+        string region = hintRegion ?? "";
+
+        if (string.IsNullOrWhiteSpace(shard) && _parser.Meta.TryGetValue("shard", out var s) && !string.IsNullOrWhiteSpace(s))
+        {
+            shard = s;
+        }
+
+        var targetKey = $"{shard}|{region}";
+        if (_currentPingMs.HasValue && targetKey == _lastPingTarget && (DateTime.UtcNow - _lastPingTime).TotalSeconds < 12)
+        {
+            return;
+        }
+
+        _isMeasuringPing = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var latency = await ServerPingService.MeasureLatencyAsync(shard, region);
+                if (latency.HasValue)
+                {
+                    int ping = (int)latency.Value;
+                    bool changed = _currentPingMs != ping;
+                    _currentPingMs = ping;
+                    _lastPingTime = DateTime.UtcNow;
+                    _lastPingTarget = targetKey;
+
+                    if (changed && _isWebviewReady)
+                    {
+                        Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[ServerPing] Ping measurement error: {ex.Message}");
+            }
+            finally
+            {
+                _isMeasuringPing = false;
+            }
+        });
+    }
+
     private HudTelemetryDto GetHudTelemetry(string? sessionName = null)
     {
         Database.EnsureInitialized();
@@ -3751,7 +3828,19 @@ public class PhotinoBridge
             );
         }
 
-        int? ping = isGameRunning ? 28 : null;
+        int? ping = null;
+        if (isGameRunning && targetSession == "__live__")
+        {
+            if (!_currentPingMs.HasValue && !_isMeasuringPing)
+            {
+                TriggerServerPing(shard, regionCode);
+            }
+            else if (_currentPingMs.HasValue && (DateTime.UtcNow - _lastPingTime).TotalSeconds > 25 && !_isMeasuringPing)
+            {
+                TriggerServerPing(shard, regionCode);
+            }
+            ping = _currentPingMs;
+        }
 
         // Location from LocationStateMachine & DB Fallback
         var locState = _parser.LocationMachine.State;
@@ -5565,6 +5654,10 @@ public class PhotinoBridge
             if (!string.IsNullOrEmpty(latestShard))
             {
                 p.Meta["shard"] = latestShard;
+                if (targetParser == null || targetParser == _parser)
+                {
+                    TriggerServerPing(latestShard);
+                }
             }
         }
         catch { }

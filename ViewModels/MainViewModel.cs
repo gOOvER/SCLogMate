@@ -2867,7 +2867,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var shard = ServerShardName;
-            var latency = await ServerPingService.MeasureLatencyAsync(shard);
+            var latency = await ServerPingService.MeasureLatencyAsync(shard, ServerRegionCode);
             Dispatcher.UIThread.Post(() =>
             {
                 ServerPingMs = latency;

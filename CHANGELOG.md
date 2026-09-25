@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **Dynamic Regional Server Latency / Ping (`Core/Photino/PhotinoBridge.cs`, `Services/ServerPingService.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Replaced hardcoded static ping placeholder (`int? ping = isGameRunning ? 28 : null;`) in `PhotinoBridge.GetHudTelemetry` with real-time, asynchronous regional latency measurements.
+  - Added background periodic ping measurement timer (`_serverPingTimer`) and reactive measurement on shard detection in `PhotinoBridge`, broadcasting accurate round-trip time (RTT) to the dashboard and native mini HUD overlay.
+  - Enhanced `ServerPingService.GetRegionalHost` and `MeasureLatencyAsync` to accept optional `regionCode` alongside shard name, adding support for `apse` (Australia/APAC), `apne`/`ape`/`aps`/`hkg` (Asia), `eun` (Northern Europe), and `na` (North America) shard substrings.
 - **HUD Flight Telemetry & Live Active Ship Updates (`Core/Photino/PhotinoBridge.cs`, `frontend/src/components/HudBar.tsx`, `frontend/src/services/photinoBridge.ts`, `frontend/src/i18n/`)**:
   - Replaced hardcoded placeholder flight statistics (`Flugbereit · 14 Flüge · 8 QT-Sprünge`) in `GetHudTelemetry` with accurate, real-time dynamic flight data aggregation.
   - Display active ship's overall lifetime career statistics (`<Status> · <Flights> Flüge · <QTs> QT-Sprünge`) prominently in the primary HUD card subline, harmonized directly with `Database.GetFleetStats()` from the Hangar/Fleet view.
