@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Global GPS Location Detected Popup & Native In-Game Toast Overlay (`Core/Photino/PhotinoBridge.cs`, `frontend/src/components/LocationDetectedPopup.tsx`, `frontend/src/App.tsx`, `frontend/src/views/PlacesView.tsx`)**:
+  - Automatically pops up an interactive HUD notification whenever `/showlocation` coordinates are detected from the Windows clipboard.
+  - Displays detected star system (Stanton, Pyro, Nyx), formatted X/Y/Z coordinates, and nearest known POI/landmark with distance.
+  - Features an inline 1-click "Als POI pinnen" form to instantly name, categorize (Mining, Salvage, Bunker, Secret, Trade, Misc), and save the POI to the SQLite database without leaving the current view.
+  - Provides instant coordinates copy and direct navigation to the Places & Starmap view.
+  - Includes a 15-second auto-dismiss countdown with hover-pause protection.
+  - Simultaneously triggers the native Win32 Always-On-Top Toast Overlay (`📍 GPS-KOORDINATEN ERFASST`) so pilots in fullscreen gameplay receive immediate in-game feedback upon copying coordinates.
 - **Optional HOTAS & Joystick Profiler with 1-Click Swap & Bindings Explorer (`Core/Hotas/`, `Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/views/SettingsView.tsx`)**:
   - Implemented a complete HOTAS & Joystick profiling subsystem for Star Citizen pilots inspired by controls reverse-engineering.
   - Automatically parses the live `actionmaps.xml` profile, extracting connected joysticks, deadzones per axis, exponential sensitivity curves, and custom rebinds.

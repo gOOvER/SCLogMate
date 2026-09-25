@@ -1335,6 +1335,25 @@ public class PhotinoBridge
         PoiClipboardWatcher.OnLocationDetected += reading =>
         {
             Broadcast("LOCATION_COPIED", reading);
+            try
+            {
+                var nearestInfo = reading.NearestPois?.FirstOrDefault();
+                var subtitle = nearestInfo != null
+                    ? $"{nearestInfo.Name} ({nearestInfo.FormattedDistance})"
+                    : $"X: {reading.X:N0} Y: {reading.Y:N0} Z: {reading.Z:N0}";
+
+                _toastOverlay.ShowToast(
+                    "📍",
+                    "GPS-KOORDINATEN ERFASST",
+                    reading.DetectedSystem ?? "Stanton",
+                    subtitle,
+                    0x000BB5F5u
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("PoiClipboardWatcher OnLocationDetected Toast", ex);
+            }
         };
         PoiClipboardWatcher.Start();
     }

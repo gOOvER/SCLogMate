@@ -149,9 +149,15 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
       });
     }, 1000);
 
+    const handlePoiSavedEvent = () => {
+      fetchUserPois();
+    };
+    window.addEventListener('user-poi-saved', handlePoiSavedEvent);
+
     return () => {
       unsub();
       unsubHangar();
+      window.removeEventListener('user-poi-saved', handlePoiSavedEvent);
       clearInterval(timer);
     };
   }, []);
