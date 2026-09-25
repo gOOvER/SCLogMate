@@ -32,6 +32,7 @@ import {
   Trash2,
   Copy,
   Puzzle,
+  Gamepad2,
 } from 'lucide-react';
 import {
   bridge,
@@ -96,6 +97,7 @@ export const SettingsView: React.FC = () => {
     minimizeToTrayOnClose: true,
     autostartEnabled: false,
     debugMode: false,
+    hotasProfilerEnabled: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1104,6 +1106,38 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </label>
               </div>
+            </div>
+          </div>
+
+          {/* 5. HOTAS & Joystick Profiler */}
+          <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-emerald-400 flex items-center space-x-2">
+                <Gamepad2 className="w-4 h-4" />
+                <span>HOTAS & JOYSTICK PROFILER</span>
+              </h2>
+              <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
+                OPTIONAL
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-start space-x-3 cursor-pointer p-2 rounded hover:bg-slate-800/40">
+                <input
+                  type="checkbox"
+                  checked={settings.hotasProfilerEnabled ?? true}
+                  onChange={(e) => setSettings({ ...settings, hotasProfilerEnabled: e.target.checked })}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 bg-slate-800 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-slate-200">
+                    HOTAS &amp; Joystick Profiler Modul aktivieren
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Schaltet den Reiter "🕹️ HOTAS &amp; Joysticks" im Tools-Bereich frei: Analysiert Belegungen, Totzonen &amp; Kurven deiner Sticks, erkennt Windows USB-Vertauschungen (js1 ⇄ js2) und bietet 1-Klick Vertauschungs-Korrektur sowie Profil-Export.
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
         </div>

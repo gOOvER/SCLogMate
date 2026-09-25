@@ -240,6 +240,9 @@ public class AppSettings
     /// <summary>List of plugin IDs that have been explicitly disabled by the user.</summary>
     public List<string> DisabledPluginIds { get; set; } = new();
 
+    /// <summary>HOTAS &amp; Joystick Profiler &amp; Gerätezuordnung aktivieren.</summary>
+    public bool HotasProfilerEnabled { get; set; } = true;
+
     /// <summary>
     /// Aktiviert den Entwickler- &amp; Debug-Modus.
     /// In lokalen Debug-Builds standardmäßig true, in Release-Builds standardmäßig false.

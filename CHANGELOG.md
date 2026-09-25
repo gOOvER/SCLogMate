@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Optional HOTAS & Joystick Profiler with 1-Click Swap & Bindings Explorer (`Core/Hotas/`, `Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/views/SettingsView.tsx`)**:
+  - Implemented a complete HOTAS & Joystick profiling subsystem for Star Citizen pilots inspired by controls reverse-engineering.
+  - Automatically parses the live `actionmaps.xml` profile, extracting connected joysticks, deadzones per axis, exponential sensitivity curves, and custom rebinds.
+  - Detects USB Vendor and Product IDs directly from Star Citizen DirectInput GUIDs with friendly manufacturer recognition (Thrustmaster, VKB-Sim, Virpil, Logitech, Saitek, Winwing, etc.).
+  - Correlates connected joysticks with Star Citizen startup log notices (`- Connected joystick0: <Product> <GUID>`) to detect Windows USB device order swaps (`js1` ⇄ `js2`).
+  - Provides two instant swap remedies: a 1-click automatic `actionmaps.xml` profile retargeting tool with automatic pre-swap backups, and a one-click copy button for the in-game console command `pp_resortdevices joystick 1 2` (no game restart required).
+  - Added an interactive Keybindings Explorer with real-time text search, per-device filters (Stick 1, Stick 2, Keyboard, Mouse), category filters (Flight, Combat, Systems, Industrial, Scanner, General), and friendly German action labels.
+  - Supports one-click profile export to `user\client\0\controls\mappings\layout_<name>_exported.xml` with standard `CustomisationUIHeader` metadata.
+  - Configurable as an optional subsystem via `HotasProfilerEnabled` in Settings and accessible as a dedicated tab in `ToolsView`.
 - **Multi-Crew Boarding & Ship Comms Channel Recognition (`Core/ShipChannel.cs`, `Core/LogParser.cs`)**:
   - Overhauled ship communication channel parsing to detect when crew members board or leave player-owned ships (`Painful_Pilot has joined the channel 'Argo MOTH : gOOvER'`), or when the player boards multi-crew vessels owned by other pilots (`RSI Perseus : GHO5T-04K`).
   - Stripped preceding timestamps and message prefixes from raw channel log lines so handles are cleanly extracted even outside notification wrappers.

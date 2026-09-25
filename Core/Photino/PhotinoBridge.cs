@@ -922,6 +922,7 @@ public class SettingsDto
     [JsonPropertyName("minimizeToTrayOnClose")] public bool MinimizeToTrayOnClose { get; set; } = true;
     [JsonPropertyName("autostartEnabled")] public bool AutostartEnabled { get; set; }
     [JsonPropertyName("debugMode")] public bool DebugMode { get; set; }
+    [JsonPropertyName("hotasProfilerEnabled")] public bool HotasProfilerEnabled { get; set; } = true;
 }
 
 public class OcrRegionsConfigDto
@@ -2894,6 +2895,33 @@ public class PhotinoBridge
                         var syncRes = MaintenanceService.SyncLogsToCloud(sc.CloudStoragePath, _currentLogPath);
                         SendResponse(req.Id, "sync_logs_cloud_response", new { success = syncRes.success, message = syncRes.message });
                     }
+                    break;
+
+                case "get_hotas_status":
+                    var hotasStatus = SCLogMate.Core.Hotas.HotasService.GetHotasStatus(_currentLogPath);
+                    SendResponse(req.Id, "get_hotas_status_response", hotasStatus);
+                    break;
+
+                case "swap_hotas_devices":
+                    int instA = 1;
+                    int instB = 2;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("instanceA", out var aProp) && aProp.TryGetInt32(out var aVal)) instA = aVal;
+                        if (req.Payload.Value.TryGetProperty("instanceB", out var bProp) && bProp.TryGetInt32(out var bVal)) instB = bVal;
+                    }
+                    var swapRes = SCLogMate.Core.Hotas.HotasService.SwapDevices(_currentLogPath, instA, instB);
+                    SendResponse(req.Id, "swap_hotas_devices_response", swapRes);
+                    break;
+
+                case "export_hotas_layout":
+                    string layoutName = "Custom_Hotas";
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("layoutName", out var lnProp))
+                    {
+                        layoutName = lnProp.GetString() ?? "Custom_Hotas";
+                    }
+                    var exportRes = SCLogMate.Core.Hotas.HotasService.ExportLayout(_currentLogPath, layoutName);
+                    SendResponse(req.Id, "export_hotas_layout_response", new { success = exportRes.Success, message = exportRes.Message, targetFile = exportRes.TargetFile });
                     break;
 
                 case "get_settings":
@@ -6488,6 +6516,7 @@ public class PhotinoBridge
             MinimizeToTrayOnClose = s.MinimizeToTrayOnClose,
             AutostartEnabled = s.AutostartEnabled,
             DebugMode = s.DebugMode,
+            HotasProfilerEnabled = s.HotasProfilerEnabled,
         };
     }
 
@@ -6498,6 +6527,7 @@ public class PhotinoBridge
 
         s.LogPath = dto.LogPath;
         s.AutoOcrEnabled = dto.AutoOcrEnabled;
+        s.HotasProfilerEnabled = dto.HotasProfilerEnabled;
         s.UexApiKey = dto.UexApiKey;
         UexApiClient.SetApiKey(dto.UexApiKey);
         s.OverlayEnabled = dto.OverlayEnabled;

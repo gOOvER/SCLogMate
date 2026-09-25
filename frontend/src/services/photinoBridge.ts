@@ -897,6 +897,78 @@ export interface SettingsDto {
   minimizeToTrayOnClose?: boolean;
   autostartEnabled?: boolean;
   debugMode?: boolean;
+  hotasProfilerEnabled?: boolean;
+}
+
+export interface HotasCurveDto {
+  option: string;
+  optionLabel: string;
+  exponent?: number | null;
+  inverted: boolean;
+}
+
+export interface HotasDeviceDto {
+  instance: number;
+  deviceKey: string;
+  product?: string;
+  guid?: string;
+  vendorName?: string;
+  usbVid?: string;
+  usbPid?: string;
+  deadzones: Record<string, number>;
+  curves: HotasCurveDto[];
+  bindingCount: number;
+  isConnected: boolean;
+  connectedIndex?: number | null;
+  connectedProduct?: string;
+  isSwappedWith?: number | null;
+}
+
+export interface HotasBindingDto {
+  actionMap: string;
+  actionMapLabel: string;
+  category: string;
+  action: string;
+  actionLabel: string;
+  rawInput: string;
+  deviceKey: string;
+  deviceType: string;
+  instance: number;
+  control: string;
+  controlLabel: string;
+  activationMode?: string;
+  multiTap?: number;
+}
+
+export interface HotasConnectedLogDeviceDto {
+  logIndex: number;
+  expectedInstance: number;
+  product: string;
+  guid: string;
+  timestamp: string;
+}
+
+export interface HotasStatusDto {
+  enabled: boolean;
+  actionMapsFound: boolean;
+  actionMapsPath?: string;
+  profileName: string;
+  devices: HotasDeviceDto[];
+  logDevices: HotasConnectedLogDeviceDto[];
+  hasMismatch: boolean;
+  mismatchDescription?: string;
+  suggestedConsoleCommand?: string;
+  totalBindingsCount: number;
+  joystickBindingsCount: number;
+  lastBackupFolder?: string;
+  bindings: HotasBindingDto[];
+}
+
+export interface HotasSwapResultDto {
+  success: boolean;
+  message: string;
+  backupFolder?: string;
+  status?: HotasStatusDto;
 }
 
 export interface DetectedPath {
@@ -2856,6 +2928,22 @@ class PhotinoBridge {
           ]
         } as CargoFitResultDto;
     }
+  }
+
+  getSettings(): Promise<SettingsDto> {
+    return this.send<SettingsDto>('get_settings');
+  }
+
+  getHotasStatus(): Promise<HotasStatusDto> {
+    return this.sendRequest<HotasStatusDto>('get_hotas_status');
+  }
+
+  swapHotasDevices(instanceA: number = 1, instanceB: number = 2): Promise<HotasSwapResultDto> {
+    return this.sendRequest<HotasSwapResultDto>('swap_hotas_devices', { instanceA, instanceB });
+  }
+
+  exportHotasLayout(layoutName: string): Promise<{ success: boolean; message: string; targetFile?: string }> {
+    return this.sendRequest<{ success: boolean; message: string; targetFile?: string }>('export_hotas_layout', { layoutName });
   }
 }
 

@@ -37,8 +37,19 @@ import {
   Minimize2,
   X,
   Eye,
+  Gamepad2,
+  ArrowLeftRight,
+  Search,
+  AlertTriangle,
 } from 'lucide-react';
-import { bridge, ToolsStatusDto, ConfigBackupItemDto, KeybindBackupItemDto } from '../services/photinoBridge';
+import {
+  bridge,
+  ToolsStatusDto,
+  ConfigBackupItemDto,
+  KeybindBackupItemDto,
+  HotasStatusDto,
+  SettingsDto,
+} from '../services/photinoBridge';
 import { useI18n } from '../i18n';
 
 export interface HardwareRecommendation {
@@ -570,8 +581,8 @@ function mergeCfgContent(
 
 export const ToolsView: React.FC = () => {
   const { t, locale } = useI18n();
-  // Navigation: Exactly 3 primary tools in the top bar
-  const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds'>('cfg');
+  // Navigation: Maintenance, user.cfg Studio, Backups, and HOTAS & Joysticks
+  const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds' | 'hotas'>('cfg');
   const [cfgView, setCfgView] = useState<'editor' | 'tuning' | 'backups' | 'reference'>('editor');
   const [editorPopout, setEditorPopout] = useState(false);
 
@@ -579,6 +590,19 @@ export const ToolsView: React.FC = () => {
   const hwRec = useMemo(() => getHardwareRecommendation(status), [status]);
   const [previewPreset, setPreviewPreset] = useState<'hardware_auto' | 'esport' | 'quality' | 'minimal' | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // HOTAS & Sticks Profiler State
+  const [hotasStatus, setHotasStatus] = useState<HotasStatusDto | null>(null);
+  const [hotasLoading, setHotasLoading] = useState(false);
+  const [hotasSwapping, setHotasSwapping] = useState(false);
+  const [hotasExporting, setHotasExporting] = useState(false);
+  const [hotasSearch, setHotasSearch] = useState('');
+  const [hotasFilterDevice, setHotasFilterDevice] = useState<string>('all');
+  const [hotasFilterCategory, setHotasFilterCategory] = useState<string>('all');
+  const [hotasExportName, setHotasExportName] = useState('sclogmate_profile');
+  const [hotasExportModalOpen, setHotasExportModalOpen] = useState(false);
+  const [copiedResortCmd, setCopiedResortCmd] = useState(false);
+  const [hotasEnabled, setHotasEnabled] = useState(true);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1068,8 +1092,64 @@ export const ToolsView: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const loadHotasStatus = async () => {
+    try {
+      setHotasLoading(true);
+      const res = await bridge.getHotasStatus();
+      if (res) {
+        setHotasStatus(res);
+      }
+    } catch (err) {
+      console.error('Failed to load HOTAS status:', err);
+    } finally {
+      setHotasLoading(false);
+    }
+  };
+
+  const handleSwapSticks = async (instA: number = 1, instB: number = 2) => {
+    try {
+      setHotasSwapping(true);
+      const res = await bridge.swapHotasDevices(instA, instB);
+      if (res?.success) {
+        showToast(res.message);
+        if (res.status) setHotasStatus(res.status);
+        else await loadHotasStatus();
+      } else {
+        showToast(res?.message || 'Fehler beim Tausch der Joysticks');
+      }
+    } catch (err) {
+      showToast('Fehler beim Tauschen der Joysticks');
+    } finally {
+      setHotasSwapping(false);
+    }
+  };
+
+  const handleExportHotas = async () => {
+    try {
+      setHotasExporting(true);
+      const res = await bridge.exportHotasLayout(hotasExportName);
+      if (res?.success) {
+        showToast(res.message);
+        setHotasExportModalOpen(false);
+      } else {
+        showToast(res?.message || 'Fehler beim Exportieren des Profils');
+      }
+    } catch (err) {
+      showToast('Fehler beim Exportieren des Profils');
+    } finally {
+      setHotasExporting(false);
+    }
+  };
+
   useEffect(() => {
     loadStatus();
+    loadHotasStatus();
+    bridge.getSettings().then((st: SettingsDto) => {
+      if (st && st.hotasProfilerEnabled !== undefined) {
+        setHotasEnabled(st.hotasProfilerEnabled);
+      }
+    }).catch(() => {});
+
     const unsubscribe = bridge.on<ToolsStatusDto>('TOOLS_UPDATED', (newStatus) => {
       if (newStatus) {
         setStatus(newStatus);
@@ -1274,6 +1354,32 @@ export const ToolsView: React.FC = () => {
           {status?.keybindItems && status.keybindItems.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
               {status.keybindItems.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('hotas');
+            if (!hotasStatus) loadHotasStatus();
+          }}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+            activeTab === 'hotas'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+              : 'bg-slate-900/50 hover:bg-slate-800/70 text-slate-400 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Gamepad2 className="w-4 h-4" />
+          <span>HOTAS &amp; Joysticks</span>
+          {hotasStatus?.hasMismatch && (
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            </span>
+          )}
+          {hotasStatus?.devices && hotasStatus.devices.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-mono border border-emerald-800 font-bold">
+              {hotasStatus.devices.length}
             </span>
           )}
         </button>
@@ -2787,6 +2893,546 @@ export const ToolsView: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          TAB 4: HOTAS & JOYSTICKS (OPTIONAL PROFILER & SWAP TOOL)
+          ══════════════════════════════════════════════════════════════ */}
+      {activeTab === 'hotas' && (
+        <div className="space-y-6">
+          {/* Top Bar / Profile Info & Quick Actions */}
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <Gamepad2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm font-bold text-white tracking-wide">
+                    STAR CITIZEN HOTAS &amp; CONTROLS PROFILER
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
+                    {hotasStatus?.profileName || 'LIVE'}
+                  </span>
+                  {!hotasEnabled && (
+                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                      DEAKTIVIERT
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xl font-mono">
+                  {hotasStatus?.actionMapsPath || 'USER\\Client\\0\\Profiles\\default\\actionmaps.xml'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={loadHotasStatus}
+                disabled={hotasLoading}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                title="actionmaps.xml & Game.log neu einlesen"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${hotasLoading ? 'animate-spin' : ''}`} />
+                <span>Neu einlesen</span>
+              </button>
+
+              <button
+                onClick={() => handleSwapSticks(1, 2)}
+                disabled={hotasSwapping || !hotasStatus?.devices || hotasStatus.devices.length < 2}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-bold shadow-md shadow-amber-600/20 border border-amber-400/60 transition cursor-pointer"
+                title="Tauscht Stick 1 und Stick 2 in actionmaps.xml (mit automatischem Backup)"
+              >
+                <ArrowLeftRight className={`w-3.5 h-3.5 ${hotasSwapping ? 'animate-spin' : ''}`} />
+                <span>Stick 1 ⇄ 2 Tauschen</span>
+              </button>
+
+              <button
+                onClick={() => setHotasExportModalOpen(true)}
+                disabled={!hotasStatus?.actionMapsFound}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 border border-emerald-400 transition cursor-pointer"
+                title="Profil unter controls\\mappings als XML-Layout exportieren"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Profil Exportieren</span>
+              </button>
+            </div>
+          </div>
+
+          {/* DISABLED BANNER */}
+          {!hotasEnabled && (
+            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center justify-between gap-3 text-xs text-amber-200">
+              <div className="flex items-center space-x-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  Der HOTAS Profiler ist in den allgemeinen Einstellungen als optional markiert und aktuell deaktiviert.
+                </span>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const st = await bridge.getSettings();
+                    if (st) {
+                      st.hotasProfilerEnabled = true;
+                      await bridge.send('save_settings', { settings: st });
+                      setHotasEnabled(true);
+                      showToast('✓ HOTAS Profiler dauerhaft aktiviert');
+                      loadHotasStatus();
+                    }
+                  } catch (e) {
+                    setHotasEnabled(true);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shrink-0 cursor-pointer shadow-sm"
+              >
+                Jetzt dauerhaft aktivieren
+              </button>
+            </div>
+          )}
+
+          {/* MISMATCH WARNING BANNER (When USB Index Swap is detected) */}
+          {hotasStatus?.hasMismatch && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/80 border-2 border-rose-500/80 shadow-2xl shadow-rose-950/50 space-y-3 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start space-x-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-extrabold text-white tracking-wide uppercase text-rose-300">
+                        ⚠️ Joystick-Vertauschung erkannt! (Windows USB Index Swap)
+                      </span>
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-900 text-rose-200 border border-rose-600">
+                        KORREKTUR BEREIT
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-100/90 leading-relaxed font-medium">
+                      {hotasStatus.mismatchDescription || 'Windows hat die Reihenfolge deiner Joysticks beim Booten oder USB-Einstecken vertauscht.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-rose-900/60">
+                <button
+                  onClick={() => handleSwapSticks(1, 2)}
+                  disabled={hotasSwapping}
+                  className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold shadow-lg shadow-rose-600/40 border border-rose-300 transition cursor-pointer"
+                >
+                  <Zap className={`w-4 h-4 text-amber-300 ${hotasSwapping ? 'animate-spin' : ''}`} />
+                  <span>1-Klick Profil korrigieren (Auto-Swap in actionmaps.xml)</span>
+                </button>
+
+                {hotasStatus.suggestedConsoleCommand && (
+                  <div className="flex items-center space-x-2 bg-slate-950/90 border border-slate-700 rounded-xl px-3 py-1.5">
+                    <span className="text-[11px] text-slate-400 font-mono">In-Game Konsole:</span>
+                    <code className="text-xs font-mono font-bold text-amber-300 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                      {hotasStatus.suggestedConsoleCommand}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(hotasStatus.suggestedConsoleCommand || '');
+                        setCopiedResortCmd(true);
+                        setTimeout(() => setCopiedResortCmd(false), 2500);
+                        showToast('Konsolenbefehl in Zwischenablage kopiert! Im Spiel Taste ^ drücken und einfügen.');
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Befehl kopieren"
+                    >
+                      {copiedResortCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-300" />}
+                    </button>
+                  </div>
+                )}
+
+                <span className="text-[11px] text-slate-400 italic ml-auto">
+                  Tipp: Der Konsolenbefehl funktioniert direkt im laufenden Spiel ohne Neustart.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* CONNECTED HARDWARE CARDS GRID */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+                <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Erkannte Steuerungsgeräte ({hotasStatus?.devices?.length || 0} Joysticks/HOTAS)</span>
+              </h4>
+              <span className="text-xs text-slate-500 font-mono">
+                {hotasStatus?.joystickBindingsCount || 0} Joystick-Belegungen · {hotasStatus?.totalBindingsCount || 0} Gesamt
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {hotasStatus?.devices && hotasStatus.devices.length > 0 ? (
+                hotasStatus.devices.map((dev) => (
+                  <div
+                    key={dev.instance}
+                    className={`p-5 rounded-2xl bg-slate-900/80 border transition flex flex-col justify-between space-y-4 ${
+                      dev.isSwappedWith
+                        ? 'border-rose-500/70 shadow-lg shadow-rose-950/30'
+                        : 'border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold font-mono">
+                            Stick #{dev.instance} ({dev.deviceKey})
+                          </span>
+                          {dev.vendorName && (
+                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-semibold border border-slate-700">
+                              {dev.vendorName}
+                            </span>
+                          )}
+                        </div>
+
+                        {dev.isSwappedWith ? (
+                          <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 text-[10px] font-bold border border-rose-800 animate-pulse">
+                            Vertauscht mit Stick {dev.isSwappedWith}
+                          </span>
+                        ) : dev.isConnected ? (
+                          <span className="flex items-center space-x-1 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[10px] font-semibold border border-emerald-800">
+                            <Check className="w-3 h-3" />
+                            <span>In Game.log erkannt</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] border border-slate-700">
+                            Im Profil hinterlegt
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Product Name */}
+                      <h4 className="text-base font-bold text-white mt-3 flex items-center space-x-2">
+                        <span>{dev.product || `Joystick ${dev.instance}`}</span>
+                      </h4>
+
+                      {/* USB GUID Info */}
+                      {dev.guid && (
+                        <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
+                          {dev.guid} {dev.usbVid && dev.usbPid ? `(VID: ${dev.usbVid} · PID: ${dev.usbPid})` : ''}
+                        </p>
+                      )}
+
+                      {/* Stats & Deadzones */}
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Belegte Aktionen</span>
+                          <span className="text-sm font-bold text-sky-300 font-mono">{dev.bindingCount}</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Kurven / Exponenten</span>
+                          <span className="text-sm font-bold text-emerald-300 font-mono">
+                            {dev.curves.length > 0 ? `${dev.curves.length} konfiguriert` : 'Linear (1.0)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Configured Deadzones Pills */}
+                      {dev.deadzones && Object.keys(dev.deadzones).length > 0 && (
+                        <div className="mt-3 space-y-1.5">
+                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                            Totzonen (Deadzones):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(dev.deadzones).map(([axis, val]) => (
+                              <span
+                                key={axis}
+                                className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-300 font-mono text-[10px]"
+                              >
+                                {axis.toUpperCase()}: {(val * 100).toFixed(1)}%
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Configured Curves */}
+                      {dev.curves && dev.curves.length > 0 && (
+                        <div className="mt-3 space-y-1.5">
+                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                            Achsenkurven &amp; Invertierung:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {dev.curves.map((c) => (
+                              <span
+                                key={c.option}
+                                className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-emerald-300 font-mono text-[10px]"
+                              >
+                                {c.optionLabel}: exp {c.exponent ?? 1.0} {c.inverted ? '(Invertiert)' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Card Action */}
+                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                      <button
+                        onClick={() => handleSwapSticks(dev.instance, dev.instance === 1 ? 2 : 1)}
+                        disabled={hotasSwapping}
+                        className="flex items-center space-x-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold cursor-pointer transition"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        <span>Mit Stick {dev.instance === 1 ? 2 : 1} tauschen</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setHotasFilterDevice(dev.deviceKey);
+                        }}
+                        className="text-xs text-sky-400 hover:text-sky-300 font-medium cursor-pointer"
+                      >
+                        Belegungen filtern ({dev.bindingCount}) →
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-2 p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
+                  <Gamepad2 className="w-8 h-8 text-slate-500 mx-auto" />
+                  <div className="text-sm font-semibold text-slate-300">Keine Joystick-Geräte in actionmaps.xml gefunden</div>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Starte Star Citizen und belege mindestens eine Joystick-Achse oder Taste, damit Star Citizen die Optionen in actionmaps.xml abspeichert.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* INTERACTIVE BINDINGS EXPLORER */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <BookOpen className="w-4 h-4 text-sky-400" />
+                  <span>TASTEN- &amp; ACHSENBELEGUNGS-EXPLORER</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Durchsuche alle aktiven Belegungen deines Star Citizen Profils nach Aktion, Stick, Achse oder Taste.
+                </p>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Suchen (z. B. Pitch, Feuer, Boost, js1)..."
+                  value={hotasSearch}
+                  onChange={(e) => setHotasSearch(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Filter Bar: Device Selector + Category Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+              {/* Device Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 mr-1">Gerät:</span>
+                {[
+                  { id: 'all', label: 'Alle Geräte' },
+                  { id: 'js1', label: 'Stick 1 (js1)' },
+                  { id: 'js2', label: 'Stick 2 (js2)' },
+                  { id: 'kb1', label: 'Tastatur' },
+                  { id: 'mo1', label: 'Maus' },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => setHotasFilterDevice(d.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      hotasFilterDevice === d.id
+                        ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                        : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 mr-1">Kategorie:</span>
+                {['all', 'Flug', 'Kampf', 'Systeme', 'Industrie', 'Scanner', 'Allgemein'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setHotasFilterCategory(c)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                      hotasFilterCategory === c
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-950 text-slate-500 hover:text-slate-300 border border-slate-800/60'
+                    }`}
+                  >
+                    {c === 'all' ? 'Alle' : c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bindings Table */}
+            <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 max-h-[500px]">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 sticky top-0 z-10 backdrop-blur">
+                  <tr>
+                    <th className="py-2.5 px-4">Kategorie / Map</th>
+                    <th className="py-2.5 px-4">Aktion in Star Citizen</th>
+                    <th className="py-2.5 px-4">Eingabegerät</th>
+                    <th className="py-2.5 px-4">Belegtes Steuerelement</th>
+                    <th className="py-2.5 px-4">Modus</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {(() => {
+                    const filtered = (hotasStatus?.bindings || []).filter((b) => {
+                      if (hotasFilterDevice !== 'all' && b.deviceKey !== hotasFilterDevice) return false;
+                      if (hotasFilterCategory !== 'all' && b.category !== hotasFilterCategory) return false;
+                      if (!hotasSearch.trim()) return true;
+                      const q = hotasSearch.toLowerCase();
+                      return (
+                        b.action.toLowerCase().includes(q) ||
+                        b.actionLabel.toLowerCase().includes(q) ||
+                        b.actionMap.toLowerCase().includes(q) ||
+                        b.actionMapLabel.toLowerCase().includes(q) ||
+                        b.rawInput.toLowerCase().includes(q) ||
+                        b.control.toLowerCase().includes(q) ||
+                        b.controlLabel.toLowerCase().includes(q)
+                      );
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-500 italic font-sans">
+                            Keine Belegungen gefunden, die den Kriterien entsprechen.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((b, idx) => (
+                      <tr key={idx} className="hover:bg-slate-900/40 transition">
+                        <td className="py-2.5 px-4">
+                          <div className="font-sans font-semibold text-slate-300 text-xs">
+                            {b.actionMapLabel}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            {b.actionMap}
+                          </div>
+                        </td>
+
+                        <td className="py-2.5 px-4">
+                          <div className="font-sans font-semibold text-white text-xs">
+                            {b.actionLabel}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            {b.action}
+                          </div>
+                        </td>
+
+                        <td className="py-2.5 px-4">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              b.deviceType === 'joystick'
+                                ? b.instance === 1
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : 'bg-teal-950 text-teal-300 border border-teal-800'
+                                : b.deviceType === 'keyboard'
+                                ? 'bg-sky-950 text-sky-300 border border-sky-800'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            {b.deviceType === 'joystick' ? `Stick ${b.instance} (${b.deviceKey})` : b.deviceKey}
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 px-4">
+                          <span className="font-bold text-amber-300">
+                            {b.controlLabel}
+                          </span>
+                          <span className="text-[10px] text-slate-500 ml-1.5">
+                            ({b.rawInput})
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 px-4 text-[11px] text-slate-400 font-sans">
+                          {b.activationMode ? (
+                            <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px] uppercase font-mono">
+                              {b.activationMode}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                          {b.multiTap && (
+                            <span className="ml-1 text-[10px] text-purple-300 font-mono">
+                              ({b.multiTap}x Tap)
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* EXPORT MODAL */}
+          {hotasExportModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md p-4 flex items-center justify-center animate-in fade-in duration-150">
+              <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Save className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Steuerungsprofil Exportieren</h3>
+                    <p className="text-xs text-slate-400">
+                      Wird in <code>user\client\0\controls\mappings\</code> gespeichert.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-300 block">Profil-Name:</label>
+                  <input
+                    type="text"
+                    value={hotasExportName}
+                    onChange={(e) => setHotasExportName(e.target.value)}
+                    placeholder="z. B. Torsten_Dual_Stick"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[11px] text-slate-500 font-mono block">
+                    Dateiname: layout_{hotasExportName || 'profile'}_exported.xml
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
+                  <button
+                    onClick={() => setHotasExportModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={handleExportHotas}
+                    disabled={hotasExporting}
+                    className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/20 cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{hotasExporting ? 'Exportiere...' : 'Jetzt Exportieren'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
