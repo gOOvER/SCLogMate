@@ -43,6 +43,9 @@ public partial class AuroraVoiceService : IDisposable
     private readonly HashSet<string> _greetedShipsAtCurrentStation = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastCrashOrDeathTime = DateTime.MinValue;
     private DateTime _lastSessionOrLoginTime = DateTime.UtcNow;
+    private string? _currentJurisdiction;
+    private DateTime _lastJurisdictionChangeTime = DateTime.MinValue;
+    private const int JurisdictionCooldownSeconds = 300; // 5 Minuten Mindestabstand für dieselbe Jurisdiktion
 
     // Sequential audio queue to prevent overlapping and audio cutting off
     private readonly System.Threading.Channels.Channel<(string FilePath, int DelayMs)> _audioChannel =
@@ -612,6 +615,8 @@ public partial class AuroraVoiceService : IDisposable
             line.Contains("PlayerSpawnZone", StringComparison.OrdinalIgnoreCase))
         {
             _lastSessionOrLoginTime = DateTime.UtcNow;
+            _currentJurisdiction = null;
+            _lastJurisdictionChangeTime = DateTime.MinValue;
             IsAtStation = true;
         }
 
@@ -622,6 +627,7 @@ public partial class AuroraVoiceService : IDisposable
         {
             _lastCrashOrDeathTime = DateTime.UtcNow;
             _greetedShipsAtCurrentStation.Clear();
+            _currentJurisdiction = null;
         }
 
         // ClearDriver / Pilotensitz verlassen: Niemals Begrüßung auslösen, aber Sitz-Verlassen-Sound abspielen
@@ -650,10 +656,11 @@ public partial class AuroraVoiceService : IDisposable
         }
 
         // 2. Safety Zones (Armistice)
-        if (SafetyZonesEnabled)
+        if (SafetyZonesEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entering Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("Schutzzone - Kampfhandlung untersagt", StringComparison.OrdinalIgnoreCase))
+                line.Contains("Schutzzone - Kampfhandlung untersagt", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Schutzzone betreten", StringComparison.OrdinalIgnoreCase))
             {
                 OnSafetyZoneChanged(true);
                 return;
@@ -667,7 +674,7 @@ public partial class AuroraVoiceService : IDisposable
         }
 
         // 3. Monitored Space
-        if (MonitoredSpaceEnabled)
+        if (MonitoredSpaceEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entered Monitored Space", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Kontrollierten Raum betreten", StringComparison.OrdinalIgnoreCase))
@@ -684,7 +691,7 @@ public partial class AuroraVoiceService : IDisposable
         }
 
         // 4. Restricted Zones
-        if (RestrictedZonesEnabled)
+        if (RestrictedZonesEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entering Private Property", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Restricted Area - Vehicles Will Be Impounded", StringComparison.OrdinalIgnoreCase) ||
@@ -702,47 +709,19 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 5. Jurisdictions / Rechtsgebiete
-        if (JurisdictionsEnabled && (line.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) || line.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase)))
+        // 5. Jurisdictions / Rechtsgebiete (NUR bei echten HUD-Benachrichtigungen über den Eintritt in ein Rechtsgebiet!)
+        if (JurisdictionsEnabled &&
+            (line.Contains("<SHUDEvent_OnNotification>", StringComparison.OrdinalIgnoreCase) || line.Contains("Added notification", StringComparison.OrdinalIgnoreCase)) &&
+            !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase) &&
+            (line.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Hoheitsgebiet", StringComparison.OrdinalIgnoreCase) ||
+             line.Contains("Zuständigkeitsbereich", StringComparison.OrdinalIgnoreCase)))
         {
-            if (line.Contains("UEE", StringComparison.OrdinalIgnoreCase) || line.Contains("microTech", StringComparison.OrdinalIgnoreCase))
+            var canonical = ResolveCanonicalJurisdiction(line);
+            if (canonical != null)
             {
-                OnJurisdictionChanged("UEE");
-                return;
-            }
-            if (line.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("ArcCorp");
-                return;
-            }
-            if (line.Contains("Hurston Dynamics", StringComparison.OrdinalIgnoreCase) || line.Contains("Hurston", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("Hurston Dynamics");
-                return;
-            }
-            if (line.Contains("Crusader Industries", StringComparison.OrdinalIgnoreCase) || line.Contains("Crusader", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("Crusader Industries");
-                return;
-            }
-            if (line.Contains("Klescher Rehabilitation", StringComparison.OrdinalIgnoreCase) || line.Contains("Klescher", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("Klescher Rehabilitation");
-                return;
-            }
-            if (line.Contains("Nyx", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("Nyx");
-                return;
-            }
-            if (line.Contains("Pyro", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("Pyro");
-                return;
-            }
-            if (line.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase) || line.Contains("Peoples Alliance", StringComparison.OrdinalIgnoreCase) || line.Contains("People Alliance", StringComparison.OrdinalIgnoreCase))
-            {
-                OnJurisdictionChanged("People's Alliance");
+                OnJurisdictionChanged(canonical);
                 return;
             }
         }
@@ -940,10 +919,11 @@ public partial class AuroraVoiceService : IDisposable
                                 !e.Detail.Contains("leaving", StringComparison.OrdinalIgnoreCase);
                 OnSafetyZoneChanged(entering);
             }
-            else if (JurisdictionsEnabled)
-            {
-                OnJurisdictionChanged(e.Detail);
-            }
+            // HINWEIS: Echte Rechtsgebiets-Benachrichtigungen werden bereits präzise in ProcessLiveLine
+            // über die SHUD Added notification gefiltert und mit Status-Tracking verarbeitet.
+            // OnJurisdictionChanged(e.Detail) darf hier NICHT erneut aufgerufen werden, da e.Detail
+            // Formatierungen wie "🏛 Rechtsgebiet: People's Alliance (Nyx)" oder "🏴 Ungesetzlicher Sektor (Nyx)"
+            // enthält, die sonst fälschlicherweise als zweiter Sound ("Willkommen in Nyx") abgespielt würden!
         }
     }
 
@@ -1053,12 +1033,77 @@ public partial class AuroraVoiceService : IDisposable
             PlaySoundWithCooldown(entering ? "restricted_enter" : "restricted_leave", sounds, minCooldownSeconds: 30);
     }
 
+    /// <summary>
+    /// Löst einen Rohstring (aus Benachrichtigung oder Event) in den kanonischen Jurisdiktionsnamen auf.
+    /// WICHTIG: People's Alliance (Levski/Delamar) muss zwingend VOR Nyx geprüft werden,
+    /// da Delamar im Nyx-System liegt und sonst fälschlicherweise als "Nyx" statt "Levski" eingestuft wird.
+    /// </summary>
+    public string? ResolveCanonicalJurisdiction(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+
+        // 1. People's Alliance (Levski / Delamar in Nyx) - IMMER ZUERST prüfen!
+        if (raw.Contains("People's Alliance", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Peoples Alliance", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("People Alliance", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Levski", StringComparison.OrdinalIgnoreCase))
+        {
+            return "People's Alliance";
+        }
+
+        // 2. Stanton Konzerne & Planeten
+        if (raw.Contains("Hurston", StringComparison.OrdinalIgnoreCase))
+            return "Hurston Dynamics";
+
+        if (raw.Contains("Crusader", StringComparison.OrdinalIgnoreCase))
+            return "Crusader Industries";
+
+        if (raw.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase))
+            return "ArcCorp";
+
+        if (raw.Contains("microTech", StringComparison.OrdinalIgnoreCase))
+            return "UEE";
+
+        if (raw.Contains("Klescher", StringComparison.OrdinalIgnoreCase))
+            return "Klescher Rehabilitation";
+
+        if (raw.Contains("UEE", StringComparison.OrdinalIgnoreCase))
+            return "UEE";
+
+        // 3. Pyro (Rough & Ready, Green, Pyro)
+        if (raw.Contains("Rough & Ready", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Rough and Ready", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Green", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Entered Pyro Jurisdiction", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Rechtsgebiet von Pyro betreten", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Pyro";
+        }
+
+        // 4. Nyx System (NUR bei echtem System-Eintritt, NIEMALS bei Levski oder Ungoverned!)
+        if (raw.Contains("Entered Nyx Jurisdiction", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Rechtsgebiet von Nyx betreten", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw.Trim(), "Nyx", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Nyx";
+        }
+
+        // 5. Exakter Dictionary Key Match
+        foreach (var key in _jurisdictionSounds.Keys)
+        {
+            if (string.Equals(key, raw.Trim(), StringComparison.OrdinalIgnoreCase))
+                return key;
+        }
+
+        return null;
+    }
+
     public void OnJurisdictionChanged(string jurisdiction)
     {
         if (!_isEnabled || !_isInstalled || !JurisdictionsEnabled) return;
         if (string.IsNullOrWhiteSpace(jurisdiction)) return;
 
-        // Falls Schutzzonen-Detail im Event, an OnSafetyZoneChanged weiterleiten
+        // Falls Schutzzonen-Detail im Event (Fallback), an OnSafetyZoneChanged weiterleiten
         if (jurisdiction.Contains("Schutzzone", StringComparison.OrdinalIgnoreCase) ||
             jurisdiction.Contains("Armistice", StringComparison.OrdinalIgnoreCase))
         {
@@ -1068,20 +1113,60 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // Während Login-Phase unterdrücken
-        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
+        // Ungesetzlicher Sektor / Lawless Space hat keinen eigenen Begrüßungssound.
+        // Setze _currentJurisdiction auf ungoverned, damit beim nächsten Betreten eines echten Rechtsgebiets wieder begrüßt werden kann.
+        if (jurisdiction.Contains("Ungesetzlich", StringComparison.OrdinalIgnoreCase) ||
+            jurisdiction.Contains("Ungoverned", StringComparison.OrdinalIgnoreCase) ||
+            jurisdiction.Contains("Unregiert", StringComparison.OrdinalIgnoreCase) ||
+            jurisdiction.Contains("Lawless", StringComparison.OrdinalIgnoreCase))
         {
-            Logger.Log($"[AuroraVoiceService] Jurisdiction-Audio für '{jurisdiction}' unterdrückt (Login-Phase aktiv).");
+            Logger.Log("[AuroraVoiceService] Ungoverned / ungesetzlicher Raum betreten -> Jurisdiktion zurückgesetzt.");
+            _currentJurisdiction = "Ungoverned";
             return;
         }
 
-        foreach (var kvp in _jurisdictionSounds)
+        var canonical = ResolveCanonicalJurisdiction(jurisdiction);
+        if (canonical == null)
         {
-            if (jurisdiction.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase) && kvp.Value.Count > 0)
-            {
-                PlaySoundWithCooldown($"jurisdiction_{kvp.Key}", kvp.Value, minCooldownSeconds: 60);
-                return;
-            }
+            Logger.Log($"[AuroraVoiceService] Unbekannte Jurisdiktion ignoriert: '{jurisdiction}'.");
+            return;
+        }
+
+        // Während Login-Phase unterdrücken (45 Sekunden nach Login/Spawn)
+        if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
+        {
+            _currentJurisdiction = canonical;
+            Logger.Log($"[AuroraVoiceService] Initial-Jurisdiktion nach Login gesetzt: '{canonical}' (Begrüßung unterdrückt während Login-Phase).");
+            return;
+        }
+
+        // Wenn man sich auf einer Station / im Hangar befindet (IsAtStation == true):
+        // Beim Bewegen auf der Station oder beim Verlassen des Hangars NIEMALS wiederholen!
+        if (IsAtStation)
+        {
+            _currentJurisdiction = canonical;
+            Logger.Log($"[AuroraVoiceService] Jurisdiktion '{canonical}' registriert, aber Begrüßung ignoriert: Spieler ist auf Station / im Hangar.");
+            return;
+        }
+
+        // Bereits in dieser Jurisdiktion? Wenn ja: KEINE erneute Begrüßung!
+        if (string.Equals(_currentJurisdiction, canonical, StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Log($"[AuroraVoiceService] Jurisdiktion '{canonical}' unverändert (bereits aktiv) -> Begrüßung übersprungen.");
+            return;
+        }
+
+        _currentJurisdiction = canonical;
+        _lastJurisdictionChangeTime = DateTime.UtcNow;
+
+        if (_jurisdictionSounds.TryGetValue(canonical, out var sounds) && sounds.Count > 0)
+        {
+            Logger.Log($"[AuroraVoiceService] Jurisdiktionswechsel zu '{canonical}' ausgelöst.");
+            PlaySoundWithCooldown($"jurisdiction_{canonical.ToLowerInvariant()}", sounds, minCooldownSeconds: JurisdictionCooldownSeconds);
+        }
+        else
+        {
+            Logger.Log($"[AuroraVoiceService] Keine Sounddateien hinterlegt für Jurisdiktion: '{canonical}'.");
         }
     }
 

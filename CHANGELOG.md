@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reactive ping updates now immediately measure regional server latency when switching shards.
 
 ### Fixed
+- **Aurora Voice Companion - Elimination of Repeated "Willkommen in Nyx" & "Willkommen in Levski" Audio Spams (`Core/AuroraVoiceService.cs`)**:
+  - Fixed a critical double-invocation bug where `ProcessLiveLine` triggered `OnJurisdictionChanged("People's Alliance")` and subsequently `ProcessLiveEvent` called `OnJurisdictionChanged("🏛 Rechtsgebiet: People's Alliance (Nyx)")`, which matched the "Nyx" substring and queued "Willkommen in Nyx" directly behind "Willkommen in Levski".
+  - Implemented strict SHUD notification filtering for jurisdiction changes so intermediate HUD fade/removal notifications (`<UpdateNotificationItem>`, `Action: Next`, `Action: StartFade`, `Action: Remove`) and chat messages never trigger false or repetitive jurisdiction audio.
+  - Added active jurisdiction state tracking (`_currentJurisdiction`) and debounce so players moving around Levski, entering/exiting hangars, or transitioning between station subzones never receive repetitive greetings for a jurisdiction they are already in.
+  - Added station suppression (`IsAtStation`) ensuring jurisdiction greetings only occur when entering a system/jurisdiction from space/quantum travel, not while docked or moving between station hangars.
+  - Added canonical jurisdiction resolution (`ResolveCanonicalJurisdiction`) prioritizing "People's Alliance" over "Nyx", and ignoring ungoverned sector boundaries (`Ungoverned` / `Ungesetzlicher Sektor`) from playing system greetings.
 - **Dynamic Regional Server Latency / Ping (`Core/Photino/PhotinoBridge.cs`, `Services/ServerPingService.cs`, `ViewModels/MainViewModel.cs`)**:
   - Replaced hardcoded static ping placeholder (`int? ping = isGameRunning ? 28 : null;`) in `PhotinoBridge.GetHudTelemetry` with real-time, asynchronous regional latency measurements.
   - Added background periodic ping measurement timer (`_serverPingTimer`) and reactive measurement on shard detection in `PhotinoBridge`, broadcasting accurate round-trip time (RTT) to the dashboard and native mini HUD overlay.
