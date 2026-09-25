@@ -23,6 +23,7 @@ import {
   AlertOctagon,
   Activity,
   Package,
+  Globe,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
@@ -279,6 +280,13 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
   const getCategoryBadge = (cat: string, evItem?: LogEventItem) => {
     switch (cat) {
+      case 'server':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/60 text-blue-300 border border-blue-800/60 shrink-0">
+            <Globe className="w-2.5 h-2.5 text-blue-400" />
+            <span>{t('events.catServer')}</span>
+          </span>
+        );
       case 'wallet':
         return (
           <button
@@ -388,6 +396,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
     }
     if (d.includes('abgeschlossen') || d.includes('Complete') || d.includes('Erfolgreich') || (e.category === 'wallet' && (e.amount || 0) > 0)) {
       return 'text-emerald-300 font-medium';
+    }
+    if (e.category === 'server' || d.includes('Server beigetreten') || d.includes('Server verbunden')) {
+      return 'text-cyan-300 font-medium';
     }
     if (d.includes('zurückgezogen') || d.includes('Withdrawn') || d.includes('Session') || d.includes('Warnung') || d.includes('Waffen scharf') || d.includes('Ungesetzlich')) {
       return 'text-amber-300';

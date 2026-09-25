@@ -366,6 +366,9 @@ public partial class LogParser
     [GeneratedRegex(@"Join PU>.*shard\[(?<s>[^\]]+)\]")]
     private static partial Regex ShardRegex();
 
+    [GeneratedRegex(@"Update Shard Id>.*New Shard Id:\s*(?<s>[^\s\.]+)")]
+    private static partial Regex UpdateShardRegex();
+
     [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", RegexOptions.IgnoreCase)]
     private static partial Regex CleanMissionTitlePrefixRegex();
 
@@ -444,7 +447,10 @@ public partial class LogParser
         _inGameDuration = TimeSpan.Zero;
         _menuDuration = TimeSpan.Zero;
         ExpiredPendingTransfers = 0;
+        _lastJoinedShard = null;
     }
+
+    private string? _lastJoinedShard;
 
     // Tracking für Contracts, Spending, Ledger, Cargo und Places
     public sealed record PendingPurchase(DateTime Timestamp, string Shop, string Item, string Guid, decimal Price, int Qty);
@@ -2654,18 +2660,118 @@ public partial class LogParser
         // Session-Ende / Disconnect / Shard-Exit
         if (line.Contains("CDisciplineServiceExternal::EndSession", StringComparison.Ordinal))
         {
+            _lastJoinedShard = null;
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = "Server-Verbindung getrennt / Sitzung beendet (EndSession)" };
         }
 
-        // Server-Beitritt (<Join PU>)
-        if (line.Contains("<Join PU>", StringComparison.Ordinal))
+        // Server-Beitritt (<Join PU> oder <Update Shard Id>)
+        if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase))
         {
             var mShard = ShardRegex().Match(line);
             var shardName = mShard.Success ? mShard.Groups["s"].Value : "PU";
-            return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = $"Server beigetreten (Shard: {shardName})" };
+            if (!string.IsNullOrEmpty(shardName) && !string.Equals(_lastJoinedShard, shardName, StringComparison.OrdinalIgnoreCase))
+            {
+                _lastJoinedShard = shardName;
+                return CreateServerJoinEntry(ParseTs(line), shardName);
+            }
+        }
+        else if (line.Contains("<Update Shard Id>", StringComparison.OrdinalIgnoreCase) && line.Contains("New Shard Id:", StringComparison.OrdinalIgnoreCase))
+        {
+            var mShard = UpdateShardRegex().Match(line);
+            if (mShard.Success)
+            {
+                var shardName = mShard.Groups["s"].Value;
+                if (!string.IsNullOrEmpty(shardName) && !string.Equals(_lastJoinedShard, shardName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastJoinedShard = shardName;
+                    return CreateServerJoinEntry(ParseTs(line), shardName);
+                }
+            }
         }
 
         return null;
+    }
+
+    public static (string Flag, string RegionLabel, string ShardNumber) ParseShardDetails(string shard)
+    {
+        if (string.IsNullOrWhiteSpace(shard))
+            return ("🌐", "PU", "");
+
+        var s = shard.Trim();
+        var lower = s.ToLowerInvariant();
+
+        string flag;
+        string region;
+
+        if (lower.Contains("aus") || lower.Contains("apse") || lower.Contains("oce") || lower.Contains("syd") || lower.Contains("ap-south"))
+        {
+            flag = "🇦🇺";
+            region = "AUS";
+        }
+        else if (lower.Contains("asia") || lower.Contains("apne") || lower.Contains("ape") || lower.Contains("aps") || lower.Contains("tokyo") || lower.Contains("tyo") || lower.Contains("jp") || lower.Contains("sg"))
+        {
+            flag = "🌏";
+            region = "Asia";
+        }
+        else if (lower.Contains("hkg"))
+        {
+            flag = "🇭🇰";
+            region = "HK";
+        }
+        else if (lower.Contains("use") || lower.Contains("us-east") || lower.Contains("virginia") || lower.Contains("-va-"))
+        {
+            flag = "🇺🇸";
+            region = "US-East";
+        }
+        else if (lower.Contains("usw") || lower.Contains("us-west") || lower.Contains("oregon") || lower.Contains("-or-"))
+        {
+            flag = "🇺🇸";
+            region = "US-West";
+        }
+        else if (lower.Contains("na") || lower.Contains("us"))
+        {
+            flag = "🇺🇸";
+            region = "US";
+        }
+        else if (lower.Contains("euc") || lower.Contains("fra") || lower.Contains("ger") || lower.Contains("frankfurt"))
+        {
+            flag = "🇩🇪";
+            region = "EU-Central";
+        }
+        else if (lower.Contains("euw") || lower.Contains("eun") || lower.Contains("eu") || lower.Contains("lon") || lower.Contains("irl") || lower.Contains("dublin"))
+        {
+            flag = "🇪🇺";
+            region = "EU";
+        }
+        else
+        {
+            flag = "🌐";
+            region = "PU";
+        }
+
+        var parts = s.Split('_');
+        string shardNumber = "";
+        if (parts.Length > 1 && int.TryParse(parts[^1], out _))
+        {
+            shardNumber = $"#{parts[^1]}";
+        }
+
+        return (flag, region, shardNumber);
+    }
+
+    private static LogEntry CreateServerJoinEntry(DateTime time, string shardName)
+    {
+        var (flag, region, shardNum) = ParseShardDetails(shardName);
+        var detail = string.IsNullOrEmpty(shardNum)
+            ? $"{flag} Server beigetreten: {region} ({shardName})"
+            : $"{flag} Server beigetreten: {region} · Shard {shardNum} ({shardName})";
+
+        return new LogEntry
+        {
+            Time = time,
+            Kind = EventKind.SessionChange,
+            Detail = detail
+        };
     }
 
     static EventKind? Categorize(string t)
@@ -2768,6 +2874,14 @@ public partial class LogParser
         if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
         {
             var mShard = ShardRegex().Match(line);
+            if (mShard.Success)
+            {
+                Meta["shard"] = mShard.Groups["s"].Value;
+            }
+        }
+        else if (line.Contains("<Update Shard Id>", StringComparison.OrdinalIgnoreCase) && line.Contains("New Shard Id:", StringComparison.OrdinalIgnoreCase))
+        {
+            var mShard = UpdateShardRegex().Match(line);
             if (mShard.Success)
             {
                 Meta["shard"] = mShard.Groups["s"].Value;

@@ -4562,6 +4562,7 @@ public class PhotinoBridge
         ["Orte"] = new() { EventKind.Location, EventKind.Jurisdiction, EventKind.Hangar },
         ["Crew"] = new() { EventKind.Party, EventKind.Friend },
         ["Loot"] = new() { EventKind.Loot },
+        ["Server"] = new() { EventKind.SessionChange },
         ["Sonst"] = new() { EventKind.MedBed, EventKind.Death, EventKind.Impound,
                             EventKind.Loadout, EventKind.Entitlement, EventKind.Inventory, EventKind.Gear, EventKind.Kill,
                             EventKind.Crime, EventKind.Refinery, EventKind.Injury, EventKind.Crash, EventKind.SessionChange },
@@ -5645,6 +5646,14 @@ public class PhotinoBridge
                 if (line.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && line.Contains("shard[", StringComparison.OrdinalIgnoreCase))
                 {
                     var m = System.Text.RegularExpressions.Regex.Match(line, @"shard\[(?<s>[^\]]+)\]");
+                    if (m.Success)
+                    {
+                        latestShard = m.Groups["s"].Value;
+                    }
+                }
+                else if (line.Contains("<Update Shard Id>", StringComparison.OrdinalIgnoreCase) && line.Contains("New Shard Id:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"New Shard Id:\s*(?<s>[^\s\.]+)");
                     if (m.Success)
                     {
                         latestShard = m.Groups["s"].Value;
@@ -6929,7 +6938,10 @@ public class PhotinoBridge
             {
                 _walletCapture.ProcessLine(rawLine);
                 _auroraService.ProcessLiveLine(rawLine);
-                if (_isWebviewReady && rawLine.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && rawLine.Contains("shard[", StringComparison.OrdinalIgnoreCase))
+                if (_isWebviewReady && (
+                    (rawLine.Contains("<Join PU>", StringComparison.OrdinalIgnoreCase) && rawLine.Contains("shard[", StringComparison.OrdinalIgnoreCase)) ||
+                    (rawLine.Contains("<Update Shard Id>", StringComparison.OrdinalIgnoreCase) && rawLine.Contains("New Shard Id:", StringComparison.OrdinalIgnoreCase))
+                ))
                 {
                     Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
                 }
@@ -7022,6 +7034,10 @@ public class PhotinoBridge
                 {
                     Broadcast("MISSIONS_UPDATED", GetMissionsData());
                 }
+                if (entry.Kind == EventKind.SessionChange && _parser.Meta.TryGetValue("shard", out var curShard) && !string.IsNullOrEmpty(curShard))
+                {
+                    TriggerServerPing(curShard);
+                }
             }
         }
         catch (Exception ex)
@@ -7079,6 +7095,7 @@ public class PhotinoBridge
         EventKind.Mission or EventKind.MissionDone or EventKind.MissionTaken => "mission",
         EventKind.Vehicle or EventKind.Quantum or EventKind.Hangar => "ship",
         EventKind.Location or EventKind.Jurisdiction => "location",
+        EventKind.SessionChange => "server",
         _ => "system"
     };
 

@@ -105,7 +105,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Loot => "Loot",
         EventKind.MissionTaken => "Auftraggeber",
         EventKind.Crash => "Crash",
-        EventKind.SessionChange => "Session",
+        EventKind.SessionChange => "Server",
         _ => "Info"
     };
 
@@ -124,7 +124,7 @@ public partial class LogEntry : ObservableObject
         get
         {
             if (Kind == EventKind.Crash) return _missRed;
-            if (Kind == EventKind.SessionChange) return _missAmber;
+            if (Kind == EventKind.SessionChange) return _missBlue;
             if (Kind == EventKind.MissionDone) return _missGreen;
             if (Kind != EventKind.Mission) return _detailDefault;
             var d = Detail ?? "";
@@ -180,7 +180,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Loot => "◈",
         EventKind.MissionTaken => "❖",
         EventKind.Crash => "💥",
-        EventKind.SessionChange => "⚡",
+        EventKind.SessionChange => "🌐",
         _ => "·"
     };
 
@@ -194,6 +194,7 @@ public partial class LogEntry : ObservableObject
     private static readonly IBrush _bgCombatLoss = new SolidColorBrush(Color.Parse("#3D1016"));
     private static readonly IBrush _bgInventory = new SolidColorBrush(Color.Parse("#0F2836"));
     private static readonly IBrush _bgMission = new SolidColorBrush(Color.Parse("#1A202C"));
+    private static readonly IBrush _bgServer = new SolidColorBrush(Color.Parse("#0C2340"));
     private static readonly IBrush _bgDefault = new SolidColorBrush(Color.Parse("#161B22"));
 
     private static readonly IBrush _fgMissionReward = new SolidColorBrush(Color.Parse("#FBBF24"));
@@ -205,6 +206,7 @@ public partial class LogEntry : ObservableObject
     private static readonly IBrush _fgCombatLoss = new SolidColorBrush(Color.Parse("#FB7185"));
     private static readonly IBrush _fgInventory = new SolidColorBrush(Color.Parse("#67E8F9"));
     private static readonly IBrush _fgMission = new SolidColorBrush(Color.Parse("#E2E8F0"));
+    private static readonly IBrush _fgServer = new SolidColorBrush(Color.Parse("#60A5FA"));
     private static readonly IBrush _fgDefault = new SolidColorBrush(Color.Parse("#8B949E"));
 
     public IBrush KindBadgeBg => Kind switch
@@ -218,6 +220,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Kill or EventKind.Death or EventKind.ShipLoss or EventKind.Crash => _bgCombatLoss,
         EventKind.Loot or EventKind.Loadout => _bgInventory,
         EventKind.Mission or EventKind.MissionTaken or EventKind.MissionDone => _bgMission,
+        EventKind.SessionChange => _bgServer,
         _ => _bgDefault
     };
 
@@ -232,6 +235,7 @@ public partial class LogEntry : ObservableObject
         EventKind.Kill or EventKind.Death or EventKind.ShipLoss or EventKind.Crash => _fgCombatLoss,
         EventKind.Loot or EventKind.Loadout => _fgInventory,
         EventKind.Mission or EventKind.MissionTaken or EventKind.MissionDone => _fgMission,
+        EventKind.SessionChange => _fgServer,
         _ => _fgDefault
     };
 }

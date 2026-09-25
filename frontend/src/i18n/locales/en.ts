@@ -144,6 +144,7 @@ export const en: Translations = {
     catLocation: 'Location',
     catWarehouse: 'Warehouse',
     catSystem: 'System',
+    catServer: 'Server',
     tabLive: 'Live Stream',
     tabArchive: 'Session Archive',
     tabCombat: 'Combat Analytics',

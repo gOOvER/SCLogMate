@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Server Join & Shard Tracking in Live Log with Regional Icons (`Core/LogParser.cs`, `Models/LogEntry.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/EventsView.tsx`, `frontend/src/i18n/`)**:
+  - Implemented automatic parsing of initial server joins (`<Join PU>`) and mid-session shard transitions (`<Update Shard Id>`) as `EventKind.SessionChange` events in both the Avalonia Desktop UI and Web frontend.
+  - Added dedicated `Server` category badge with high-tech blue styling and `🌐` / `Globe` icon.
+  - Added smart regional flag detection and shard extraction (`ParseShardDetails`) displaying regional flag emoji (🇪🇺, 🇺🇸, 🇩🇪, 🇦🇺, 🌏, 🇭🇰), region label, and shard number (e.g. `🇪🇺 Server beigetreten: EU · Shard #120 (pub_euw1b_12660092_120)`).
+  - Added consecutive join/shard deduplication to prevent duplicate entries while maintaining accurate connection state transitions.
+  - Reactive ping updates now immediately measure regional server latency when switching shards.
+
 ### Fixed
 - **Dynamic Regional Server Latency / Ping (`Core/Photino/PhotinoBridge.cs`, `Services/ServerPingService.cs`, `ViewModels/MainViewModel.cs`)**:
   - Replaced hardcoded static ping placeholder (`int? ping = isGameRunning ? 28 : null;`) in `PhotinoBridge.GetHudTelemetry` with real-time, asynchronous regional latency measurements.

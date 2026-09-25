@@ -147,6 +147,7 @@ export interface Translations {
     catLocation: string;
     catWarehouse: string;
     catSystem: string;
+    catServer: string;
     tabLive: string;
     tabArchive: string;
     tabCombat: string;

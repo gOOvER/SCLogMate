@@ -144,6 +144,7 @@ export const de: Translations = {
     catLocation: 'Ort',
     catWarehouse: 'Lager',
     catSystem: 'System',
+    catServer: 'Server',
     tabLive: 'Live-Stream',
     tabArchive: 'Sitzungsarchiv',
     tabCombat: 'Combat-Analytics',
