@@ -784,6 +784,7 @@ public class RsMatchDto
     [JsonPropertyName("errorPct")] public double ErrorPct { get; set; }
     [JsonPropertyName("scannedRs")] public int ScannedRs { get; set; }
     [JsonPropertyName("estimatedClusterValue")] public long EstimatedClusterValue { get; set; }
+    [JsonPropertyName("estimatedValueText")] public string EstimatedValueText { get; set; } = "";
 }
 
 public class MarketCommodityDto
@@ -6263,19 +6264,27 @@ public class PhotinoBridge
     private List<RsMatchDto> DecodeRsData(int rs)
     {
         var matches = RsDecoderCatalog.Decode(rs);
-        var dtos = matches.Select(m => new RsMatchDto
+        var dtos = matches.Select(m =>
         {
-            ResourceName = m.Resource.Name,
-            BaseRs = m.Resource.BaseRs,
-            Tier = m.Resource.Tier,
-            Rarity = m.Resource.Rarity,
-            Method = m.Resource.Method,
-            EstimatedPricePerScu = m.Resource.EstimatedPricePerScu,
-            Nodes = m.Nodes,
-            IsExact = m.IsExact,
-            ErrorPct = Math.Round(m.ErrorPct, 1),
-            ScannedRs = m.ScannedRs,
-            EstimatedClusterValue = (long)m.Resource.EstimatedPricePerScu * m.Nodes * 12
+            string valText = m.Resource.Method == "salvage"
+                ? $"ca. {m.Nodes * 25000:N0} aUEC"
+                : (m.Resource.EstimatedPricePerScu > 0 ? $"{m.Resource.EstimatedPricePerScu:N0} aUEC / SCU" : "—");
+
+            return new RsMatchDto
+            {
+                ResourceName = m.Resource.Name,
+                BaseRs = m.Resource.BaseRs,
+                Tier = m.Resource.Tier,
+                Rarity = m.Resource.Rarity,
+                Method = m.Resource.Method,
+                EstimatedPricePerScu = m.Resource.EstimatedPricePerScu,
+                Nodes = m.Nodes,
+                IsExact = m.IsExact,
+                ErrorPct = Math.Round(m.ErrorPct, 1),
+                ScannedRs = m.ScannedRs,
+                EstimatedClusterValue = m.Resource.Method == "salvage" ? (long)m.Nodes * 25000L : (long)m.Resource.EstimatedPricePerScu,
+                EstimatedValueText = valText
+            };
         }).ToList();
 
         if (dtos.Count > 0)

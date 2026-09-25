@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced frontend `HudBar` regex replacements to cleanly support both singular and plural forms (`Flug`/`Flüge`, `QT-Sprung`/`QT-Sprünge`) and multi-lingual status indicators.
 
 ### Changed
+- **Streamlined RS Radar HUD In-Game Overlay & Realistic Valuation (`Core/Overlays/NativeRsOverlay.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/services/photinoBridge.ts`)**:
+  - Corrected estimated signature valuation by removing the arbitrary and exaggerated `* 12` SCU multiplier (`m.Nodes * 12`), which previously displayed unrealistic sums (e.g. `~456.000 aUEC` for a single Savrilium node or `>1.000.000 aUEC` for Quantanium).
+  - Standardized market values to transparent, player-familiar metrics: displays exact market price per SCU for mineable ores (`38.000 aUEC / SCU`) and realistic yield estimates for salvage panels (`ca. 25.000 aUEC`).
+  - Redesigned the native Win32 RS overlay into an ultra-compact, high-contrast 3-row HUD badge: reduced dimensions by ~45% (from 380x150 down to 320x84) to eliminate cockpit clutter and avoid obscuring flight instruments.
+  - Added persistent window position memory via `WM_EXITSIZEMOVE` saving coordinates directly to `settings.json` (`RsOverlayPositionX/Y`).
 - Updated copyright notice in `LICENSE` and development mock profile in `frontend/src/services/photinoBridge.ts` to `gOOvER`.
 
 

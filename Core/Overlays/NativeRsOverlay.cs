@@ -35,8 +35,8 @@ public sealed class NativeRsOverlay : IDisposable
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int HTCAPTION = 2;
 
-    public const int OverlayWidth = 380;
-    public const int OverlayHeight = 150;
+    public const int OverlayWidth = 320;
+    public const int OverlayHeight = 84;
 
     private IntPtr _hwnd = IntPtr.Zero;
     private Thread? _uiThread;
@@ -49,9 +49,9 @@ public sealed class NativeRsOverlay : IDisposable
     // RS Signal State
     private string _rsValueText = "STANDBY";
     private string _targetName = "Warte auf Radar-Signal...";
-    private string _tierRarityText = "Bereit zum Scannen (V-Taste / Ping)";
-    private string _clusterValueText = "— aUEC";
-    private string _matchDetailText = "Tippe Scan-Taste oder aktiviere Auto-Scan";
+    private string _tierRarityText = "Bereit zum Scannen (TAB / V)";
+    private string _clusterValueText = "—";
+    private string _matchDetailText = "In-Game anpingen";
     private uint _themeColor = 0x0038BDF8u; // Amber/Cyan in BGR (0x00F8BD38)
     private bool _hasTarget = false;
 
@@ -117,16 +117,31 @@ public sealed class NativeRsOverlay : IDisposable
                         int x = (short)(lParam.ToInt32() & 0xFFFF);
                         int y = (short)((lParam.ToInt32() >> 16) & 0xFFFF);
 
-                        // Close button clicked (top right 355..375, 5..25)
-                        if (x >= OverlayWidth - 25 && x <= OverlayWidth - 5 && y >= 5 && y <= 25)
+                        // Close button clicked (top right: OverlayWidth - 25 .. OverlayWidth - 4, y: 2 .. 22)
+                        if (x >= OverlayWidth - 25 && x <= OverlayWidth - 4 && y >= 2 && y <= 22)
                         {
                             SetVisible(false);
+                            var s = Settings.Load();
+                            s.RsOverlayEnabled = false;
+                            Settings.Save(s);
                             return IntPtr.Zero;
                         }
 
                         // Drag window
                         ReleaseCapture();
                         SendMessage(hWnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+                        return IntPtr.Zero;
+                    }
+
+                case WM_EXITSIZEMOVE:
+                    {
+                        if (GetWindowRect(hWnd, out var rect))
+                        {
+                            var s = Settings.Load();
+                            s.RsOverlayPositionX = rect.left;
+                            s.RsOverlayPositionY = rect.top;
+                            Settings.Save(s);
+                        }
                         return IntPtr.Zero;
                     }
 
@@ -150,9 +165,10 @@ public sealed class NativeRsOverlay : IDisposable
 
         RegisterClassEx(ref wndClass);
 
+        var settings = Settings.Load();
         int screenW = GetSystemMetrics(0);
-        int posX = Math.Max(20, screenW - OverlayWidth - 40);
-        int posY = 210;
+        int posX = settings.RsOverlayPositionX > 0 ? (int)settings.RsOverlayPositionX : Math.Max(20, screenW - OverlayWidth - 40);
+        int posY = settings.RsOverlayPositionY > 0 ? (int)settings.RsOverlayPositionY : 210;
 
         int exStyle = WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED;
 
@@ -177,21 +193,23 @@ public sealed class NativeRsOverlay : IDisposable
             if (match != null && !string.IsNullOrWhiteSpace(match.ResourceName))
             {
                 _hasTarget = true;
-                _rsValueText = $"RS {match.ScannedRs:N0}";
-                _targetName = match.ResourceName;
-                _tierRarityText = $"Tier {match.Tier} · {match.Rarity.ToUpperInvariant()} · {match.Nodes}x Cluster";
-                _clusterValueText = match.EstimatedClusterValue > 0 ? $"~{match.EstimatedClusterValue:N0} aUEC" : "—";
-                _matchDetailText = $"Genauigkeit: {(100 - match.ErrorPct):0.#}% · {match.Method.ToUpperInvariant()}";
-                _themeColor = match.Tier == "S" ? 0x0080DE4Au : (match.Tier == "A" ? 0x000BB5F5u : 0x00EED322u);
+                _rsValueText = $"{match.ScannedRs:N0} RS";
+                _targetName = match.ResourceName.ToUpperInvariant();
+                _tierRarityText = $"{match.Nodes}x · Tier {match.Tier} · {match.Rarity.ToUpperInvariant()}";
+                _clusterValueText = !string.IsNullOrWhiteSpace(match.EstimatedValueText)
+                    ? match.EstimatedValueText
+                    : (match.EstimatedPricePerScu > 0 ? $"{match.EstimatedPricePerScu:N0} aUEC / SCU" : "—");
+                _matchDetailText = $"{(100 - match.ErrorPct):0.#}% · {match.Method.ToUpperInvariant()}";
+                _themeColor = match.Tier == "S" ? 0x0080DE4Au : (match.Tier == "A" ? 0x000BB5F5u : (match.Tier == "B" ? 0x00EED322u : 0x0034D399u));
             }
             else
             {
                 _hasTarget = false;
                 _rsValueText = "STANDBY";
                 _targetName = "Warte auf Radar-Signal...";
-                _tierRarityText = "Bereit zum Scannen (V-Taste / Ping)";
+                _tierRarityText = "Bereit zum Scannen (TAB / V)";
                 _clusterValueText = "—";
-                _matchDetailText = "In-Game RS-Signal anpingen";
+                _matchDetailText = "In-Game anpingen";
                 _themeColor = 0x009E948Bu;
             }
         }
@@ -208,78 +226,69 @@ public sealed class NativeRsOverlay : IDisposable
         IntPtr memBmp = CreateCompatibleBitmap(hdc, OverlayWidth, OverlayHeight);
         IntPtr oldBmp = SelectObject(memDC, memBmp);
 
-        // Hintergrund (Dunkelblau-Schwarz: 0x00160B05)
-        IntPtr bgBrush = CreateSolidBrush(0x00160B05);
+        // Hintergrund: Semi-transparenter Sci-Fi Dark-Blue/Black Container mit feinem Leuchtrahmen
+        IntPtr bgBrush = CreateSolidBrush(0x00140A04);
         IntPtr borderPen = CreatePen(0, 1, _themeColor);
         SelectObject(memDC, bgBrush);
         SelectObject(memDC, borderPen);
 
-        RoundRect(memDC, 1, 1, OverlayWidth - 1, OverlayHeight - 1, 12, 12);
+        RoundRect(memDC, 0, 0, OverlayWidth, OverlayHeight, 10, 10);
 
-        // Header Sub-Leiste
-        IntPtr headerBrush = CreateSolidBrush(0x0024160E);
-        var headerRc = new RECT { left = 2, top = 2, right = OverlayWidth - 2, bottom = 26 };
+        // Header Sub-Leiste (21px Höhe)
+        IntPtr headerBrush = CreateSolidBrush(0x00221308);
+        var headerRc = new RECT { left = 1, top = 1, right = OverlayWidth - 1, bottom = 22 };
         FillRect(memDC, ref headerRc, headerBrush);
         DeleteObject(headerBrush);
 
         IntPtr fontSmall = CreateFont(12, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
-        IntPtr fontBig = CreateFont(18, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
-        IntPtr fontMono = CreateFont(13, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Consolas");
+        IntPtr fontBig = CreateFont(16, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Segoe UI");
+        IntPtr fontMono = CreateFont(12, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 2, 0, "Consolas");
 
         SetBkMode(memDC, 1 /*TRANSPARENT*/);
 
-        // Header: 🛰 RS RADAR DECODER + Close Button
+        // 1. Header: 🛰 RS RADAR
         SelectObject(memDC, fontSmall);
         SetTextColor(memDC, _themeColor);
-        var hdrRc = new RECT { left = 10, top = 4, right = 250, bottom = 24 };
-        DrawText(memDC, "🛰 RS RADAR DECODER", -1, ref hdrRc, 0x00000000 | 0x00000004 | 0x00000020);
+        var hdrRc = new RECT { left = 8, top = 2, right = 110, bottom = 22 };
+        DrawText(memDC, "🛰 RS RADAR", -1, ref hdrRc, 0x00000000 | 0x00000004 | 0x00000020);
 
-        // Status / RS Value Pill
-        SetTextColor(memDC, 0x00FCF6F0);
-        var pillRc = new RECT { left = 240, top = 4, right = OverlayWidth - 28, bottom = 24 };
+        // Signal Badge Pill (RS 3.200 oder STANDBY)
+        SetTextColor(memDC, _hasTarget ? 0x000BB5F5u : 0x0094A3B8u);
+        var pillRc = new RECT { left = 105, top = 2, right = OverlayWidth - 26, bottom = 22 };
         DrawText(memDC, _rsValueText, -1, ref pillRc, 0x00000002 | 0x00000004 | 0x00000020);
 
         // Close Button [✕]
         SetTextColor(memDC, 0x00A0A0A0);
-        var closeRc = new RECT { left = OverlayWidth - 24, top = 4, right = OverlayWidth - 6, bottom = 24 };
+        var closeRc = new RECT { left = OverlayWidth - 22, top = 2, right = OverlayWidth - 4, bottom = 22 };
         DrawText(memDC, "✕", -1, ref closeRc, 0x00000001 | 0x00000004 | 0x00000020);
 
-        // Trennlinie
-        IntPtr divPen = CreatePen(0, 1, 0x003D2616);
+        // Subtile Trennlinie
+        IntPtr divPen = CreatePen(0, 1, 0x00331F10);
         SelectObject(memDC, divPen);
-        MoveToEx(memDC, 2, 26, IntPtr.Zero);
-        LineTo(memDC, OverlayWidth - 2, 26);
+        MoveToEx(memDC, 1, 22, IntPtr.Zero);
+        LineTo(memDC, OverlayWidth - 1, 22);
         DeleteObject(divPen);
 
-        // Ziel-Name / Hero Titel
+        // 2. Zeile: Ziel-Name (links) & Richtpreis/SCU (rechts)
         SelectObject(memDC, fontBig);
-        SetTextColor(memDC, _hasTarget ? 0x00FCF6F0u : 0x00A0948Bu);
-        var targetRc = new RECT { left = 12, top = 34, right = OverlayWidth - 12, bottom = 60 };
+        SetTextColor(memDC, _hasTarget ? 0x00FCF6F0u : 0x0094A3B8u);
+        var targetRc = new RECT { left = 10, top = 25, right = OverlayWidth - 130, bottom = 52 };
         DrawText(memDC, _targetName, -1, ref targetRc, 0x00000000 | 0x00000004 | 0x00000020);
 
-        // Tier & Rarity Subtitle
+        SelectObject(memDC, fontMono);
+        SetTextColor(memDC, _hasTarget ? 0x004ADE80u : 0x0064748Bu); // Leuchtendes Smaragdgrün
+        var valRc = new RECT { left = OverlayWidth - 145, top = 27, right = OverlayWidth - 10, bottom = 52 };
+        DrawText(memDC, _clusterValueText, -1, ref valRc, 0x00000002 | 0x00000004 | 0x00000020);
+
+        // 3. Zeile: Details / Cluster (links) & Match % (rechts)
         SelectObject(memDC, fontSmall);
-        SetTextColor(memDC, _themeColor);
-        var tierRc = new RECT { left = 12, top = 62, right = OverlayWidth - 12, bottom = 82 };
+        SetTextColor(memDC, _hasTarget ? _themeColor : 0x0064748Bu);
+        var tierRc = new RECT { left = 10, top = 54, right = OverlayWidth - 100, bottom = 78 };
         DrawText(memDC, _tierRarityText, -1, ref tierRc, 0x00000000 | 0x00000004 | 0x00000020);
 
-        // Trennlinie vor Footer
-        IntPtr footPen = CreatePen(0, 1, 0x002A1C12);
-        SelectObject(memDC, footPen);
-        MoveToEx(memDC, 8, 88, IntPtr.Zero);
-        LineTo(memDC, OverlayWidth - 8, 88);
-        DeleteObject(footPen);
-
-        // Footer: Geschätzter Clusterwert & Genauigkeit
-        SelectObject(memDC, fontMono);
-        SetTextColor(memDC, 0x0080DE4A); // Grün
-        var valRc = new RECT { left = 12, top = 94, right = OverlayWidth - 12, bottom = 114 };
-        DrawText(memDC, $"Geschätzter Wert: {_clusterValueText}", -1, ref valRc, 0x00000000 | 0x00000004 | 0x00000020);
-
-        SelectObject(memDC, fontSmall);
-        SetTextColor(memDC, 0x009E948B);
-        var detRc = new RECT { left = 12, top = 118, right = OverlayWidth - 12, bottom = 138 };
-        DrawText(memDC, _matchDetailText, -1, ref detRc, 0x00000000 | 0x00000004 | 0x00000020);
+        SetTextColor(memDC, 0x0094A3B8);
+        var detRc = new RECT { left = OverlayWidth - 105, top = 54, right = OverlayWidth - 10, bottom = 78 };
+        DrawText(memDC, _matchDetailText, -1, ref detRc, 0x00000002 | 0x00000004 | 0x00000020);
 
         BitBlt(hdc, 0, 0, OverlayWidth, OverlayHeight, memDC, 0, 0, 0x00CC0020 /*SRCCOPY*/);
 
@@ -401,6 +410,7 @@ public sealed class NativeRsOverlay : IDisposable
     [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
     [DllImport("user32.dll")] private static extern bool SetThreadDpiAwarenessContext(IntPtr dpiContext);
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(IntPtr lpModuleName);

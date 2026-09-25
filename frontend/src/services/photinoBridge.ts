@@ -692,6 +692,7 @@ export interface RsMatchDto {
   errorPct: number;
   scannedRs: number;
   estimatedClusterValue: number;
+  estimatedValueText?: string;
 }
 
 export interface MarketCommodityDto {
