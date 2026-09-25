@@ -152,7 +152,8 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
     <div
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="fixed bottom-10 right-6 z-50 w-[420px] max-w-[calc(100vw-3rem)] rounded-xl border border-amber-500/50 bg-[#030712]/95 backdrop-blur-md shadow-[0_0_35px_rgba(245,158,11,0.3)] text-slate-200 font-sans sc-hud-corner overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300"
+      style={{ position: 'fixed', bottom: '2.5rem', right: '1.5rem', zIndex: 9999 }}
+      className="w-[390px] max-w-[calc(100vw-3rem)] rounded-xl border border-amber-500/50 bg-[#030712]/95 backdrop-blur-md shadow-[0_0_35px_rgba(245,158,11,0.3)] text-slate-200 font-sans overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300"
     >
       {/* Top Header Bar */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/40 border-b border-amber-500/30">

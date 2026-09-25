@@ -514,9 +514,6 @@ export const App: React.FC = () => {
 
         <GlobalTooltip />
 
-        {/* Global GPS Location Detected Popup (/showlocation) */}
-        <LocationDetectedPopup onNavigate={handleSelectTab} />
-
         {/* Bottom Statusbar */}
         <footer className="flex items-center justify-between px-5 py-1.5 border-t border-cyan-950/60 bg-[#020610]/95 text-[11px] font-mono text-slate-500 shrink-0">
           <div className="flex items-center gap-4">
@@ -541,6 +538,9 @@ export const App: React.FC = () => {
           </div>
         </footer>
       </div>
+
+      {/* Global GPS Location Detected Popup (/showlocation) - rendered at the root level */}
+      <LocationDetectedPopup onNavigate={handleSelectTab} />
     </div>
   );
 };

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically detects nearby landmarks/POIs (within 15km) to provide smart names like `GPS: <Landmark>` or `GPS HH:mm:ss`.
   - Built-in duplicate protection ensures locations copied within 30m of an existing waypoint do not create redundant entries.
   - Displays the native Win32 Always-On-Top Toast Overlay (`📍 GPS-WEGPUNKT HINZUGEFÜGT`) and broadcasts `USER_POIS_UPDATED` so all views update in real time.
+  - Fixed viewport overlay positioning and clipping by lifting `LocationDetectedPopup` to the application root container with dedicated fixed coordinates on the bottom right, eliminating sidebar collision.
   - Added an inline rename/edit drawer directly in the GPS HUD popup to adjust name, category, and notes on the fly.
   - Added full POI editing and renaming support with an `Edit` action on all POI cards in `PlacesView`.
 - **Optional HOTAS & Joystick Profiler with 1-Click Swap & Bindings Explorer (`Core/Hotas/`, `Core/Settings.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/views/SettingsView.tsx`)**:
