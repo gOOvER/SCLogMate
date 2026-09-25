@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Compass, Crosshair, Plus, Copy, Check, X, BookmarkCheck, ExternalLink, Save } from 'lucide-react';
+import { Compass, Crosshair, Copy, Check, X, BookmarkCheck, ExternalLink, Save, Edit2 } from 'lucide-react';
 import { bridge, CopiedLocationReading, UserPoiDto } from '../services/photinoBridge';
 import { useI18n } from '../i18n';
 import { NavTabId } from './Sidebar';
@@ -32,7 +32,7 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
 
   // Form State
   const [poiName, setPoiName] = useState<string>('');
-  const [poiCategory, setPoiCategory] = useState<string>('Mining');
+  const [poiCategory, setPoiCategory] = useState<string>('Misc');
   const [poiBody, setPoiBody] = useState<string>('');
   const [poiNotes, setPoiNotes] = useState<string>('');
 
@@ -48,12 +48,12 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
       setSavedSuccessName(null);
       setTimeLeft(15);
 
-      // Pre-fill defaults based on nearest POI if available
+      // Pre-fill defaults based on saved POI or nearest POI if available
       const nearest = data.nearestPois && data.nearestPois.length > 0 ? data.nearestPois[0] : null;
       setPoiBody(nearest?.body || '');
-      setPoiCategory(nearest?.category || 'Mining');
-      setPoiName('');
-      setPoiNotes('');
+      setPoiCategory('Misc');
+      setPoiName(data.savedPoiName || `GPS ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+      setPoiNotes('Automatisch via /showlocation erfasst');
     });
 
     return () => {
@@ -161,7 +161,7 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
             <Compass className="w-4 h-4" />
           </div>
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 truncate">
-            {locale === 'en' ? 'GPS Location Detected' : 'GPS-Koordinaten erkannt'}
+            {locale === 'en' ? 'GPS Waypoint Added' : 'GPS-Wegpunkt hinzugefügt'}
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800">
             /showlocation
@@ -184,12 +184,20 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
           <div className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 flex items-center gap-2 font-mono text-xs animate-in zoom-in-95">
             <BookmarkCheck className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <div className="font-bold">{locale === 'en' ? 'POI Saved Successfully!' : 'POI erfolgreich gespeichert!'}</div>
+              <div className="font-bold">{locale === 'en' ? 'Waypoint Updated!' : 'Wegpunkt aktualisiert!'}</div>
               <div className="text-[11px] text-emerald-200/80">"{savedSuccessName}"</div>
             </div>
           </div>
         ) : (
           <>
+            {/* Saved POI Name Badge */}
+            <div className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded bg-cyan-950/40 border border-cyan-800/60 font-mono">
+              <span className="text-slate-400">{locale === 'en' ? 'Pinned as:' : 'Gespeichert als:'}</span>
+              <span className="font-bold text-cyan-300 truncate max-w-[240px]">
+                {reading.savedPoiName || `GPS ${reading.x.toFixed(0)}`}
+              </span>
+            </div>
+
             {/* System & Nearest POI */}
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 font-mono">
@@ -309,7 +317,7 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
                     className="flex items-center gap-1.5 px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-mono font-semibold text-xs transition cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.3)]"
                   >
                     <Save className="w-3.5 h-3.5" />
-                    {isSaving ? (locale === 'en' ? 'Saving...' : 'Speichert...') : (locale === 'en' ? 'Save POI' : 'Speichern')}
+                    {isSaving ? (locale === 'en' ? 'Saving...' : 'Speichert...') : (locale === 'en' ? 'Update POI' : 'Aktualisieren')}
                   </button>
                 </div>
               </form>
@@ -320,8 +328,8 @@ export const LocationDetectedPopup: React.FC<LocationDetectedPopupProps> = ({ on
                   onClick={handleOpenForm}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-mono font-bold text-xs transition cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.35)] shrink-0"
                 >
-                  <Plus className="w-4 h-4" />
-                  {locale === 'en' ? 'Pin as POI' : 'Als POI pinnen'}
+                  <Edit2 className="w-3.5 h-3.5" />
+                  {locale === 'en' ? 'Rename / Edit' : 'Umbenennen / Anpassen'}
                 </button>
 
                 <div className="flex items-center gap-1.5">

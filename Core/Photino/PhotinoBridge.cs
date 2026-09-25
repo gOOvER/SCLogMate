@@ -1335,17 +1335,17 @@ public class PhotinoBridge
         PoiClipboardWatcher.OnLocationDetected += reading =>
         {
             Broadcast("LOCATION_COPIED", reading);
+            Broadcast("USER_POIS_UPDATED", GetUserPoisData(null));
             try
             {
-                var nearestInfo = reading.NearestPois?.FirstOrDefault();
-                var subtitle = nearestInfo != null
-                    ? $"{nearestInfo.Name} ({nearestInfo.FormattedDistance})"
-                    : $"X: {reading.X:N0} Y: {reading.Y:N0} Z: {reading.Z:N0}";
+                var subtitle = !string.IsNullOrEmpty(reading.SavedPoiName)
+                    ? $"{reading.DetectedSystem} · {reading.SavedPoiName}"
+                    : $"{reading.DetectedSystem} (X:{reading.X:N0} Y:{reading.Y:N0})";
 
                 _toastOverlay.ShowToast(
                     "📍",
-                    "GPS-KOORDINATEN ERFASST",
-                    reading.DetectedSystem ?? "Stanton",
+                    "GPS-WEGPUNKT HINZUGEFÜGT",
+                    reading.SavedPoiName ?? "GPS-Wegpunkt",
                     subtitle,
                     0x000BB5F5u
                 );

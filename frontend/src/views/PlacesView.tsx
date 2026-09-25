@@ -21,6 +21,7 @@ import {
   Shield,
   RotateCcw,
   Zap,
+  Edit2,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -43,6 +44,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
 
   // New POI modal
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [editingPoiId, setEditingPoiId] = useState<number | null>(null);
   const [newPoiName, setNewPoiName] = useState<string>('');
   const [newPoiSystem, setNewPoiSystem] = useState<string>('Stanton');
   const [newPoiBody, setNewPoiBody] = useState<string>('');
@@ -130,6 +132,10 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
       if (data) setExecHangar(data);
     });
 
+    const unsubPois = bridge.on('USER_POIS_UPDATED', () => {
+      fetchUserPois();
+    });
+
     const timer = setInterval(() => {
       setExecHangar((prev) => {
         if (!prev) return prev;
@@ -157,6 +163,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     return () => {
       unsub();
       unsubHangar();
+      unsubPois();
       window.removeEventListener('user-poi-saved', handlePoiSavedEvent);
       clearInterval(timer);
     };
@@ -246,6 +253,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
   };
 
   const openAddWithCurrentLocation = () => {
+    setEditingPoiId(null);
     if (lastCopiedLoc) {
       setNewPoiX(lastCopiedLoc.x.toString());
       setNewPoiY(lastCopiedLoc.y.toString());
@@ -259,6 +267,19 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     setShowAddModal(true);
   };
 
+  const openEditPoi = (poi: UserPoiDto) => {
+    setEditingPoiId(poi.id);
+    setNewPoiName(poi.name);
+    setNewPoiSystem(poi.system || 'Stanton');
+    setNewPoiBody(poi.body || '');
+    setNewPoiCategory(poi.category || 'Mining');
+    setNewPoiNotes(poi.notes || '');
+    setNewPoiX(poi.posX !== undefined && poi.posX !== null ? poi.posX.toString() : '');
+    setNewPoiY(poi.posY !== undefined && poi.posY !== null ? poi.posY.toString() : '');
+    setNewPoiZ(poi.posZ !== undefined && poi.posZ !== null ? poi.posZ.toString() : '');
+    setShowAddModal(true);
+  };
+
   const handleSaveNewPoi = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPoiName.trim()) return;
@@ -268,6 +289,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     const pz = parseFloat(newPoiZ);
 
     const payload: Partial<UserPoiDto> = {
+      id: editingPoiId || 0,
       name: newPoiName.trim(),
       system: newPoiSystem,
       body: newPoiBody.trim(),
@@ -291,6 +313,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     try {
       await bridge.sendRequest('save_user_poi', payload);
       setShowAddModal(false);
+      setEditingPoiId(null);
       fetchUserPois();
     } catch (err) {
       console.error('Failed to save POI:', err);
@@ -564,6 +587,14 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
                         >
                           {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                           <span className="text-[10px]">{isCopied ? 'Kopiert' : 'Kopieren'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => openEditPoi(poi)}
+                          title={locale === 'en' ? 'Edit / Rename POI' : 'POI bearbeiten / umbenennen'}
+                          className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-amber-400 hover:border-amber-500/30 transition cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
 
                         <button
@@ -890,7 +921,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
           <div className="sc-glass border border-cyan-500/40 rounded-lg p-5 w-full max-w-lg shadow-[0_0_30px_rgba(0,240,255,0.2)]">
             <h2 className="text-base font-bold text-slate-100 font-mono uppercase tracking-wider mb-4 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-amber-400" />
-              Neuen POI / Wegpunkt anlegen
+              {editingPoiId ? (locale === 'en' ? 'Edit POI / Waypoint' : 'POI / Wegpunkt bearbeiten') : (locale === 'en' ? 'New POI / Waypoint' : 'Neuen POI / Wegpunkt anlegen')}
             </h2>
 
             <form onSubmit={handleSaveNewPoi} className="space-y-3 font-mono text-xs">
@@ -987,7 +1018,10 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingPoiId(null);
+                  }}
                   className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
                 >
                   Abbrechen
@@ -996,7 +1030,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
                   type="submit"
                   className="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.3)]"
                 >
-                  Speichern
+                  {editingPoiId ? 'Aktualisieren' : 'Speichern'}
                 </button>
               </div>
             </form>

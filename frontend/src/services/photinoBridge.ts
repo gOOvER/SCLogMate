@@ -515,6 +515,8 @@ export interface CopiedLocationReading {
   rawText: string;
   detectedSystem: string;
   nearestPois: PoiDistanceInfo[];
+  savedPoiId?: number | null;
+  savedPoiName?: string | null;
 }
 
 export interface UserPoiDto {

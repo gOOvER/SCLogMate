@@ -16,7 +16,9 @@ public sealed record CopiedLocationReading(
     DateTime Timestamp,
     string RawText,
     string DetectedSystem,
-    List<PoiDistanceInfo> NearestPois
+    List<PoiDistanceInfo> NearestPois,
+    int? SavedPoiId = null,
+    string? SavedPoiName = null
 );
 
 public sealed record PoiDistanceInfo(
@@ -148,9 +150,52 @@ public static partial class PoiClipboardWatcher
 
         nearest = nearest.OrderBy(p => p.DistanceMeters).Take(5).ToList();
 
-        var reading = new CopiedLocationReading(x, y, z, DateTime.UtcNow, text.Trim(), system, nearest);
+        // Check if already very close (< 30m) to an existing POI to prevent duplicate clutter
+        var existingVeryClose = nearest.FirstOrDefault(p => p.DistanceMeters < 30.0);
+        int savedPoiId;
+        string poiName;
+
+        if (existingVeryClose != null)
+        {
+            savedPoiId = existingVeryClose.Id;
+            poiName = existingVeryClose.Name;
+            Logger.Log($"PoiClipboardWatcher: Koordinate liegt nahe existierendem POI #{savedPoiId} '{poiName}', kein Duplikat nötig.");
+        }
+        else
+        {
+            var closest = nearest.FirstOrDefault();
+            string poiBody = "";
+            if (closest != null && closest.DistanceMeters < 15_000)
+            {
+                poiName = $"GPS: {closest.Name}";
+                poiBody = closest.Body;
+            }
+            else
+            {
+                poiName = $"GPS {DateTime.Now:HH:mm:ss}";
+            }
+
+            var newPoi = new UserPoi
+            {
+                System = system,
+                Body = poiBody,
+                Name = poiName,
+                Notes = "Automatisch via /showlocation erfasst",
+                Category = "Misc",
+                Color = "#06B6D4",
+                PosX = x,
+                PosY = y,
+                PosZ = z,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            savedPoiId = Database.SaveUserPoi(newPoi);
+            Logger.Log($"PoiClipboardWatcher: Neuer POI #{savedPoiId} '{poiName}' automatisch hinzugefügt.");
+        }
+
+        var reading = new CopiedLocationReading(x, y, z, DateTime.UtcNow, text.Trim(), system, nearest, savedPoiId, poiName);
         LastReading = reading;
-        Logger.Log($"PoiClipboardWatcher: Neue Koordinaten aus Zwischenablage erfasst: X={x:F1}, Y={y:F1}, Z={z:F1} ({system})");
+        Logger.Log($"PoiClipboardWatcher: Neue Koordinaten aus Zwischenablage erfasst: X={x:F1}, Y={y:F1}, Z={z:F1} ({system}) -> POI #{savedPoiId}");
 
         OnLocationDetected?.Invoke(reading);
     }
