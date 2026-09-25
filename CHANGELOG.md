@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-09-25
 ### Added
 - **Server Join & Shard Tracking in Live Log with Regional Icons (`Core/LogParser.cs`, `Models/LogEntry.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/EventsView.tsx`, `frontend/src/i18n/`)**:
   - Implemented automatic parsing of initial server joins (`<Join PU>`) and mid-session shard transitions (`<Update Shard Id>`) as `EventKind.SessionChange` events in both the Avalonia Desktop UI and Web frontend.

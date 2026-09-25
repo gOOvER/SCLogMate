@@ -1,7 +1,7 @@
 # release.ps1 — lokal bauen + GitHub-Release mit ordentlichem Changelog.
 # Ablauf: 1) Version aus csproj  2) [Unreleased] in CHANGELOG.md zu [version] stempeln
 #         3) bauen  4) Release mit der Changelog-Sektion als Notes (+ Link).
-param([switch]$SkipSign)
+param([switch]$Sign)
 $ErrorActionPreference = 'Stop'
 $root   = $PSScriptRoot
 $csproj = Join-Path $root 'SCLogMate.csproj'
@@ -58,11 +58,9 @@ $exe = Join-Path $root 'publish\SCLogMate.exe'
 if (-not (Test-Path $exe)) { throw "exe nicht gefunden: $exe" }
 Write-Host ("   gebaut: {0:N1} MB" -f ((Get-Item $exe).Length/1MB)) -ForegroundColor Green
 
-# Code-Signing (Certum/SimplySign)
-if (-not $SkipSign) {
+# Code-Signing (standardmäßig deaktiviert)
+if ($Sign) {
   & (Join-Path $root 'sign.ps1') -File $exe
-} else {
-  Write-Host "==> Code-Signing übersprungen (-SkipSign)" -ForegroundColor Yellow
 }
 
 # Tag + Release
