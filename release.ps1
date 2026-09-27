@@ -13,20 +13,18 @@ $tag  = "v$ver"
 $date = Get-Date -Format 'yyyy-MM-dd'
 Write-Host "==> Release $tag" -ForegroundColor Cyan
 
-# CHANGELOG: [Unreleased] -> [version] - date. Idempotent: bei Retry Notes aus der
-# bereits gestempelten [version]-Sektion nehmen (kein doppeltes Stempeln/Committen).
+# CHANGELOG: [Unreleased] -> [version] - date. Idempotent: wenn [Unreleased] Inhalt hat,
+# stempeln und committen. Wenn [Unreleased] leer ist (Retry), Notes aus der [$ver]-Sektion nehmen.
 $cl = Get-Content $clPath -Raw
-$verPat = "(?ms)^## \[$([regex]::Escape($ver))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)"
-if ($cl -match $verPat) {
-  $body = $Matches[1].Trim()                         # schon gestempelt (Retry)
-} elseif ($cl -match '(?ms)^## \[Unreleased\]\s*(.*?)(?=^## \[|\z)') {
+if ($cl -match '(?ms)^## \[Unreleased\]\s*\r?\n(.*?)(?=^## \[|\z)' -and $Matches[1].Trim()) {
   $body = $Matches[1].Trim()
-  if (-not $body) { $body = '- (keine Einträge)' }
   $cl = $cl -replace '(?m)^## \[Unreleased\]\s*', "## [Unreleased]`r`n`r`n## [$ver] - $date`r`n"
   Set-Content $clPath $cl -Encoding UTF8
   git add CHANGELOG.md
   git commit -m "changelog: $tag"
   git push origin refs/heads/main
+} elseif ($cl -match "(?ms)^## \[$([regex]::Escape($ver))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)") {
+  $body = $Matches[1].Trim()                         # schon gestempelt (Retry)
 } else {
   $body = "Siehe Commits."
 }
@@ -46,7 +44,11 @@ Pop-Location
 
 # Single-file exe bauen (CPU gedrosselt, damit das System flüssig bleibt)
 Stop-Process -Name SCLogMate -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 500
+Start-Sleep -Seconds 1
+$existingExe = Join-Path $root 'publish\SCLogMate.exe'
+if (Test-Path $existingExe) {
+  Remove-Item $existingExe -Force -ErrorAction SilentlyContinue
+}
 [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = 'BelowNormal'
 dotnet publish -c Release -r win-x64 --self-contained true -m:4 `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `

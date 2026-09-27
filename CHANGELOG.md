@@ -1061,7 +1061,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct OCR leading-digit truncation and live balance recomputation.
 - Prevent tray lifecycle disposal failures.
 
-## [1.2.0] - 2026-08-29
+## [1.1.19-legacy] - 2026-08-29
 
 ### Added
 - Settings page, crash and fatal-error detection, bilingual mobiGlas scanning, and multi-monitor OCR calibration.
