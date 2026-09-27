@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `stepsDone`, `stepsTotal`, and `progressText` to `MissionItemDto` and displayed dynamic progress badges on active contracts in `MissionsView`.
 
 ### Fixed
+- **Windows 11 Identification from StarEngine Logs (`Core/MaintenanceService.cs`, `frontend/src/views/ToolsView.tsx`)**:
+  - Corrected OS version detection where StarEngine / CryEngine logs the legacy NT kernel major version as `Windows 10 64 bit (build 10.0.X)`. Implemented `NormalizeWindowsVersion` to accurately classify all NT builds >= 22000 (e.g. build 26200 / 24H2) as Windows 11 in system diagnostics and the frontend hardware badge.
 - **Ship Equipment Detection & ASOP Loadout Estimate Column OCR Overhaul (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `frontend/src/components/ShipLoadoutModal.tsx`)**:
   - Overhauled ASOP Terminal "LOADOUT ESTIMATE" scanning to utilize a two-column paired parsing algorithm matching items under the `NAME` column directly with corresponding rows in the `TYPE` column (`Cooler`, `Jump Module`, `Power Plant`, `Quantum Drives`, `Radar`, `Shield Generator`, `Tractor Beam`, `Turret`, `Gun`, `Missile Rack`, `Liveries`), resolving the issue where only 5 components were detected for vessels like the Cutlass Black.
   - Expanded the comprehensive Star Citizen component keyword fallback catalog with stock Cutlass components and standard equipment (`ColdSnap`, `Odyssey`, `Chernykh`, `CoverAll`, `SureGrip S1`, `VariPuck S3 Gimbal`, `MSD-442`, `MSD-423`).

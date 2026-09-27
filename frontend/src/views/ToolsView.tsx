@@ -2572,7 +2572,14 @@ export const ToolsView: React.FC = () => {
 
               {status?.windowsVersion && (
                 <div className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 shrink-0">
-                  {status.windowsVersion}
+                  {(() => {
+                    const raw = status.windowsVersion;
+                    const m = raw.match(/10\.0\.(\d+)/i);
+                    if (m && parseInt(m[1], 10) >= 22000) {
+                      return raw.replace(/Windows\s+10/i, 'Windows 11');
+                    }
+                    return raw;
+                  })()}
                 </div>
               )}
             </div>

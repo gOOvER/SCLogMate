@@ -941,6 +941,11 @@ public static class MaintenanceService
         // 3. Hardware & Benchmark Details aus Game.log extrahieren
         ParseHardwareAndBenchmarksFromLog(logPath, info);
 
+        if (string.IsNullOrEmpty(info.WindowsVersion))
+        {
+            info.WindowsVersion = NormalizeWindowsVersion(null);
+        }
+
         return info;
     }
 
@@ -1007,11 +1012,11 @@ public static class MaintenanceService
                         info.CpuLogicalCores = cores;
                     }
                 }
-                // Windows Version: Windows 10 64 bit (build 10.0.26200)
+                // Windows Version: Windows 10 64 bit (build 10.0.26200) -> Auf Windows 11 korrigieren wenn Build >= 22000
                 else if (line.Contains("Windows ") && line.Contains("64 bit"))
                 {
                     var m = System.Text.RegularExpressions.Regex.Match(line, @"Windows\s+[^\r\n]+");
-                    if (m.Success) info.WindowsVersion = m.Value.Trim();
+                    if (m.Success) info.WindowsVersion = NormalizeWindowsVersion(m.Value.Trim());
                 }
                 // Current display mode is 2560x1440x32
                 else if (line.Contains("Current display mode is "))
@@ -1088,6 +1093,44 @@ public static class MaintenanceService
         {
             Logger.Error("ParseHardwareAndBenchmarksFromLog", ex);
         }
+    }
+
+    public static string NormalizeWindowsVersion(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            var v = Environment.OSVersion.Version;
+            string os = v.Build >= 22000 ? "Windows 11" : (v.Major == 10 ? "Windows 10" : "Windows");
+            string bitness = Environment.Is64BitOperatingSystem ? "64 bit" : "32 bit";
+            return $"{os} {bitness} (build {v.Major}.{v.Minor}.{v.Build})";
+        }
+
+        // Star Citizen / StarEngine loggt legacy: "Windows 10 64 bit (build 10.0.26200)"
+        // Da Microsoft die Major-Version bei NT 10.0 belassen hat, ist jeder Build >= 22000 offiziell Windows 11.
+        var m = System.Text.RegularExpressions.Regex.Match(raw, @"10\.0\.(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        int buildNum = 0;
+        if (m.Success && int.TryParse(m.Groups[1].Value, out int b))
+        {
+            buildNum = b;
+        }
+        else
+        {
+            buildNum = Environment.OSVersion.Version.Build;
+        }
+
+        if (buildNum >= 22000)
+        {
+            if (raw.StartsWith("Windows 10", StringComparison.OrdinalIgnoreCase))
+            {
+                raw = "Windows 11" + raw.Substring("Windows 10".Length);
+            }
+            else
+            {
+                raw = System.Text.RegularExpressions.Regex.Replace(raw, @"\bWindows\s+10\b", "Windows 11", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+        }
+
+        return raw;
     }
 
     private static string SanitizeFileName(string name)
