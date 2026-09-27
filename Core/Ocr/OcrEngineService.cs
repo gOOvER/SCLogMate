@@ -105,7 +105,7 @@ public sealed class OcrEngineService : IDisposable
 
         try
         {
-            using var fileStream = File.OpenRead(filePath);
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var randomAccessStream = fileStream.AsRandomAccessStream();
             var decoder = await BitmapDecoder.CreateAsync(randomAccessStream);
             using var sBmp = await decoder.GetSoftwareBitmapAsync();

@@ -1169,6 +1169,12 @@ public class PhotinoBridge
                         : "[]";
                     Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson, res.IsFullSnapshot);
                     Broadcast("FLEET_UPDATED", GetFleetResponse());
+
+                    var compCount = res.Components?.Count ?? 0;
+                    var subtitle = !string.IsNullOrWhiteSpace(res.Livery)
+                        ? $"{compCount} Komponenten · Lackierung: {res.Livery}"
+                        : $"{compCount} Komponenten erfasst";
+                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", res.ShipName, subtitle, 0x00EED322u);
                 }
             }
             catch (Exception ex)
@@ -1986,6 +1992,7 @@ public class PhotinoBridge
                                     {
                                         Broadcast("FLEET_UPDATED", GetFleetResponse());
                                         var shipNames = string.Join(", ", processedShips.Select(s => s.Split('·')[0].Trim()));
+                                        _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", shipNames, $"{totalComponents} Komponenten synchronisiert", 0x00EED322u);
                                         SendResponse(req.Id, "scan_screenshot_loadout_response", new ScreenshotLoadoutResult(
                                             Success: true,
                                             ShipName: shipNames,
@@ -2018,6 +2025,12 @@ public class PhotinoBridge
                                         : "[]";
                                     Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson, scrLoadoutRes.IsFullSnapshot);
                                     Broadcast("FLEET_UPDATED", GetFleetResponse());
+
+                                    var compCount = scrLoadoutRes.Components?.Count ?? 0;
+                                    var subtitle = !string.IsNullOrWhiteSpace(scrLoadoutRes.Livery)
+                                        ? $"{compCount} Komponenten · Lackierung: {scrLoadoutRes.Livery}"
+                                        : $"{compCount} Komponenten erfasst";
+                                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", scrLoadoutRes.ShipName, subtitle, 0x00EED322u);
                                 }
                                 catch (Exception ex)
                                 {
@@ -2049,6 +2062,13 @@ public class PhotinoBridge
                                     : "[]";
                                 Database.SaveFleetShipComponents(clipRes.ShipName, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
                                 Broadcast("FLEET_UPDATED", GetFleetResponse());
+
+                                var compCount = clipRes.Components?.Count ?? 0;
+                                var subtitle = !string.IsNullOrWhiteSpace(clipRes.Livery)
+                                    ? $"{compCount} Komponenten · Lackierung: {clipRes.Livery}"
+                                    : $"{compCount} Komponenten erfasst";
+                                _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", clipRes.ShipName, subtitle, 0x00EED322u);
+
                                 SendResponse(req.Id, "scan_clipboard_loadout_response", clipRes with {
                                     Message = $"[Zwischenablage] {clipRes.ShipName}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
                                 });
@@ -7388,6 +7408,23 @@ public class PhotinoBridge
             if (_tailer != null)
             {
                 StartLogTailer(path);
+            }
+
+            if (_screenshotWatcher != null)
+            {
+                try
+                {
+                    var dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrWhiteSpace(dir))
+                    {
+                        var scDir = Path.Combine(dir, "ScreenShots");
+                        if (Directory.Exists(scDir) && _screenshotWatcher.WatchedFolder != scDir)
+                        {
+                            _screenshotWatcher.StartWatching(scDir);
+                        }
+                    }
+                }
+                catch { }
             }
         }
         return GetLogStatus();

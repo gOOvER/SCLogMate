@@ -36,6 +36,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     private readonly OcrEngineService _ocr;
     private FileSystemWatcher? _watcher;
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _inFlightFiles = new(StringComparer.OrdinalIgnoreCase);
 
     public event Action<ScreenshotLoadoutResult>? OnLoadoutDetected;
 
@@ -72,11 +73,13 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             _watcher = new FileSystemWatcher(folder)
             {
                 Filter = "*.*",
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 EnableRaisingEvents = true
             };
 
-            _watcher.Created += OnFileCreated;
+            _watcher.Created += OnFileEvent;
+            _watcher.Changed += OnFileEvent;
+            _watcher.Renamed += OnFileRenamed;
             Logger.Log($"ScreenshotLoadoutWatcher: Überwache '{folder}' auf VLM/Flottenmanager-Screenshots.");
             return true;
         }
@@ -91,35 +94,124 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     {
         if (_watcher != null)
         {
-            _watcher.EnableRaisingEvents = false;
-            _watcher.Created -= OnFileCreated;
-            _watcher.Dispose();
+            try
+            {
+                _watcher.EnableRaisingEvents = false;
+                _watcher.Created -= OnFileEvent;
+                _watcher.Changed -= OnFileEvent;
+                _watcher.Renamed -= OnFileRenamed;
+                _watcher.Dispose();
+            }
+            catch { }
             _watcher = null;
         }
     }
 
-    private async void OnFileCreated(object sender, FileSystemEventArgs e)
+    private void OnFileEvent(object sender, FileSystemEventArgs e) => HandleIncomingFile(e.FullPath);
+    private void OnFileRenamed(object sender, RenamedEventArgs e) => HandleIncomingFile(e.FullPath);
+
+    private void HandleIncomingFile(string fullPath)
     {
-        var ext = Path.GetExtension(e.FullPath).ToLowerInvariant();
+        var ext = Path.GetExtension(fullPath).ToLowerInvariant();
         if (ext != ".jpg" && ext != ".png" && ext != ".jpeg") return;
 
-        if (!_processedFiles.TryAdd(e.FullPath, 0)) return;
+        if (_processedFiles.ContainsKey(fullPath)) return;
+        if (!_inFlightFiles.TryAdd(fullPath, 0)) return;
 
-        // Kurze Pause, damit die Bilddatei von Star Citizen vollständig geschrieben wird
-        await Task.Delay(1200);
-
-        try
+        _ = Task.Run(async () =>
         {
-            var res = await AnalyzeScreenshotAsync(e.FullPath);
-            if (res.Success)
+            try
             {
-                OnLoadoutDetected?.Invoke(res);
+                var fileName = Path.GetFileName(fullPath);
+                Logger.Log($"ScreenshotLoadoutWatcher: Neuer Screenshot registriert: {fileName} – warte auf Dateibereitschaft...");
+
+                bool ready = await WaitForFileReadyAsync(fullPath, 6000);
+                if (!ready)
+                {
+                    Logger.Log($"ScreenshotLoadoutWatcher: Datei {fileName} ist nach Timeout nicht bereit oder gesperrt.");
+                    return;
+                }
+
+                Logger.Log($"ScreenshotLoadoutWatcher: Analysiere {fileName}...");
+                var res = await AnalyzeScreenshotAsync(fullPath);
+                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) &&
+                    ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
+                {
+                    _processedFiles.TryAdd(fullPath, 0);
+                    Logger.Log($"ScreenshotLoadoutWatcher: Loadout erkannt für '{res.ShipName}': {res.Components?.Count ?? 0} Komponenten, Livery: {res.Livery ?? "keine"}.");
+                    OnLoadoutDetected?.Invoke(res);
+                }
+                else
+                {
+                    Logger.Log($"ScreenshotLoadoutWatcher: Kein Schiffs-Loadout in {fileName} erkannt ({res.Message ?? "Kein Treffer"}).");
+                }
             }
-        }
-        catch (Exception ex)
+            catch (Exception ex)
+            {
+                Logger.Error($"ScreenshotLoadoutWatcher analyse error: {fullPath}", ex);
+            }
+            finally
+            {
+                _inFlightFiles.TryRemove(fullPath, out _);
+            }
+        });
+    }
+
+    private static async Task<bool> WaitForFileReadyAsync(string filePath, int timeoutMs = 6000)
+    {
+        var startTime = DateTime.UtcNow;
+        long lastSize = -1;
+        int stableChecks = 0;
+
+        while ((DateTime.UtcNow - startTime).TotalMilliseconds < timeoutMs)
         {
-            Logger.Error($"ScreenshotLoadoutWatcher analyse error: {e.FullPath}", ex);
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    long currentSize = fileInfo.Length;
+
+                    // Star Citizen Screenshots sind typischerweise >= 20 KB
+                    if (currentSize > 1024)
+                    {
+                        if (currentSize == lastSize)
+                        {
+                            stableChecks++;
+                            if (stableChecks >= 2)
+                            {
+                                // Versuche lesenden Zugriff mit FileShare.ReadWrite
+                                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                                {
+                                    if (fs.Length > 0)
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            lastSize = currentSize;
+                            stableChecks = 0;
+                        }
+                    }
+                }
+            }
+            catch (IOException)
+            {
+                // Datei wird noch geschrieben
+                stableChecks = 0;
+            }
+            catch
+            {
+                // Sonstige Fehler abfangen
+            }
+
+            await Task.Delay(250).ConfigureAwait(false);
         }
+
+        return false;
     }
 
     /// <summary>
@@ -911,25 +1003,28 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         try
         {
             var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
-            if (content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Bitmap))
+            if (content != null && content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Bitmap))
             {
                 var bitmapRef = await content.GetBitmapAsync();
-                using var stream = await bitmapRef.OpenReadAsync();
-                var decoder = await BitmapDecoder.CreateAsync(stream);
-                using var sBmp = await decoder.GetSoftwareBitmapAsync();
+                if (bitmapRef != null)
+                {
+                    using var stream = await bitmapRef.OpenReadAsync();
+                    var decoder = await BitmapDecoder.CreateAsync(stream);
+                    using var sBmp = await decoder.GetSoftwareBitmapAsync();
 
-                var tempPath = Path.Combine(Path.GetTempPath(), $"sclogmate_clipboard_{DateTime.UtcNow.Ticks}.png");
-                using var fileStream = File.Create(tempPath);
-                var randomAccessStream = fileStream.AsRandomAccessStream();
-                var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, randomAccessStream);
-                encoder.SetSoftwareBitmap(sBmp);
-                await encoder.FlushAsync();
-                return tempPath;
+                    var tempPath = Path.Combine(Path.GetTempPath(), $"sclogmate_clipboard_{DateTime.UtcNow.Ticks}.png");
+                    using var fileStream = File.Create(tempPath);
+                    var randomAccessStream = fileStream.AsRandomAccessStream();
+                    var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, randomAccessStream);
+                    encoder.SetSoftwareBitmap(sBmp);
+                    await encoder.FlushAsync();
+                    return tempPath;
+                }
             }
         }
         catch (Exception ex)
         {
-            Logger.Error("SaveClipboardImageToFileAsync", ex);
+            Logger.Log($"SaveClipboardImageToFileAsync: {ex.Message}");
         }
         return null;
     }
@@ -946,8 +1041,31 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
     public static string? DetectStarCitizenScreenshotFolder()
     {
-        // Standardpfade auf gängigen Laufwerken suchen
-        string[] drives = { "C", "D", "E", "F", "G", "J", "X" };
+        // 1. Zuerst prüfen, ob in Settings ein Star Citizen Log-Pfad hinterlegt ist
+        try
+        {
+            var s = Settings.Load();
+            if (!string.IsNullOrWhiteSpace(s?.LogPath))
+            {
+                var dir = Path.GetDirectoryName(s.LogPath);
+                if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                {
+                    var scDir = Path.Combine(dir, "ScreenShots");
+                    if (Directory.Exists(scDir)) return scDir;
+                }
+            }
+        }
+        catch { }
+
+        // 2. Bekanntes Standardverzeichnis auf J: prüfen
+        var defaultLogDir = @"J:\StarCitizen\LIVE\ScreenShots";
+        if (Directory.Exists(defaultLogDir))
+        {
+            return defaultLogDir;
+        }
+
+        // 3. Standardpfade auf gängigen Laufwerken suchen
+        string[] drives = { "J", "C", "D", "E", "F", "G", "X" };
         foreach (var d in drives)
         {
             var livePath = $@"{d}:\StarCitizen\LIVE\ScreenShots";
@@ -955,13 +1073,9 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
             var rsiPath = $@"{d}:\Program Files\Roberts Space Industries\StarCitizen\LIVE\ScreenShots";
             if (Directory.Exists(rsiPath)) return rsiPath;
-        }
 
-        // Falls Log-Verzeichnis bekannt ist
-        var defaultLogDir = @"j:\StarCitizen\LIVE";
-        if (Directory.Exists(Path.Combine(defaultLogDir, "ScreenShots")))
-        {
-            return Path.Combine(defaultLogDir, "ScreenShots");
+            var ptuPath = $@"{d}:\StarCitizen\PTU\ScreenShots";
+            if (Directory.Exists(ptuPath)) return ptuPath;
         }
 
         return null;

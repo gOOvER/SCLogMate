@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Automatic Screenshot Loadout Reading & In-Game Toast Notifications (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Ocr/OcrEngineService.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Implemented robust automatic reading of Star Citizen screenshots with multi-event watching (`Created`, `Changed`, `Renamed`) and size-stabilizing file readiness polling (`WaitForFileReadyAsync`), eliminating file-locking races and premature reads while the game is writing the file.
+  - Added intelligent screenshot folder auto-detection that prioritizes the active `Settings.LogPath` directory as well as `J:\StarCitizen\LIVE\ScreenShots` before scanning standard system paths.
+  - Connected the native Win32 Always-On-Top Toast Overlay (`🛸 SCHIFFS-AUSRÜSTUNG ERFASST`) to display recognized ship loadouts, component counts, and livery names directly over the game window upon detection (via watcher, manual scan, or clipboard).
+  - Switched `OcrEngineService.RecognizeImageFileAsync` to `FileShare.ReadWrite` to allow seamless parallel reads of newly captured screenshots.
+- **Robust ASOP Loadout Estimate Extraction (`Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - Overhauled OCR parsing for ASOP Fleet Manager "LOADOUT ESTIMATE" screens with paired NAME/TYPE column parsing and comprehensive Star Citizen component fallbacks.
+  - Fixed tree marker regex stripping so words beginning with 'L' (Liveries, Lightstrike, Laser) are preserved intact.
+  - Corrected model number normalization so weapons with trailing zeros (e.g. Mantis GT-220) maintain their exact designation.
 - **Automatic GPS Waypoint Recording & POI Editing (`Core/PoiClipboardWatcher.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/LocationDetectedPopup.tsx`, `frontend/src/views/PlacesView.tsx`)**:
   - Automatically records and saves detected `/showlocation` coordinates directly into the SQLite database as permanent GPS waypoints without requiring manual form entry.
   - Automatically detects nearby landmarks/POIs (within 15km) to provide smart names like `GPS: <Landmark>` or `GPS HH:mm:ss`.
