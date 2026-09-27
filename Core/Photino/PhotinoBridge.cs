@@ -5366,17 +5366,29 @@ public class PhotinoBridge
         // 1. Live-Verträge aus dem LogParser (Game.log) mit Status InProgress
         foreach (var c in _parser.ContractsList.Where(c => c.Outcome == ContractOutcome.InProgress))
         {
+            var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
+            var issuer = !string.IsNullOrWhiteSpace(c.Issuer) && c.Issuer != "Unbekannt" && c.Issuer != "Star Citizen Auftragsmanager"
+                ? c.Issuer
+                : (cat?.Contractor ?? "Star Citizen Auftragsmanager");
+            var faction = !string.IsNullOrWhiteSpace(cat?.Faction) ? cat.Faction : issuer;
+            var mType = !string.IsNullOrWhiteSpace(c.Type) && c.Type != "Auftrag" ? c.Type : (cat?.MissionType ?? "Auftrag");
+            var sys = !string.IsNullOrWhiteSpace(c.System) && c.System != "k.A." && c.System != "Stanton"
+                ? c.System
+                : (cat?.StarSystems ?? (!string.IsNullOrWhiteSpace(c.System) ? c.System : "Stanton"));
+            var reward = (int)c.Reward > 0 ? (int)c.Reward : (cat?.BaseReward ?? 0);
+
             activeContracts.Add(new MissionItemDto
             {
                 Id = !string.IsNullOrWhiteSpace(c.MissionId) ? c.MissionId : Guid.NewGuid().ToString("N"),
-                Title = !string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag",
-                Contractor = !string.IsNullOrWhiteSpace(c.Issuer) ? c.Issuer : "Star Citizen Auftragsmanager",
-                Faction = !string.IsNullOrWhiteSpace(c.Issuer) ? c.Issuer : "Star Citizen Auftragsmanager",
-                MissionType = !string.IsNullOrWhiteSpace(c.Type) ? c.Type : "Auftrag",
-                BaseReward = (int)c.Reward,
+                Title = cat?.Title ?? (!string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag"),
+                Contractor = issuer,
+                Faction = faction,
+                MissionType = mType,
+                BaseReward = reward,
                 IsActive = true,
-                Description = $"{c.Type} • {c.Difficulty} • System: {c.System}",
-                StarSystems = !string.IsNullOrWhiteSpace(c.System) && c.System != "k.A." ? c.System : "Stanton",
+                Description = $"{mType} • {c.Difficulty} • System: {sys}",
+                StarSystems = sys,
+                Blueprints = cat?.Blueprints ?? Array.Empty<string>(),
                 Time = c.AcceptedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
                 StepsDone = c.StepsDone,
                 StepsTotal = c.StepsTotal,
@@ -5389,17 +5401,25 @@ public class PhotinoBridge
         {
             if (!activeContracts.Any(a => string.Equals(a.Title, c.Title, StringComparison.OrdinalIgnoreCase)))
             {
+                var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
+                var issuer = !string.IsNullOrWhiteSpace(c.ContractedBy)
+                    ? c.ContractedBy
+                    : (cat?.Contractor ?? "Star Citizen Auftragsmanager");
+                var faction = !string.IsNullOrWhiteSpace(cat?.Faction) ? cat.Faction : issuer;
+                var reward = c.Reward > 0 ? c.Reward : (cat?.BaseReward ?? 0);
+
                 activeContracts.Add(new MissionItemDto
                 {
                     Id = Guid.NewGuid().ToString("N"),
-                    Title = c.Title,
-                    Contractor = c.ContractedBy,
-                    Faction = c.ContractedBy,
-                    MissionType = "Auftrag",
-                    BaseReward = c.Reward,
+                    Title = cat?.Title ?? c.Title,
+                    Contractor = issuer,
+                    Faction = faction,
+                    MissionType = cat?.MissionType ?? "Auftrag",
+                    BaseReward = reward,
                     IsActive = true,
-                    Description = c.DisplayText,
-                    StarSystems = "Stanton",
+                    Description = !string.IsNullOrWhiteSpace(c.DisplayText) ? c.DisplayText : (cat?.Description ?? "Aktiver Auftrag"),
+                    StarSystems = cat?.StarSystems ?? "Stanton",
+                    Blueprints = cat?.Blueprints ?? Array.Empty<string>(),
                     Time = c.ScannedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
                 });
             }
@@ -5447,17 +5467,32 @@ public class PhotinoBridge
             else if (low.Contains("retrieval") || low.Contains("recover")) missionType = "Bergung";
             else if (low.Contains("refuel") || low.Contains("betankung")) missionType = "Service & Wartung";
 
+            var cat = MissionCatalog.Lookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(cleanTitle);
+            string faction = contractor;
+            if (cat != null)
+            {
+                if (contractor == "Star Citizen Auftragsmanager" && !string.IsNullOrWhiteSpace(cat.Contractor))
+                    contractor = cat.Contractor;
+                faction = !string.IsNullOrWhiteSpace(cat.Faction) ? cat.Faction : contractor;
+                if (missionType == "Auftrag" && !string.IsNullOrWhiteSpace(cat.MissionType))
+                    missionType = cat.MissionType;
+            }
+
+            var rewardAmt = (int)e.Amount > 0 ? (int)e.Amount : (cat?.BaseReward ?? 0);
+            var sys = cat?.StarSystems ?? "Stanton";
+
             return new MissionItemDto
             {
                 Id = Guid.NewGuid().ToString("N"),
-                Title = cleanTitle,
+                Title = cat?.Title ?? cleanTitle,
                 Contractor = contractor,
-                Faction = contractor,
+                Faction = faction,
                 MissionType = missionType,
-                BaseReward = (int)e.Amount,
+                BaseReward = rewardAmt,
                 IsCompleted = true,
-                StarSystems = "Stanton",
-                Description = e.Amount > 0 ? $"Erfolgreich abgeschlossen • Belohnung: +{e.Amount:N0} aUEC" : "Auftrag erfolgreich abgeschlossen",
+                StarSystems = sys,
+                Blueprints = cat?.Blueprints ?? Array.Empty<string>(),
+                Description = e.Amount > 0 ? $"Erfolgreich abgeschlossen • Belohnung: +{e.Amount:N0} aUEC" : (cat?.Description ?? "Auftrag erfolgreich abgeschlossen"),
                 Time = e.Time.ToLocalTime().ToString("dd.MM. HH:mm"),
             };
         }).ToList();

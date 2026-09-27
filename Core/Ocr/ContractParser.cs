@@ -23,6 +23,10 @@ public static partial class ContractParser
     [GeneratedRegex(@"(?:¤|Reward|Belohnung|Payment|Auszahlung)\s*[:\s]*¤?\s*(?<num>\d{1,3}(?:[\s.,]\d{3})+|\d{4,8})", RegexOptions.IgnoreCase)]
     private static partial Regex RewardSymbolRegex();
 
+    // Blueprint-Hinweise im Auftrags-Detailbereich (z. B. "[!] Blueprints only for 88.250 aUEC missions")
+    [GeneratedRegex(@"(?:Blueprints\s+only\s+for|for)\s+(?<num>\d{1,3}(?:[\s.,]\d{3})+|\d{4,8})\s*(?:¤|aUEC)?\s+missions?", RegexOptions.IgnoreCase)]
+    private static partial Regex BlueprintMissionRewardRegex();
+
     // Auftraggeber-Organisation (EN & DE) - max 35 Zeichen, um nicht den Kartentext einzuschlucken
     [GeneratedRegex(
         @"(?:Contracted\s+By|Auftraggeber\s*:?)\s+(?<org>[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß .'&\-]{1,35}?)\s*" +
@@ -93,8 +97,6 @@ public static partial class ContractParser
             return null;
 
         var reward = ParseReward(ocrText);
-        if (reward <= 0)
-            return null;
 
         var contractedBy = "";
         if (ExplicitContractorRegex().Match(ocrText) is { Success: true } ecb)
@@ -120,6 +122,16 @@ public static partial class ContractParser
             if (reward <= 0 && cat.BaseReward > 0)
                 reward = cat.BaseReward;
         }
+
+        bool hasBpMarker = ocrText.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
+                           title.Contains("[BP]", StringComparison.OrdinalIgnoreCase);
+        if (hasBpMarker && reward < 88250)
+        {
+            reward = 88250;
+        }
+
+        if (reward <= 0)
+            return null;
 
         if (!IsValidMissionTitle(title))
             return null;
@@ -172,6 +184,13 @@ public static partial class ContractParser
         {
             var digits = Regex.Replace(s.Groups["num"].Value, @"[\s.,]", "");
             if (int.TryParse(digits, out var v) && v > 0) return v;
+        }
+
+        // 5. Blueprint Mission Hinweis: z. B. "[!] Blueprints only for 88.250 aUEC missions"
+        if (BlueprintMissionRewardRegex().Match(cleanText) is { Success: true } bp)
+        {
+            var digits = Regex.Replace(bp.Groups["num"].Value, @"[\s.,]", "");
+            if (int.TryParse(digits, out var bpv) && bpv > 0) return bpv;
         }
 
         return 0;

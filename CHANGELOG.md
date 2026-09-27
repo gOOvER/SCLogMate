@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Fixed
+- **Accurate Mission Rewards & People's Alliance / Blueprint Linking (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
+  - Corrected base rewards and reputation for Star Citizen 4.x People's Alliance (Levski / Nyx) missions: `Blackbox Retrieval Very Dangerous [BP]` now awards 88,250 aUEC and 360 XP (previously erroneously set to 38,000 aUEC).
+  - Consolidated all Recco Battaglia / People's Alliance missions into a unified catalog list, eliminating duplicate and conflicting entries for `Ship In Distress`, `Missing Mining Team`, and `Moraine Data Retrieval`.
+  - Added blueprint tag detection (`[BP]` and `<EM4>[BP]</EM4>`) in `LogParser` and `ContractParser` ensuring blueprint-bearing missions adhere to the Star Citizen 88,250 aUEC reward floor.
+  - Added `BlueprintMissionRewardRegex` in `ContractParser` to parse explicit detail text lines like `[!] Blueprints only for 88.250 aUEC missions` and relocated catalog fallbacks before validation rejection so unlisted OCR payment formats are safely resolved.
+  - Enriched active contracts and completed history items in `PhotinoBridge` with canonical `MissionCatalog` metadata (Contractor, Faction, Star Systems, Blueprints, and BaseReward).
+  - Implemented database schema migration `v40` in `Database.cs` to automatically upgrade historical `MissionReward` and `MissionTaken` event amounts from 38,000 to 88,250 aUEC without resetting local user sessions.
 
 ## [1.2.0] - 2026-09-27
 ### Removed

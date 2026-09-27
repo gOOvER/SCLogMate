@@ -2103,6 +2103,11 @@ public partial class LogParser
                     ? midMatch.Groups["id"].Value
                     : "";
 
+                var rawFull = ms.Groups["full"].Value;
+                bool hasBpTag = rawFull.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
+                                line.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
+                                line.Contains("<EM4>[BP]</EM4>", StringComparison.OrdinalIgnoreCase);
+
                 var cleanTitle = CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':');
                 cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
                 var normTitle = cleanTitle.ToLowerInvariant().Trim();
@@ -2207,6 +2212,11 @@ public partial class LogParser
                             reward = 25000; // Standard aUEC für Belohnungs-Events
                         }
                     }
+
+                    if (hasBpTag && reward < 88250)
+                    {
+                        reward = 88250;
+                    }
                 }
 
                     lock (_stateLock)
@@ -2229,7 +2239,7 @@ public partial class LogParser
                                 Outcome = ContractOutcome.Completed,
                                 CompletedAt = existing.CompletedAt ?? ParseTs(line),
                                 StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
-                                Reward = existing.Reward > 0 ? existing.Reward : reward
+                                Reward = (existing.Reward > 0 && (!hasBpTag || existing.Reward >= 88250)) ? existing.Reward : reward
                             };
                         }
                         else
@@ -2320,6 +2330,10 @@ public partial class LogParser
                 else if (isAccepted)
                 {
                     var finalReward = isSalvageClaim ? 0 : (cat?.BaseReward ?? 0);
+                    if (hasBpTag && finalReward < 88250)
+                    {
+                        finalReward = 88250;
+                    }
                     var finalIssuer = ResolveIssuer(cat, mId);
                     if ((finalIssuer == "Unbekannt" || finalIssuer == "TheBackpocket") && cleanTitle.Contains(':'))
                     {

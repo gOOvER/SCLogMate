@@ -847,19 +847,69 @@ public static class MissionCatalog
             Description = "Beseitige kontaminierte Abfallbehälter an einem der Außenposten auf Arial."
         });
 
-        // ── RECCO BATTAGLIA & NYX SYSTEM (DELAMAR / LEVSKI) ─────────────────
+        // ── RECCO BATTAGLIA & NYX SYSTEM (DELAMAR / LEVSKI - PEOPLE'S ALLIANCE) ───
+        Add(new MissionInfo
+        {
+            Id = "recco_blackbox_retrieval_dangerous",
+            Title = "Blackbox Retrieval Very Dangerous",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten/Bergung",
+            BaseReward = 88250,
+            ReputationGain = 360,
+            StarSystems = "Nyx",
+            Blueprints = new[] { "Deadrig Shotgun", "Overlord Helmet Supernova" },
+            Description = "Gefährliche Flugschreiber-Bergung im Glaciem Ring für die People's Alliance (Levski). [!] Blueprints only for 88.250 aUEC missions."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_ship_in_distress",
+            Title = "Ship In Distress",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Söldner",
+            BaseReward = 88250,
+            ReputationGain = 450,
+            StarSystems = "Nyx",
+            Blueprints = new[] { "Overlord Arms Supernova", "Overlord Core Supernova" },
+            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer im Nyx-System. [!] Blueprints only for 88.250 aUEC missions."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_blackbox_retrieval",
+            Title = "Blackbox Retrieval",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Daten/Bergung",
+            BaseReward = 45000,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Description = "Fliege zum gemeldeten Wrack im Nyx-System und berge den Flugschreiber für Recco Battaglia."
+        });
         Add(new MissionInfo
         {
             Id = "recco_missing_mining_team",
             Title = "Missing Mining Team",
             Contractor = "Recco Battaglia",
             Faction = "People's Alliance",
-            MissionType = "Ermittlung",
-            BaseReward = 26750,
-            ReputationGain = 200,
+            MissionType = "Person/Bergung",
+            BaseReward = 58000,
+            ReputationGain = 300,
             StarSystems = "Nyx",
             Blueprints = new[] { "Piecemeal Armor Core", "Killshot Rifle" },
             Description = "Eines der Bergbau-Teams ist verschollen. Finde heraus, was mit der Crew im Glaciem Ring geschehen ist."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_missing_persons",
+            Title = "Missing Persons",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Person/Bergung",
+            BaseReward = 48000,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Description = "Finde vermisste Bergleute oder Kundschafter im Nyx-System und sichere ihre Kennungen."
         });
         Add(new MissionInfo
         {
@@ -868,8 +918,8 @@ public static class MissionCatalog
             Contractor = "Recco Battaglia",
             Faction = "People's Alliance",
             MissionType = "Bergung & Salvage",
-            BaseReward = 30500,
-            ReputationGain = 250,
+            BaseReward = 65000,
+            ReputationGain = 350,
             StarSystems = "Nyx",
             Blueprints = new[] { "Deadrig Shotgun", "Overlord Helmet Supernova" },
             Description = "Besorge vertrauliche Forschungs- und Scandaten von der verlassenen Moraine-Basis auf Delamar."
@@ -881,24 +931,11 @@ public static class MissionCatalog
             Contractor = "Recco Battaglia",
             Faction = "People's Alliance",
             MissionType = "Daten",
-            BaseReward = 25000,
-            ReputationGain = 250,
+            BaseReward = 55000,
+            ReputationGain = 300,
             StarSystems = "Nyx",
             Blueprints = new[] { "Deadrig Shotgun", "Overlord Helmet Supernova" },
             Description = "Installiere ein Datenlaufwerk (Data Drive) an der Moraine-Basis auf Delamar für Recco Battaglia."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_ship_in_distress",
-            Title = "Ship In Distress",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Söldner",
-            BaseReward = 58000,
-            ReputationGain = 450,
-            StarSystems = "Nyx",
-            Blueprints = new[] { "Overlord Arms Supernova", "Overlord Core Supernova" },
-            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer."
         });
         Add(new MissionInfo
         {
@@ -907,12 +944,73 @@ public static class MissionCatalog
             Contractor = "Recco Battaglia",
             Faction = "People's Alliance",
             MissionType = "Söldner",
-            BaseReward = 45000,
-            ReputationGain = 350,
+            BaseReward = 65000,
+            ReputationGain = 400,
             StarSystems = "Nyx",
             Blueprints = new[] { "Overlord Legs Supernova" },
             Description = "Illegale Schürfer verletzen Delamars Bergbaurechte. Vertreibe die unbefugten Schiffe."
         });
+        Add(new MissionInfo
+        {
+            Id = "recco_crew_hasnt_checked_in",
+            Title = "Crew Hasn’t Checked In",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Person/Bergung",
+            BaseReward = 52000,
+            ReputationGain = 300,
+            StarSystems = "Nyx",
+            Description = "Eine Fracht- oder Schürfcrew hat sich nicht termingerecht gemeldet. Prüfe die letzte bekannte Position."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_minor_mining_job",
+            Title = "Minor Mining Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergbau",
+            BaseReward = 38000,
+            ReputationGain = 250,
+            StarSystems = "Nyx",
+            Description = "Gewinne und liefere benötigte Erze oder Rohstoffe für die Reparaturarbeiten an Levski."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_extra_special_job",
+            Title = "Extra Special Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergbau / Bergung",
+            BaseReward = 68000,
+            ReputationGain = 450,
+            StarSystems = "Nyx",
+            Description = "Spezialauftrag von Recco Battaglia in den Asteroidenfeldern rund um Levski (Delamar / Nyx)."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_emergency",
+            Title = "Emergency",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Notfall",
+            BaseReward = 68000,
+            ReputationGain = 400,
+            StarSystems = "Nyx",
+            Description = "Dringender Noteinsatz für die People's Alliance bei Levski."
+        });
+        Add(new MissionInfo
+        {
+            Id = "recco_salvage_job",
+            Title = "Salvage Job",
+            Contractor = "Recco Battaglia",
+            Faction = "People's Alliance",
+            MissionType = "Bergung",
+            BaseReward = 52000,
+            ReputationGain = 350,
+            StarSystems = "Nyx",
+            Description = "Sichere wertvolle Komponenten und Hüllenteile von einem aufgegebenen Schiffswrack."
+        });
+
 
         // ── PYRO SYSTEM (ROUGH & READY, OVERLORDS, RUIN STATION) ────────────
         Add(new MissionInfo
@@ -1028,115 +1126,7 @@ public static class MissionCatalog
             Description = "Hochbezahlter Attentatsauftrag im Asteroidenfeld. Schalte die Zielperson und ihre Leibwache aus."
         });
 
-        // ── RECCO BATTAGLIA (LEVSKI / PEOPLE'S ALLIANCE - NYX) ───────────────
-        Add(new MissionInfo
-        {
-            Id = "recco_extra_special_job",
-            Title = "Extra Special Job",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Bergbau / Bergung",
-            BaseReward = 32000,
-            ReputationGain = 350,
-            StarSystems = "Nyx",
-            Description = "Spezialauftrag von Recco Battaglia in den Asteroidenfeldern rund um Levski (Delamar / Nyx)."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_missing_persons",
-            Title = "Missing Persons",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Person/Bergung",
-            BaseReward = 24000,
-            ReputationGain = 250,
-            StarSystems = "Nyx",
-            Description = "Finde vermisste Bergleute oder Kundschafter im Nyx-System und sichere ihre Kennungen."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_missing_mining_team",
-            Title = "Missing Mining Team",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Person/Bergung",
-            BaseReward = 28000,
-            ReputationGain = 300,
-            StarSystems = "Nyx",
-            Description = "Ein Bergbauteam der People's Alliance antwortet nicht mehr. Lokalisiere den Einsatzort in den Minen."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_minor_mining_job",
-            Title = "Minor Mining Job",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Bergbau",
-            BaseReward = 19000,
-            ReputationGain = 200,
-            StarSystems = "Nyx",
-            Description = "Gewinne und liefere benötigte Erze oder Rohstoffe für die Reparaturarbeiten an Levski."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_blackbox_retrieval",
-            Title = "Blackbox Retrieval",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Daten/Bergung",
-            BaseReward = 22500,
-            ReputationGain = 250,
-            StarSystems = "Nyx",
-            Description = "Fliege zum gemeldeten Wrack im Nyx-System und berge den Flugschreiber für Recco Battaglia."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_blackbox_retrieval_dangerous",
-            Title = "Blackbox Retrieval Very Dangerous",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Daten/Bergung",
-            BaseReward = 38000,
-            ReputationGain = 400,
-            StarSystems = "Nyx",
-            Description = "Gefährliche Flugschreiber-Bergung in umkämpftem Gebiet mit potenzieller Piraten-Präsenz."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_crew_hasnt_checked_in",
-            Title = "Crew Hasn’t Checked In",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Person/Bergung",
-            BaseReward = 26000,
-            ReputationGain = 280,
-            StarSystems = "Nyx",
-            Description = "Eine Fracht- oder Schürfcrew hat sich nicht termingerecht gemeldet. Prüfe die letzte bekannte Position."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_moraine_data",
-            Title = "Moraine Data Retrieval",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Daten",
-            BaseReward = 25000,
-            ReputationGain = 270,
-            StarSystems = "Nyx",
-            Description = "Sichere vertrauliche Messdaten und Bergbauberichte aus verlassenen Depots."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_salvage_job",
-            Title = "Salvage Job",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Bergung",
-            BaseReward = 27000,
-            ReputationGain = 300,
-            StarSystems = "Nyx",
-            Description = "Sichere wertvolle Komponenten und Hüllenteile von einem aufgegebenen Schiffswrack."
-        });
+
 
         // ── REGULÄRE & SPEZIFISCHE BERGUNGS-AUFTRÄGE (SALVAGE CONTRACTS) ─────
         Add(new MissionInfo
@@ -1332,30 +1322,7 @@ public static class MissionCatalog
             StarSystems = "Stanton & Pyro",
             Description = "Illegale Komplett-Ausschlachtung einer abgeschossenen Hammerhead."
         });
-        Add(new MissionInfo
-        {
-            Id = "recco_ship_in_distress",
-            Title = "Ship In Distress",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Rettung",
-            BaseReward = 30000,
-            ReputationGain = 320,
-            StarSystems = "Nyx",
-            Description = "Ein Notsignal eines verbündeten Schiffs wurde empfangen. Leiste Unterstützung und sichere das Überleben der Besatzung."
-        });
-        Add(new MissionInfo
-        {
-            Id = "recco_emergency",
-            Title = "Emergency",
-            Contractor = "Recco Battaglia",
-            Faction = "People's Alliance",
-            MissionType = "Notfall",
-            BaseReward = 35000,
-            ReputationGain = 380,
-            StarSystems = "Nyx",
-            Description = "Dringender Noteinsatz für die People's Alliance bei Levski."
-        });
+
 
         // ── ALLIANCE AID & CARGO HAULING (FRACHT & TRANSPORT) ────────────────
         Add(new MissionInfo

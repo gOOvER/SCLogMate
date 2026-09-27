@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 39; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v39: Entfernung der Chat-Erfassung und Bereinigung der chat_messages Tabelle)
+    public const int CurrentSchemaVersion = 40; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v40: Korrektur Missionsbelohnung Blackbox Retrieval Very Dangerous & BP-Aufträge auf 88.250 aUEC)
     public const int CurrentParserVersion = 41; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v41: Multi-Crew Schiffskanäle & ASOP-Flottenabfrage)
 
     public static bool WasParserResetRequired { get; set; }
@@ -1077,6 +1077,32 @@ public static class Database
             Exec(db, "PRAGMA user_version = 39;");
             dbSchemaVersion = 39;
             Logger.Log("DB Schema: Migration auf v39 (Entfernung chat_messages) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 40)
+        {
+            try
+            {
+                // v40: Korrektur von Missionsbelohnungen für Blackbox Retrieval Very Dangerous [BP] & People's Alliance Aufträge (88.250 aUEC)
+                Exec(db, @"
+                    UPDATE events
+                    SET amount = 88250
+                    WHERE kind IN ('MissionReward', 'MissionTaken') AND amount = 38000
+                      AND (detail LIKE '%Blackbox Retrieval Very Dangerous%' OR detail LIKE '%Blackbox Retrieval%Dangerous%');
+
+                    UPDATE contracts
+                    SET reward = 88250
+                    WHERE reward = 38000
+                      AND (title LIKE '%Blackbox Retrieval Very Dangerous%' OR title LIKE '%Blackbox Retrieval%Dangerous%');
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v40 (Korrektur Missionsbelohnung Blackbox Retrieval Very Dangerous 88.250 aUEC)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 40;");
+            dbSchemaVersion = 40;
+            Logger.Log("DB Schema: Migration auf v40 (Korrektur Missionsbelohnung Blackbox Retrieval Very Dangerous auf 88.250 aUEC) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
