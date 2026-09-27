@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `stepsDone`, `stepsTotal`, and `progressText` to `MissionItemDto` and displayed dynamic progress badges on active contracts in `MissionsView`.
 
 ### Fixed
+- **Ship Equipment Detection & ASOP Loadout Estimate Column OCR Overhaul (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `frontend/src/components/ShipLoadoutModal.tsx`)**:
+  - Overhauled ASOP Terminal "LOADOUT ESTIMATE" scanning to utilize a two-column paired parsing algorithm matching items under the `NAME` column directly with corresponding rows in the `TYPE` column (`Cooler`, `Jump Module`, `Power Plant`, `Quantum Drives`, `Radar`, `Shield Generator`, `Tractor Beam`, `Turret`, `Gun`, `Missile Rack`, `Liveries`), resolving the issue where only 5 components were detected for vessels like the Cutlass Black.
+  - Expanded the comprehensive Star Citizen component keyword fallback catalog with stock Cutlass components and standard equipment (`ColdSnap`, `Odyssey`, `Chernykh`, `CoverAll`, `SureGrip S1`, `VariPuck S3 Gimbal`, `MSD-442`, `MSD-423`).
+  - Fixed tree-marker regex in OCR line cleaning (`^(?:[><|•·\*\.└├│\-]+|L\s+)[\s\-]*`) which previously stripped leading capital letters `L` from regular words like `Liveries` (`iveries`), `Lightstrike`, and `Laser`.
+  - Fixed model number normalization bug where unconditionally stripping `0` truncated weapon and shield models ending with zero (e.g. `Mantis GT-220` truncated to `Mantis GT-22`, preventing Pips projectile velocity matching).
+  - Preserved balanced parentheses in component specification tags (e.g. `(Civ/2/C)`, `(Mil/2/B)`).
+  - Added OCR typo normalizations for `SureGrip Sl` -> `SureGrip S1` and `VariPuck sa` -> `VariPuck S3`.
 - **Party Join/Leave Log Contamination (`Core/LogParser.cs`)**:
   - Prevented ship channel join/leave notifications from falsely triggering party member join or leave log entries.
 - **Premature Contract Completion Bug on Multi-Step Missions (`Core/LogParser.cs`)**:

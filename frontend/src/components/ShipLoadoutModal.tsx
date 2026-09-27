@@ -58,8 +58,12 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     name = name.replace(/\b5ca\s*'?akura['•·*]*/gi, "5CA 'Akura'");
     name = name.replace(/\bFunstop\b/gi, 'FullStop');
     name = name.replace(/\bGirnbal\b/gi, 'Gimbal');
+    name = name.replace(/\bGirnul\b/gi, 'Gimbal');
     name = name.replace(/\bVMP,uck\b/gi, 'VariPuck');
     name = name.replace(/\bvariPuck\b/g, 'VariPuck');
+    name = name.replace(/\bSureGrip\s+Sl\b/gi, 'SureGrip S1');
+    name = name.replace(/\bVariPuck\s+sa\b/gi, 'VariPuck S3');
+    name = name.replace(/\bVariPuck\s+s4\b/gi, 'VariPuck S4');
 
     // Clean spec distortions
     name = name.replace(/\(Inci\/MC\)/gi, '(Ind/3/C)');
