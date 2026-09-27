@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Shader Cache & Crash Dump Maintenance Feedback & Game Guard (`Core/MaintenanceService.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`)**:
+  - Added active game detection (`IsStarCitizenRunning`) to prevent silent deletion failures and file-lock errors while Star Citizen is actively running, warning pilots with an immediate in-app and in-game prompt to exit the game first.
+  - Upgraded file deletion routines in `CleanShaderCache` and `CleanCrashDumps` to recursively clean individual files and reset attributes, returning exact freed megabytes and deleted file counts.
+  - Connected native Win32 Always-On-Top Toast Overlay (`🧹 SHADER-CACHE GELEERT` / `⚠️ SHADER-CACHE`) and enhanced in-app toast styling with distinct warning/error badges (`AlertTriangle`).
+  - Added automatic `TOOLS_UPDATED` IPC event broadcast so all maintenance cards refresh disk metrics immediately upon clearing.
 - **Automatic Screenshot Loadout Reading & In-Game Toast Notifications (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Ocr/OcrEngineService.cs`, `Core/Photino/PhotinoBridge.cs`)**:
   - Implemented robust automatic reading of Star Citizen screenshots with multi-event watching (`Created`, `Changed`, `Renamed`) and size-stabilizing file readiness polling (`WaitForFileReadyAsync`), eliminating file-locking races and premature reads while the game is writing the file.
   - Added intelligent screenshot folder auto-detection that prioritizes the active `Settings.LogPath` directory as well as `J:\StarCitizen\LIVE\ScreenShots` before scanning standard system paths.

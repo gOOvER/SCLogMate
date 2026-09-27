@@ -665,7 +665,7 @@ export const ToolsView: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 5000);
   };
 
   const loadStatus = async () => {
@@ -907,12 +907,16 @@ export const ToolsView: React.FC = () => {
   const handleClearShaderCache = async () => {
     setActionLoading('shaders');
     try {
-      const res = await bridge.send<ToolsStatusDto>('clear_shader_cache');
-      setStatus(res);
-      showToast('Shader-Cache erfolgreich geleert!');
-    } catch (err) {
+      const res = await bridge.send<{ success: boolean; freedMb: number; message: string; tools?: ToolsStatusDto }>('clear_shader_cache');
+      if (res.tools) {
+        setStatus(res.tools);
+      } else if ((res as any).shaderCacheMb !== undefined) {
+        setStatus(res as any);
+      }
+      showToast(res.message || (res.success ? 'Shader-Cache erfolgreich geleert!' : 'Shader-Cache konnte nicht geleert werden.'));
+    } catch (err: any) {
       console.error(err);
-      showToast('Fehler beim Bereinigen der Shader');
+      showToast(err?.message || 'Fehler beim Bereinigen der Shader');
     } finally {
       setActionLoading(null);
     }
@@ -921,12 +925,16 @@ export const ToolsView: React.FC = () => {
   const handleClearCrashDumps = async () => {
     setActionLoading('dumps');
     try {
-      const res = await bridge.send<ToolsStatusDto>('clear_crash_dumps');
-      setStatus(res);
-      showToast('Crash-Dumps erfolgreich gelöscht!');
-    } catch (err) {
+      const res = await bridge.send<{ success: boolean; freedMb: number; message: string; tools?: ToolsStatusDto }>('clear_crash_dumps');
+      if (res.tools) {
+        setStatus(res.tools);
+      } else if ((res as any).crashDumpsMb !== undefined) {
+        setStatus(res as any);
+      }
+      showToast(res.message || (res.success ? 'Crash-Dumps erfolgreich bereinigt!' : 'Crash-Dumps konnten nicht gelöscht werden.'));
+    } catch (err: any) {
       console.error(err);
-      showToast('Fehler beim Löschen der Crash-Dumps');
+      showToast(err?.message || 'Fehler beim Löschen der Crash-Dumps');
     } finally {
       setActionLoading(null);
     }
@@ -1191,9 +1199,17 @@ export const ToolsView: React.FC = () => {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-900/95 border border-sky-500/50 shadow-2xl shadow-sky-500/20 text-sky-100 animate-in fade-in slide-in-from-bottom-2">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="text-xs font-semibold">{toastMessage}</span>
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-900/95 shadow-2xl animate-in fade-in slide-in-from-bottom-2 max-w-md ${
+          toastMessage.toLowerCase().includes('fehler') || toastMessage.toLowerCase().includes('gesperrt') || toastMessage.toLowerCase().includes('läuft') || toastMessage.toLowerCase().includes('nicht')
+            ? 'border border-amber-500/60 shadow-amber-500/20 text-amber-100'
+            : 'border border-sky-500/50 shadow-sky-500/20 text-sky-100'
+        }`}>
+          {toastMessage.toLowerCase().includes('fehler') || toastMessage.toLowerCase().includes('gesperrt') || toastMessage.toLowerCase().includes('läuft') || toastMessage.toLowerCase().includes('nicht') ? (
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          )}
+          <span className="text-xs font-semibold leading-relaxed">{toastMessage}</span>
         </div>
       )}
 

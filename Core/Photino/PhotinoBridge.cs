@@ -6474,16 +6474,58 @@ public class PhotinoBridge
         };
     }
 
-    private ToolsStatusDto ClearShaderCache()
+    private object ClearShaderCache()
     {
-        MaintenanceService.CleanShaderCache();
-        return GetToolsStatus();
+        var (ok, freedMb, msg) = MaintenanceService.CleanShaderCache();
+        var tools = GetToolsStatus();
+        Broadcast("TOOLS_UPDATED", tools);
+
+        if (ok)
+        {
+            _toastOverlay.ShowToast("🧹", "SHADER-CACHE GELEERT", $"{freedMb:F1} MB freigegeben", msg, 0x0080DE4Au);
+        }
+        else
+        {
+            _toastOverlay.ShowToast("⚠️", "SHADER-CACHE", "Bereinigung nicht möglich", msg, 0x002288EEu);
+        }
+
+        return new
+        {
+            success = ok,
+            freedMb,
+            message = msg,
+            tools,
+            shaderCacheMb = tools.ShaderCacheMb,
+            crashDumpsMb = tools.CrashDumpsMb,
+            userCfgContent = tools.UserCfgContent
+        };
     }
 
-    private ToolsStatusDto ClearCrashDumps()
+    private object ClearCrashDumps()
     {
-        MaintenanceService.CleanCrashDumps();
-        return GetToolsStatus();
+        var (ok, freedMb, msg) = MaintenanceService.CleanCrashDumps();
+        var tools = GetToolsStatus();
+        Broadcast("TOOLS_UPDATED", tools);
+
+        if (ok)
+        {
+            _toastOverlay.ShowToast("🗑️", "CRASH-DUMPS GELÖSCHT", $"{freedMb:F1} MB freigegeben", msg, 0x0080DE4Au);
+        }
+        else
+        {
+            _toastOverlay.ShowToast("⚠️", "CRASH-DUMPS", "Löschen fehlgeschlagen", msg, 0x002288EEu);
+        }
+
+        return new
+        {
+            success = ok,
+            freedMb,
+            message = msg,
+            tools,
+            shaderCacheMb = tools.ShaderCacheMb,
+            crashDumpsMb = tools.CrashDumpsMb,
+            userCfgContent = tools.UserCfgContent
+        };
     }
 
     private ToolsStatusDto SaveUserCfg(string content)

@@ -111,10 +111,30 @@ public static class MaintenanceService
         return Math.Round((double)totalBytes / (1024 * 1024), 1);
     }
 
+    public static bool IsStarCitizenRunning()
+    {
+        try
+        {
+            var procs = System.Diagnostics.Process.GetProcessesByName("StarCitizen");
+            return procs.Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static (bool success, double freedMb, string message) CleanShaderCache()
     {
+        if (IsStarCitizenRunning())
+        {
+            return (false, 0, "Star Citizen läuft aktuell noch! Bitte beende das Spiel vor dem Leeren des Shader-Caches, da geöffnete Shader-Dateien durch die 3D-Engine gesperrt sind.");
+        }
+
         double initialMb = GetShaderCacheSizeMb();
-        int deletedCount = 0;
+        int deletedDirs = 0;
+        int deletedFiles = 0;
+        var errors = new List<string>();
 
         foreach (var dir in GetShaderDirectories())
         {
@@ -122,19 +142,51 @@ public static class MaintenanceService
             {
                 if (Directory.Exists(dir))
                 {
-                    Directory.Delete(dir, recursive: true);
-                    deletedCount++;
+                    var di = new DirectoryInfo(dir);
+                    foreach (var file in di.EnumerateFiles("*", SearchOption.AllDirectories))
+                    {
+                        try
+                        {
+                            file.Attributes = FileAttributes.Normal;
+                            file.Delete();
+                            deletedFiles++;
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add(ex.Message);
+                        }
+                    }
+
+                    foreach (var sub in di.EnumerateDirectories("*", SearchOption.AllDirectories).OrderByDescending(d => d.FullName.Length))
+                    {
+                        try { sub.Delete(true); } catch { }
+                    }
+
+                    try { Directory.Delete(dir, recursive: true); } catch { }
+                    deletedDirs++;
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error($"CleanShaderCache for {dir}", ex);
+                errors.Add(ex.Message);
             }
         }
 
         double finalMb = GetShaderCacheSizeMb();
         double freed = Math.Max(0, initialMb - finalMb);
-        return (true, freed, $"✓ Shader-Cache bereinigt: {freed:F1} MB freigegeben ({deletedCount} Cache-Ordner geleert).");
+
+        if (errors.Count > 0 && deletedFiles == 0 && initialMb > 0)
+        {
+            return (false, 0, $"Fehler beim Bereinigen der Shader: {errors[0]}");
+        }
+
+        if (freed <= 0.01 && initialMb <= 0.01)
+        {
+            return (true, 0, "Shader-Cache war bereits leer (0 MB).");
+        }
+
+        return (true, freed, $"✓ Shader-Cache erfolgreich geleert: {freed:F1} MB freigegeben ({deletedFiles} Shader-Dateien gelöscht).");
     }
 
     public static double GetCrashDumpsSizeMb()
@@ -158,9 +210,10 @@ public static class MaintenanceService
     {
         double initialMb = GetCrashDumpsSizeMb();
         var crashDir = GetCrashDirectory();
-        if (!Directory.Exists(crashDir)) return (true, 0, "Keine Crash-Dumps vorhanden.");
+        if (!Directory.Exists(crashDir)) return (true, 0, "Keine Crash-Dumps vorhanden (0 MB).");
 
         int deletedFiles = 0;
+        var errors = new List<string>();
         try
         {
             var di = new DirectoryInfo(crashDir);
@@ -168,20 +221,36 @@ public static class MaintenanceService
             {
                 try
                 {
+                    f.Attributes = FileAttributes.Normal;
                     f.Delete();
                     deletedFiles++;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    errors.Add(ex.Message);
+                }
             }
         }
         catch (Exception ex)
         {
             Logger.Error("CleanCrashDumps", ex);
+            return (false, 0, $"Fehler beim Zugriff auf Crash-Dumps: {ex.Message}");
         }
 
         double finalMb = GetCrashDumpsSizeMb();
         double freed = Math.Max(0, initialMb - finalMb);
-        return (true, freed, $"✓ Crash-Dumps bereinigt: {freed:F1} MB freigegeben ({deletedFiles} Dateien entfernt).");
+
+        if (errors.Count > 0 && deletedFiles == 0 && initialMb > 0)
+        {
+            return (false, 0, $"Crash-Dumps konnten nicht gelöscht werden: {errors[0]}");
+        }
+
+        if (deletedFiles == 0)
+        {
+            return (true, 0, "Keine Crash-Dumps zum Löschen vorhanden (0 MB).");
+        }
+
+        return (true, freed, $"✓ Crash-Dumps erfolgreich bereinigt: {freed:F1} MB freigegeben ({deletedFiles} Dateien entfernt).");
     }
 
     // ══ KEYBINDS BACKUP & RESTORE ══
