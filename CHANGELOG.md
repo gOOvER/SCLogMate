@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-09-27
 ### Removed
 - **Redundant Manual Refresh Buttons (`frontend/src/views/ToolsView.tsx`, `RefineryView.tsx`, `BlueprintsView.tsx`, `SettingsView.tsx`, `Views/MainWindow.axaml`)**:
   - Removed the unnecessary "Aktualisieren" refresh button from the Tools & Maintenance header banner (`ToolsView`), as status is automatically loaded on mount and kept in sync via reactive IPC events (`TOOLS_UPDATED`) and action callbacks.
@@ -1098,6 +1100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
 
