@@ -70,24 +70,50 @@ public static class MaintenanceService
     public static List<string> GetShaderDirectories()
     {
         var dirs = new List<string>();
+
+        // 1. Star Citizen Client Shader & Vulkan Caches
         var scLocal = GetStarCitizenLocalAppDataDir();
-        if (!Directory.Exists(scLocal)) return dirs;
-
-        try
+        if (Directory.Exists(scLocal))
         {
-            foreach (var sub in Directory.GetDirectories(scLocal))
+            try
             {
-                var s1 = Path.Combine(sub, "Shaders");
-                if (Directory.Exists(s1)) dirs.Add(s1);
+                foreach (var sub in Directory.GetDirectories(scLocal))
+                {
+                    var s1 = Path.Combine(sub, "Shaders");
+                    if (Directory.Exists(s1)) dirs.Add(s1);
 
-                var s2 = Path.Combine(sub, "vulkanshadercache");
-                if (Directory.Exists(s2)) dirs.Add(s2);
+                    var s2 = Path.Combine(sub, "vulkanshadercache");
+                    if (Directory.Exists(s2)) dirs.Add(s2);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("GetShaderDirectories SC", ex);
             }
         }
-        catch (Exception ex)
+
+        // 2. NVIDIA GPU-Treiber Shader-Caches (DirectX DXCache, Vulkan/OpenGL GLCache, ComputeCache)
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+        var driverDirs = new[]
         {
-            Logger.Error("GetShaderDirectories", ex);
+            Path.Combine(local, "NVIDIA", "DXCache"),
+            Path.Combine(local, "NVIDIA", "GLCache"),
+            Path.Combine(roaming, "NVIDIA", "ComputeCache"),
+            Path.Combine(local, "NVIDIA Corporation", "NV_Cache"),
+            // 3. Windows DirectX Shader-Cache (D3DSCache)
+            Path.Combine(local, "D3DSCache"),
+            // 4. AMD Radeon GPU-Treiber Shader-Caches
+            Path.Combine(local, "AMD", "DxCache"),
+            Path.Combine(local, "AMD", "GLCache")
+        };
+
+        foreach (var d in driverDirs)
+        {
+            if (Directory.Exists(d)) dirs.Add(d);
         }
+
         return dirs;
     }
 
@@ -132,12 +158,17 @@ public static class MaintenanceService
         }
 
         double initialMb = GetShaderCacheSizeMb();
-        int deletedDirs = 0;
         int deletedFiles = 0;
+        int lockedFiles = 0;
+        int scDirsCleaned = 0;
         var errors = new List<string>();
+
+        var scLocal = GetStarCitizenLocalAppDataDir();
 
         foreach (var dir in GetShaderDirectories())
         {
+            bool isStarCitizenDir = dir.StartsWith(scLocal, StringComparison.OrdinalIgnoreCase);
+
             try
             {
                 if (Directory.Exists(dir))
@@ -151,19 +182,40 @@ public static class MaintenanceService
                             file.Delete();
                             deletedFiles++;
                         }
+                        catch (IOException)
+                        {
+                            // Datei ist aktuell durch Windows DWM / Desktop-Prozess geöffnet
+                            lockedFiles++;
+                        }
                         catch (Exception ex)
                         {
                             errors.Add(ex.Message);
                         }
                     }
 
+                    // Unterordner leeren wenn leer
                     foreach (var sub in di.EnumerateDirectories("*", SearchOption.AllDirectories).OrderByDescending(d => d.FullName.Length))
                     {
-                        try { sub.Delete(true); } catch { }
+                        try
+                        {
+                            if (!sub.EnumerateFileSystemInfos().Any())
+                            {
+                                sub.Delete();
+                            }
+                        }
+                        catch { }
                     }
 
-                    try { Directory.Delete(dir, recursive: true); } catch { }
-                    deletedDirs++;
+                    // Bei Star Citizen spezifischen Ordnern auch den übergeordneten Shader-Ordner löschen
+                    if (isStarCitizenDir)
+                    {
+                        try
+                        {
+                            Directory.Delete(dir, recursive: true);
+                            scDirsCleaned++;
+                        }
+                        catch { }
+                    }
                 }
             }
             catch (Exception ex)
@@ -176,17 +228,16 @@ public static class MaintenanceService
         double finalMb = GetShaderCacheSizeMb();
         double freed = Math.Max(0, initialMb - finalMb);
 
-        if (errors.Count > 0 && deletedFiles == 0 && initialMb > 0)
-        {
-            return (false, 0, $"Fehler beim Bereinigen der Shader: {errors[0]}");
-        }
-
         if (freed <= 0.01 && initialMb <= 0.01)
         {
-            return (true, 0, "Shader-Cache war bereits leer (0 MB).");
+            return (true, 0, "Shader-Cache war bereits vollständig leer (0 MB).");
         }
 
-        return (true, freed, $"✓ Shader-Cache erfolgreich geleert: {freed:F1} MB freigegeben ({deletedFiles} Shader-Dateien gelöscht).");
+        var detailMsg = lockedFiles > 0
+            ? $"✓ Shader-Cache bereinigt: {freed:F1} MB freigegeben ({deletedFiles} Star Citizen-, DirectX- & NVIDIA-Dateien gelöscht, {lockedFiles} aktive Windows-DWM Dateien übersprungen)."
+            : $"✓ Shader-Cache bereinigt: {freed:F1} MB freigegeben ({deletedFiles} Star Citizen-, DirectX- & NVIDIA-Dateien gelöscht).";
+
+        return (true, freed, detailMsg);
     }
 
     public static double GetCrashDumpsSizeMb()

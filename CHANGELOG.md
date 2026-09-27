@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Full GPU Driver & DirectX Shader Cache Purge (`Core/MaintenanceService.cs`, `frontend/src/views/ToolsView.tsx`)**:
+  - Expanded shader cache detection and cleanup beyond Star Citizen client folders to include NVIDIA driver caches (`%LOCALAPPDATA%\NVIDIA\DXCache`, `GLCache`, `%APPDATA%\NVIDIA\ComputeCache`, `NV_Cache`), Windows DirectX shader cache (`%LOCALAPPDATA%\D3DSCache`), and AMD Radeon driver caches (`AMD\DxCache`, `GLCache`).
+  - Implemented resilient per-file deletion with active-handle protection, safely clearing driver cache directories while skipping files held open by the Windows Desktop Window Manager (DWM).
+  - Forces Star Citizen and the GPU driver to perform a complete, clean shader recompilation on launch, resolving micro-stuttering and preventing stale GPU binary blobs from being reused.
 - **Shader Cache & Crash Dump Maintenance Feedback & Game Guard (`Core/MaintenanceService.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`)**:
   - Added active game detection (`IsStarCitizenRunning`) to prevent silent deletion failures and file-lock errors while Star Citizen is actively running, warning pilots with an immediate in-app and in-game prompt to exit the game first.
   - Upgraded file deletion routines in `CleanShaderCache` and `CleanCrashDumps` to recursively clean individual files and reset attributes, returning exact freed megabytes and deleted file counts.

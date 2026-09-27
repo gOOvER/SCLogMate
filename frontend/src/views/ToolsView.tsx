@@ -2501,23 +2501,23 @@ export const ToolsView: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2.5">
                     <HardDrive className="w-5 h-5 text-amber-400" />
-                    <h3 className="text-sm font-semibold text-white">DirectX / Vulkan Shader-Cache</h3>
+                    <h3 className="text-sm font-semibold text-white">DirectX, Vulkan &amp; NVIDIA / AMD Shader</h3>
                   </div>
                   <span className="text-xs px-2.5 py-0.5 rounded bg-amber-950/70 text-amber-400 border border-amber-800/70 font-mono font-bold">
                     {status?.shaderCacheMb ? `${status.shaderCacheMb.toFixed(1)} MB` : '0 MB'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                  Löscht vorkompilierte Shader. Behebt Shader-Stottern und Ruckler nach Patches. Die Pipeline baut sich beim nächsten Start sauber neu auf.
+                  Löscht Star Citizen-, DirectX- und GPU-Treiber-Shader (NVIDIA DXCache/GLCache &amp; AMD). Verhindert Shader-Stottern und zwingt die Grafikkarte zum sauberen Neuaufbau aller Shader.
                 </p>
               </div>
               <button
                 onClick={handleClearShaderCache}
-                disabled={actionLoading === 'shaders' || (status?.shaderCacheMb || 0) === 0}
+                disabled={actionLoading === 'shaders'}
                 className="w-full flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>{actionLoading === 'shaders' ? 'Bereinige...' : 'Shader-Cache leeren'}</span>
+                <span>{actionLoading === 'shaders' ? 'Bereinige...' : 'Shader-Cache vollständig leeren'}</span>
               </button>
             </div>
 
