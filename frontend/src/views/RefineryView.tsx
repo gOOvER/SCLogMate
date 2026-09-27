@@ -525,16 +525,6 @@ export const RefineryView: React.FC<RefineryViewProps> = ({ onOpenWiki }) => {
             <Compass className="w-3.5 h-3.5" />
             {locale === 'en' ? '4. Refinery Stations & Bonuses' : '4. Stations-Atlas (Stanton, Pyro & Nyx)'}
           </button>
-
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={fetchHauls}
-              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 rounded-lg transition"
-              title="Aktualisieren"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
 

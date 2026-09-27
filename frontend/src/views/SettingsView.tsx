@@ -1425,15 +1425,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            <button
-              onClick={() => loadOcrConfig()}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition shrink-0"
-              title="Aktuelle Regionen und Displaymaße neu abfragen"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Neu laden</span>
-            </button>
           </div>
 
           {/* Sektion 1: mobiGlas aUEC Kontostand Scan-Bereich */}

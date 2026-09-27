@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Removed
+- **Redundant Manual Refresh Buttons (`frontend/src/views/ToolsView.tsx`, `RefineryView.tsx`, `BlueprintsView.tsx`, `SettingsView.tsx`, `Views/MainWindow.axaml`)**:
+  - Removed the unnecessary "Aktualisieren" refresh button from the Tools & Maintenance header banner (`ToolsView`), as status is automatically loaded on mount and kept in sync via reactive IPC events (`TOOLS_UPDATED`) and action callbacks.
+  - Removed isolated, redundant refresh buttons from the Refinery tab bar (`RefineryView`), Blueprints category bar (`BlueprintsView`), OCR configuration header (`SettingsView`), and the desktop Avalonia tools header (`MainWindow.axaml`).
+
 ### Added
 - **Full GPU Driver & DirectX Shader Cache Purge (`Core/MaintenanceService.cs`, `frontend/src/views/ToolsView.tsx`)**:
   - Expanded shader cache detection and cleanup beyond Star Citizen client folders to include NVIDIA driver caches (`%LOCALAPPDATA%\NVIDIA\DXCache`, `GLCache`, `%APPDATA%\NVIDIA\ComputeCache`, `NV_Cache`), Windows DirectX shader cache (`%LOCALAPPDATA%\D3DSCache`), and AMD Radeon driver caches (`AMD\DxCache`, `GLCache`).

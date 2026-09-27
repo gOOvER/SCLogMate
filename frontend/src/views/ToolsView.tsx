@@ -580,7 +580,7 @@ function mergeCfgContent(
 }
 
 export const ToolsView: React.FC = () => {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   // Navigation: Maintenance, user.cfg Studio, Backups, and HOTAS & Joysticks
   const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds' | 'hotas'>('cfg');
   const [cfgView, setCfgView] = useState<'editor' | 'tuning' | 'backups' | 'reference'>('editor');
@@ -1312,17 +1312,6 @@ export const ToolsView: React.FC = () => {
               Client-Tuning, Cache-Bereinigung, Hardware-Benchmark &amp; Backups
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center space-x-2.5 shrink-0">
-          <button
-            onClick={loadStatus}
-            disabled={actionLoading !== null}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin' : ''}`} />
-            <span>{t('common.refresh')}</span>
-          </button>
         </div>
       </div>
 
