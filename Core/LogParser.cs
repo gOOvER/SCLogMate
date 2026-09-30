@@ -2110,6 +2110,8 @@ public partial class LogParser
 
                 var cleanTitle = CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':');
                 cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
+                bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
+                                           cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
                 var normTitle = cleanTitle.ToLowerInvariant().Trim();
 
                 if (string.IsNullOrEmpty(mId))
@@ -2213,8 +2215,6 @@ public partial class LogParser
                         }
                     }
 
-                    bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
-                                               cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
                     if (hasBpTag && isBlackboxDangerous && reward < 88250)
                     {
                         reward = 88250;
@@ -2332,8 +2332,6 @@ public partial class LogParser
                 else if (isAccepted)
                 {
                     var finalReward = isSalvageClaim ? 0 : (cat?.BaseReward ?? 0);
-                    bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
-                                               cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
                     if (hasBpTag && isBlackboxDangerous && finalReward < 88250)
                     {
                         finalReward = 88250;
