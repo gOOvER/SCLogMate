@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reliable Player Death & Respawn Detection (`Core/LogParser.cs`, `Core/Database.cs`)**:
+  - Implemented 100% reliable death detection for Star Citizen 4.9 and 4.10 based on `CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement` burst grouping. Since CIG removed `<Actor Death>` and killcam lines are absent during suicide, ship explosions, crashes, bleeding out, or NPC kills, grouping tight corpse item port clusters provides accurate casualty tracking.
+  - Added automatic respawn detection: waking up at a hospital or clinic bed location within 10 minutes of dying is accurately recognized and tagged as `Aufgewacht (Respawn) · {Location}`.
+  - Clears active ship seat context upon death so destroyed ships do not linger as the pilot's current active vessel.
+  - Bumped `CurrentParserVersion` to 42 in `Database.cs` to trigger clean historical re-indexing of all sessions with exact death and respawn events.
+- **Game & StarStrings Markup Stripping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`)**:
+  - Added `StripGameMarkup` to remove XML/HTML formatting tags (such as `<EM>`, `<EM2>`, `<EM3>`, `<EM4>`, `<b>`, `<i>`) and unescape literal `\n` characters from StarStrings mod texts, contract notifications, and mission objectives.
+  - Strips tags prior to tokenizing in `MissionCatalog.Normalize` and `FuzzyLookup`, preventing `<EM3>` from polluting catalog word tokens with spurious `em3` entries and ensuring clean UI display in mission lists and logs.
+- **Internal Engine Class Noise Filter (`Core/WikiApiClient.cs`, `Core/LogParser.cs`)**:
+  - Filtered internal engine classes and dummy props lacking display names (`controller_flight_`, `display_components_`, `scitem_prop_`) in `WikiApiClient.IsIgnoredItemNoise` and `LogParser.LoadoutNoise` to keep warehouse listings and inventory search clean.
+- **Multi-Ship Session Display Formatting (`Core/FlightRecorderService.cs`, `Core/HtmlReportGenerator.cs`)**:
+  - Formatted multi-ship session debriefs and flight recorder markdown reports into a clean distinct block list rather than an overflowing inline run of text.
 - **Automated Contract & Mission OCR from Star Citizen Screenshots (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`)**:
   - Extended `ScreenshotLoadoutWatcher` with `OnContractDetected` to automatically detect and parse mobiGlas contracts when a screenshot is captured in Star Citizen (`PrintScreen`).
   - Seamlessly extracts contract title, contractor, and reward via `ContractParser`, saving the contract to the database, updating UI state (`MISSIONS_UPDATED`), and displaying an in-game toast overlay (`📋 AUFTRAG ERFASST`).

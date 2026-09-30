@@ -32,8 +32,25 @@ public sealed class MissionInfo
 /// Vollständige Master-Missionsdatenbank basierend auf Star Citizen Spieldaten (scunpacked-data &amp; StarCitizenWiki).
 /// Bietet exakte und fehlertolerante (Fuzzy) Suche für Logfile- und OCR-Missionsabgleiche.
 /// </summary>
-public static class MissionCatalog
+public static partial class MissionCatalog
 {
+    [GeneratedRegex(@"</?(?:EM\d*|em\d*|[biu])>", RegexOptions.IgnoreCase)]
+    private static partial Regex GameMarkupRegex();
+
+    /// <summary>
+    /// Entfernt XML/HTML-Markup (z. B. &lt;EM&gt;, &lt;EM2&gt;, &lt;EM3&gt;, &lt;EM4&gt;) und literale Zeilenumbrüche aus Spiel- und StarStrings-Texten.
+    /// </summary>
+    public static string StripGameMarkup(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var stripped = GameMarkupRegex().Replace(text, "");
+        if (stripped.Contains(@"\n"))
+        {
+            stripped = stripped.Replace(@"\n", " ");
+        }
+        return stripped.Trim();
+    }
+
     private static readonly List<MissionInfo> _catalog = new();
     private static readonly Dictionary<string, MissionInfo> _lookupByNormTitle = new(StringComparer.OrdinalIgnoreCase);
 
@@ -82,6 +99,7 @@ public static class MissionCatalog
     public static MissionInfo? FuzzyLookup(string? rawTitle)
     {
         if (string.IsNullOrWhiteSpace(rawTitle)) return null;
+        rawTitle = StripGameMarkup(rawTitle);
         var exact = Lookup(rawTitle);
         if (exact != null) return exact;
 
@@ -205,7 +223,8 @@ public static class MissionCatalog
 
     public static string Normalize(string s)
     {
-        var noTags = Regex.Replace(s, @"\[[^\]]*\]", " ");
+        var clean = StripGameMarkup(s);
+        var noTags = Regex.Replace(clean, @"\[[^\]]*\]", " ");
         var lower = noTags.ToLowerInvariant();
         var sb = new System.Text.StringBuilder(lower.Length);
         foreach (var ch in lower)
@@ -226,7 +245,7 @@ public static class MissionCatalog
         if (string.IsNullOrWhiteSpace(rawTitle))
             return cat?.Title ?? "Auftrag";
 
-        var trimmed = rawTitle.Trim(' ', ':', '-');
+        var trimmed = StripGameMarkup(rawTitle).Trim(' ', ':', '-');
         if (trimmed.Length == 0)
             return cat?.Title ?? "Auftrag";
 

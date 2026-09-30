@@ -166,7 +166,12 @@ public static class WikiApiClient
                lower.Contains("eyedetail") ||
                lower.Contains("eyelashes") ||
                lower.StartsWith("head_") ||
-               lower.StartsWith("pupil_");
+               lower.StartsWith("pupil_") ||
+               lower.StartsWith("controller_flight_") ||
+               lower.StartsWith("display_components_") ||
+               lower.StartsWith("scitem_prop_") ||
+               lower.Contains("display_component") ||
+               lower.Contains("controller_flight");
     }
 
     public static async Task<WikiInfo?> LookupByClassNameAsync(string className)

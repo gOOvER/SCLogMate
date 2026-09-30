@@ -205,7 +205,19 @@ public static class FlightRecorderService
         sb.AppendLine($"- **Schiffsverluste**: {summary.ShipLossesText}");
         sb.AppendLine($"- **Quantum Sprünge**: {summary.QuantumJumps}");
         sb.AppendLine($"- **Besuchte Himmelskörper**: {(summary.VisitedBodies.Any() ? string.Join(", ", summary.VisitedBodies) : "Keine")}");
-        sb.AppendLine($"- **Eingesetzte Schiffe**: {(summary.UsedShips.Any() ? string.Join(", ", summary.UsedShips) : "Keine")}\n");
+        if (summary.UsedShips.Count > 1)
+        {
+            sb.AppendLine("- **Eingesetzte Schiffe**:");
+            foreach (var ship in summary.UsedShips)
+            {
+                sb.AppendLine($"  - {ship}");
+            }
+            sb.AppendLine();
+        }
+        else
+        {
+            sb.AppendLine($"- **Eingesetzte Schiffe**: {(summary.UsedShips.Any() ? summary.UsedShips[0] : "Keine")}\n");
+        }
 
         sb.AppendLine("## ⏱ Chronologischer Flugschreiber");
         sb.AppendLine("| Zeit | Typ | Ereignis | Ort | Delta |");

@@ -400,6 +400,9 @@ public partial class LogParser
     DateTime _lastQt = DateTime.MinValue;   // Drosselung der QT-Marker
     string? _lastNotif;                     // gegen Notification-Spam
     string? _lastParty;                     // gegen Party-Spam (Wiederholungen)
+    DateTime _lastCorpseDeathAt = DateTime.MinValue; // Drosselung des Leichen-Spawnpunkts (Burst-Gruppierung)
+    DateTime? _awaitingRespawnAt;           // Zeitstempel des letzten Tods für Respawn-Erkennung
+    string? _diedAtLocation;                // Ort des letzten Tods
     readonly HashSet<string> _loadoutSeen = new();
     readonly HashSet<string> _channelSeen = new();
     readonly HashSet<string> _gearSeen = new();
@@ -427,6 +430,9 @@ public partial class LogParser
         _lastQt = DateTime.MinValue;
         _lastNotif = null;
         _lastParty = null;
+        _lastCorpseDeathAt = DateTime.MinValue;
+        _awaitingRespawnAt = null;
+        _diedAtLocation = null;
         _loadoutSeen.Clear();
         _channelSeen.Clear();
         _gearSeen.Clear();
@@ -556,8 +562,20 @@ public partial class LogParser
             LocationVisits.Add((ts, locRes.RawCode, locRes.DisplayName, locRes.SystemName, locRes.ParentBody, locRes.Type.ToString()));
             if (locRes.DisplayName != _lastLoc)
             {
+                bool isRespawn = _awaitingRespawnAt != null &&
+                                 ts - _awaitingRespawnAt.Value <= TimeSpan.FromMinutes(10) &&
+                                 !string.IsNullOrEmpty(_diedAtLocation) &&
+                                 !string.Equals(locRes.DisplayName, _diedAtLocation, StringComparison.OrdinalIgnoreCase);
+
+                _awaitingRespawnAt = null;
+                _diedAtLocation = null;
+
                 _lastLoc = locRes.DisplayName;
-                return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = _lastLoc };
+                var detail = isRespawn
+                    ? $"Aufgewacht (Respawn) · {_lastLoc}"
+                    : _lastLoc;
+
+                return new LogEntry { Time = ts, Kind = EventKind.Location, Detail = detail };
             }
         }
         return null;
@@ -1973,6 +1991,32 @@ public partial class LogParser
             }
         }
 
+        // Leichen-Erstellung / Spielertod (CSCActorCorpseUtils: Einziger verlässlicher Todessignal-Burst in SC 4.9 & 4.10)
+        if (line.Contains("CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement", StringComparison.Ordinal))
+        {
+            var ts = ParseTs(line);
+            if (ts - _lastCorpseDeathAt > TimeSpan.FromSeconds(5))
+            {
+                _lastCorpseDeathAt = ts;
+                _awaitingRespawnAt = ts;
+                _diedAtLocation = _lastLoc;
+                _lastShip = null;
+
+                var loc = _lastLoc;
+                var detail = !string.IsNullOrEmpty(loc) && loc != "—"
+                    ? $"☠ Gestorben · {loc}"
+                    : "☠ Gestorben";
+
+                return new LogEntry
+                {
+                    Time = ts,
+                    Kind = EventKind.Death,
+                    Detail = detail
+                };
+            }
+            return null;
+        }
+
         // Kill-Feed (Combat)
         if (line.Contains("CActor::Kill:", StringComparison.Ordinal))
         {
@@ -2108,7 +2152,7 @@ public partial class LogParser
                                 line.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
                                 line.Contains("<EM4>[BP]</EM4>", StringComparison.OrdinalIgnoreCase);
 
-                var cleanTitle = CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':');
+                var cleanTitle = MissionCatalog.StripGameMarkup(CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':'));
                 cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
                 bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
                                            cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
@@ -3017,11 +3061,13 @@ public partial class LogParser
     {
         "Default_", "FPS_Default", "Head_", "Shared_", "FP_Visor", "LensDisplay", "Eyedetail",
         "Eyelash", "necksock", "brows_", "hair_", "Inventory_LocalAttach", "Scalp", "Teeth",
-        "_LensDisplay", "Skin", "Beard", "Mouth", "PuglioseSkin"
+        "_LensDisplay", "Skin", "Beard", "Mouth", "PuglioseSkin",
+        "Controller_Flight_", "display_components_", "scitem_prop_"
     };
 
     static string CleanMission(string s)
     {
+        s = MissionCatalog.StripGameMarkup(s);
         s = BpBlockRegex().Replace(s, "");                         // Blueprint-Marker-Block ganz raus
         s = HtmlTagRegex().Replace(s, "");                         // restliche Tags
         // unaufgelöste Platzhalter-Segmente (geteilte Aufträge) entfernen

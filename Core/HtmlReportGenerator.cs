@@ -269,7 +269,10 @@ public static class HtmlReportGenerator
         sb.AppendLine("      <div class=\"kpi-card\">");
         sb.AppendLine("        <div class=\"kpi-label\">🛸 Schiffseinsätze</div>");
         sb.AppendLine($"        <div class=\"kpi-val\" style=\"color: #38BDF8;\">{summary.SortieCount} Starts</div>");
-        sb.AppendLine($"        <div class=\"kpi-sub\">{System.Net.WebUtility.HtmlEncode(summary.ShipsUsedText)}</div>");
+        var shipsSub = summary.UsedShips.Count > 1
+            ? $"{summary.UsedShips.Count} Schiffe ({string.Join(", ", summary.UsedShips)})"
+            : (summary.UsedShips.Count == 1 ? summary.UsedShips[0] : summary.ShipsUsedText);
+        sb.AppendLine($"        <div class=\"kpi-sub\" title=\"{System.Net.WebUtility.HtmlEncode(string.Join(", ", summary.UsedShips))}\">{System.Net.WebUtility.HtmlEncode(shipsSub)}</div>");
         sb.AppendLine("      </div>");
 
         sb.AppendLine("      <div class=\"kpi-card\">");
