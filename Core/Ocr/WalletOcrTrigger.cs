@@ -47,6 +47,10 @@ public static partial class WalletOcrTrigger
         if (raw.Contains("mobiGlas", StringComparison.OrdinalIgnoreCase))
             return true;
 
+        if (raw.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         return false;
     }
 

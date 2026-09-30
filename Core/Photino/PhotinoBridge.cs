@@ -1330,6 +1330,68 @@ public class PhotinoBridge
 
         Logger.Log($"OnBalanceCaptured: mobiGlas Kontostand aktualisiert: {newBalance:N0} aUEC (Vorher: {oldBalance:N0} aUEC).");
 
+        long diff = oldBalance - newBalance;
+        if (oldBalance > 0 && diff > 0)
+        {
+            // 1. Prüfen, ob kürzlich ein Betankungs- oder Wartungs-Event ohne Betrag erfasst wurde
+            bool updated = false;
+            lock (_liveEventsLock)
+            {
+                var targetEvent = _liveEvents.FirstOrDefault(x =>
+                    x.Kind == "Maintenance" &&
+                    (x.Description.Contains("Betankung", StringComparison.OrdinalIgnoreCase) ||
+                     x.Description.Contains("Wartung", StringComparison.OrdinalIgnoreCase) ||
+                     x.Description.Contains("Refuel", StringComparison.OrdinalIgnoreCase)) &&
+                    (x.Amount == null || x.Amount == 0));
+
+                if (targetEvent != null)
+                {
+                    targetEvent.Amount = -diff;
+                    targetEvent.Description = $"{targetEvent.Description} (-{diff:N0} aUEC)";
+                    Database.UpdateRecentEventAmount(_activeSessionName ?? "Game.log", "Maintenance", "Betankung", -diff, targetEvent.Description);
+                    updated = true;
+                    Logger.Log($"[WalletOCR] Betankungskosten von -{diff:N0} aUEC erfolgreich auf Log-Event gebucht.");
+                    _toastOverlay.ShowToast("⛽", "BETANKUNG BERECHNET", $"-{diff:N0} aUEC", _currentShip ?? "Schiff", 0x0038BDF8u);
+                }
+            }
+
+            if (updated)
+            {
+                Broadcast("LIVE_EVENTS_LOADED", _liveEvents.ToList());
+            }
+            else if (diff >= 100 && diff <= 50_000_000)
+            {
+                // Allgemeines ungeloggtes Wartungs- / Service-Delta verbuchen
+                var nowTs = DateTime.UtcNow;
+                var ship = _currentShip != "—" ? _currentShip : null;
+                var detail = $"⛽ Schiffswartung & Service (-{diff:N0} aUEC)";
+                Database.InsertCustomEvent(_activeSessionName ?? "Game.log", nowTs, EventKind.Maintenance, -diff, detail, ship);
+
+                var dto = new LogEventDto
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Timestamp = nowTs.ToLocalTime().ToString("HH:mm:ss"),
+                    Category = "wallet",
+                    Kind = EventKind.Maintenance.ToString(),
+                    KindText = "Finanzen",
+                    Icon = "⛽",
+                    Title = "Finanzen",
+                    Description = detail,
+                    Amount = -diff,
+                    Ship = ship,
+                    RawText = $"Wallet OCR Delta: -{diff:N0} aUEC"
+                };
+
+                lock (_liveEventsLock)
+                {
+                    _liveEvents.Insert(0, dto);
+                }
+
+                Broadcast("LOG_EVENT", dto);
+                _toastOverlay.ShowToast("⛽", "WARTUNG BERECHNET", $"-{diff:N0} aUEC", ship ?? "Schiff", 0x0038BDF8u);
+            }
+        }
+
         _walletScanIndicator.FlashGreen();
         Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
         Broadcast("STATUS_UPDATE", GetAppStatus());
@@ -7199,10 +7261,15 @@ public class PhotinoBridge
                 CheckAndTriggerToast(entry, dto);
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
 
-                if (!string.IsNullOrWhiteSpace(entry.Ship) && entry.Ship != "—" && entry.Kind is EventKind.Vehicle or EventKind.Quantum)
+                if (!string.IsNullOrWhiteSpace(entry.Ship) && entry.Ship != "—" && entry.Kind is EventKind.Vehicle or EventKind.Quantum or EventKind.Maintenance)
                 {
                     var cat = FleetCatalog.Lookup(entry.Ship);
                     _currentShip = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : entry.Ship;
+                }
+
+                if (entry.Kind == EventKind.Maintenance && (entry.Detail?.Contains("Betankung") == true || entry.Detail?.Contains("Refuel") == true || entry.Detail?.Contains("Wartung") == true))
+                {
+                    _walletCapture.Trigger();
                 }
 
                 bool isFinancial = entry.Amount != 0 && MapCategory(entry.Kind) == "wallet";

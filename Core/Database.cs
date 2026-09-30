@@ -2633,6 +2633,43 @@ public static class Database
         }
     }
 
+    /// <summary>
+    /// Aktualisiert Betrag und Detail eines kürzlichen Events (z. B. ungeloggte Betankungs- oder Wartungskosten nach Wallet-OCR-Abgleich).
+    /// </summary>
+    public static bool UpdateRecentEventAmount(string session, string kind, string detailContains, long newAmount, string? newDetail = null)
+    {
+        lock (_writeLock)
+        {
+            try
+            {
+                EnsureInitialized();
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE events 
+                    SET amount = $a,
+                        detail = COALESCE($nd, detail)
+                    WHERE rowid = (
+                        SELECT rowid FROM events 
+                        WHERE session = $s AND kind = $k AND detail LIKE $d AND (amount = 0 OR amount IS NULL)
+                        ORDER BY time DESC LIMIT 1
+                    );";
+                cmd.Parameters.AddWithValue("$s", session);
+                cmd.Parameters.AddWithValue("$k", kind);
+                cmd.Parameters.AddWithValue("$d", "%" + detailContains + "%");
+                cmd.Parameters.AddWithValue("$a", newAmount);
+                cmd.Parameters.AddWithValue("$nd", (object?)newDetail ?? DBNull.Value);
+                return cmd.ExecuteNonQuery() > 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Database.UpdateRecentEventAmount", ex);
+                return false;
+            }
+        }
+    }
+
     public static void SaveContract(Models.ContractDetails contract)
     {
         lock (_writeLock)

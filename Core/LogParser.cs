@@ -1538,27 +1538,27 @@ public partial class LogParser
                 if (text.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankung abgeschlossen" };
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Ship = _lastShip, Detail = "⛽ Betankung abgeschlossen" };
                 }
                 if (text.Contains("Refuel Request Accepted", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Betankungsanforderung akzeptiert", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankungsanfrage akzeptiert" };
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Info, Ship = _lastShip, Detail = "⛽ Betankungsanfrage akzeptiert" };
                 }
                 if (text.Contains("Dock With Refueler", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Am Tanker andocken", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Andocken an Tanker" };
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Ship = _lastShip, Detail = "⛽ Andocken an Tanker" };
                 }
                 if (text.Contains("Undock From Refueler", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Vom Tanker abdocken", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Vom Tanker abgedockt" };
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Ship = _lastShip, Detail = "⛽ Vom Tanker abgedockt" };
                 }
                 if (text.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Betankungsvorgang", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Detail = "⛽ Betankungsvorgang aktiv" };
+                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Ship = _lastShip, Detail = "⛽ Betankungsvorgang aktiv" };
                 }
 
                 // Bergbau (Mining HUD)

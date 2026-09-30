@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automated Refueling & Maintenance Cost Delta Calculation via Wallet OCR (`Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `Core/LogParser.cs`, `Core/Ocr/WalletOcrTrigger.cs`)**:
+  - Automatically captures wallet balance upon refueling or maintenance completion signals (`Refuel Request Complete`), computing the exact expense from the wallet balance difference (`oldBalance - newBalance`).
+  - Seamlessly updates the recent zero-amount refueling event in the SQLite database and live event stream with the calculated negative amount, displaying the price in the `BETRAG` column and triggering an in-game confirmation overlay toast (`⛽ BETANKUNG BERECHNET`).
+  - Accurately associates the pilot's active vessel with refueling and docking events (`Ship = _lastShip`), ensuring the ship column is cleanly populated.
+  - Reclassified tanker docking/undocking and refueling pipeline status events to vehicle/info categories so only actual service completions appear under the financial maintenance ledger.
 - **Reliable Player Death & Respawn Detection (`Core/LogParser.cs`, `Core/Database.cs`)**:
   - Implemented 100% reliable death detection for Star Citizen 4.9 and 4.10 based on `CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement` burst grouping. Since CIG removed `<Actor Death>` and killcam lines are absent during suicide, ship explosions, crashes, bleeding out, or NPC kills, grouping tight corpse item port clusters provides accurate casualty tracking.
   - Added automatic respawn detection: waking up at a hospital or clinic bed location within 10 minutes of dying is accurately recognized and tagged as `Aufgewacht (Respawn) · {Location}`.
