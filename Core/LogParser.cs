@@ -2213,7 +2213,9 @@ public partial class LogParser
                         }
                     }
 
-                    if (hasBpTag && reward < 88250)
+                    bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
+                                               cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
+                    if (hasBpTag && isBlackboxDangerous && reward < 88250)
                     {
                         reward = 88250;
                     }
@@ -2239,7 +2241,7 @@ public partial class LogParser
                                 Outcome = ContractOutcome.Completed,
                                 CompletedAt = existing.CompletedAt ?? ParseTs(line),
                                 StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
-                                Reward = (existing.Reward > 0 && (!hasBpTag || existing.Reward >= 88250)) ? existing.Reward : reward
+                                Reward = (existing.Reward > 0 && (!hasBpTag || !isBlackboxDangerous || existing.Reward >= 88250)) ? existing.Reward : reward
                             };
                         }
                         else
@@ -2330,7 +2332,9 @@ public partial class LogParser
                 else if (isAccepted)
                 {
                     var finalReward = isSalvageClaim ? 0 : (cat?.BaseReward ?? 0);
-                    if (hasBpTag && finalReward < 88250)
+                    bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
+                                               cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
+                    if (hasBpTag && isBlackboxDangerous && finalReward < 88250)
                     {
                         finalReward = 88250;
                     }

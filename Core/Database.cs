@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 40; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v40: Korrektur Missionsbelohnung Blackbox Retrieval Very Dangerous & BP-Aufträge auf 88.250 aUEC)
+    public const int CurrentSchemaVersion = 41; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v41: Korrektur Missionsbelohnung Ship In Distress auf 58.000 aUEC)
     public const int CurrentParserVersion = 41; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v41: Multi-Crew Schiffskanäle & ASOP-Flottenabfrage)
 
     public static bool WasParserResetRequired { get; set; }
@@ -1103,6 +1103,32 @@ public static class Database
             Exec(db, "PRAGMA user_version = 40;");
             dbSchemaVersion = 40;
             Logger.Log("DB Schema: Migration auf v40 (Korrektur Missionsbelohnung Blackbox Retrieval Very Dangerous auf 88.250 aUEC) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 41)
+        {
+            try
+            {
+                // v41: Korrektur von Missionsbelohnungen für 'Ship In Distress' von fälschlicherweise 88.250 auf 58.000 aUEC
+                Exec(db, @"
+                    UPDATE events
+                    SET amount = 58000
+                    WHERE kind IN ('MissionReward', 'MissionTaken') AND amount = 88250
+                      AND (detail LIKE '%Ship In Distress%' OR detail LIKE '%Ship in Distress%' OR detail LIKE '%Ships In Distress%');
+
+                    UPDATE contracts
+                    SET reward = 58000
+                    WHERE reward = 88250
+                      AND (title LIKE '%Ship In Distress%' OR title LIKE '%Ship in Distress%' OR title LIKE '%Ships In Distress%');
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v41 (Korrektur Missionsbelohnung Ship In Distress 58.000 aUEC)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 41;");
+            dbSchemaVersion = 41;
+            Logger.Log("DB Schema: Migration auf v41 (Korrektur Missionsbelohnung Ship In Distress auf 58.000 aUEC) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));

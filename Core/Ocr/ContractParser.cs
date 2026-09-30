@@ -125,7 +125,9 @@ public static partial class ContractParser
 
         bool hasBpMarker = ocrText.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
                            title.Contains("[BP]", StringComparison.OrdinalIgnoreCase);
-        if (hasBpMarker && reward < 88250)
+        bool isBlackboxDangerous = title.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
+                                   title.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
+        if (hasBpMarker && isBlackboxDangerous && reward < 88250)
         {
             reward = 88250;
         }

@@ -251,12 +251,25 @@ public static class MissionCatalog
         return trimmed;
     }
 
-    private static void Add(MissionInfo info)
+    private static void Add(MissionInfo info, params string[] aliases)
     {
         _catalog.Add(info);
         var norm = Normalize(info.Title);
         if (!_lookupByNormTitle.ContainsKey(norm))
             _lookupByNormTitle[norm] = info;
+
+        if (aliases != null)
+        {
+            foreach (var alias in aliases)
+            {
+                if (!string.IsNullOrWhiteSpace(alias))
+                {
+                    var aNorm = Normalize(alias);
+                    if (!_lookupByNormTitle.ContainsKey(aNorm))
+                        _lookupByNormTitle[aNorm] = info;
+                }
+            }
+        }
     }
 
     private static void InitializeCatalog()
@@ -868,12 +881,12 @@ public static class MissionCatalog
             Contractor = "Recco Battaglia",
             Faction = "People's Alliance",
             MissionType = "Söldner",
-            BaseReward = 88250,
+            BaseReward = 58000,
             ReputationGain = 450,
             StarSystems = "Nyx",
             Blueprints = new[] { "Overlord Arms Supernova", "Overlord Core Supernova" },
-            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer im Nyx-System. [!] Blueprints only for 88.250 aUEC missions."
-        });
+            Description = "Ein Transportschiff der People's Alliance wird von Piraten attackiert. Vernichte die Angreifer im Nyx-System."
+        }, "Ships In Distress", "Goto ship in distress");
         Add(new MissionInfo
         {
             Id = "recco_blackbox_retrieval",

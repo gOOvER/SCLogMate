@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Accurate 'Ship In Distress' Mission Reward & Blueprint Floor Scoping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
+  - Corrected base reward for the Nyx / People's Alliance mission `Ship In Distress` (and alias `Ships In Distress`) from 88,250 aUEC to its true value of 58,000 aUEC.
+  - Scoped the 88,250 aUEC blueprint reward floor in `LogParser` and OCR `ContractParser` strictly to `Blackbox Retrieval Very Dangerous` instead of globally overriding all blueprint-tagged missions.
+  - Implemented database schema migration `v41` in `Database.cs` to automatically retroactively adjust existing `Ship In Distress` mission entries from 88,250 aUEC to 58,000 aUEC.
 - **Accurate Mission Rewards & People's Alliance / Blueprint Linking (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
   - Corrected base rewards and reputation for Star Citizen 4.x People's Alliance (Levski / Nyx) missions: `Blackbox Retrieval Very Dangerous [BP]` now awards 88,250 aUEC and 360 XP (previously erroneously set to 38,000 aUEC).
   - Consolidated all Recco Battaglia / People's Alliance missions into a unified catalog list, eliminating duplicate and conflicting entries for `Ship In Distress`, `Missing Mining Team`, and `Moraine Data Retrieval`.
