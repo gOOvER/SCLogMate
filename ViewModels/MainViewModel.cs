@@ -27,7 +27,6 @@ public partial class MainViewModel : ObservableObject
     LogParser _parser = new();
     readonly OcrEngineService _ocrEngine = new();
     readonly WalletCapture _walletCapture;
-    readonly ContractScanner _contractScanner;
     readonly RsOcrScanner _rsScanner;
     readonly AuroraVoiceService _auroraService;
     readonly ScanIndicatorWindow _scanIndicator = new();
@@ -3291,11 +3290,6 @@ public partial class MainViewModel : ObservableObject
 
         _walletCapture = new WalletCapture(_ocrEngine, () => _settings.WalletRegion ?? ScreenCapture.GetDefaultWalletRegion(), () => AutoOcrEnabled);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
-
-        _contractScanner = new ContractScanner(
-            _ocrEngine,
-            () => _settings.ContractRegion ?? ScreenCapture.GetDefaultContractRegion(),
-            () => false); // Mission OCR dauerhaft deaktiviert (Log-basiertes Tracking ist aktiv)
 
         _rsScanner = new RsOcrScanner(_ocrEngine, () => _settings.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion(), () => IsRsAutoScanEnabled);
         _rsScanner.RsValueDetected += val => Dispatcher.UIThread.Post(() => OnRsDetected(val));

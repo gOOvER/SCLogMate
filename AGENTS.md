@@ -85,7 +85,7 @@ The `Core/Ocr/` directory contains five services. Key invariants:
   Do not remove either safety layer.
 - **OcrEngineService** serializes all OCR calls through `_ocrLock`. Every
   method must acquire and release it, including `Dispose()`.
-- **RsOcrScanner** and **ContractScanner** use `AutoReset=false` timers with
+- **RsOcrScanner** uses `AutoReset=false` timers with
   `ObjectDisposedException` guards on re-arm. `_busy` fields use `Interlocked`.
 - **ScreenCapture** uses Win32 GDI. The cleanup order is:
   `SelectObject(old) → DeleteObject → DeleteDC → ReleaseDC`.

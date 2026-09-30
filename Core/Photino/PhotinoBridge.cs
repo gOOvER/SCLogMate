@@ -1183,6 +1183,27 @@ public class PhotinoBridge
             }
             Broadcast("SCREENSHOT_LOADOUT_DETECTED", res);
         };
+        _screenshotWatcher.OnContractDetected += contract =>
+        {
+            try
+            {
+                if (contract != null && contract.Reward > 0 && !string.IsNullOrWhiteSpace(contract.Title))
+                {
+                    Database.SaveContract(contract);
+                    Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+
+                    var rewardStr = contract.Reward > 0 ? $"{contract.Reward:N0} aUEC" : "—";
+                    var orgStr = !string.IsNullOrWhiteSpace(contract.ContractedBy) ? $" · {contract.ContractedBy}" : "";
+                    _toastOverlay.ShowToast("📋", "AUFTRAG ERFASST", contract.Title, $"{rewardStr}{orgStr}", 0x0038BDF8u);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ScreenshotWatcher.OnContractDetected Save", ex);
+            }
+            Broadcast("SCREENSHOT_CONTRACT_DETECTED", contract);
+        };
         try
         {
             _screenshotWatcher.StartWatching();

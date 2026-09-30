@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
+using SCLogMate.Models;
 
 namespace SCLogMate.Core.Ocr;
 
@@ -28,8 +29,8 @@ public sealed record ScreenshotLoadoutResult(
 );
 
 /// <summary>
-/// Erkennt Schiffs-Ausrüstungen (VLM mobiGlas und ASOP Fleet Manager) aus Screenshots
-/// und überwacht optional den Screenshot-Ordner von Star Citizen.
+/// Erkennt Schiffs-Ausrüstungen (VLM mobiGlas und ASOP Fleet Manager) sowie Auftragsdetails (mobiGlas Contracts)
+/// aus Screenshots und überwacht den Screenshot-Ordner von Star Citizen.
 /// </summary>
 public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 {
@@ -39,6 +40,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     private readonly ConcurrentDictionary<string, byte> _inFlightFiles = new(StringComparer.OrdinalIgnoreCase);
 
     public event Action<ScreenshotLoadoutResult>? OnLoadoutDetected;
+    public event Action<ContractDetails>? OnContractDetected;
 
     public bool IsWatching => _watcher != null && _watcher.EnableRaisingEvents;
     public string? WatchedFolder { get; private set; }
@@ -133,17 +135,44 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 }
 
                 Logger.Log($"ScreenshotLoadoutWatcher: Analysiere {fileName}...");
-                var res = await AnalyzeScreenshotAsync(fullPath);
-                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) &&
-                    ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
+                string? ocrText = null;
+                try
                 {
-                    _processedFiles.TryAdd(fullPath, 0);
-                    Logger.Log($"ScreenshotLoadoutWatcher: Loadout erkannt für '{res.ShipName}': {res.Components?.Count ?? 0} Komponenten, Livery: {res.Livery ?? "keine"}.");
-                    OnLoadoutDetected?.Invoke(res);
+                    ocrText = await _ocr.RecognizeImageFileAsync(fullPath);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"ScreenshotLoadoutWatcher OCR error: {fullPath}", ex);
+                }
+
+                if (!string.IsNullOrWhiteSpace(ocrText))
+                {
+                    // 1. Schiffsloadout / ASOP Fleet Manager prüfen
+                    var res = ParseLoadoutFromText(ocrText, fullPath);
+                    if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) &&
+                        ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
+                    {
+                        _processedFiles.TryAdd(fullPath, 0);
+                        Logger.Log($"ScreenshotLoadoutWatcher: Loadout erkannt für '{res.ShipName}': {res.Components?.Count ?? 0} Komponenten, Livery: {res.Livery ?? "keine"}.");
+                        OnLoadoutDetected?.Invoke(res);
+                        return;
+                    }
+
+                    // 2. mobiGlas Auftragsmanager (Contract) prüfen
+                    var contract = ContractParser.Parse(ocrText, requireAccepted: false);
+                    if (contract != null && contract.Reward > 0 && !string.IsNullOrWhiteSpace(contract.Title) && contract.Title.Length >= 3)
+                    {
+                        _processedFiles.TryAdd(fullPath, 0);
+                        Logger.Log($"ScreenshotLoadoutWatcher: Auftrag erkannt: '{contract.Title}' ({contract.Reward:N0} aUEC · {contract.ContractedBy}).");
+                        OnContractDetected?.Invoke(contract);
+                        return;
+                    }
+
+                    Logger.Log($"ScreenshotLoadoutWatcher: Weder Schiffs-Loadout noch Auftrag in {fileName} erkannt.");
                 }
                 else
                 {
-                    Logger.Log($"ScreenshotLoadoutWatcher: Kein Schiffs-Loadout in {fileName} erkannt ({res.Message ?? "Kein Treffer"}).");
+                    Logger.Log($"ScreenshotLoadoutWatcher: Kein Text in {fileName} erkannt.");
                 }
             }
             catch (Exception ex)
@@ -239,6 +268,25 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             return new(false, null, null, Array.Empty<ScannedShipComponent>(), imagePath, "Kein Text im Bild erkannt.");
 
         return ParseLoadoutFromText(ocrText, imagePath);
+    }
+
+    /// <summary>
+    /// Analysiert eine Screenshot-Bilddatei auf mobiGlas Auftragsmanager / Missionsdetails.
+    /// </summary>
+    public async Task<ContractDetails?> AnalyzeContractScreenshotAsync(string imagePath)
+    {
+        if (!File.Exists(imagePath) || !_ocr.IsAvailable) return null;
+        try
+        {
+            var ocrText = await _ocr.RecognizeImageFileAsync(imagePath);
+            if (string.IsNullOrWhiteSpace(ocrText)) return null;
+            return ContractParser.Parse(ocrText, requireAccepted: false);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"AnalyzeContractScreenshotAsync error: {imagePath}", ex);
+            return null;
+        }
     }
 
     /// <summary>

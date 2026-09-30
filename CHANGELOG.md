@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Automated Contract & Mission OCR from Star Citizen Screenshots (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Extended `ScreenshotLoadoutWatcher` with `OnContractDetected` to automatically detect and parse mobiGlas contracts when a screenshot is captured in Star Citizen (`PrintScreen`).
+  - Seamlessly extracts contract title, contractor, and reward via `ContractParser`, saving the contract to the database, updating UI state (`MISSIONS_UPDATED`), and displaying an in-game toast overlay (`📋 AUFTRAG ERFASST`).
+
+### Removed
+- **Obsolete Background Continuous Screen-Polling `ContractScanner` (`Core/Ocr/ContractScanner.cs`, `ViewModels/MainViewModel.cs`)**:
+  - Removed the legacy GDI timer-based `ContractScanner` service that polled the screen every 1,000ms.
+  - Replaced legacy polling with reliable, zero-overhead event-based log parsing and on-demand screenshot folder OCR.
+
 ### Fixed
 - **Accurate 'Ship In Distress' Mission Reward & Blueprint Floor Scoping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
   - Corrected base reward for the Nyx / People's Alliance mission `Ship In Distress` (and alias `Ships In Distress`) from 88,250 aUEC to its true value of 58,000 aUEC.
