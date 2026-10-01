@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Guarded backend `cycle_ship_insurance` against non-pledge ships and ensured `GetFleetResponse`, `set_ship_acquisition`, and `cycle_ship_acquisition` automatically assign and preserve standard in-game insurance values.
 
 ### Fixed
+- **Ship Hover Preview Viewport Collision & Upward Flipping (`frontend/src/views/FleetView.tsx`)**:
+  - Implemented dynamic viewport collision detection and React portaling (`createPortal`) for the ship thumbnail hover card in Fleet view.
+  - Automatically flips the preview card to open upwards when hovering ships near the bottom edge of the table or viewport, preventing clipping against table overflow containers and the application footer.
 - **Ship Rewards vs. Crafting Blueprints Differentiation (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `frontend/src/views/EventsView.tsx`)**:
   - Differentiated Star Citizen `"You've earned:"` rewards between ship awards (`Access it at a destination Ship Kiosk`) and freight elevator deliveries (`Access it at a destination Freight Elevator`), preventing mission ship rewards (such as the MISC Prospector) and gear from falsely triggering the "Bauplan erlernt" blueprint toast or populating the Blueprints catalog.
   - Automatically classifies ship awards as `EventKind.Vehicle` (`🚀 Schiff freigeschaltet: ...`), navigates to Fleet on badge click, and displays the in-game toast overlay `🚀 SCHIFF FREIGESCHALTET`.

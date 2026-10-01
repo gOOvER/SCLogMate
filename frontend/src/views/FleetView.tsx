@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   bridge,
   FleetShipDto,
@@ -81,6 +82,24 @@ export const FleetView: React.FC<FleetViewProps> = ({
   // Notes editing state
   const [editingNotesShip, setEditingNotesShip] = useState<string | null>(null);
   const [notesInputVal, setNotesInputVal] = useState<string>('');
+
+  // Floating ship hover preview state with collision detection
+  const [hoveredPreview, setHoveredPreview] = useState<{
+    ship: FleetShipDto;
+    rect: DOMRect;
+    placement: 'top' | 'bottom';
+  } | null>(null);
+
+  useEffect(() => {
+    if (!hoveredPreview) return;
+    const handleDismiss = () => setHoveredPreview(null);
+    window.addEventListener('scroll', handleDismiss, { capture: true, passive: true });
+    window.addEventListener('click', handleDismiss, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleDismiss, { capture: true });
+      window.removeEventListener('click', handleDismiss);
+    };
+  }, [hoveredPreview]);
 
   const fetchFleet = async () => {
     try {
@@ -724,7 +743,19 @@ export const FleetView: React.FC<FleetViewProps> = ({
                       {/* 2. Schiff & Hersteller */}
                       <td className="py-3 px-3.5">
                         <div className="flex flex-col">
-                          <div className="relative group/shipname inline-block">
+                          <div
+                            className="relative group/shipname inline-block"
+                            onMouseEnter={(e) => {
+                              if (!ship.imageUrl && !ship.thumbnailUrl) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const cardHeight = 210;
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              // If less than card height + 24px space below, flip to open upwards!
+                              const placement = spaceBelow < cardHeight + 24 ? 'top' : 'bottom';
+                              setHoveredPreview({ ship, rect, placement });
+                            }}
+                            onMouseLeave={() => setHoveredPreview(null)}
+                          >
                             <div className="flex items-center gap-1.5 cursor-pointer">
                               <span className="font-bold text-slate-100 group-hover/shipname:text-cyan-300 transition-colors text-[13.5px] tracking-wide">
                                 {ship.name.split(/\s*·\s*/)[0].trim()}
@@ -733,42 +764,6 @@ export const FleetView: React.FC<FleetViewProps> = ({
                                 <Eye className="w-3 h-3 text-cyan-500/50 group-hover/shipname:text-cyan-400 transition-colors" />
                               )}
                             </div>
-
-                            {/* 🌌 High-Tech Ship Preview Hover Card */}
-                            {(ship.imageUrl || ship.thumbnailUrl) && (
-                              <div className="absolute left-0 top-full mt-2 hidden group-hover/shipname:flex flex-col z-50 w-72 p-2.5 rounded-xl bg-[#040d1a]/95 border border-cyan-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.8),0_0_15px_rgba(6,182,212,0.25)] backdrop-blur-md pointer-events-none transition-all animate-in fade-in duration-150">
-                                <div className="relative w-full h-36 rounded-lg overflow-hidden bg-[#02060f] border border-cyan-900/60 flex items-center justify-center">
-                                  <img
-                                    src={ship.imageUrl || ship.thumbnailUrl || ''}
-                                    alt={ship.name}
-                                    className="w-full h-full object-cover object-center relative z-1"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      (e.target as HTMLElement).style.display = 'none';
-                                    }}
-                                  />
-                                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-2 text-center bg-[#030914]">
-                                    <Rocket className="w-7 h-7 text-cyan-500/40 mb-1" />
-                                    <span className="text-[10px] font-mono text-cyan-300/70 truncate max-w-[90%]">{ship.name}</span>
-                                  </div>
-                                  <div className="absolute inset-0 bg-gradient-to-t from-[#040d1a] via-transparent to-transparent opacity-80" />
-                                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/75 text-cyan-300 border border-cyan-500/30 backdrop-blur-sm">
-                                      {ship.manufacturerBadge || 'SHIP'}
-                                    </span>
-                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/75 text-slate-300 border border-slate-700 backdrop-blur-sm">
-                                      {ship.role}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="mt-2 flex items-center justify-between text-[11px]">
-                                  <span className="font-bold text-slate-100 truncate">{ship.name}</span>
-                                  <span className="text-[10px] font-mono text-cyan-400">
-                                    {ship.flightCount} Einsätze
-                                  </span>
-                                </div>
-                              </div>
-                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span
@@ -1264,6 +1259,64 @@ export const FleetView: React.FC<FleetViewProps> = ({
           onRefreshFleet={fetchFleet}
         />
       )}
+
+      {/* 🌌 High-Tech Floating Ship Preview Hover Card (mit echter Kollisionserkennung & Portal) */}
+      {hoveredPreview &&
+        createPortal(
+          (() => {
+            const { ship, rect, placement } = hoveredPreview;
+            const cardWidth = 288; // w-72
+            const cardHeight = 210;
+
+            // Horizontale Ausrichtung: linksbündig am Trigger, innerhalb des Viewports geklammert
+            const left = Math.max(16, Math.min(window.innerWidth - cardWidth - 16, rect.left));
+
+            // Vertikale Ausrichtung mit Kollisionsschutz:
+            // 'top' -> öffnet nach oben (über dem Trigger)
+            // 'bottom' -> öffnet nach unten (unter dem Trigger)
+            let top = placement === 'top' ? rect.top - cardHeight - 8 : rect.bottom + 8;
+            top = Math.max(12, Math.min(window.innerHeight - cardHeight - 12, top));
+
+            return (
+              <div
+                className="fixed z-[9999] w-72 p-2.5 rounded-xl bg-[#040d1a]/95 border border-cyan-500/50 shadow-[0_12px_40px_rgba(0,0,0,0.9),0_0_20px_rgba(6,182,212,0.3)] backdrop-blur-md pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150"
+                style={{ top, left }}
+              >
+                <div className="relative w-full h-36 rounded-lg overflow-hidden bg-[#02060f] border border-cyan-900/60 flex items-center justify-center">
+                  <img
+                    src={ship.imageUrl || ship.thumbnailUrl || ''}
+                    alt={ship.name}
+                    className="w-full h-full object-cover object-center relative z-1"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-2 text-center bg-[#030914]">
+                    <Rocket className="w-7 h-7 text-cyan-500/40 mb-1" />
+                    <span className="text-[10px] font-mono text-cyan-300/70 truncate max-w-[90%]">{ship.name}</span>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#040d1a] via-transparent to-transparent opacity-80" />
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/75 text-cyan-300 border border-cyan-500/30 backdrop-blur-sm">
+                      {ship.manufacturerBadge || 'SHIP'}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/75 text-slate-300 border border-slate-700 backdrop-blur-sm">
+                      {ship.role}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-100 truncate">{ship.name}</span>
+                  <span className="text-[10px] font-mono text-cyan-400">
+                    {ship.flightCount} Einsätze
+                  </span>
+                </div>
+              </div>
+            );
+          })(),
+          document.body
+        )}
     </div>
   );
 };
