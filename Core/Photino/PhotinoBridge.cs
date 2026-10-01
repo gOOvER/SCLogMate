@@ -7217,6 +7217,10 @@ public class PhotinoBridge
             {
                 _toastOverlay.ShowToast("📜", "BAUPLAN ERLERNT", dto.Title ?? "Bauplan", dto.Description ?? "", 0x000BB5F5u);
             }
+            else if (entry.Kind == EventKind.Vehicle && entry.Detail?.Contains("Schiff freigeschaltet", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                _toastOverlay.ShowToast("🚀", "SCHIFF FREIGESCHALTET", entry.Ship ?? "Neues Schiff", "Abholbar am Ship Kiosk", 0x0022C55Eu);
+            }
             else if (s.ToastReputationEnabled && dto.Title != null && dto.Title.Contains("Ruf", StringComparison.OrdinalIgnoreCase))
             {
                 _toastOverlay.ShowToast("🎖️", "RUF GESTIEGEN", dto.Title, dto.Description ?? "", 0x00EED322u);
@@ -7242,6 +7246,8 @@ public class PhotinoBridge
         EventKind.Vehicle or EventKind.Quantum or EventKind.Hangar => "ship",
         EventKind.Location or EventKind.Jurisdiction => "location",
         EventKind.SessionChange => "server",
+        EventKind.Blueprint => "blueprint",
+        EventKind.Loot => "inventory",
         _ => "system"
     };
 

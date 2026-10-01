@@ -23,6 +23,7 @@ import {
   AlertOctagon,
   Activity,
   Package,
+  Scroll,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
@@ -379,6 +380,23 @@ export const EventsView: React.FC<EventsViewProps> = ({
           >
             <Package className="w-2.5 h-2.5 text-purple-400" />
             <span>{t('events.catWarehouse')}</span>
+          </button>
+        );
+      case 'blueprint':
+        return (
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (onNavigate) {
+                ev.stopPropagation();
+                onNavigate('blueprints');
+              }
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 hover:border-cyan-500 shrink-0 cursor-pointer transition"
+            title="In Bauplänen aufrufen"
+          >
+            <Scroll className="w-2.5 h-2.5 text-cyan-400" />
+            <span>{t('events.catBlueprint')}</span>
           </button>
         );
       default:

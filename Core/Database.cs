@@ -19,7 +19,7 @@ namespace SCLogMate.Core;
 public static class Database
 {
     public const int CurrentSchemaVersion = 41; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v41: Korrektur Missionsbelohnung Ship In Distress auf 58.000 aUEC)
-    public const int CurrentParserVersion = 43; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v43: Filtert fremde Schiffs-QT-Ankünfte aus der Streaming-Bubble heraus)
+    public const int CurrentParserVersion = 44; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v44: Schiffsbelohnungen und Frachtaufzug-Items vs. echte Blaupausen)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }

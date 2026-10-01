@@ -107,7 +107,7 @@ public partial class LogParser
     [GeneratedRegex(@"MissionId:\s*\[(?<id>[0-9a-fA-F-]+)\]")]
     private static partial Regex NotificationMissionIdRegex();
 
-    // Blaupause / Crafting Blueprint / Belohnung erhalten - unterstützt alle SC-Varianten & Missions-Drops
+    // Echte Blaupausen / Crafting Blueprints erhalten
     private static readonly string[] BlueprintMarkers = {
         "Received Blueprint:",
         "Bauplan erhalten:",
@@ -115,11 +115,7 @@ public partial class LogParser
         "Blueprint Unlocked:",
         "Bauplan freigeschaltet:",
         "Schematic received:",
-        "You've earned:",
-        "You have earned:",
-        "Du hast verdient:",
-        "Du hast erhalten:",
-        "Item erhalten:"
+        "Bauplan:"
     };
 
     public static string? TryExtractBlueprint(string line)
@@ -138,8 +134,7 @@ public partial class LogParser
         }
         if (idx < 0) return null;
 
-        int start = idx + markerLen;
-        string remaining = line[start..];
+        string remaining = line[(idx + markerLen)..];
 
         // Schneide an Zeilenumbrüchen oder gängigen Star Citizen Zusatztexten ab
         int end = remaining.IndexOfAny(new[] { '\r', '\n' });
@@ -151,9 +146,6 @@ public partial class LogParser
         int quoteIdx = remaining.IndexOf('"');
         if (quoteIdx >= 0) remaining = remaining[..quoteIdx];
 
-        int freightIdx = remaining.IndexOf("Access it at", StringComparison.OrdinalIgnoreCase);
-        if (freightIdx >= 0) remaining = remaining[..freightIdx];
-
         int actionIdx = remaining.IndexOf("Action:", StringComparison.OrdinalIgnoreCase);
         if (actionIdx >= 0) remaining = remaining[..actionIdx];
 
@@ -161,6 +153,49 @@ public partial class LogParser
         if (seg.Length < 3) return null;
 
         return seg;
+    }
+
+    /// <summary>
+    /// Extrahiert den Namen einer erhaltenen Belohnung (Schiff oder Frachtaufzug-Item aus "You've earned: ...").
+    /// </summary>
+    public static string? ExtractEarnedRewardName(string line)
+    {
+        string[] prefixes = { "You've earned:", "You have earned:", "Du hast verdient:", "Du hast erhalten:", "Belohnung erhalten:" };
+        int idx = -1;
+        int pLen = 0;
+        foreach (var p in prefixes)
+        {
+            int found = line.IndexOf(p, StringComparison.OrdinalIgnoreCase);
+            if (found >= 0)
+            {
+                idx = found;
+                pLen = p.Length;
+                break;
+            }
+        }
+        if (idx < 0) return null;
+
+        string remaining = line[(idx + pLen)..];
+        int end = remaining.IndexOfAny(new[] { '\r', '\n' });
+        if (end >= 0) remaining = remaining[..end];
+
+        int tagIdx = remaining.IndexOf("\" [", StringComparison.Ordinal);
+        if (tagIdx >= 0) remaining = remaining[..tagIdx];
+
+        int quoteIdx = remaining.IndexOf('"');
+        if (quoteIdx >= 0) remaining = remaining[..quoteIdx];
+
+        int accessIdx = remaining.IndexOf("Access it at", StringComparison.OrdinalIgnoreCase);
+        if (accessIdx >= 0) remaining = remaining[..accessIdx];
+
+        int greifIdx = remaining.IndexOf("Greife", StringComparison.OrdinalIgnoreCase);
+        if (greifIdx >= 0) remaining = remaining[..greifIdx];
+
+        int actionIdx = remaining.IndexOf("Action:", StringComparison.OrdinalIgnoreCase);
+        if (actionIdx >= 0) remaining = remaining[..actionIdx];
+
+        string name = remaining.Trim().Trim('\'', ':', ' ').Trim();
+        return name.Length >= 2 ? name : null;
     }
 
     // Abgeschlossene Mission (Server-Event, ohne Betrag) – eindeutig je mission_id.
@@ -2790,7 +2825,40 @@ public partial class LogParser
             }
         }
 
-        // Blaupause / Crafting Blueprint / Belohnung erhalten
+        // Schiffs-Belohnung / Kiosk-Bereitstellung (z. B. "You've earned: MISC Prospector Alliance\nAccess it at a destination Ship Kiosk")
+        if (line.Contains("Ship Kiosk", StringComparison.OrdinalIgnoreCase) || line.Contains("Schiff-Kiosk", StringComparison.OrdinalIgnoreCase) || line.Contains("Schiffskiosk", StringComparison.OrdinalIgnoreCase))
+        {
+            var shipName = ExtractEarnedRewardName(line);
+            if (!string.IsNullOrWhiteSpace(shipName))
+            {
+                var t = ParseTs(line);
+                var ship = Ships.Prettify(shipName);
+                if (_seenBlueprints.TryGetValue($"ship:{ship}", out var lastT) && (t - lastT).TotalSeconds < 30)
+                {
+                    return null;
+                }
+                _seenBlueprints[$"ship:{ship}"] = t;
+                return new LogEntry { Time = t, Kind = EventKind.Vehicle, Ship = ship, Detail = $"🚀 Schiff freigeschaltet: {ship} (Abholbar am Ship Kiosk)" };
+            }
+        }
+
+        // Frachtaufzug-Itembelohnung (z. B. "You've earned: People's Alliance Hat\nAccess it at a destination Freight Elevator")
+        if (line.Contains("Freight Elevator", StringComparison.OrdinalIgnoreCase) || line.Contains("Frachtaufzug", StringComparison.OrdinalIgnoreCase))
+        {
+            var lootName = ExtractEarnedRewardName(line);
+            if (!string.IsNullOrWhiteSpace(lootName))
+            {
+                var t = ParseTs(line);
+                if (_seenBlueprints.TryGetValue($"loot:{lootName}", out var lastT) && (t - lastT).TotalSeconds < 30)
+                {
+                    return null;
+                }
+                _seenBlueprints[$"loot:{lootName}"] = t;
+                return new LogEntry { Time = t, Kind = EventKind.Loot, Detail = $"🎁 Belohnung: {lootName} (Frachtaufzug)" };
+            }
+        }
+
+        // Blaupause / Crafting Blueprint erhalten
         var bpName = TryExtractBlueprint(line);
         if (bpName != null)
         {
@@ -3091,7 +3159,9 @@ public partial class LogParser
 
         if (t.Contains("has sent you", StringComparison.OrdinalIgnoreCase) || t.Contains("überwiesen", StringComparison.OrdinalIgnoreCase)) return EventKind.Offer;
 
-        if (t.Contains("Retrieve", StringComparison.OrdinalIgnoreCase) || t.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase)) return EventKind.Hangar;
+        if (t.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase) ||
+            (t.Contains("Retrieve", StringComparison.OrdinalIgnoreCase) && !t.Trim().TrimEnd(':').Trim().Equals("Retrieve", StringComparison.OrdinalIgnoreCase)))
+            return EventKind.Hangar;
 
         return null;
     }

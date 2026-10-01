@@ -141,6 +141,7 @@ export const de: Translations = {
     catShip: 'Schiff',
     catLocation: 'Ort',
     catWarehouse: 'Lager',
+    catBlueprint: 'Bauplan',
     catSystem: 'System',
     catServer: 'Server',
     tabLive: 'Live-Stream',
