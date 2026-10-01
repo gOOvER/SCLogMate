@@ -46,7 +46,7 @@ public partial class LogParser
     private static partial Regex VehicleRetrievalRegex();
 
     // Echtes QT-Ereignis: abgeschlossener Sprung (1x pro Ankunft), inkl. Schiff.
-    [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::OnQuantumDriveArrived")]
+    [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_(?<entityId>\d+)\[\d+\]\|CSCItemNavigation::OnQuantumDriveArrived")]
     private static partial Regex QtArriveRegex();
 
     [GeneratedRegex(@"gamerules=""(?<gr>[^""]+)""", RegexOptions.Compiled)]
@@ -55,7 +55,7 @@ public partial class LogParser
     [GeneratedRegex(@"Loading screen for (?<screen>[^:]+)\s*:\s*(?<rules>\S+)\s+closed after", RegexOptions.Compiled)]
     private static partial Regex LoadingScreenClosedRegex();
 
-    [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_\d+\[\d+\]\|CSCItemNavigation::(?:CalculateRoute|OnPlayerRequestFuelToQuantumTarget|OnPlayerSelectedQuantumTarget)")]
+    [GeneratedRegex(@"(?<ship>[A-Za-z][A-Za-z0-9_]+?)_(?<entityId>\d+)\[\d+\]\|CSCItemNavigation::(?:CalculateRoute|OnPlayerRequestFuelToQuantumTarget|OnPlayerSelectedQuantumTarget)")]
     private static partial Regex ItemNavShipRegex();
 
     [GeneratedRegex(@"Projected Start Location is (?<origin>.+?) for route to destination (?<dest>\S+)")]
@@ -396,6 +396,7 @@ public partial class LogParser
     string? _lastLoc;                       // für Quantum-Kontext
     string _currentSystem = "Stanton";      // aktuell erkanntes Sternensystem (Stanton / Pyro / Nyx)
     string? _lastShip;                      // aktuell erkanntes Schiff
+    string? _lastShipEntityId;              // Entity-ID des aktuellen Schiffs (z.B. 853417067815)
     string? _pendingQtDestination;          // aus Route-Kalkulation (Quantum Route)
     DateTime _lastQt = DateTime.MinValue;   // Drosselung der QT-Marker
     string? _lastNotif;                     // gegen Notification-Spam
@@ -426,6 +427,7 @@ public partial class LogParser
         _lastLoc = null;
         _currentSystem = "Stanton";
         _lastShip = null;
+        _lastShipEntityId = null;
         _pendingQtDestination = null;
         _lastQt = DateTime.MinValue;
         _lastNotif = null;
@@ -1326,6 +1328,11 @@ public partial class LogParser
                 var vehRaw = vcf.Groups["veh"].Value;
                 var ship = Ships.Prettify(vehRaw);
                 _lastShip = ship;
+                var mId = System.Text.RegularExpressions.Regex.Match(vehRaw, @"_(\d{6,})$");
+                if (mId.Success)
+                {
+                    _lastShipEntityId = mId.Groups[1].Value;
+                }
 
                 if (method.Contains("Clear", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1883,7 +1890,14 @@ public partial class LogParser
             {
                 var rawShip = ins.Groups["ship"].Value;
                 var ship = Ships.Prettify(rawShip);
-                _lastShip = ship;
+                if (string.IsNullOrEmpty(_lastShip) || Ships.IsSameShip(_lastShip, ship))
+                {
+                    _lastShip = ship;
+                    if (ins.Groups["entityId"].Success)
+                    {
+                        _lastShipEntityId = ins.Groups["entityId"].Value;
+                    }
+                }
             }
         }
 
@@ -1945,7 +1959,31 @@ public partial class LogParser
             if (qt.Success)
             {
                 var t = ParseTs(line);
-                var ship = Ships.Prettify(qt.Groups["ship"].Value);
+                var rawShip = qt.Groups["ship"].Value;
+                var ship = Ships.Prettify(rawShip);
+                var entityId = qt.Groups["entityId"].Value;
+
+                // Fremde Schiffe in der Netzwerk-Streaming-Bubble herausfiltern:
+                // Wenn das aktuell aktive Schiff bekannt ist, muss das ankommende Schiff übereinstimmen.
+                if (!string.IsNullOrEmpty(_lastShip) && !Ships.IsSameShip(_lastShip, ship))
+                {
+                    return null;
+                }
+
+                if (!string.IsNullOrEmpty(_lastShipEntityId) && !string.IsNullOrEmpty(entityId) && !string.Equals(_lastShipEntityId, entityId, StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                if (string.IsNullOrEmpty(_lastShip))
+                {
+                    _lastShip = ship;
+                }
+                if (!string.IsNullOrEmpty(entityId))
+                {
+                    _lastShipEntityId = entityId;
+                }
+
                 string? destination = null;
                 if ((t - _lastQt).TotalSeconds > 3)   // doppelte Logzeilen entprellen
                 {
@@ -2001,6 +2039,7 @@ public partial class LogParser
                 _awaitingRespawnAt = ts;
                 _diedAtLocation = _lastLoc;
                 _lastShip = null;
+                _lastShipEntityId = null;
 
                 var loc = _lastLoc;
                 var detail = !string.IsNullOrEmpty(loc) && loc != "—"

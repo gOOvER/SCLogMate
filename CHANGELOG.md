@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced legacy polling with reliable, zero-overhead event-based log parsing and on-demand screenshot folder OCR.
 
 ### Fixed
+- **Foreign Ship Quantum Travel Arrival Filtering (`Core/LogParser.cs`, `Core/Ships.cs`, `Core/Database.cs`)**:
+  - Filtered out spurious Quantum Travel arrival events (`OnQuantumDriveArrived`) from third-party players and entities streamed into the local player's network bubble.
+  - Validates arriving ships against the player's active ship model (`Ships.IsSameShip`) and vehicle entity IDs so that only the pilot's legitimate jumps are recorded into travel history.
+  - Bumped `CurrentParserVersion` to 43 in `Database.cs` to cleanly purge historical false-positive arrivals upon re-indexing.
 - **Accurate 'Ship In Distress' Mission Reward & Blueprint Floor Scoping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
   - Corrected base reward for the Nyx / People's Alliance mission `Ship In Distress` (and alias `Ships In Distress`) from 88,250 aUEC to its true value of 58,000 aUEC.
   - Scoped the 88,250 aUEC blueprint reward floor in `LogParser` and OCR `ContractParser` strictly to `Blackbox Retrieval Very Dangerous` instead of globally overriding all blueprint-tagged missions.

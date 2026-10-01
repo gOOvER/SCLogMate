@@ -181,4 +181,24 @@ public static partial class Ships
 
         return $"{NormalizeModelName(rawModel)} · {brand}";
     }
+
+    /// <summary>
+    /// Prüft, ob zwei Schiffsbezeichnungen (roh oder prettified) dasselbe Schiff bzw. dieselbe Modellreihe bezeichnen.
+    /// </summary>
+    public static bool IsSameShip(string? a, string? b)
+    {
+        if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b)) return false;
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return true;
+
+        var cleanA = Prettify(a);
+        var cleanB = Prettify(b);
+        if (string.Equals(cleanA, cleanB, StringComparison.OrdinalIgnoreCase)) return true;
+
+        var modelA = cleanA.Split('·')[0].Trim();
+        var modelB = cleanB.Split('·')[0].Trim();
+        if (string.Equals(modelA, modelB, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return modelA.StartsWith(modelB, StringComparison.OrdinalIgnoreCase)
+            || modelB.StartsWith(modelA, StringComparison.OrdinalIgnoreCase);
+    }
 }
