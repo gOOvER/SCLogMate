@@ -20,6 +20,9 @@ import {
   Sparkles,
   ChevronRight,
   Info,
+  Activity,
+  RotateCcw,
+  Tv,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -37,6 +40,12 @@ export const OreScannerView: React.FC = () => {
   const [isSelectingRegion, setIsSelectingRegion] = useState(false);
   const [isTestingScan, setIsTestingScan] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Auto-Scan & Live Detection State
+  const [isAutoScanActive, setIsAutoScanActive] = useState<boolean>(true);
+  const [hasCustomRegion, setHasCustomRegion] = useState<boolean>(false);
+  const [isOverlayActive, setIsOverlayActive] = useState<boolean>(false);
+  const [lastLivePing, setLastLivePing] = useState<{ rs: number; time: string } | null>(null);
 
   // Rock-Cracking Calculator State
   const [miningEquip, setMiningEquip] = useState<MiningEquipmentResponseDto | null>(null);
@@ -104,6 +113,48 @@ export const OreScannerView: React.FC = () => {
     fetchSignatures();
     decodeRs(inputRs);
     fetchMiningEquipment();
+
+    bridge.getSettings().then((st) => {
+      if (st) {
+        setIsAutoScanActive(st.rsAutoScanEnabled ?? true);
+        setHasCustomRegion(!!st.rsScanRegion);
+      }
+    }).catch(console.error);
+
+    const unsubSignal = bridge.on('RS_SIGNAL_DETECTED', (data: any) => {
+      if (data?.rs) {
+        const valStr = data.rs.toString();
+        setInputRs(valStr);
+        setLastLivePing({
+          rs: data.rs,
+          time: new Date().toLocaleTimeString(),
+        });
+        if (data.matches && Array.isArray(data.matches) && data.matches.length > 0) {
+          setMatches(data.matches);
+        } else {
+          decodeRs(valStr);
+        }
+      }
+    });
+
+    const unsubSettings = bridge.on('SETTINGS_UPDATED', (st: any) => {
+      if (st) {
+        setIsAutoScanActive(st.rsAutoScanEnabled ?? true);
+        setHasCustomRegion(!!st.rsScanRegion);
+      }
+    });
+
+    const unsubOverlay = bridge.on('RS_OVERLAY_STATE', (data: any) => {
+      if (data && typeof data.isRsOverlayActive === 'boolean') {
+        setIsOverlayActive(data.isRsOverlayActive);
+      }
+    });
+
+    return () => {
+      unsubSignal();
+      unsubSettings();
+      unsubOverlay();
+    };
   }, []);
 
   // Recalculate Crackability whenever rock or equipment changes
@@ -209,6 +260,45 @@ export const OreScannerView: React.FC = () => {
     }
   };
 
+  const handleToggleAutoScan = async () => {
+    try {
+      const res = await bridge.sendRequest<any>('toggle_rs_autoscan');
+      if (res?.success) {
+        setIsAutoScanActive(res.isRsAutoScanEnabled);
+        showToast(res.isRsAutoScanEnabled ? '✓ RS Auto-Scan AKTIV (Hintergrund)' : 'RS Auto-Scan PAUSIERT');
+      }
+    } catch (err) {
+      console.error('Failed to toggle RS auto-scan:', err);
+      showToast('Fehler beim Umschalten des Auto-Scans');
+    }
+  };
+
+  const handleResetRegion = async () => {
+    try {
+      const res = await bridge.sendRequest<any>('reset_rs_scan_region');
+      if (res?.success) {
+        setHasCustomRegion(false);
+        showToast('✓ Auf Vollbild / Cockpit-Automatik (Bedrock-Modus) zurückgesetzt');
+      }
+    } catch (err) {
+      console.error('Failed to reset RS region:', err);
+      showToast('Fehler beim Zurücksetzen des Scanbereichs');
+    }
+  };
+
+  const handleToggleOverlay = async () => {
+    try {
+      const res = await bridge.sendRequest<any>('open_rs_overlay');
+      if (res?.success) {
+        setIsOverlayActive(res.isRsOverlayActive);
+        showToast(res.isRsOverlayActive ? '✓ RS HUD-Overlay aktiv' : 'RS HUD-Overlay ausgeblendet');
+      }
+    } catch (err) {
+      console.error('Failed to toggle RS overlay:', err);
+      showToast('Fehler beim Öffnen des Overlays');
+    }
+  };
+
   const transferToCracker = (resourceName: string) => {
     setMineralName(resourceName);
     if (resourceName.toLowerCase().includes('quant')) {
@@ -267,6 +357,10 @@ export const OreScannerView: React.FC = () => {
   const quickPresets = [
     { label: '2.000 RS (Salvage Panels)', value: '2000' },
     { label: '3.000 RS (FPS Gems)', value: '3000' },
+    { label: '3.170 RS (1x Quant)', value: '3170' },
+    { label: '3.200 RS (1x Savrilium)', value: '3200' },
+    { label: '3.600 RS (1x Bexalite)', value: '3600' },
+    { label: '10.800 RS (3x Bexalite)', value: '10800' },
     { label: '14.000 RS (Mining Cluster)', value: '14000' },
     { label: '18.000 RS (Großes Vorkommen)', value: '18000' },
   ];
@@ -317,28 +411,69 @@ export const OreScannerView: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Radar className="w-5 h-5 text-cyan-400" />
-                <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wider font-mono">
-                  Radar-Signatur Decoder (Ping-Erkennung)
-                </h2>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wider font-mono flex items-center gap-2">
+                    <span>Radar-Signatur Decoder</span>
+                    <span className="text-xs font-normal text-slate-400 lowercase">(Live Ping-Erkennung)</span>
+                  </h2>
+                </div>
               </div>
 
-              {/* OCR Controls */}
-              <div className="flex items-center gap-2">
+              {/* OCR Controls & Auto-Scan Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={handleSelectRegion}
-                  disabled={isSelectingRegion}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono transition cursor-pointer border border-slate-700"
-                  title="Wähle den Bildschirmausschnitt deines Schiffs-HUDs mit dem RS-Signalwert"
+                  onClick={handleToggleAutoScan}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-semibold transition cursor-pointer border ${
+                    isAutoScanActive
+                      ? 'bg-emerald-950/80 border-emerald-500/80 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title={isAutoScanActive ? 'Auto-Scan ist AKTIV (erkennt Star Citizen Pings im Hintergrund)' : 'Auto-Scan pausiert. Klicken zum Aktivieren.'}
                 >
-                  <Crop className="w-3.5 h-3.5 text-cyan-400" />
-                  {isSelectingRegion ? 'Auswahl läuft...' : 'RS-Bereich markieren'}
+                  <span className={`w-2 h-2 rounded-full ${isAutoScanActive ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]' : 'bg-slate-500'}`} />
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>{isAutoScanActive ? 'Auto-Scan: AN' : 'Auto-Scan: AUS'}</span>
                 </button>
+
+                <button
+                  onClick={handleToggleOverlay}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono font-semibold transition cursor-pointer border ${
+                    isOverlayActive
+                      ? 'bg-cyan-950/80 border-cyan-500/80 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Schaltet das transparente RS-HUD Overlay über Star Citizen ein/aus"
+                >
+                  <Tv className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>HUD Overlay</span>
+                </button>
+
+                {hasCustomRegion ? (
+                  <button
+                    onClick={handleResetRegion}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border border-amber-500/50 text-xs font-mono transition cursor-pointer"
+                    title="Löscht den manuellen Zuschnitt und schaltet zurück auf Bedrock-artigen Vollbild/Cockpit-Autoscan"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Auto-Vollbild</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSelectRegion}
+                    disabled={isSelectingRegion}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono transition cursor-pointer border border-slate-700"
+                    title="Optional: Manuellen HUD-Bereich markieren (wenn Vollbild nicht gewünscht ist)"
+                  >
+                    <Crop className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{isSelectingRegion ? 'Auswahl...' : 'Bereich'}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleTestScan}
                   disabled={isTestingScan}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold transition cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.25)]"
-                  title="Testet den OCR-Scan im gewählten Bereich"
+                  title="Testet den OCR-Scan im aktuellen Bereich sofort"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   {isTestingScan ? 'Scannt...' : 'HUD Scan'}
@@ -346,8 +481,29 @@ export const OreScannerView: React.FC = () => {
               </div>
             </div>
 
+            {/* Mode & Live status banner */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono pt-0.5">
+              <div className="flex items-center gap-2 text-slate-400">
+                <span>Modus:</span>
+                {hasCustomRegion ? (
+                  <span className="text-amber-400">Manueller Scanbereich aktiv</span>
+                ) : (
+                  <span className="text-cyan-400 flex items-center gap-1">
+                    <span>✓ Cockpit-Automatik (ohne Kalibrierung wie Bedrock)</span>
+                  </span>
+                )}
+              </div>
+
+              {lastLivePing && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Live erkannt: <strong>{lastLivePing.rs.toLocaleString('de-DE')} RS</strong> ({lastLivePing.time})</span>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs text-slate-400 font-mono">
-              Gib die erkannte RS-Signatur aus deinem Schiffs-Ping ein (oder nutze OCR), um zu decodieren, ob es sich um lukratives Quantainium, Gold, FPS-Gems oder Trümmerteile handelt.
+              Gib die erkannte RS-Signatur ein oder lass sie automatisch via Hintergrund-Scan erfassen. SCLogMate decodiert Quantainium, Bexalite, Gold, Savrilium, Salvage und FPS-Gems sofort.
             </p>
 
             {/* Input & Presets */}

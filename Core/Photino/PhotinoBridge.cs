@@ -902,8 +902,11 @@ public class SettingsDto
     [JsonPropertyName("auroraMaintenance")] public bool AuroraMaintenance { get; set; } = true;
     [JsonPropertyName("auroraDestinations")] public bool AuroraDestinations { get; set; } = true;
     [JsonPropertyName("auroraShipSystems")] public bool AuroraShipSystems { get; set; } = true;
+    [JsonPropertyName("rsAutoScanEnabled")] public bool RsAutoScanEnabled { get; set; } = true;
     [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
     [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
+    [JsonPropertyName("rsTargetTtsEnabled")] public bool RsTargetTtsEnabled { get; set; } = true;
+    [JsonPropertyName("rsTargetList")] public List<string>? RsTargetList { get; set; }
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
     [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
@@ -1117,6 +1120,7 @@ public class PhotinoBridge
     private readonly NativeToastOverlay _toastOverlay = new();
     private readonly NativeRsOverlay _rsOverlay = new();
     private readonly ScreenshotLoadoutWatcher _screenshotWatcher;
+    private readonly RsOcrScanner _rsScanner;
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
@@ -1156,6 +1160,48 @@ public class PhotinoBridge
             () => Settings.Load().AutoOcrEnabled,
             () => Settings.Load().Balance);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
+
+        _rsOverlay.IsAutoScanActive = s.RsAutoScanEnabled;
+        _rsScanner = new RsOcrScanner(
+            _ocrEngine,
+            () => Settings.Load().RsScanRegion ?? ScreenCapture.GetDefaultRsRegion(),
+            () => Settings.Load().RsAutoScanEnabled);
+
+        _rsScanner.RsValueDetected += rs =>
+        {
+            try
+            {
+                var dtos = DecodeRsData(rs);
+                var best = dtos.FirstOrDefault();
+                if (best != null)
+                {
+                    _rsOverlay.UpdateRsMatch(best);
+                    var curS = Settings.Load();
+                    if (curS.RsTargetAlertEnabled && curS.RsTargetList != null && curS.RsTargetList.Any(t => t.Equals(best.ResourceName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var match = new RsMatch
+                        {
+                            Resource = RsDecoderCatalog.AllResources.FirstOrDefault(r => r.Name.Equals(best.ResourceName, StringComparison.OrdinalIgnoreCase)) ?? new RsResource { Name = best.ResourceName },
+                            Nodes = best.Nodes,
+                            IsExact = best.IsExact,
+                            ErrorPct = best.ErrorPct,
+                            ScannedRs = best.ScannedRs
+                        };
+                        RsAudioAlertService.TriggerTargetAlert(match, curS.RsTargetSoundEnabled, curS.RsTargetTtsEnabled);
+                    }
+                }
+                Broadcast("RS_SIGNAL_DETECTED", new { rs, matches = dtos });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("PhotinoBridge._rsScanner.RsValueDetected", ex);
+            }
+        };
+
+        if (s.RsAutoScanEnabled)
+        {
+            _rsScanner.Start();
+        }
 
         _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
         _screenshotWatcher.OnLoadoutDetected += res =>
@@ -3537,8 +3583,33 @@ public class PhotinoBridge
 
                 case "open_rs_overlay":
                     _rsOverlay.Toggle();
+                    var curRsSettings = Settings.Load();
+                    _rsOverlay.IsAutoScanActive = curRsSettings.RsAutoScanEnabled;
+                    if (_rsOverlay.IsVisible && curRsSettings.RsAutoScanEnabled)
+                    {
+                        _rsScanner.Start();
+                    }
                     SendResponse(req.Id, "open_rs_overlay_response", new { success = true, isRsOverlayActive = _rsOverlay.IsVisible });
                     Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = _rsOverlay.IsVisible });
+                    break;
+
+                case "toggle_rs_autoscan":
+                    var sRs = Settings.Load();
+                    sRs.RsAutoScanEnabled = !sRs.RsAutoScanEnabled;
+                    Settings.Save(sRs);
+                    if (sRs.RsAutoScanEnabled) _rsScanner.Start();
+                    else _rsScanner.Stop();
+                    _rsOverlay.IsAutoScanActive = sRs.RsAutoScanEnabled;
+                    SendResponse(req.Id, "toggle_rs_autoscan_response", new { success = true, isRsAutoScanEnabled = sRs.RsAutoScanEnabled });
+                    Broadcast("SETTINGS_UPDATED", GetSettingsData());
+                    break;
+
+                case "reset_rs_scan_region":
+                    var sReg = Settings.Load();
+                    sReg.RsScanRegion = null;
+                    Settings.Save(sReg);
+                    SendResponse(req.Id, "reset_rs_scan_region_response", new { success = true });
+                    Broadcast("SETTINGS_UPDATED", GetSettingsData());
                     break;
 
                 case "test_toast":
@@ -6697,8 +6768,11 @@ public class PhotinoBridge
             AuroraMaintenance = s.AuroraMaintenance,
             AuroraDestinations = s.AuroraDestinations,
             AuroraShipSystems = s.AuroraShipSystems,
+            RsAutoScanEnabled = s.RsAutoScanEnabled,
             RsTargetAlertEnabled = s.RsTargetAlertEnabled,
             RsTargetSoundEnabled = s.RsTargetSoundEnabled,
+            RsTargetTtsEnabled = s.RsTargetTtsEnabled,
+            RsTargetList = s.RsTargetList,
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
             RsScanRegion = s.RsScanRegion,
@@ -6777,8 +6851,14 @@ public class PhotinoBridge
         _auroraService.MaintenanceEnabled = dto.AuroraMaintenance;
         _auroraService.DestinationsEnabled = dto.AuroraDestinations;
         _auroraService.ShipSystemsEnabled = dto.AuroraShipSystems;
+        s.RsAutoScanEnabled = dto.RsAutoScanEnabled;
         s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
         s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
+        s.RsTargetTtsEnabled = dto.RsTargetTtsEnabled;
+        if (dto.RsTargetList != null) s.RsTargetList = dto.RsTargetList;
+        _rsOverlay.IsAutoScanActive = dto.RsAutoScanEnabled;
+        if (dto.RsAutoScanEnabled) _rsScanner?.Start();
+        else _rsScanner?.Stop();
         s.WalletRegion = dto.WalletRegion;
         s.ContractRegion = dto.ContractRegion;
         s.RsScanRegion = dto.RsScanRegion;

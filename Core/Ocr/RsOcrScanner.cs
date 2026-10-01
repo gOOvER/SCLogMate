@@ -104,9 +104,11 @@ public sealed partial class RsOcrScanner : IDisposable
 
         try
         {
-            // 4x Upscaling (wie in sc-ore-scanner) mit Invert + 1.4x Contrast Boost:
-            // 4x erzeugt bei hochauflösenden Displays weniger Weichzeichner als 6x und ist ressourcenschonender.
-            var ocrText = await _ocrEngine.RecognizeSinglePassAsync(raw, capW, capH, scale: 4, padding: 24);
+            // Adaptiver Skalierungsfaktor: Bei weitem Sichtfeld / Vollbild (Bedrock-Modus) reicht scale=1 völlig aus und spart massiv CPU/RAM (~20-30ms).
+            // Bei kleinen, manuell eingegrenzten Bereichen (<800px) wird 3x verwendet.
+            int optScale = (capW >= 800 || capH >= 500) ? 1 : (capW < 400 ? 3 : 2);
+            int optPad = (capW >= 800 || capH >= 500) ? 8 : 16;
+            var ocrText = await _ocrEngine.RecognizeSinglePassAsync(raw, capW, capH, scale: optScale, padding: optPad);
             if (!string.IsNullOrWhiteSpace(ocrText))
             {
                 var val = ExtractRsValue(ocrText);

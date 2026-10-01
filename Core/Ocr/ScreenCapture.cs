@@ -167,16 +167,16 @@ public static class ScreenCapture
         return (sw > 0 ? sw : 1920, sh > 0 ? sh : 1080);
     }
 
-    /// <summary>Liefert die Standard-Region für die Star Citizen HUD Scanner RS-Signatur.</summary>
+    /// <summary>Liefert die Standard-Region für die Star Citizen HUD Scanner RS-Signatur (weites Cockpit-Sichtfeld für automatische Erkennung ohne Kalibrierung).</summary>
     public static ScanRegion GetDefaultRsRegion()
     {
         var (sw, sh) = GetPrimaryScreenSize();
-        // Fokussierter Bereich um das Fadenkreuz/Scanner-Retikel (ca. 480x160 px),
-        // verhindert das Erfassen irrelevanter HUD-Meldungen wie "TOO CLOSE" oder "ASTEROID PREVIOUSLY IDENTIFIED"
-        int w = Math.Min(480, (int)(sw * 0.25));
-        int h = Math.Min(160, (int)(sh * 0.14));
+        // Großzügiges zentrales Cockpit-Sichtfeld (75% Breite, 75% Höhe),
+        // erfasst Star Citizen Radar-Pings, Chevrons und Signatur-Zahlen überall im Blickfeld ohne manuelle Kalibrierung.
+        int w = (int)Math.Round(sw * 0.75);
+        int h = (int)Math.Round(sh * 0.75);
         int x = (sw - w) / 2;
-        int y = (int)(sh * 0.43);
+        int y = (int)Math.Round(sh * 0.12);
         return new ScanRegion { X = x, Y = y, Width = w, Height = h };
     }
 

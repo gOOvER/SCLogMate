@@ -879,8 +879,11 @@ export interface SettingsDto {
   auroraMaintenance?: boolean;
   auroraDestinations?: boolean;
   auroraShipSystems?: boolean;
+  rsAutoScanEnabled?: boolean;
   rsTargetAlertEnabled: boolean;
   rsTargetSoundEnabled: boolean;
+  rsTargetTtsEnabled?: boolean;
+  rsTargetList?: string[];
   walletRegion?: ScanRegionDto | null;
   contractRegion?: ScanRegionDto | null;
   rsScanRegion?: ScanRegionDto | null;
@@ -2753,8 +2756,11 @@ class PhotinoBridge {
           toastShipDestructionEnabled: payload?.settings?.toastShipDestructionEnabled ?? true,
           auroraIntegrationEnabled: payload?.settings?.auroraIntegrationEnabled ?? true,
           auroraVolume: payload?.settings?.auroraVolume ?? 40,
+          rsAutoScanEnabled: payload?.settings?.rsAutoScanEnabled ?? true,
           rsTargetAlertEnabled: payload?.settings?.rsTargetAlertEnabled ?? true,
           rsTargetSoundEnabled: payload?.settings?.rsTargetSoundEnabled ?? true,
+          rsTargetTtsEnabled: payload?.settings?.rsTargetTtsEnabled ?? true,
+          rsTargetList: payload?.settings?.rsTargetList ?? ['Quantainium', 'Bexalite', 'Savrilium', 'Gold'],
         } as SettingsDto;
 
       case 'lookup_wiki':

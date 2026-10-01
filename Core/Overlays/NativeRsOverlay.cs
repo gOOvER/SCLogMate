@@ -56,6 +56,7 @@ public sealed class NativeRsOverlay : IDisposable
     private bool _hasTarget = false;
 
     public bool IsVisible => _isVisible;
+    public bool IsAutoScanActive { get; set; } = true;
 
     public event Action<bool>? VisibilityChanged;
 
@@ -246,15 +247,16 @@ public sealed class NativeRsOverlay : IDisposable
 
         SetBkMode(memDC, 1 /*TRANSPARENT*/);
 
-        // 1. Header: 🛰 RS RADAR
+        // 1. Header: 🛰 RS RADAR [LIVE]
         SelectObject(memDC, fontSmall);
         SetTextColor(memDC, _themeColor);
-        var hdrRc = new RECT { left = 8, top = 2, right = 110, bottom = 22 };
-        DrawText(memDC, "🛰 RS RADAR", -1, ref hdrRc, 0x00000000 | 0x00000004 | 0x00000020);
+        var hdrRc = new RECT { left = 8, top = 2, right = 140, bottom = 22 };
+        string hdrTitle = IsAutoScanActive ? "🛰 RS RADAR · LIVE" : "🛰 RS RADAR";
+        DrawText(memDC, hdrTitle, -1, ref hdrRc, 0x00000000 | 0x00000004 | 0x00000020);
 
         // Signal Badge Pill (RS 3.200 oder STANDBY)
         SetTextColor(memDC, _hasTarget ? 0x000BB5F5u : 0x0094A3B8u);
-        var pillRc = new RECT { left = 105, top = 2, right = OverlayWidth - 26, bottom = 22 };
+        var pillRc = new RECT { left = 135, top = 2, right = OverlayWidth - 26, bottom = 22 };
         DrawText(memDC, _rsValueText, -1, ref pillRc, 0x00000002 | 0x00000004 | 0x00000020);
 
         // Close Button [✕]
