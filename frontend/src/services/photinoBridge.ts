@@ -677,31 +677,6 @@ export interface CombatAnalyticsDto {
   recentCasualties: CasualtyIncidentDto[];
 }
 
-export interface RsResourceDto {
-  name: string;
-  baseRs: number;
-  tier: string;
-  rarity: string;
-  method: string;
-  estimatedPricePerScu: number;
-  locations: string[];
-}
-
-export interface RsMatchDto {
-  resourceName: string;
-  baseRs: number;
-  tier: string;
-  rarity: string;
-  method: string;
-  estimatedPricePerScu: number;
-  nodes: number;
-  isExact: boolean;
-  errorPct: number;
-  scannedRs: number;
-  estimatedClusterValue: number;
-  estimatedValueText?: string;
-}
-
 export interface MarketCommodityDto {
   name: string;
   category: string;
@@ -879,14 +854,8 @@ export interface SettingsDto {
   auroraMaintenance?: boolean;
   auroraDestinations?: boolean;
   auroraShipSystems?: boolean;
-  rsAutoScanEnabled?: boolean;
-  rsTargetAlertEnabled: boolean;
-  rsTargetSoundEnabled: boolean;
-  rsTargetTtsEnabled?: boolean;
-  rsTargetList?: string[];
   walletRegion?: ScanRegionDto | null;
   contractRegion?: ScanRegionDto | null;
-  rsScanRegion?: ScanRegionDto | null;
 
   // Wipe-Filter Settings
   wipeFilterEnabled?: boolean;
@@ -2570,64 +2539,6 @@ class PhotinoBridge {
           ],
         } as FlightRecorderDto;
 
-      case 'get_rs_signatures':
-        return [
-          {
-            name: 'Salvage (Panels)',
-            baseRs: 2000,
-            tier: 'A',
-            rarity: 'uncommon',
-            method: 'salvage',
-            estimatedPricePerScu: 14500,
-            locations: ['Yela Ring', 'Hurston L1 Asteroiden'],
-          },
-          {
-            name: 'Lindinium',
-            baseRs: 3400,
-            tier: 'B',
-            rarity: 'common',
-            method: 'ship',
-            estimatedPricePerScu: 22000,
-            locations: ['Pyro Asteroiden', 'Stanton'],
-          },
-          {
-            name: 'Quantanium',
-            baseRs: 6000,
-            tier: 'S',
-            rarity: 'rare',
-            method: 'ship',
-            estimatedPricePerScu: 88000,
-            locations: ['Lyria', 'Yela Asteroid Ring'],
-          },
-          {
-            name: 'Gold',
-            baseRs: 7200,
-            tier: 'S',
-            rarity: 'uncommon',
-            method: 'ship',
-            estimatedPricePerScu: 44000,
-            locations: ['Daymar', 'Cellin', 'Magda'],
-          },
-        ] as RsResourceDto[];
-
-      case 'decode_rs':
-        const rs = payload?.rs || 2000;
-        return [
-          {
-            resourceName: rs === 2000 ? 'Salvage (Panels)' : 'Erzknoten / Erzcluster',
-            baseRs: rs === 2000 ? 2000 : rs,
-            tier: 'A',
-            rarity: 'uncommon',
-            method: rs === 2000 ? 'salvage' : 'ship',
-            estimatedPricePerScu: 14500,
-            nodes: 1,
-            isExact: true,
-            errorPct: 0,
-            scannedRs: rs,
-            estimatedClusterValue: 174000,
-          },
-        ] as RsMatchDto[];
-
       case 'get_market':
         return [
           {
@@ -2756,11 +2667,6 @@ class PhotinoBridge {
           toastShipDestructionEnabled: payload?.settings?.toastShipDestructionEnabled ?? true,
           auroraIntegrationEnabled: payload?.settings?.auroraIntegrationEnabled ?? true,
           auroraVolume: payload?.settings?.auroraVolume ?? 40,
-          rsAutoScanEnabled: payload?.settings?.rsAutoScanEnabled ?? true,
-          rsTargetAlertEnabled: payload?.settings?.rsTargetAlertEnabled ?? true,
-          rsTargetSoundEnabled: payload?.settings?.rsTargetSoundEnabled ?? true,
-          rsTargetTtsEnabled: payload?.settings?.rsTargetTtsEnabled ?? true,
-          rsTargetList: payload?.settings?.rsTargetList ?? ['Quantainium', 'Bexalite', 'Savrilium', 'Gold'],
         } as SettingsDto;
 
       case 'lookup_wiki':

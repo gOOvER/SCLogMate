@@ -4,7 +4,6 @@ import {
   HardDrive,
   RefreshCw,
   Monitor,
-  Radio,
   Sparkles,
   ArrowUpCircle,
 } from 'lucide-react';
@@ -35,38 +34,24 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
   const { locale, setLocale, t } = useI18n();
   const [overlayFeedback, setOverlayFeedback] = useState<string | null>(null);
   const [isMiniHudActive, setIsMiniHudActive] = useState(false);
-  const [isRsOverlayActive, setIsRsOverlayActive] = useState(false);
 
   useEffect(() => {
-    const unsub1 = bridge.on('OVERLAY_STATE', (data: any) => {
+    const unsub = bridge.on('OVERLAY_STATE', (data: any) => {
       if (typeof data?.isOverlayActive === 'boolean') {
         setIsMiniHudActive(data.isOverlayActive);
       }
     });
-    const unsub2 = bridge.on('RS_OVERLAY_STATE', (data: any) => {
-      if (typeof data?.isRsOverlayActive === 'boolean') {
-        setIsRsOverlayActive(data.isRsOverlayActive);
-      }
-    });
     return () => {
-      unsub1();
-      unsub2();
+      unsub();
     };
   }, []);
 
-  const handleOpenOverlay = async (type: 'mini' | 'rs') => {
+  const handleOpenOverlay = async () => {
     try {
-      if (type === 'mini') {
-        const res = await bridge.sendRequest<{ success?: boolean; isOverlayActive?: boolean }>('open_overlay');
-        const active = res?.isOverlayActive ?? !isMiniHudActive;
-        setIsMiniHudActive(active);
-        showToast(active ? 'Mini-HUD aktiviert (Alt+H)' : 'Mini-HUD ausgeblendet');
-      } else {
-        const res = await bridge.sendRequest<{ success?: boolean; isRsOverlayActive?: boolean }>('open_rs_overlay');
-        const active = res?.isRsOverlayActive ?? !isRsOverlayActive;
-        setIsRsOverlayActive(active);
-        showToast(active ? 'RS-Radar aktiviert' : 'RS-Radar ausgeblendet');
-      }
+      const res = await bridge.sendRequest<{ success?: boolean; isOverlayActive?: boolean }>('open_overlay');
+      const active = res?.isOverlayActive ?? !isMiniHudActive;
+      setIsMiniHudActive(active);
+      showToast(active ? 'Mini-HUD aktiviert (Alt+H)' : 'Mini-HUD ausgeblendet');
     } catch (e) {
       console.error('Failed to trigger overlay:', e);
     }
@@ -148,7 +133,7 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
         {/* Overlay Schnellstarter */}
         <div className="flex items-center gap-1 bg-[#06101e] p-1 rounded-md border border-cyan-950/80">
           <button
-            onClick={() => handleOpenOverlay('mini')}
+            onClick={handleOpenOverlay}
             className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
               isMiniHudActive
                 ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
@@ -159,19 +144,6 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
             <Monitor className={`w-3.5 h-3.5 ${isMiniHudActive ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'}`} />
             <span className="hidden xl:inline text-[11px]">{t('header.miniHud')}</span>
             {isMiniHudActive && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />}
-          </button>
-          <button
-            onClick={() => handleOpenOverlay('rs')}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
-              isRsOverlayActive
-                ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-                : 'text-slate-300 hover:text-amber-300 hover:bg-amber-950/40 border border-transparent'
-            }`}
-            title="RS Signal Decoder HUD Overlay ein-/ausblenden"
-          >
-            <Radio className={`w-3.5 h-3.5 ${isRsOverlayActive ? 'text-amber-300 animate-pulse' : 'text-amber-400'}`} />
-            <span className="hidden xl:inline text-[11px]">{t('header.rsOverlay')}</span>
-            {isRsOverlayActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />}
           </button>
         </div>
 

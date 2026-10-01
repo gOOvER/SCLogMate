@@ -27,7 +27,6 @@ export interface Translations {
     offline: string;
     noLogPath: string;
     miniHud: string;
-    rsOverlay: string;
     scanTooltip: string;
     refreshTooltip: string;
     german: string;
@@ -109,7 +108,6 @@ export interface Translations {
     places: string;
     wiki: string;
     blackbox: string;
-    orescanner: string;
     refinery: string;
     market: string;
     tools: string;
@@ -333,14 +331,6 @@ export interface Translations {
     destructions: string;
     timeline: string;
     noData: string;
-    [key: string]: any;
-  };
-  orescanner?: {
-    title: string;
-    signatures: string;
-    ores: string;
-    clusters: string;
-    searchOre: string;
     [key: string]: any;
   };
   refinery?: {

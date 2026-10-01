@@ -9,7 +9,6 @@ import {
   MapPin,
   Maximize2,
   Minimize2,
-  Pickaxe,
   Radar,
   Rocket,
   Scroll,
@@ -40,7 +39,6 @@ export type NavTabId =
   | 'starmap'
   | 'places'
   | 'blackbox'
-  | 'orescanner'
   | 'refinery'
   | 'market'
   | 'fleet'
@@ -134,7 +132,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'starmap', label: t('nav.starmap'), icon: Radar },
         { id: 'places', label: t('nav.places'), icon: Compass },
         { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
-        { id: 'orescanner', label: t('nav.orescanner'), icon: Pickaxe },
         { id: 'refinery', label: t('nav.refinery'), icon: Flame, badge: refineryCount },
       ],
     },

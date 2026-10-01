@@ -8,13 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Live Background RS Radar Scanner & Automatic Cockpit Ping Recognition (`Core/Ocr/RsOcrScanner.cs`, `Core/Ocr/ScreenCapture.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Overlays/NativeRsOverlay.cs`, `frontend/src/views/OreScannerView.tsx`)**:
-  - Implemented continuous background OCR auto-scan in Photino mode, capturing Star Citizen radar pings (such as `10.800 RS` for 3x Bexalite or `3.200 RS` for 1x Savrilium) in real time without requiring manual trigger presses.
-  - Introduced Bedrock-style zero-calibration cockpit viewport auto-scanning: when no custom region is configured, default capture automatically monitors a generous 75% center cockpit field of view where radar signatures appear.
-  - Added adaptive scaling in `RsOcrScanner` to process wide/full-screen captures in ~200ms with negligible CPU overhead by skipping unnecessary 2x-3x upscaling on large images.
-  - Added HUD Overlay toggle, Auto-Scan toggle with live pulse status beacon, and one-click "Auto-Vollbild" reset button in `OreScannerView.tsx`.
-  - Added real-time IPC event `RS_SIGNAL_DETECTED` to broadcast detected radar signatures, matches, and probabilities directly to the web UI and trigger in-game audio/TTS alerts.
-  - Expanded quick presets with popular mining signatures including `3.170 RS (1x Quant)`, `3.200 RS (1x Savrilium)`, `3.600 RS (1x Bexalite)`, and `10.800 RS (3x Bexalite)`.
 - **Automated Refueling & Maintenance Cost Delta Calculation via Wallet OCR (`Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `Core/LogParser.cs`, `Core/Ocr/WalletOcrTrigger.cs`)**:
   - Automatically captures wallet balance upon refueling or maintenance completion signals (`Refuel Request Complete`), computing the exact expense from the wallet balance difference (`oldBalance - newBalance`).
   - Seamlessly updates the recent zero-amount refueling event in the SQLite database and live event stream with the calculated negative amount, displaying the price in the `BETRAG` column and triggering an in-game confirmation overlay toast (`⛽ BETANKUNG BERECHNET`).
@@ -37,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Seamlessly extracts contract title, contractor, and reward via `ContractParser`, saving the contract to the database, updating UI state (`MISSIONS_UPDATED`), and displaying an in-game toast overlay (`📋 AUFTRAG ERFASST`).
 
 ### Removed
+- **Ore Scanner & RS Signal Radar Overlay (`Core/Overlays/NativeRsOverlay.cs`, `frontend/src/views/OreScannerView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Completely removed the Ore Scanner view, RS radar overlay, cockpit scan indicators, and related settings to streamline SCLogMate and keep the application focused on core capabilities: log analysis, refinery management, fleet tracking, and contracts.
 - **Obsolete Background Continuous Screen-Polling `ContractScanner` (`Core/Ocr/ContractScanner.cs`, `ViewModels/MainViewModel.cs`)**:
   - Removed the legacy GDI timer-based `ContractScanner` service that polled the screen every 1,000ms.
   - Replaced legacy polling with reliable, zero-overhead event-based log parsing and on-demand screenshot folder OCR.

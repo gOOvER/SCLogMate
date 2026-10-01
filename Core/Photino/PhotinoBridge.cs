@@ -902,14 +902,8 @@ public class SettingsDto
     [JsonPropertyName("auroraMaintenance")] public bool AuroraMaintenance { get; set; } = true;
     [JsonPropertyName("auroraDestinations")] public bool AuroraDestinations { get; set; } = true;
     [JsonPropertyName("auroraShipSystems")] public bool AuroraShipSystems { get; set; } = true;
-    [JsonPropertyName("rsAutoScanEnabled")] public bool RsAutoScanEnabled { get; set; } = true;
-    [JsonPropertyName("rsTargetAlertEnabled")] public bool RsTargetAlertEnabled { get; set; } = true;
-    [JsonPropertyName("rsTargetSoundEnabled")] public bool RsTargetSoundEnabled { get; set; } = true;
-    [JsonPropertyName("rsTargetTtsEnabled")] public bool RsTargetTtsEnabled { get; set; } = true;
-    [JsonPropertyName("rsTargetList")] public List<string>? RsTargetList { get; set; }
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
-    [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
 
     // RC2 Wipe Filter Settings
     [JsonPropertyName("wipeFilterEnabled")] public bool WipeFilterEnabled { get; set; }
@@ -932,11 +926,9 @@ public class OcrRegionsConfigDto
 {
     [JsonPropertyName("walletRegion")] public ScanRegion? WalletRegion { get; set; }
     [JsonPropertyName("contractRegion")] public ScanRegion? ContractRegion { get; set; }
-    [JsonPropertyName("rsScanRegion")] public ScanRegion? RsScanRegion { get; set; }
     [JsonPropertyName("refineryRegion")] public ScanRegion? RefineryRegion { get; set; }
     [JsonPropertyName("defaultWalletRegion")] public ScanRegion DefaultWalletRegion { get; set; } = new();
     [JsonPropertyName("defaultContractRegion")] public ScanRegion DefaultContractRegion { get; set; } = new();
-    [JsonPropertyName("defaultRsRegion")] public ScanRegion DefaultRsRegion { get; set; } = new();
     [JsonPropertyName("defaultRefineryRegion")] public ScanRegion DefaultRefineryRegion { get; set; } = new();
     [JsonPropertyName("screenWidth")] public int ScreenWidth { get; set; } = 1920;
     [JsonPropertyName("screenHeight")] public int ScreenHeight { get; set; } = 1080;
@@ -1118,9 +1110,7 @@ public class PhotinoBridge
     private readonly NativeScanIndicator _contractScanIndicator = new("Auftrag Scan", 0x38BDF8);
     private readonly NativeMiniHudOverlay _miniHudOverlay = new();
     private readonly NativeToastOverlay _toastOverlay = new();
-    private readonly NativeRsOverlay _rsOverlay = new();
     private readonly ScreenshotLoadoutWatcher _screenshotWatcher;
-    private readonly RsOcrScanner _rsScanner;
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
@@ -1160,48 +1150,6 @@ public class PhotinoBridge
             () => Settings.Load().AutoOcrEnabled,
             () => Settings.Load().Balance);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
-
-        _rsOverlay.IsAutoScanActive = s.RsAutoScanEnabled;
-        _rsScanner = new RsOcrScanner(
-            _ocrEngine,
-            () => Settings.Load().RsScanRegion ?? ScreenCapture.GetDefaultRsRegion(),
-            () => Settings.Load().RsAutoScanEnabled);
-
-        _rsScanner.RsValueDetected += rs =>
-        {
-            try
-            {
-                var dtos = DecodeRsData(rs);
-                var best = dtos.FirstOrDefault();
-                if (best != null)
-                {
-                    _rsOverlay.UpdateRsMatch(best);
-                    var curS = Settings.Load();
-                    if (curS.RsTargetAlertEnabled && curS.RsTargetList != null && curS.RsTargetList.Any(t => t.Equals(best.ResourceName, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        var match = new RsMatch
-                        {
-                            Resource = RsDecoderCatalog.AllResources.FirstOrDefault(r => r.Name.Equals(best.ResourceName, StringComparison.OrdinalIgnoreCase)) ?? new RsResource { Name = best.ResourceName },
-                            Nodes = best.Nodes,
-                            IsExact = best.IsExact,
-                            ErrorPct = best.ErrorPct,
-                            ScannedRs = best.ScannedRs
-                        };
-                        RsAudioAlertService.TriggerTargetAlert(match, curS.RsTargetSoundEnabled, curS.RsTargetTtsEnabled);
-                    }
-                }
-                Broadcast("RS_SIGNAL_DETECTED", new { rs, matches = dtos });
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("PhotinoBridge._rsScanner.RsValueDetected", ex);
-            }
-        };
-
-        if (s.RsAutoScanEnabled)
-        {
-            _rsScanner.Start();
-        }
 
         _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
         _screenshotWatcher.OnLoadoutDetected += res =>
@@ -1282,10 +1230,6 @@ public class PhotinoBridge
         _miniHudOverlay.VisibilityChanged += visible =>
         {
             Broadcast("OVERLAY_STATE", new { isOverlayActive = visible });
-        };
-        _rsOverlay.VisibilityChanged += visible =>
-        {
-            Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = visible });
         };
 
         CitizenService.ProfileResolved += profile =>
@@ -2698,19 +2642,6 @@ public class PhotinoBridge
                     SendResponse(req.Id, "blackbox_response", GetBlackboxData(bbSession));
                     break;
 
-                case "get_rs_signatures":
-                    SendResponse(req.Id, "rs_signatures_response", GetRsSignaturesData());
-                    break;
-
-                case "decode_rs":
-                    int rsVal = 0;
-                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("rs", out var rsProp))
-                    {
-                        rsVal = rsProp.GetInt32();
-                    }
-                    SendResponse(req.Id, "decode_rs_response", DecodeRsData(rsVal));
-                    break;
-
                 case "get_market":
                     SendResponse(req.Id, "market_response", GetMarketData());
                     break;
@@ -3579,37 +3510,6 @@ public class PhotinoBridge
                     }
                     SendResponse(req.Id, "open_overlay_response", new { success = true, isOverlayActive = _miniHudOverlay.IsVisible });
                     Broadcast("OVERLAY_STATE", new { isOverlayActive = _miniHudOverlay.IsVisible });
-                    break;
-
-                case "open_rs_overlay":
-                    _rsOverlay.Toggle();
-                    var curRsSettings = Settings.Load();
-                    _rsOverlay.IsAutoScanActive = curRsSettings.RsAutoScanEnabled;
-                    if (_rsOverlay.IsVisible && curRsSettings.RsAutoScanEnabled)
-                    {
-                        _rsScanner.Start();
-                    }
-                    SendResponse(req.Id, "open_rs_overlay_response", new { success = true, isRsOverlayActive = _rsOverlay.IsVisible });
-                    Broadcast("RS_OVERLAY_STATE", new { isRsOverlayActive = _rsOverlay.IsVisible });
-                    break;
-
-                case "toggle_rs_autoscan":
-                    var sRs = Settings.Load();
-                    sRs.RsAutoScanEnabled = !sRs.RsAutoScanEnabled;
-                    Settings.Save(sRs);
-                    if (sRs.RsAutoScanEnabled) _rsScanner.Start();
-                    else _rsScanner.Stop();
-                    _rsOverlay.IsAutoScanActive = sRs.RsAutoScanEnabled;
-                    SendResponse(req.Id, "toggle_rs_autoscan_response", new { success = true, isRsAutoScanEnabled = sRs.RsAutoScanEnabled });
-                    Broadcast("SETTINGS_UPDATED", GetSettingsData());
-                    break;
-
-                case "reset_rs_scan_region":
-                    var sReg = Settings.Load();
-                    sReg.RsScanRegion = null;
-                    Settings.Save(sReg);
-                    SendResponse(req.Id, "reset_rs_scan_region_response", new { success = true });
-                    Broadcast("SETTINGS_UPDATED", GetSettingsData());
                     break;
 
                 case "test_toast":
@@ -6519,53 +6419,6 @@ public class PhotinoBridge
         return Database.SaveMiningHaul(haul);
     }
 
-    private List<RsResourceDto> GetRsSignaturesData()
-    {
-        return RsDecoderCatalog.AllResources.Select(r => new RsResourceDto
-        {
-            Name = r.Name,
-            BaseRs = r.BaseRs,
-            Tier = r.Tier,
-            Rarity = r.Rarity,
-            Method = r.Method,
-            EstimatedPricePerScu = r.EstimatedPricePerScu,
-            Locations = r.Locations ?? new()
-        }).OrderBy(r => r.Name).ToList();
-    }
-
-    private List<RsMatchDto> DecodeRsData(int rs)
-    {
-        var matches = RsDecoderCatalog.Decode(rs);
-        var dtos = matches.Select(m =>
-        {
-            string valText = m.Resource.Method == "salvage"
-                ? $"ca. {m.Nodes * 25000:N0} aUEC"
-                : (m.Resource.EstimatedPricePerScu > 0 ? $"{m.Resource.EstimatedPricePerScu:N0} aUEC / SCU" : "—");
-
-            return new RsMatchDto
-            {
-                ResourceName = m.Resource.Name,
-                BaseRs = m.Resource.BaseRs,
-                Tier = m.Resource.Tier,
-                Rarity = m.Resource.Rarity,
-                Method = m.Resource.Method,
-                EstimatedPricePerScu = m.Resource.EstimatedPricePerScu,
-                Nodes = m.Nodes,
-                IsExact = m.IsExact,
-                ErrorPct = Math.Round(m.ErrorPct, 1),
-                ScannedRs = m.ScannedRs,
-                EstimatedClusterValue = m.Resource.Method == "salvage" ? (long)m.Nodes * 25000L : (long)m.Resource.EstimatedPricePerScu,
-                EstimatedValueText = valText
-            };
-        }).ToList();
-
-        if (dtos.Count > 0)
-        {
-            _rsOverlay.UpdateRsMatch(dtos[0]);
-        }
-        return dtos;
-    }
-
     private List<MarketCommodityDto> GetMarketData()
     {
         return new List<MarketCommodityDto>
@@ -6768,14 +6621,8 @@ public class PhotinoBridge
             AuroraMaintenance = s.AuroraMaintenance,
             AuroraDestinations = s.AuroraDestinations,
             AuroraShipSystems = s.AuroraShipSystems,
-            RsAutoScanEnabled = s.RsAutoScanEnabled,
-            RsTargetAlertEnabled = s.RsTargetAlertEnabled,
-            RsTargetSoundEnabled = s.RsTargetSoundEnabled,
-            RsTargetTtsEnabled = s.RsTargetTtsEnabled,
-            RsTargetList = s.RsTargetList,
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
-            RsScanRegion = s.RsScanRegion,
 
             WipeFilterEnabled = s.WipeFilterEnabled,
             WipeDateString = s.WipeDateString,
@@ -6851,17 +6698,8 @@ public class PhotinoBridge
         _auroraService.MaintenanceEnabled = dto.AuroraMaintenance;
         _auroraService.DestinationsEnabled = dto.AuroraDestinations;
         _auroraService.ShipSystemsEnabled = dto.AuroraShipSystems;
-        s.RsAutoScanEnabled = dto.RsAutoScanEnabled;
-        s.RsTargetAlertEnabled = dto.RsTargetAlertEnabled;
-        s.RsTargetSoundEnabled = dto.RsTargetSoundEnabled;
-        s.RsTargetTtsEnabled = dto.RsTargetTtsEnabled;
-        if (dto.RsTargetList != null) s.RsTargetList = dto.RsTargetList;
-        _rsOverlay.IsAutoScanActive = dto.RsAutoScanEnabled;
-        if (dto.RsAutoScanEnabled) _rsScanner?.Start();
-        else _rsScanner?.Stop();
         s.WalletRegion = dto.WalletRegion;
         s.ContractRegion = dto.ContractRegion;
-        s.RsScanRegion = dto.RsScanRegion;
 
         s.WipeFilterEnabled = dto.WipeFilterEnabled;
         s.WipeDateString = dto.WipeDateString;
@@ -6902,11 +6740,9 @@ public class PhotinoBridge
         {
             WalletRegion = s.WalletRegion,
             ContractRegion = s.ContractRegion,
-            RsScanRegion = s.RsScanRegion,
             RefineryRegion = s.RefineryRegion,
             DefaultWalletRegion = ScreenCapture.GetDefaultWalletRegion(),
             DefaultContractRegion = ScreenCapture.GetDefaultContractRegion(),
-            DefaultRsRegion = ScreenCapture.GetDefaultRsRegion(),
             DefaultRefineryRegion = ScreenCapture.GetDefaultRefineryRegion(),
             ScreenWidth = sw,
             ScreenHeight = sh,
@@ -6945,47 +6781,6 @@ public class PhotinoBridge
                 Success = !string.IsNullOrWhiteSpace(text),
                 Target = target,
                 RecognizedText = text?.Trim() ?? "(Kein Text erkannt)",
-                DurationMs = (int)sw.ElapsedMilliseconds,
-                Region = region
-            };
-        }
-        else if (target == "rs")
-        {
-            var region = s.RsScanRegion ?? ScreenCapture.GetDefaultRsRegion();
-            var raw = ScreenCapture.Capture(region.X, region.Y, region.Width, region.Height);
-            if (raw == null)
-            {
-                return new OcrTestResultDto { Success = false, Target = target, Error = "Bildschirmbereich konnte nicht erfasst werden.", Region = region };
-            }
-            // 4x Upscaling mit Dual-Pass (invertiert + plain): Erfasst Star Citizen HUD-Ziffern sowohl vor dunklem Weltraum als auch vor hellen Planeten/Atmosphären
-            var (invText, plainText) = await _ocrEngine.RecognizeDualPassAsync(raw, region.Width, region.Height, scale: 4, padding: 24, boostContrast: true);
-            sw.Stop();
-
-            string recognizedText = !string.IsNullOrWhiteSpace(invText) ? invText.Trim() : (plainText?.Trim() ?? "(Kein Text erkannt)");
-            int? extractedVal = RsOcrScanner.ExtractRsValue(invText ?? "");
-            if (!extractedVal.HasValue && !string.IsNullOrWhiteSpace(plainText))
-            {
-                extractedVal = RsOcrScanner.ExtractRsValue(plainText);
-            }
-
-            // Fallback: Tausendertrennzeichen (Komma, Punkt, Apostroph) entfernen und Ziffern suchen
-            if (!extractedVal.HasValue && !string.IsNullOrWhiteSpace(recognizedText) && recognizedText != "(Kein Text erkannt)")
-            {
-                var stripped = System.Text.RegularExpressions.Regex.Replace(recognizedText, @"[^\d]", "");
-                if (int.TryParse(stripped, out int directVal) && directVal >= 1000 && directVal <= 300000)
-                {
-                    extractedVal = directVal;
-                }
-            }
-
-            Logger.Log($"[RsOcr-Test] Region={region.Width}x{region.Height}@({region.X},{region.Y}) in {sw.ElapsedMilliseconds}ms: Invertiert='{invText?.Trim()}', Plain='{plainText?.Trim()}' -> RS={extractedVal?.ToString() ?? "null"}");
-
-            return new OcrTestResultDto
-            {
-                Success = extractedVal.HasValue || (!string.IsNullOrWhiteSpace(recognizedText) && recognizedText != "(Kein Text erkannt)"),
-                Target = target,
-                RecognizedText = recognizedText,
-                ExtractedValue = extractedVal,
                 DurationMs = (int)sw.ElapsedMilliseconds,
                 Region = region
             };

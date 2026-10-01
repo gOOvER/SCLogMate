@@ -24,7 +24,6 @@ import { LoadoutView } from './views/LoadoutView';
 import { StarmapView } from './views/StarmapView';
 import { PlacesView } from './views/PlacesView';
 import { BlackboxView } from './views/BlackboxView';
-import { OreScannerView } from './views/OreScannerView';
 import { RefineryView } from './views/RefineryView';
 import { MarketView } from './views/MarketView';
 import { ToolsView } from './views/ToolsView';
@@ -438,8 +437,6 @@ export const App: React.FC = () => {
           {activeTab === 'places' && <PlacesView initialSearch={navContext?.search} />}
 
           {activeTab === 'blackbox' && <BlackboxView />}
-
-          {activeTab === 'orescanner' && <OreScannerView />}
 
           {activeTab === 'refinery' && <RefineryView onOpenWiki={handleOpenWiki} />}
 
