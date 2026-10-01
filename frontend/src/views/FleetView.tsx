@@ -980,13 +980,36 @@ export const FleetView: React.FC<FleetViewProps> = ({
 
                       {/* 5. Versicherung */}
                       <td className="py-3 px-3.5">
-                        <button
-                          onClick={() => handleCycleInsurance(ship.name)}
-                          className={`px-2.5 py-1 rounded-md text-[10.5px] font-mono font-semibold border transition cursor-pointer ${insColor}`}
-                          data-tooltip="Klicken zum Durchschalten: LTI ➔ 120M (IAE) ➔ 24M ➔ 12M ➔ 6M"
-                        >
-                          {ship.insuranceType || 'LTI (Lifetime)'}
-                        </button>
+                        {ship.acquisitionType === 'In-Game (aUEC)' ? (
+                          <span
+                            className="px-2.5 py-1 rounded-md text-[10.5px] font-mono font-medium border border-emerald-800/40 bg-emerald-950/30 text-emerald-300/80 inline-block cursor-default select-none"
+                            data-tooltip="In-Game Kauf: Standard-Versicherung im Spiel (nicht konfigurierbar)"
+                          >
+                            Standard (In-Game)
+                          </span>
+                        ) : ship.acquisitionType === 'Miete (Rental)' ? (
+                          <span
+                            className="px-2.5 py-1 rounded-md text-[10.5px] font-mono font-medium border border-sky-800/40 bg-sky-950/30 text-sky-300/80 inline-block cursor-default select-none"
+                            data-tooltip="Gemietetes Schiff: Temporäre Mietversicherung"
+                          >
+                            Miet-Versicherung
+                          </span>
+                        ) : ship.acquisitionType === 'Geliehen / Free Fly' ? (
+                          <span
+                            className="px-2.5 py-1 rounded-md text-[10.5px] font-mono font-medium border border-slate-800/60 bg-slate-900/40 text-slate-400 inline-block cursor-default select-none"
+                            data-tooltip="Gast- oder geliehenes Schiff: Keine eigene Pledge-Versicherung"
+                          >
+                            —
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleCycleInsurance(ship.name)}
+                            className={`px-2.5 py-1 rounded-md text-[10.5px] font-mono font-semibold border transition cursor-pointer ${insColor}`}
+                            data-tooltip="Klicken zum Durchschalten: LTI ➔ 120M (IAE) ➔ 24M ➔ 12M ➔ 6M"
+                          >
+                            {ship.insuranceType || 'LTI (Lifetime)'}
+                          </button>
+                        )}
                       </td>
 
                       {/* 6. Flug-Einsätze */}

@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed the legacy GDI timer-based `ContractScanner` service that polled the screen every 1,000ms.
   - Replaced legacy polling with reliable, zero-overhead event-based log parsing and on-demand screenshot folder OCR.
 
+### Changed
+- **Locked Pledge Insurance Cycling for In-Game Purchased, Rented, and Borrowed Ships (`frontend/src/views/FleetView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Disabled insurance tier cycling for ships acquired in-game (`In-Game (aUEC)`), rented (`Miete (Rental)`), or borrowed (`Geliehen / Free Fly`), replacing the clickable pledge insurance button with a styled non-interactive badge (`Standard (In-Game)`, `Miet-Versicherung`, or `—`).
+  - Guarded backend `cycle_ship_insurance` against non-pledge ships and ensured `GetFleetResponse`, `set_ship_acquisition`, and `cycle_ship_acquisition` automatically assign and preserve standard in-game insurance values.
+
 ### Fixed
 - **Ship Rewards vs. Crafting Blueprints Differentiation (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `frontend/src/views/EventsView.tsx`)**:
   - Differentiated Star Citizen `"You've earned:"` rewards between ship awards (`Access it at a destination Ship Kiosk`) and freight elevator deliveries (`Access it at a destination Freight Elevator`), preventing mission ship rewards (such as the MISC Prospector) and gear from falsely triggering the "Bauplan erlernt" blueprint toast or populating the Blueprints catalog.

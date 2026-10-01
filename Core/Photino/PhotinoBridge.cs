@@ -1833,7 +1833,25 @@ public class PhotinoBridge
                         bool inHangar = (exCd?.InHangar ?? false) || nextAcq is "Pledge Store" or "In-Game (aUEC)";
                         bool isPledge = nextAcq == "Pledge Store";
                         int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
-                        string ins = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
+                        string ins;
+                        if (nextAcq == "In-Game (aUEC)")
+                        {
+                            ins = "Standard In-Game";
+                        }
+                        else if (nextAcq == "Miete (Rental)")
+                        {
+                            ins = "Miet-Versicherung";
+                        }
+                        else if (nextAcq == "Geliehen / Free Fly")
+                        {
+                            ins = "—";
+                        }
+                        else
+                        {
+                            ins = (!string.IsNullOrWhiteSpace(exCd?.Insurance) && !exCd.Insurance.Contains("Standard") && !exCd.Insurance.Contains("Miet") && exCd.Insurance != "—")
+                                ? exCd.Insurance
+                                : FleetCatalog.Lookup(sName).DefaultInsurance;
+                        }
                         string notes = exCd?.Notes ?? "";
                         Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, ins, nextAcq, notes);
                         var fleetRes = GetFleetResponse();
@@ -1855,7 +1873,25 @@ public class PhotinoBridge
                         bool inHangar = (exCd?.InHangar ?? false) || targetAcq is "Pledge Store" or "In-Game (aUEC)";
                         bool isPledge = targetAcq == "Pledge Store";
                         int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
-                        string ins = exCd?.Insurance ?? FleetCatalog.Lookup(sName).DefaultInsurance;
+                        string ins;
+                        if (targetAcq == "In-Game (aUEC)")
+                        {
+                            ins = "Standard In-Game";
+                        }
+                        else if (targetAcq == "Miete (Rental)")
+                        {
+                            ins = "Miet-Versicherung";
+                        }
+                        else if (targetAcq == "Geliehen / Free Fly")
+                        {
+                            ins = "—";
+                        }
+                        else
+                        {
+                            ins = (!string.IsNullOrWhiteSpace(exCd?.Insurance) && !exCd.Insurance.Contains("Standard") && !exCd.Insurance.Contains("Miet") && exCd.Insurance != "—")
+                                ? exCd.Insurance
+                                : FleetCatalog.Lookup(sName).DefaultInsurance;
+                        }
                         string notes = exCd?.Notes ?? "";
                         Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, ins, targetAcq, notes);
                         var fleetRes = GetFleetResponse();
@@ -1870,6 +1906,13 @@ public class PhotinoBridge
                         var sName = csiProp.GetString() ?? "";
                         var custom = Database.GetAllFleetCustomData();
                         custom.TryGetValue(sName, out var exCd);
+                        string acq = exCd?.Acquisition ?? "Pledge Store";
+                        if (acq != "Pledge Store")
+                        {
+                            // In-Game gekaufte, gemietete oder geliehene Schiffe besitzen keine durchschaltbare Pledge-Versicherung
+                            SendResponse(req.Id, "cycle_ship_insurance_response", GetFleetResponse());
+                            break;
+                        }
                         var curIns = exCd?.Insurance ?? "LTI (Lifetime)";
                         var nextIns = curIns switch
                         {
@@ -1880,9 +1923,8 @@ public class PhotinoBridge
                             _ => "LTI (Lifetime)"
                         };
                         bool inHangar = exCd?.InHangar ?? true;
-                        bool isPledge = exCd?.IsPledge ?? true;
+                        bool isPledge = true;
                         int pledgeUsd = exCd?.PledgeUsd ?? FleetCatalog.Lookup(sName).PledgeValueUsd;
-                        string acq = exCd?.Acquisition ?? "Pledge Store";
                         string notes = exCd?.Notes ?? "";
                         Database.SaveFleetShipCustomData(sName, inHangar, isPledge, pledgeUsd, nextIns, acq, notes);
                         var fleetRes = GetFleetResponse();
@@ -5142,8 +5184,25 @@ public class PhotinoBridge
                 shipDto.IsInHangar = cd.InHangar || cd.IsPledge || cd.Acquisition == "Pledge Store" || cd.Acquisition == "In-Game (aUEC)";
                 shipDto.IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store";
                 shipDto.PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd;
-                shipDto.InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance;
                 shipDto.AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : (shipDto.IsInHangar ? "Pledge Store" : "Geliehen / Free Fly");
+                if (shipDto.AcquisitionType == "In-Game (aUEC)")
+                {
+                    shipDto.InsuranceType = "Standard In-Game";
+                }
+                else if (shipDto.AcquisitionType == "Miete (Rental)")
+                {
+                    shipDto.InsuranceType = "Miet-Versicherung";
+                }
+                else if (shipDto.AcquisitionType == "Geliehen / Free Fly")
+                {
+                    shipDto.InsuranceType = "—";
+                }
+                else
+                {
+                    shipDto.InsuranceType = (!string.IsNullOrWhiteSpace(cd.Insurance) && !cd.Insurance.Contains("Standard") && !cd.Insurance.Contains("Miet") && cd.Insurance != "—")
+                        ? cd.Insurance
+                        : cat.DefaultInsurance;
+                }
                 shipDto.CustomNotes = cd.Notes ?? "";
             }
             else
@@ -5151,7 +5210,7 @@ public class PhotinoBridge
                 shipDto.IsInHangar = false;
                 shipDto.IsPledgeBought = false;
                 shipDto.PledgeValueUsd = cat.PledgeValueUsd;
-                shipDto.InsuranceType = cat.DefaultInsurance;
+                shipDto.InsuranceType = "—";
                 shipDto.AcquisitionType = "Geliehen / Free Fly";
                 shipDto.CustomNotes = "";
             }
@@ -5189,6 +5248,27 @@ public class PhotinoBridge
                     WikiApiClient.PrefetchVehicle(shortName);
                 }
 
+                var acqType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : "Pledge Store";
+                string insType;
+                if (acqType == "In-Game (aUEC)")
+                {
+                    insType = "Standard In-Game";
+                }
+                else if (acqType == "Miete (Rental)")
+                {
+                    insType = "Miet-Versicherung";
+                }
+                else if (acqType == "Geliehen / Free Fly")
+                {
+                    insType = "—";
+                }
+                else
+                {
+                    insType = (!string.IsNullOrWhiteSpace(cd.Insurance) && !cd.Insurance.Contains("Standard") && !cd.Insurance.Contains("Miet") && cd.Insurance != "—")
+                        ? cd.Insurance
+                        : cat.DefaultInsurance;
+                }
+
                 ships.Add(new FleetShipDto
                 {
                     Name = canonicalName,
@@ -5204,10 +5284,10 @@ public class PhotinoBridge
                     LastFlown = "—",
                     IsCurrent = isCurrent,
                     IsInHangar = true,
-                    IsPledgeBought = cd.IsPledge || cd.Acquisition == "Pledge Store",
+                    IsPledgeBought = cd.IsPledge || acqType == "Pledge Store",
                     PledgeValueUsd = cd.PledgeUsd > 0 ? cd.PledgeUsd : cat.PledgeValueUsd,
-                    InsuranceType = !string.IsNullOrWhiteSpace(cd.Insurance) ? cd.Insurance : cat.DefaultInsurance,
-                    AcquisitionType = !string.IsNullOrWhiteSpace(cd.Acquisition) ? cd.Acquisition : "Pledge Store",
+                    InsuranceType = insType,
+                    AcquisitionType = acqType,
                     CustomNotes = cd.Notes ?? "",
                     PipsResult = ocrGuns.Count > 0 ? PipsAnalyzer.EvaluateGuns(ocrGuns) : PipsAnalyzer.EvaluateShip(canonicalName),
                     Livery = liv,
