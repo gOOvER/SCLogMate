@@ -14,13 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accurately associates the pilot's active vessel with refueling and docking events (`Ship = _lastShip`), ensuring the ship column is cleanly populated.
   - Reclassified tanker docking/undocking and refueling pipeline status events to vehicle/info categories so only actual service completions appear under the financial maintenance ledger.
 - **Reliable Player Death & Respawn Detection (`Core/LogParser.cs`, `Core/Database.cs`)**:
-  - Implemented 100% reliable death detection for Star Citizen 4.9 and 4.10 based on `CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement` burst grouping. Since CIG removed `<Actor Death>` and killcam lines are absent during suicide, ship explosions, crashes, bleeding out, or NPC kills, grouping tight corpse item port clusters provides accurate casualty tracking.
+  - Implemented 100% reliable death detection for Star Citizen 4.9 and 4.10 based on `CSCActorCorpseUtils::PopulateItemPortForItemRecoveryEntitlement` burst grouping, overcoming CIG's removal of `<Actor Death>` and missing killcams during crashes, bleeding out, suicide, or NPC kills.
   - Added automatic respawn detection: waking up at a hospital or clinic bed location within 10 minutes of dying is accurately recognized and tagged as `Aufgewacht (Respawn) · {Location}`.
   - Clears active ship seat context upon death so destroyed ships do not linger as the pilot's current active vessel.
-  - Bumped `CurrentParserVersion` to 42 in `Database.cs` to trigger clean historical re-indexing of all sessions with exact death and respawn events.
 - **Game & StarStrings Markup Stripping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`)**:
   - Added `StripGameMarkup` to remove XML/HTML formatting tags (such as `<EM>`, `<EM2>`, `<EM3>`, `<EM4>`, `<b>`, `<i>`) and unescape literal `\n` characters from StarStrings mod texts, contract notifications, and mission objectives.
-  - Strips tags prior to tokenizing in `MissionCatalog.Normalize` and `FuzzyLookup`, preventing `<EM3>` from polluting catalog word tokens with spurious `em3` entries and ensuring clean UI display in mission lists and logs.
+  - Strips tags prior to tokenizing in `MissionCatalog.Normalize` and `FuzzyLookup`, preventing `<EM3>` from polluting catalog word tokens with spurious entries and ensuring clean UI display in mission lists and logs.
 - **Internal Engine Class Noise Filter (`Core/WikiApiClient.cs`, `Core/LogParser.cs`)**:
   - Filtered internal engine classes and dummy props lacking display names (`controller_flight_`, `display_components_`, `scitem_prop_`) in `WikiApiClient.IsIgnoredItemNoise` and `LogParser.LoadoutNoise` to keep warehouse listings and inventory search clean.
 - **Multi-Ship Session Display Formatting (`Core/FlightRecorderService.cs`, `Core/HtmlReportGenerator.cs`)**:
@@ -30,8 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Seamlessly extracts contract title, contractor, and reward via `ContractParser`, saving the contract to the database, updating UI state (`MISSIONS_UPDATED`), and displaying an in-game toast overlay (`📋 AUFTRAG ERFASST`).
 
 ### Removed
-- **Ore Scanner & RS Signal Radar Overlay (`Core/Overlays/NativeRsOverlay.cs`, `frontend/src/views/OreScannerView.tsx`, `Core/Photino/PhotinoBridge.cs`)**:
-  - Completely removed the Ore Scanner view, RS radar overlay, cockpit scan indicators, and related settings to streamline SCLogMate and keep the application focused on core capabilities: log analysis, refinery management, fleet tracking, and contracts.
 - **Obsolete Background Continuous Screen-Polling `ContractScanner` (`Core/Ocr/ContractScanner.cs`, `ViewModels/MainViewModel.cs`)**:
   - Removed the legacy GDI timer-based `ContractScanner` service that polled the screen every 1,000ms.
   - Replaced legacy polling with reliable, zero-overhead event-based log parsing and on-demand screenshot folder OCR.
@@ -41,17 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Filtered out spurious Quantum Travel arrival events (`OnQuantumDriveArrived`) from third-party players and entities streamed into the local player's network bubble.
   - Validates arriving ships against the player's active ship model (`Ships.IsSameShip`) and vehicle entity IDs so that only the pilot's legitimate jumps are recorded into travel history.
   - Bumped `CurrentParserVersion` to 43 in `Database.cs` to cleanly purge historical false-positive arrivals upon re-indexing.
-- **Accurate 'Ship In Distress' Mission Reward & Blueprint Floor Scoping (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Database.cs`)**:
-  - Corrected base reward for the Nyx / People's Alliance mission `Ship In Distress` (and alias `Ships In Distress`) from 88,250 aUEC to its true value of 58,000 aUEC.
-  - Scoped the 88,250 aUEC blueprint reward floor in `LogParser` and OCR `ContractParser` strictly to `Blackbox Retrieval Very Dangerous` instead of globally overriding all blueprint-tagged missions.
-  - Implemented database schema migration `v41` in `Database.cs` to automatically retroactively adjust existing `Ship In Distress` mission entries from 88,250 aUEC to 58,000 aUEC.
-- **Accurate Mission Rewards & People's Alliance / Blueprint Linking (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
-  - Corrected base rewards and reputation for Star Citizen 4.x People's Alliance (Levski / Nyx) missions: `Blackbox Retrieval Very Dangerous [BP]` now awards 88,250 aUEC and 360 XP (previously erroneously set to 38,000 aUEC).
-  - Consolidated all Recco Battaglia / People's Alliance missions into a unified catalog list, eliminating duplicate and conflicting entries for `Ship In Distress`, `Missing Mining Team`, and `Moraine Data Retrieval`.
-  - Added blueprint tag detection (`[BP]` and `<EM4>[BP]</EM4>`) in `LogParser` and `ContractParser` ensuring blueprint-bearing missions adhere to the Star Citizen 88,250 aUEC reward floor.
-  - Added `BlueprintMissionRewardRegex` in `ContractParser` to parse explicit detail text lines like `[!] Blueprints only for 88.250 aUEC missions` and relocated catalog fallbacks before validation rejection so unlisted OCR payment formats are safely resolved.
-  - Enriched active contracts and completed history items in `PhotinoBridge` with canonical `MissionCatalog` metadata (Contractor, Faction, Star Systems, Blueprints, and BaseReward).
-  - Implemented database schema migration `v40` in `Database.cs` to automatically upgrade historical `MissionReward` and `MissionTaken` event amounts from 38,000 to 88,250 aUEC without resetting local user sessions.
+- **Accurate People's Alliance & Blueprint Mission Rewards (`Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Ocr/ContractParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`)**:
+  - Consolidated all Recco Battaglia / People's Alliance (Levski / Nyx) missions into a unified catalog list, eliminating duplicate and conflicting entries.
+  - Corrected base rewards and reputation for Star Citizen 4.x: `Blackbox Retrieval Very Dangerous [BP]` awards 88,250 aUEC (360 XP) and `Ship In Distress` awards 58,000 aUEC.
+  - Added blueprint tag detection (`[BP]` and `<EM4>[BP]</EM4>`) ensuring blueprint-bearing missions adhere to the Star Citizen 88,250 aUEC reward floor for blackbox retrieval.
+  - Added `BlueprintMissionRewardRegex` in `ContractParser` to parse explicit payment detail lines like `[!] Blueprints only for 88.250 aUEC missions`.
+  - Enriched active contracts and completed history items in `PhotinoBridge` with canonical `MissionCatalog` metadata.
+  - Implemented database schema migrations `v40` and `v41` in `Database.cs` to automatically adjust historical entries to true values without resetting local user sessions.
 
 ## [1.2.0] - 2026-09-27
 ### Removed
