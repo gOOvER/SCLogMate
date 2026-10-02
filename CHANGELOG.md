@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-02
 ### Added
 - **Automated Refueling & Maintenance Cost Delta Calculation via Wallet OCR (`Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `Core/LogParser.cs`, `Core/Ocr/WalletOcrTrigger.cs`)**:
   - Automatically captures wallet balance upon refueling or maintenance completion signals (`Refuel Request Complete`), computing the exact expense from the wallet balance difference (`oldBalance - newBalance`).
@@ -1152,6 +1153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
 
