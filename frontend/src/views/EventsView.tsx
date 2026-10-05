@@ -29,6 +29,7 @@ import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
 import { useI18n } from '../i18n';
 import { RegionFlag, extractRegionFromText, cleanServerEventDescription } from '../components/RegionFlag';
+import { translateEventDetail, translateEventTitle } from '../utils/eventTranslation';
 
 type SortColumn = 'timestamp' | 'category' | 'amount' | 'ship' | 'title';
 type SortDirection = 'asc' | 'desc';
@@ -46,7 +47,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
   onNavigate,
   onOpenWiki,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [events, setEvents] = useState<LogEventItem[]>(initialEvents);
   const [viewMode, setViewMode] = useState<'live' | 'archive' | 'combat'>('live');
   const [archiveSession, setArchiveSession] = useState<string>('__all__');
@@ -239,10 +240,13 @@ export const EventsView: React.FC<EventsViewProps> = ({
     let raw = (description || '').trim();
     if (!raw) raw = (title || '').trim();
 
+    // Strip Teilziel / Objective progress prefixes like "Teilziel: Fracht geliefert (3/4) · ..."
+    raw = raw.replace(/^(teilziel|objective):\s*[^·]+·\s*/i, '').trim();
+
     // Strip prefixes like "Neuer Auftrag: ", "Auftrag angenommen: ", "Missionsziel abgeschlossen: ", "Contract Accepted: "
     raw = raw
       .replace(
-        /^(neuer auftrag|auftrag angenommen|auftrag erfolgreich abgeschlossen|auftrag fehlgeschlagen|auftrag abgebrochen|contract accepted|contract completed|contract complete|contract failed|missionsziel abgeschlossen|neues missionsziel|missions-belohnung):\s*/i,
+        /^(neuer auftrag|auftrag angenommen|auftrag erfolgreich abgeschlossen|auftrag fehlgeschlagen|auftrag abgebrochen|contract accepted|contract completed|contract complete|contract failed|missionsziel abgeschlossen|neues missionsziel|missions-belohnung|teilziel|objective):\s*/i,
         ''
       )
       .trim();
@@ -557,9 +561,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400 font-mono">KILLS / TOTESVERHÄLTNIS</div>
+                <div className="text-xs text-slate-400 font-mono">{t('events.combatKdRatio')}</div>
                 <div className="text-xl font-bold text-emerald-400 mt-0.5">
-                  {combatData?.totalKills ?? 0} <span className="text-xs text-slate-400 font-normal">Kills</span> · <span className="text-cyan-300">K/D {combatData?.kdRatio ?? 0}</span>
+                  {combatData?.totalKills ?? 0} <span className="text-xs text-slate-400 font-normal">{t('events.combatKills')}</span> · <span className="text-cyan-300">K/D {combatData?.kdRatio ?? 0}</span>
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -569,9 +573,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400 font-mono">TODE & SCHIFFSVERLUSTE</div>
+                <div className="text-xs text-slate-400 font-mono">{t('events.combatDeathsShipLosses')}</div>
                 <div className="text-xl font-bold text-rose-400 mt-0.5">
-                  {combatData?.totalDeaths ?? 0} <span className="text-xs text-slate-400 font-normal">Tode</span> · <span className="text-rose-300">{combatData?.shipLosses ?? 0} Schiffe</span>
+                  {combatData?.totalDeaths ?? 0} <span className="text-xs text-slate-400 font-normal">{t('events.combatDeaths')}</span> · <span className="text-rose-300">{combatData?.shipLosses ?? 0} {t('events.combatShips')}</span>
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -581,9 +585,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400 font-mono">KIT-AUSRÜSTUNGSVERLUST</div>
+                <div className="text-xs text-slate-400 font-mono">{t('events.combatKitLoss')}</div>
                 <div className="text-xl font-bold text-amber-400 mt-0.5">
-                  ~ {((combatData?.estimatedKitLossAuec ?? 0) / 1000).toLocaleString('de-DE')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
+                  ~ {((combatData?.estimatedKitLossAuec ?? 0) / 1000).toLocaleString(locale === 'de' ? 'de-DE' : 'en-US')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -593,9 +597,9 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
             <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400 font-mono">GESAMTSCHADEN AUSFÄLLE</div>
+                <div className="text-xs text-slate-400 font-mono">{t('events.combatTotalLoss')}</div>
                 <div className="text-xl font-bold text-rose-400 mt-0.5">
-                  ~ {((combatData?.estimatedTotalLossAuec ?? 0) / 1000).toLocaleString('de-DE')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
+                  ~ {((combatData?.estimatedTotalLossAuec ?? 0) / 1000).toLocaleString(locale === 'de' ? 'de-DE' : 'en-US')}k <span className="text-xs font-normal text-slate-400">aUEC</span>
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -612,14 +616,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
               <div className="sc-glass rounded-lg p-3.5 border border-slate-800 space-y-3">
                 <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-rose-400" />
-                  Todesursachen-Verteilung
+                  {t('events.combatCauses')}
                 </h3>
                 <div className="space-y-2 font-mono text-xs">
                   {combatData?.deathCauses.map((c) => (
                     <div key={c.label} className="space-y-1">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-300">{c.label}</span>
-                        <span className="text-slate-400">{c.count} Vorfälle ({c.percent}%)</span>
+                        <span className="text-slate-300">{translateEventDetail(c.label, locale)}</span>
+                        <span className="text-slate-400">{c.count} {t('events.combatIncidents')} ({c.percent}%)</span>
                       </div>
                       <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
                         <div
@@ -636,7 +640,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               <div className="sc-glass rounded-lg p-3.5 border border-slate-800 space-y-3 flex-1">
                 <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  Gefahrenzonen & Hotspots (Verlustschwerpunkte)
+                  {t('events.combatDangerZones')}
                 </h3>
                 <div className="space-y-1.5 font-mono text-xs">
                   {combatData?.dangerZones && combatData.dangerZones.length > 0 ? (
@@ -655,7 +659,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
 
                         <div className="flex items-center gap-3 text-[11px]">
                           <span className="text-slate-400">
-                            ☠ {z.deaths} Tode · 💥 {z.shipLosses} Schiffe
+                            ☠ {z.deaths} {t('events.combatDeaths')} · 💥 {z.shipLosses} {t('events.combatShips')}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
@@ -664,13 +668,17 @@ export const EventsView: React.FC<EventsViewProps> = ({
                                 : 'bg-amber-950/60 text-amber-400 border-amber-800'
                             }`}
                           >
-                            {z.threatLevel}
+                            {z.threatLevel === 'Kritisch'
+                              ? t('events.combatThreatCritical')
+                              : z.threatLevel === 'Hoch'
+                              ? t('events.combatThreatHigh')
+                              : t('events.combatThreatMedium')}
                           </span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-xs text-center py-6">Keine Gefahrenzonen verzeichnet.</div>
+                    <div className="text-slate-500 text-xs text-center py-6">{t('events.combatNoDangerZones')}</div>
                   )}
                 </div>
               </div>
@@ -680,7 +688,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             <div className="sc-glass rounded-lg p-3.5 border border-slate-800 flex flex-col">
               <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2 shrink-0">
                 <Skull className="w-4 h-4 text-rose-400" />
-                Letzte Verlust- & Gefechtsvorfälle ({combatData?.recentCasualties.length ?? 0})
+                {t('events.combatRecentCasualties')} ({combatData?.recentCasualties.length ?? 0})
               </h3>
               <div className="flex-1 overflow-y-auto space-y-2 font-mono text-xs pr-1 max-h-[500px]">
                 {combatData?.recentCasualties && combatData.recentCasualties.length > 0 ? (
@@ -691,10 +699,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     >
                       <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
                         <span>{inc.timestamp}</span>
-                        <span className="text-rose-400 font-bold">~ {inc.estimatedCostAuec.toLocaleString('de-DE')} aUEC Kit-Kosten</span>
+                        <span className="text-rose-400 font-bold">~ {inc.estimatedCostAuec.toLocaleString(locale === 'de' ? 'de-DE' : 'en-US')} aUEC {t('events.kitCost')}</span>
                       </div>
-                      <div className="font-bold text-slate-200 text-[11px]">{inc.title}</div>
-                      <div className="text-slate-400 text-[10px] mt-0.5 truncate">{inc.detail}</div>
+                      <div className="font-bold text-slate-200 text-[11px]">{translateEventTitle(inc.title, locale)}</div>
+                      <div className="text-slate-400 text-[10px] mt-0.5 truncate">{translateEventDetail(inc.detail, locale)}</div>
                       <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-cyan-400" />
                         {inc.location}
@@ -702,7 +710,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="text-slate-500 text-xs text-center py-12">Keine Verluste in dieser Sitzung.</div>
+                  <div className="text-slate-500 text-xs text-center py-12">{t('events.noLosses')}</div>
                 )}
               </div>
             </div>
@@ -853,14 +861,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           />
                           <span
                             className={`truncate text-xs ${getDetailColor(e)}`}
-                            title={cleanServerEventDescription(e.description || e.title)}
+                            title={cleanServerEventDescription(translateEventDetail(e.description || e.title, locale), locale)}
                           >
-                            {cleanServerEventDescription(e.description || e.title)}
+                            {cleanServerEventDescription(translateEventDetail(e.description || e.title, locale), locale)}
                           </span>
                         </div>
                       ) : (
-                        <span className={`truncate text-xs ${getDetailColor(e)}`} title={e.description || e.title}>
-                          {e.description || e.title}
+                        <span className={`truncate text-xs ${getDetailColor(e)}`} title={translateEventDetail(e.description || e.title, locale)}>
+                          {translateEventDetail(e.description || e.title, locale)}
                         </span>
                       )}
                       {e.category === 'mission' ? (
@@ -929,7 +937,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 <button
                   onClick={() => setSelectedEvent(null)}
                   className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
-                  title="Schließen (Esc)"
+                  title={`${t('common.close')} (Esc)`}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -944,12 +952,12 @@ export const EventsView: React.FC<EventsViewProps> = ({
                       className="w-4 h-[11px] rounded-[1.5px] overflow-hidden border border-cyan-800/60 shrink-0 shadow-xs relative inline-flex items-center justify-center"
                     />
                   )}
-                  <span>{selectedEvent.title}</span>
+                  <span>{translateEventTitle(selectedEvent.title, locale)}</span>
                 </div>
                 <div className="mt-1 text-xs text-slate-300 font-sans leading-relaxed">
                   {selectedEvent.category === 'server'
-                    ? cleanServerEventDescription(selectedEvent.description)
-                    : selectedEvent.description}
+                    ? cleanServerEventDescription(translateEventDetail(selectedEvent.description, locale), locale)
+                    : translateEventDetail(selectedEvent.description, locale)}
                 </div>
               </div>
 
@@ -957,13 +965,13 @@ export const EventsView: React.FC<EventsViewProps> = ({
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {/* Zeit */}
                 <div className="p-2 rounded bg-[#061224] border border-cyan-950">
-                  <span className="text-[10px] text-slate-500 block uppercase font-bold">Zeitpunkt</span>
+                  <span className="text-[10px] text-slate-500 block uppercase font-bold">{t('events.drawerTimestamp')}</span>
                   <span className="text-slate-200 text-xs mt-0.5 block">{selectedEvent.timestamp}</span>
                 </div>
 
                 {/* Betrag */}
                 <div className="p-2 rounded bg-[#061224] border border-cyan-950">
-                  <span className="text-[10px] text-slate-500 block uppercase font-bold">Finanzen</span>
+                  <span className="text-[10px] text-slate-500 block uppercase font-bold">{t('events.drawerFinances')}</span>
                   {selectedEvent.amount !== undefined && selectedEvent.amount !== null && selectedEvent.amount !== 0 ? (
                     <span
                       className={`text-xs font-bold mt-0.5 block ${
@@ -982,7 +990,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 {selectedEvent.ship && (
                   <div className="col-span-2 p-2 rounded bg-[#061224] border border-cyan-950">
                     <span className="text-[10px] text-slate-500 block uppercase font-bold">
-                      Beteiligtes Schiff
+                      {t('events.drawerActiveShip')}
                     </span>
                     <span className="text-sky-300 font-bold text-xs mt-0.5 block">
                       {selectedEvent.ship}
@@ -996,7 +1004,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 <div className="p-2.5 rounded bg-[#061224] border border-cyan-900/60 space-y-2">
                   <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider flex items-center gap-1.5">
                     <ExternalLink className="w-3 h-3" />
-                    <span>Direkt-Verknüpfungen</span>
+                    <span>{t('events.drawerQuickActions')}</span>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -1007,10 +1015,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           type="button"
                           onClick={() => onNavigate?.('fleet', { search: selectedEvent.ship })}
                           className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-400 text-sky-200 text-xs font-semibold transition cursor-pointer"
-                          title={`Schiff im Hangar anzeigen: ${selectedEvent.ship}`}
+                          title={t('events.drawerInHangar', { ship: selectedEvent.ship })}
                         >
                           <Rocket className="w-3.5 h-3.5 text-sky-400" />
-                          <span className="truncate">Im Hangar: {selectedEvent.ship}</span>
+                          <span className="truncate">{t('events.drawerInHangar', { ship: selectedEvent.ship })}</span>
                         </button>
                         <button
                           type="button"
@@ -1022,7 +1030,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                             }
                           }}
                           className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-700/60 hover:border-cyan-400 text-cyan-200 text-xs font-semibold transition cursor-pointer shrink-0"
-                          title="Star Citizen Wiki Dossier öffnen"
+                          title="Star Citizen Wiki Dossier"
                         >
                           <BookOpen className="w-3 h-3 text-cyan-400" />
                           <span>Wiki</span>
@@ -1039,10 +1047,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                           onNavigate?.('missions', query ? { search: query } : undefined);
                         }}
                         className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 hover:border-amber-400 text-amber-200 text-xs font-semibold transition cursor-pointer"
-                        title="Im Auftragsmanager aufrufen"
+                        title={t('events.drawerOpenMission')}
                       >
                         <Target className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Im Auftragsmanager öffnen</span>
+                        <span>{t('events.drawerOpenMission')}</span>
                       </button>
                     )}
 
@@ -1052,10 +1060,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                         type="button"
                         onClick={() => onNavigate?.('finances', { subTab: 'ledger' })}
                         className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 hover:border-emerald-400 text-emerald-200 text-xs font-semibold transition cursor-pointer"
-                        title="In Finanzen & Buchhaltung aufrufen"
+                        title={t('events.drawerInFinances')}
                       >
                         <Coins className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>In Finanzen & Buchhaltung</span>
+                        <span>{t('events.drawerInFinances')}</span>
                       </button>
                     )}
 
@@ -1065,10 +1073,10 @@ export const EventsView: React.FC<EventsViewProps> = ({
                         type="button"
                         onClick={() => onNavigate?.('warehouse')}
                         className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-purple-950/60 hover:bg-purple-900 border border-purple-700/60 hover:border-purple-400 text-purple-200 text-xs font-semibold transition cursor-pointer"
-                        title="Im Warenlager aufrufen"
+                        title={t('events.drawerInWarehouse')}
                       >
                         <Package className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Im Warenlager anzeigen</span>
+                        <span>{t('events.drawerInWarehouse')}</span>
                       </button>
                     )}
                   </div>
@@ -1078,7 +1086,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
               {/* Rohdaten / Logzeile Box */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Rohdaten (Log-Zeile)</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500">{t('events.drawerRawData')}</span>
                   <button
                     onClick={() => handleCopy(selectedEvent.rawText || selectedEvent.description, 'raw')}
                     className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer"
@@ -1086,12 +1094,12 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     {copiedField === 'raw' ? (
                       <>
                         <Check className="w-2.5 h-2.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-bold">Kopiert!</span>
+                        <span className="text-emerald-400 font-bold">{t('common.copied')}</span>
                       </>
                     ) : (
                       <>
                         <Copy className="w-2.5 h-2.5" />
-                        <span>Kopieren</span>
+                        <span>{t('common.copy')}</span>
                       </>
                     )}
                   </button>
@@ -1105,18 +1113,18 @@ export const EventsView: React.FC<EventsViewProps> = ({
             {/* Aktionen am Fuß des Drawers */}
             <div className="pt-3 border-t border-cyan-950 flex items-center gap-2">
               <button
-                onClick={() => handleCopy(selectedEvent.description, 'desc')}
+                onClick={() => handleCopy(translateEventDetail(selectedEvent.description, locale), 'desc')}
                 className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-[#061224] hover:bg-cyan-950/60 border border-cyan-950 hover:border-cyan-800 text-xs text-slate-300 hover:text-cyan-300 transition cursor-pointer"
               >
                 {copiedField === 'desc' ? (
                   <>
                     <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400 font-semibold">Kopiert!</span>
+                    <span className="text-emerald-400 font-semibold">{t('common.copied')}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3 h-3" />
-                    <span>Detail kopieren</span>
+                    <span>{t('events.drawerCopyDetail')}</span>
                   </>
                 )}
               </button>
@@ -1131,7 +1139,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     }
                   }}
                   className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded bg-[#061224] hover:bg-cyan-950/60 border border-cyan-950 hover:border-cyan-800 text-xs text-cyan-400 hover:text-cyan-200 transition cursor-pointer"
-                  title="Star Citizen Wiki Dossier öffnen"
+                  title="Star Citizen Wiki Dossier"
                 >
                   <ExternalLink className="w-3 h-3" />
                   <span>Wiki</span>
@@ -1152,14 +1160,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.ship && contextMenu.event.ship !== '—'
               ? [
                   {
-                    label: `Schiff im Hangar anzeigen: ${contextMenu.event.ship}`,
+                    label: t('events.drawerInHangar', { ship: contextMenu.event.ship }),
                     icon: Rocket,
                     onClick: () => {
                       onNavigate?.('fleet', { search: contextMenu.event.ship });
                     },
                   },
                   {
-                    label: `Im SCWiki öffnen: ${contextMenu.event.ship}`,
+                    label: `Wiki: ${contextMenu.event.ship}`,
                     icon: BookOpen,
                     onClick: () => {
                       if (onOpenWiki && contextMenu.event.ship) {
@@ -1172,7 +1180,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
                     },
                   },
                   {
-                    label: `Filter auf Schiff: ${contextMenu.event.ship}`,
+                    label: t('events.menuFilterShip', { ship: contextMenu.event.ship }),
                     icon: Filter,
                     onClick: () => setSearch(contextMenu.event.ship || ''),
                   },
@@ -1181,7 +1189,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.category === 'mission' || (contextMenu.event.kind && contextMenu.event.kind.toLowerCase().includes('mission'))
               ? [
                   {
-                    label: 'Auftrag im Manager öffnen',
+                    label: t('events.menuOpenMission'),
                     icon: Target,
                     onClick: () => {
                       const query = cleanMissionSearch(contextMenu.event.title, contextMenu.event.description);
@@ -1193,7 +1201,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.category === 'wallet' || contextMenu.event.amount
               ? [
                   {
-                    label: 'In Buchhaltung anzeigen',
+                    label: t('events.menuInFinances'),
                     icon: Coins,
                     onClick: () => {
                       onNavigate?.('finances', { subTab: 'ledger' });
@@ -1204,7 +1212,7 @@ export const EventsView: React.FC<EventsViewProps> = ({
             ...(contextMenu.event.category === 'inventory'
               ? [
                   {
-                    label: 'Im Warenlager anzeigen',
+                    label: t('events.menuInWarehouse'),
                     icon: Package,
                     onClick: () => {
                       onNavigate?.('warehouse');
@@ -1213,24 +1221,26 @@ export const EventsView: React.FC<EventsViewProps> = ({
                 ]
               : []),
             {
-              label: `Kategorie filtern: ${contextMenu.event.category}`,
+              label: t('events.menuFilterCategory', { category: contextMenu.event.category }),
               icon: Filter,
               onClick: () => setCategory(contextMenu.event.category),
             },
             { divider: true, label: '', onClick: () => {} },
             {
-              label: 'Zeilen-Inhalt kopieren',
+              label: t('events.menuCopyRow'),
               icon: Copy,
               onClick: () => {
                 const e = contextMenu.event;
                 const amt = e.amount ? ` (${e.amount > 0 ? '+' : ''}${e.amount} aUEC)` : '';
                 const shp = e.ship ? ` [${e.ship}]` : '';
-                const text = `[${e.timestamp}] [${e.kindText}] ${e.title} - ${e.description || ''}${amt}${shp}`.trim();
+                const title = translateEventTitle(e.title, locale);
+                const desc = translateEventDetail(e.description || '', locale);
+                const text = `[${e.timestamp}] [${translateEventTitle(e.kindText, locale)}] ${title} - ${desc}${amt}${shp}`.trim();
                 handleCopy(text, 'row');
               },
             },
             {
-              label: 'JSON Rohdaten kopieren',
+              label: t('events.menuCopyJson'),
               icon: Code2,
               onClick: () => {
                 handleCopy(JSON.stringify(contextMenu.event, null, 2), 'json');

@@ -4,8 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
+
+### Fixed
+- **Dynamic Log Entry & Event Detail Localization (`frontend/src/utils/eventTranslation.ts`, `frontend/src/views/EventsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/components/RegionFlag.tsx`, `frontend/src/i18n/`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Fixed an issue where switching the app language to English left event log entries, details, drawer fields, and combat analytics in German.
+  - Implemented a high-performance regex/pattern-based dynamic translation engine (`eventTranslation.ts`) that instantly translates both live stream events and historical session records when switching between English and German.
+  - Covers all core Star Citizen gameplay categories: armistice & lawless zones, ATC & hangar doors, pilot seat & sortie transitions, server connects & disconnects, multi-step contract objectives (e.g. `Teilziel: Fracht geliefert`), quantum travel, refinery work orders, and casualty records.
+  - Fully internationalized the Combat Analytics view (K/D ratios, kit losses, death cause distribution, hazard hotspots, and casualty incident cards).
+  - Added bidirectional `set_language` IPC synchronization to align backend settings and DTO cleanup with the active UI locale.
+  - Enhanced `cleanMissionSearch` to strip objective progress prefixes, allowing 1-click navigation directly to the corresponding contract in the Mission Manager.
+
 ### Added
 - **Multi-Contract Hauling Chainer & Cargo Fill-Level Projection (`Core/HaulingChainer.cs`, `Models/HaulingRouteModels.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/HaulingChainerTab.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
   - Implemented an intelligent route optimizer and sequencing engine for multi-contract hauling runs across Stanton and Pyro.

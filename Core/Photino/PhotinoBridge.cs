@@ -3188,6 +3188,21 @@ public class PhotinoBridge
                     Broadcast("STATUS_UPDATE", GetAppStatus());
                     break;
 
+                case "set_language":
+                    if (req.Payload.HasValue)
+                    {
+                        string? lang = null;
+                        if (req.Payload.Value.TryGetProperty("language", out var lProp)) lang = lProp.GetString();
+                        if (!string.IsNullOrEmpty(lang))
+                        {
+                            var s = Settings.Load();
+                            s.AppLanguage = lang;
+                            Settings.Save(s);
+                            I18n.Instance.SetLanguage(lang);
+                        }
+                    }
+                    break;
+
                 case "simulate_event":
                     if (req.Payload.HasValue)
                     {
@@ -7613,6 +7628,37 @@ public class PhotinoBridge
                 return "Auftrag storniert";
             if (d.Equals("Contract Withdrawn", StringComparison.OrdinalIgnoreCase))
                 return "Auftrag zurückgezogen";
+        }
+        else if (!I18n.Instance.IsGerman)
+        {
+            if (d.Contains("Schutzzone aktiv (Waffen blockiert)"))
+                return d.Replace("Schutzzone aktiv (Waffen blockiert)", "Armistice zone active (weapons locked)");
+            if (d.Contains("Schutzzone verlassen (Waffen scharf)"))
+                return d.Replace("Schutzzone verlassen (Waffen scharf)", "Left armistice zone (weapons armed)");
+            if (d.Contains("Server-Verbindung getrennt / Sitzung beendet (EndSession)"))
+                return "Server disconnected / session ended (EndSession)";
+            if (d.Contains("Server verbunden / Shard erkannt"))
+                return "Server connected / shard identified";
+            if (d.Contains("Hangar-Anforderung bereit / Tor geöffnet"))
+                return "Hangar request ready / doors open";
+            if (d.Contains("Hangar-Zuweisung erhalten"))
+                return "Hangar assignment received";
+            if (d.Contains("In Hangar-Warteschlange eingereiht"))
+                return "Queued for hangar assignment";
+            if (d.Contains("Im Spiel gespawnt (Station / Hangar)"))
+                return "Spawned in game (Station / Hangar)";
+            if (d.Contains("(Sortie beendet / Pilotensitz verlassen)"))
+                return d.Replace("(Sortie beendet / Pilotensitz verlassen)", "(Sortie ended / exited pilot seat)");
+            if (d.Contains("(Pilotensitz eingenommen)"))
+                return d.Replace("(Pilotensitz eingenommen)", "(Entered pilot seat)");
+            if (d.StartsWith("Rechtsgebiet:") || d.StartsWith("🏛 Rechtsgebiet:"))
+                return d.Replace("Rechtsgebiet:", "Jurisdiction:");
+            if (d.Contains("🏴 Ungesetzlicher Sektor"))
+                return d.Replace("🏴 Ungesetzlicher Sektor", "🏴 Unlawful sector");
+            if (d.StartsWith("Teilziel:"))
+                return "Objective:" + d["Teilziel:".Length..].Replace("Fracht geliefert", "Cargo delivered");
+            if (d.Equals("Missionsziel abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                return "Mission objective completed";
         }
 
         return d;

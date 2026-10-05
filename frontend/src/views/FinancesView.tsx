@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { NavTabId } from '../components/Sidebar';
 import { useI18n } from '../i18n';
+import { translateEventDetail, translateEventTitle } from '../utils/eventTranslation';
 
 export interface FinancesViewProps {
   onNavigate?: (tab: NavTabId, context?: { search?: string; subTab?: string }) => void;
@@ -865,8 +866,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   {(data?.topIncome || []).map((e, idx) => (
                     <div key={idx} className="flex justify-between items-center text-xs font-mono bg-[#051122]/60 p-1.5 rounded border border-cyan-950/60">
                       <div className="truncate max-w-[240px]">
-                        <span className="text-slate-200 font-semibold">{e.title}</span>
-                        <div className="text-[10px] text-slate-500 truncate">{e.description}</div>
+                        <span className="text-slate-200 font-semibold">{translateEventTitle(e.title, locale)}</span>
+                        <div className="text-[10px] text-slate-500 truncate">{translateEventDetail(e.description, locale)}</div>
                       </div>
                       <span className="text-emerald-400 font-bold shrink-0">+{formatNumber(e.amount)} aUEC</span>
                     </div>
@@ -887,8 +888,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   {(data?.topExpenses || []).map((e, idx) => (
                     <div key={idx} className="flex justify-between items-center text-xs font-mono bg-[#051122]/60 p-1.5 rounded border border-cyan-950/60">
                       <div className="truncate max-w-[240px]">
-                        <span className="text-slate-200 font-semibold">{e.title}</span>
-                        <div className="text-[10px] text-slate-500 truncate">{e.description}</div>
+                        <span className="text-slate-200 font-semibold">{translateEventTitle(e.title, locale)}</span>
+                        <div className="text-[10px] text-slate-500 truncate">{translateEventDetail(e.description, locale)}</div>
                       </div>
                       <span className="text-rose-400 font-bold shrink-0">{formatNumber(e.amount)} aUEC</span>
                     </div>
@@ -936,7 +937,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                       <td className="py-2 px-3 text-slate-400 whitespace-nowrap">{item.timestamp}</td>
                       <td className="py-2 px-3">
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 border border-cyan-900/50 text-cyan-300">
-                          {item.kindText || item.title}
+                          {translateEventTitle(item.kindText || item.title, locale)}
                         </span>
                       </td>
                       <td className="py-2 px-3 whitespace-nowrap font-bold">
@@ -959,7 +960,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                           '—'
                         )}
                       </td>
-                      <td className="py-2 px-3 text-slate-300 truncate max-w-md" title={item.description}>{item.description}</td>
+                      <td className="py-2 px-3 text-slate-300 truncate max-w-md" title={translateEventDetail(item.description, locale)}>{translateEventDetail(item.description, locale)}</td>
                     </tr>
                   ))}
                   {filteredLedger.length === 0 && (

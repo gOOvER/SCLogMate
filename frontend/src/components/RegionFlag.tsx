@@ -119,12 +119,23 @@ export function extractRegionFromText(text?: string): string | undefined {
   return m ? m[1].toUpperCase() : undefined;
 }
 
-export function cleanServerEventDescription(text?: string): string {
+export function cleanServerEventDescription(text?: string, locale: 'de' | 'en' = 'de'): string {
   if (!text) return '';
   // Strip leading unicode flag emojis (Regional Indicator Symbols U+1F1E6 to U+1F1FF) and globe emoji
   let cleaned = text.replace(/^[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]\s*/g, '');
   cleaned = cleaned.replace(/^[🌐🌏🌎🌍]\s*/g, '');
   // Also strip broken double regional indicator letters when rendered as plain text (e.g. "EU Server beigetreten: EU" -> "Server beigetreten: EU")
   cleaned = cleaned.replace(/^(EU|US|DE|AUS|HK)\s+(Server\s+beigetreten)/i, '$2');
-  return cleaned.trim();
+  cleaned = cleaned.trim();
+
+  if (locale === 'en') {
+    cleaned = cleaned.replace(/^Server-Verbindung getrennt\s*\/\s*Sitzung beendet/i, 'Server disconnected / session ended');
+    cleaned = cleaned.replace(/^Server-Verbindung getrennt/i, 'Server disconnected');
+    cleaned = cleaned.replace(/^Server verbunden\s*\/\s*Shard erkannt/i, 'Server connected / shard identified');
+    cleaned = cleaned.replace(/^Server verbunden:\s*/i, 'Server connected: ');
+    cleaned = cleaned.replace(/^Server beigetreten:\s*/i, 'Joined server: ');
+    cleaned = cleaned.replace(/^Server beigetreten\s*/i, 'Joined server ');
+    cleaned = cleaned.replace(/^Verbindung getrennt\s*\(30000 Crash\)/i, 'Connection lost (30000 Crash)');
+  }
+  return cleaned;
 }

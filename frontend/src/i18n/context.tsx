@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Locale, DEFAULT_LOCALE, SUPPORTED_LOCALES, Translations } from './types';
 import { de } from './locales/de';
 import { en } from './locales/en';
+import { bridge } from '../services/photinoBridge';
 
 interface I18nContextType {
   locale: Locale;
@@ -47,6 +48,11 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setLocale = (newLocale: Locale) => {
     if (!SUPPORTED_LOCALES.includes(newLocale)) return;
     setLocaleState(newLocale);
+    try {
+      bridge.send('set_language', { language: newLocale === 'de' ? 'de-DE' : 'en-US' });
+    } catch {
+      // ignore
+    }
   };
 
   const dict = useMemo(() => dictionaries[locale] || dictionaries.de, [locale]);
