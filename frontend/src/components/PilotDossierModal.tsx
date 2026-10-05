@@ -13,9 +13,10 @@ import {
   Wifi,
   ClipboardCopy,
   CheckCircle2,
-  ArrowRight,
+  Star,
+  AlertTriangle,
 } from 'lucide-react';
-import { PilotProfile, HudTelemetry, bridge } from '../services/photinoBridge';
+import { PilotProfile, HudTelemetry, ServerShardDto, bridge } from '../services/photinoBridge';
 import { RegionFlag } from './RegionFlag';
 import { ServerShardsTab } from './ServerShardsTab';
 
@@ -36,12 +37,58 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'pilot' | 'shards'>(initialTab);
   const [copiedCigString, setCopiedCigString] = useState<boolean>(false);
+  const [activeShardRating, setActiveShardRating] = useState<string>('Neutral');
+  const [activeShardNotes, setActiveShardNotes] = useState<string>('');
 
   useEffect(() => {
     if (isOpen && initialTab) {
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    if (!isOpen || !telemetry?.serverShard || telemetry.serverShard === '—' || telemetry.serverShard === 'Kein Server') {
+      return;
+    }
+    const loadRating = async () => {
+      try {
+        const shards = await bridge.sendRequest<ServerShardDto[]>('get_server_shards');
+        const match = shards?.find((s) => s.shardId === telemetry.serverShard);
+        if (match) {
+          setActiveShardRating(match.rating || 'Neutral');
+          setActiveShardNotes(match.notes || '');
+        }
+      } catch { }
+    };
+    loadRating();
+
+    const unsub = bridge.on('SERVER_SHARDS_UPDATED', (payload: any) => {
+      if (Array.isArray(payload)) {
+        const match = payload.find((s) => s.shardId === telemetry.serverShard);
+        if (match) {
+          setActiveShardRating(match.rating || 'Neutral');
+          setActiveShardNotes(match.notes || '');
+        }
+      } else {
+        loadRating();
+      }
+    });
+    return () => unsub();
+  }, [isOpen, telemetry?.serverShard]);
+
+  const handleRateActiveShard = async (rating: 'Good' | 'Avoid' | 'Neutral') => {
+    if (!telemetry?.serverShard || telemetry.serverShard === '—') return;
+    try {
+      await bridge.sendRequest('update_shard_rating_and_notes', {
+        shardId: telemetry.serverShard,
+        rating,
+        notes: activeShardNotes,
+      });
+      setActiveShardRating(rating);
+    } catch (e) {
+      console.error('Failed to rate active shard:', e);
+    }
+  };
 
   if (!isOpen || !profile) return null;
 
@@ -311,10 +358,60 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2.5 border-t border-cyan-950/60">
+                {/* Rating & Notes Quick-Action Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 mt-3 pt-2.5 border-t border-cyan-950/60 font-mono text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mr-1">
+                      Diesen Shard bewerten:
+                    </span>
+                    <button
+                      onClick={() => handleRateActiveShard('Good')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition cursor-pointer ${
+                        activeShardRating === 'Good'
+                          ? 'bg-emerald-600 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                          : 'bg-slate-900 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-300 border border-slate-700'
+                      }`}
+                      title="Als stabilen/guten Server markieren"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-current" />
+                      <span>Gut</span>
+                    </button>
+                    <button
+                      onClick={() => handleRateActiveShard('Avoid')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition cursor-pointer ${
+                        activeShardRating === 'Avoid'
+                          ? 'bg-rose-600 text-white font-bold shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                          : 'bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700'
+                      }`}
+                      title="Als problematischen Server markieren (z.B. Lags, 30k)"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Meiden</span>
+                    </button>
+                    {activeShardRating !== 'Neutral' && (
+                      <button
+                        onClick={() => handleRateActiveShard('Neutral')}
+                        className="px-2 py-1 rounded text-[10px] text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 transition cursor-pointer"
+                        title="Bewertung auf Neutral zurücksetzen"
+                      >
+                        Neutral
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setActiveTab('shards')}
+                    className="flex items-center gap-1 text-xs font-mono text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer underline ml-auto"
+                  >
+                    <span>Server-Tagebuch aller Shards &rarr;</span>
+                  </button>
+                </div>
+
+                {/* 1-Click CIG Support String Button & Optional Note */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-cyan-950/40">
                   <button
                     onClick={handleCopyCurrentCigSupport}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-slate-300 text-xs font-mono transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-slate-300 text-xs font-mono transition cursor-pointer"
                   >
                     {copiedCigString ? (
                       <>
@@ -329,13 +426,11 @@ export const PilotDossierModal: React.FC<PilotDossierModalProps> = ({
                     )}
                   </button>
 
-                  <button
-                    onClick={() => setActiveTab('shards')}
-                    className="flex items-center gap-1 text-xs font-mono text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer underline"
-                  >
-                    <span>Server-Tagebuch aller Shards öffnen</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                  {activeShardNotes && (
+                    <span className="text-[11px] font-mono text-slate-400 italic truncate max-w-xs">
+                      📝 {activeShardNotes}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
