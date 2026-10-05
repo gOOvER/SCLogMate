@@ -25,13 +25,14 @@ public partial class MainViewModel
 
     [ObservableProperty] private string selectedContractIssuer = "Alle";
     [ObservableProperty] private string selectedContractType = "Alle";
-    [ObservableProperty] private string selectedContractOutcome = "Alle"; // "Alle", "Abgeschlossen", "Abgebrochen", "Aktiv"
-    public List<string> ContractOutcomes { get; } = new() { "Alle", "Abgeschlossen", "Abgebrochen", "Aktiv" };
+    [ObservableProperty] private string selectedContractOutcome = "Alle"; // "Alle", "Abgeschlossen", "Abgebrochen", "Fehlgeschlagen", "Aktiv"
+    public List<string> ContractOutcomes { get; } = new() { "Alle", "Abgeschlossen", "Abgebrochen", "Fehlgeschlagen", "Aktiv" };
     [ObservableProperty] private string contractSearchText = "";
 
     [ObservableProperty] private int contractsTotalCount;
     [ObservableProperty] private int contractsCompletedCount;
     [ObservableProperty] private int contractsAbandonedCount;
+    [ObservableProperty] private int contractsFailedCount;
     [ObservableProperty] private string contractsCompletionRateText = "0 %";
 
     // ══ PLACES (ORTE) ══
@@ -289,6 +290,7 @@ public partial class MainViewModel
         ContractsTotalCount = _rawContracts.Count;
         ContractsCompletedCount = _rawContracts.Count(c => c.Outcome == ContractOutcome.Completed);
         ContractsAbandonedCount = _rawContracts.Count(c => c.Outcome == ContractOutcome.Abandoned);
+        ContractsFailedCount = _rawContracts.Count(c => c.Outcome == ContractOutcome.Failed);
 
         double rate = ContractsTotalCount > 0 ? ((double)ContractsCompletedCount / ContractsTotalCount) * 100.0 : 0.0;
         ContractsCompletionRateText = $"{rate:F0} %";
@@ -331,6 +333,7 @@ public partial class MainViewModel
             {
                 "Abgeschlossen" => query.Where(c => c.Outcome == ContractOutcome.Completed),
                 "Abgebrochen" => query.Where(c => c.Outcome == ContractOutcome.Abandoned),
+                "Fehlgeschlagen" => query.Where(c => c.Outcome == ContractOutcome.Failed),
                 "Aktiv" => query.Where(c => c.Outcome == ContractOutcome.InProgress),
                 _ => query
             };
@@ -683,7 +686,8 @@ public partial class MainViewModel
                 "Frachtkauf" => query.Where(l => l.Kind == "Frachtkauf"),
                 "Item gekauft" => query.Where(l => l.Kind == "Item gekauft"),
                 "Überweisung" => query.Where(l => l.Kind.Contains("Überweisung")),
-                "Sonstige" => query.Where(l => l.Kind != "Frachtverkauf" && l.Kind != "Frachtkauf" && l.Kind != "Item gekauft"),
+                "Belohnung" => query.Where(l => l.Kind == "Belohnung"),
+                "Sonstige" => query.Where(l => l.Kind != "Frachtverkauf" && l.Kind != "Frachtkauf" && l.Kind != "Item gekauft" && l.Kind != "Belohnung"),
                 _ => query
             };
         }

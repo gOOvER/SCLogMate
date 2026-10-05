@@ -510,6 +510,8 @@ public partial class LogParser
         _lastAsopLogEntitled = -1;
         _lastChannelNoteKey = null;
         _lastChannelNoteTime = DateTime.MinValue;
+        _recentCompletedContracts.Clear();
+        _recentPayouts.Clear();
     }
 
     private string? _lastJoinedShard;
@@ -542,6 +544,8 @@ public partial class LogParser
     private readonly Dictionary<string, ContractRecord> _contracts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _contractObjectives = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Giver, string Faction)> _missionComms = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<(DateTime Time, string MissionId, string Title)> _recentCompletedContracts = new();
+    private readonly List<(DateTime Time, long Amount, int LedgerIndex)> _recentPayouts = new();
     public IReadOnlyCollection<ContractRecord> ContractsList
     {
         get
@@ -864,8 +868,8 @@ public partial class LogParser
 
                 var dt = ParseTs(line);
                 bool isCompletedState = stateStr.Equals("MISSION_OBJECTIVE_STATE_COMPLETED", StringComparison.OrdinalIgnoreCase);
-                bool isWithdrawnState = stateStr.Equals("MISSION_OBJECTIVE_STATE_WITHDRAWN", StringComparison.OrdinalIgnoreCase) ||
-                                       stateStr.Equals("MISSION_OBJECTIVE_STATE_FAILED", StringComparison.OrdinalIgnoreCase);
+                bool isFailedState = stateStr.Equals("MISSION_OBJECTIVE_STATE_FAILED", StringComparison.OrdinalIgnoreCase);
+                bool isWithdrawnState = stateStr.Equals("MISSION_OBJECTIVE_STATE_WITHDRAWN", StringComparison.OrdinalIgnoreCase);
 
                 bool isNewCompletion = false;
                 int totalSteps = 0;
@@ -903,6 +907,10 @@ public partial class LogParser
                         {
                             finalOutcome = ContractOutcome.Completed;
                         }
+                        else if (isFailedState)
+                        {
+                            finalOutcome = ContractOutcome.Failed;
+                        }
                         else if (isWithdrawnState)
                         {
                             finalOutcome = ContractOutcome.Abandoned;
@@ -916,14 +924,40 @@ public partial class LogParser
                             finalOutcome = ContractOutcome.InProgress;
                         }
 
+                        var isTerminal = finalOutcome is ContractOutcome.Completed or ContractOutcome.Abandoned or ContractOutcome.Failed;
+                        DateTime? compAt = isTerminal ? (existing.CompletedAt ?? dt) : null;
+                        var finalReward = existing.Reward;
+
+                        if (finalOutcome == ContractOutcome.Completed && existing.Outcome != ContractOutcome.Completed)
+                        {
+                            var matchIdx = _recentPayouts.FindLastIndex(p => Math.Abs((p.Time - (compAt ?? dt)).TotalSeconds) <= 60);
+                            if (matchIdx >= 0)
+                            {
+                                var payout = _recentPayouts[matchIdx];
+                                _recentPayouts.RemoveAt(matchIdx);
+                                finalReward = payout.Amount;
+                                if (payout.LedgerIndex >= 0 && payout.LedgerIndex < LedgerRecords.Count)
+                                {
+                                    var oldL = LedgerRecords[payout.LedgerIndex];
+                                    LedgerRecords[payout.LedgerIndex] = oldL with
+                                    {
+                                        What = $"Missions-Belohnung: {existing.Title}"
+                                    };
+                                }
+                            }
+                            else
+                            {
+                                _recentCompletedContracts.Add((compAt ?? dt, mId, existing.Title));
+                            }
+                        }
+
                         _contracts[mId] = existing with
                         {
                             StepsTotal = Math.Max(existing.StepsTotal, totalSteps),
                             StepsDone = Math.Max(existing.StepsDone, doneSteps),
                             Outcome = finalOutcome,
-                            CompletedAt = finalOutcome == ContractOutcome.Completed || finalOutcome == ContractOutcome.Abandoned
-                                ? (existing.CompletedAt ?? dt)
-                                : null
+                            CompletedAt = compAt,
+                            Reward = finalReward
                         };
                     }
                 }
@@ -1007,18 +1041,46 @@ public partial class LogParser
             {
                 var ts = ParseTs(line);
                 long amt = ParseAmt(rw.Groups["amt"].Value);
+                string rewardTitle = "Missions-Belohnung";
+                string? matchedMissionId = null;
+
+                lock (_stateLock)
+                {
+                    // Prüfen, ob innerhalb der letzten 60 Sekunden ein Auftrag abgeschlossen wurde (Payout-Pairing)
+                    var matchIdx = _recentCompletedContracts.FindLastIndex(c => Math.Abs((c.Time - ts).TotalSeconds) <= 60);
+                    if (matchIdx >= 0)
+                    {
+                        var contractMatch = _recentCompletedContracts[matchIdx];
+                        _recentCompletedContracts.RemoveAt(matchIdx);
+                        if (_contracts.TryGetValue(contractMatch.MissionId, out var con))
+                        {
+                            _contracts[contractMatch.MissionId] = con with { Reward = amt };
+                            if (!string.IsNullOrWhiteSpace(con.Title))
+                            {
+                                rewardTitle = $"Missions-Belohnung: {con.Title}";
+                            }
+                            matchedMissionId = contractMatch.MissionId;
+                        }
+                    }
+                    else
+                    {
+                        // Auszahlung merken, falls das Abschluss-Event kurz danach eintrifft
+                        _recentPayouts.Add((ts, amt, LedgerRecords.Count));
+                    }
+                }
+
                 LedgerRecords.Add(new LedgerRecord
                 {
                     Timestamp = ts,
                     Kind = "Belohnung",
-                    What = "Missions-Belohnung",
+                    What = rewardTitle,
                     Where = PlaceAt(ts),
                     Shop = "mobiGlas",
                     Amount = amt,
                     Quantity = 1,
                     Confirmed = true
                 });
-                return new LogEntry { Time = ts, Kind = EventKind.MissionReward, Detail = "Missions-Belohnung", Amount = amt };
+                return new LogEntry { Time = ts, Kind = EventKind.MissionReward, Detail = rewardTitle, Amount = amt, ItemRef = matchedMissionId };
             }
         }
 
@@ -2239,18 +2301,24 @@ public partial class LogParser
 
                 var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
 
-                bool isComplete = full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
+                bool isComplete = (full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
-                                  full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase);
+                                  full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase)) &&
+                                  !full.Contains("Objective", StringComparison.OrdinalIgnoreCase) &&
+                                  !full.Contains("Teilziel", StringComparison.OrdinalIgnoreCase);
 
-                bool isAbandoned = full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
-                                   full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                bool isFailed = full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                                full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
+                                full.Contains("Time Expired", StringComparison.OrdinalIgnoreCase) ||
+                                full.Contains("Zeit abgelaufen", StringComparison.OrdinalIgnoreCase);
+
+                bool isAbandoned = !isFailed && (
+                                   full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
-                                   full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
-                                   full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase);
+                                   full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase));
 
                 bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase);
 
@@ -2354,12 +2422,105 @@ public partial class LogParser
 
                         if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
                         {
+                            var compAt = existing.CompletedAt ?? ParseTs(line);
+                            var finalReward = (existing.Reward > 0 && (!hasBpTag || !isBlackboxDangerous || existing.Reward >= 88250)) ? existing.Reward : reward;
+
+                            // Payout-Pairing mit vorangegangener Auszahlung prüfen
+                            var matchIdx = _recentPayouts.FindLastIndex(p => Math.Abs((p.Time - compAt).TotalSeconds) <= 60);
+                            if (matchIdx >= 0)
+                            {
+                                var payout = _recentPayouts[matchIdx];
+                                _recentPayouts.RemoveAt(matchIdx);
+                                finalReward = payout.Amount;
+                                if (payout.LedgerIndex >= 0 && payout.LedgerIndex < LedgerRecords.Count)
+                                {
+                                    var oldL = LedgerRecords[payout.LedgerIndex];
+                                    LedgerRecords[payout.LedgerIndex] = oldL with
+                                    {
+                                        What = $"Missions-Belohnung: {existing.Title}"
+                                    };
+                                }
+                            }
+                            else
+                            {
+                                _recentCompletedContracts.Add((compAt, targetKey, existing.Title));
+                            }
+
                             _contracts[targetKey] = existing with
                             {
                                 Outcome = ContractOutcome.Completed,
-                                CompletedAt = existing.CompletedAt ?? ParseTs(line),
+                                CompletedAt = compAt,
                                 StepsDone = Math.Max(existing.StepsTotal, existing.StepsDone),
-                                Reward = (existing.Reward > 0 && (!hasBpTag || !isBlackboxDangerous || existing.Reward >= 88250)) ? existing.Reward : reward
+                                Reward = finalReward
+                            };
+                        }
+                        else
+                        {
+                            var issuer = ResolveIssuer(cat, mId);
+                            var sys = ResolveMissionSystem(cat, issuer);
+                            var compAt = ParseTs(line);
+                            var finalTitle = MissionCatalog.ResolveTitle(cleanTitle, cat);
+                            var finalReward = reward;
+
+                            var matchIdx = _recentPayouts.FindLastIndex(p => Math.Abs((p.Time - compAt).TotalSeconds) <= 60);
+                            if (matchIdx >= 0)
+                            {
+                                var payout = _recentPayouts[matchIdx];
+                                _recentPayouts.RemoveAt(matchIdx);
+                                finalReward = payout.Amount;
+                                if (payout.LedgerIndex >= 0 && payout.LedgerIndex < LedgerRecords.Count)
+                                {
+                                    var oldL = LedgerRecords[payout.LedgerIndex];
+                                    LedgerRecords[payout.LedgerIndex] = oldL with
+                                    {
+                                        What = $"Missions-Belohnung: {finalTitle}"
+                                    };
+                                }
+                            }
+                            else
+                            {
+                                _recentCompletedContracts.Add((compAt, mId, finalTitle));
+                            }
+
+                            _contracts[mId] = new ContractRecord
+                            {
+                                MissionId = mId,
+                                AcceptedAt = compAt,
+                                CompletedAt = compAt,
+                                Title = finalTitle,
+                                Issuer = issuer,
+                                Type = cat?.MissionType ?? "Auftrag",
+                                Difficulty = "k.A.",
+                                System = sys,
+                                StepsTotal = 1,
+                                StepsDone = 1,
+                                Reward = finalReward,
+                                Outcome = ContractOutcome.Completed
+                            };
+                        }
+                        _missionsDone.Add(mId);
+                    }
+                }
+                else if (isFailed)
+                {
+                    lock (_stateLock)
+                    {
+                        string? targetKey = null;
+                        if (_contracts.ContainsKey(mId)) targetKey = mId;
+                        else
+                        {
+                            targetKey = _contracts.Keys.FirstOrDefault(k =>
+                                _contracts[k].Outcome == ContractOutcome.InProgress &&
+                                (!string.IsNullOrEmpty(normTitle) && _contracts[k].Title.ToLowerInvariant().Contains(normTitle) ||
+                                 normTitle.Contains(_contracts[k].Title.ToLowerInvariant())));
+                        }
+
+                        if (targetKey != null && _contracts.TryGetValue(targetKey, out var existing))
+                        {
+                            _contracts[targetKey] = existing with
+                            {
+                                Outcome = ContractOutcome.Failed,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
                             };
                         }
                         else
@@ -2377,12 +2538,11 @@ public partial class LogParser
                                 Difficulty = "k.A.",
                                 System = sys,
                                 StepsTotal = 1,
-                                StepsDone = 1,
-                                Reward = reward,
-                                Outcome = ContractOutcome.Completed
+                                StepsDone = 0,
+                                Reward = cat?.BaseReward ?? 0,
+                                Outcome = ContractOutcome.Failed
                             };
                         }
-                        _missionsDone.Add(mId);
                     }
                 }
                 else if (isAbandoned)
@@ -2739,10 +2899,34 @@ public partial class LogParser
                     _missionsDone.Add(mId);
                     if (_contracts.TryGetValue(mId, out var existing))
                     {
+                        var compAt = existing.CompletedAt ?? ParseTs(line);
+                        var finalReward = existing.Reward;
+
+                        var matchIdx = _recentPayouts.FindLastIndex(p => Math.Abs((p.Time - compAt).TotalSeconds) <= 60);
+                        if (matchIdx >= 0)
+                        {
+                            var payout = _recentPayouts[matchIdx];
+                            _recentPayouts.RemoveAt(matchIdx);
+                            finalReward = payout.Amount;
+                            if (payout.LedgerIndex >= 0 && payout.LedgerIndex < LedgerRecords.Count)
+                            {
+                                var oldL = LedgerRecords[payout.LedgerIndex];
+                                LedgerRecords[payout.LedgerIndex] = oldL with
+                                {
+                                    What = $"Missions-Belohnung: {existing.Title}"
+                                };
+                            }
+                        }
+                        else
+                        {
+                            _recentCompletedContracts.Add((compAt, mId, existing.Title));
+                        }
+
                         _contracts[mId] = existing with
                         {
                             Outcome = ContractOutcome.Completed,
-                            CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                            CompletedAt = compAt,
+                            Reward = finalReward
                         };
                     }
                 }
@@ -2766,18 +2950,84 @@ public partial class LogParser
                         _missionsDone.Add(mId);
                         if (_contracts.TryGetValue(mId, out var existing))
                         {
+                            var compAt = existing.CompletedAt ?? ParseTs(line);
+                            var finalReward = existing.Reward;
+
+                            var matchIdx = _recentPayouts.FindLastIndex(p => Math.Abs((p.Time - compAt).TotalSeconds) <= 60);
+                            if (matchIdx >= 0)
+                            {
+                                var payout = _recentPayouts[matchIdx];
+                                _recentPayouts.RemoveAt(matchIdx);
+                                finalReward = payout.Amount;
+                                if (payout.LedgerIndex >= 0 && payout.LedgerIndex < LedgerRecords.Count)
+                                {
+                                    var oldL = LedgerRecords[payout.LedgerIndex];
+                                    LedgerRecords[payout.LedgerIndex] = oldL with
+                                    {
+                                        What = $"Missions-Belohnung: {existing.Title}"
+                                    };
+                                }
+                            }
+                            else
+                            {
+                                _recentCompletedContracts.Add((compAt, mId, existing.Title));
+                            }
+
                             _contracts[mId] = existing with
                             {
                                 Outcome = ContractOutcome.Completed,
-                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                                CompletedAt = compAt,
+                                Reward = finalReward
                             };
                         }
                     }
                     return null;
                 }
+                else if (compType.Equals("Fail", StringComparison.OrdinalIgnoreCase) || compType.Equals("Failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    string title = "";
+                    lock (_stateLock)
+                    {
+                        if (_contracts.TryGetValue(mId, out var existing))
+                        {
+                            _contracts[mId] = existing with
+                            {
+                                Outcome = ContractOutcome.Failed,
+                                CompletedAt = existing.CompletedAt ?? ParseTs(line)
+                            };
+                            title = existing.Title;
+                        }
+                        else
+                        {
+                            var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
+                            if (activeKey != null)
+                            {
+                                var act = _contracts[activeKey];
+                                _contracts[activeKey] = act with
+                                {
+                                    Outcome = ContractOutcome.Failed,
+                                    CompletedAt = act.CompletedAt ?? ParseTs(line)
+                                };
+                                title = act.Title;
+                            }
+                        }
+                    }
+
+                    var detail = string.IsNullOrWhiteSpace(title)
+                        ? "Contract Failed"
+                        : $"Contract Failed: {title}";
+
+                    return new LogEntry
+                    {
+                        Time = ParseTs(line),
+                        Kind = EventKind.Mission,
+                        Detail = detail,
+                        ItemRef = mId
+                    };
+                }
                 else
                 {
-                    // Abandon, Fail, Deactivate, etc.
+                    // Abandon, Deactivate, Withdrawn, etc.
                     string title = "";
                     lock (_stateLock)
                     {
@@ -2806,13 +3056,9 @@ public partial class LogParser
                         }
                     }
 
-                    var prefix = compType.Equals("Fail", StringComparison.OrdinalIgnoreCase)
-                        ? "Contract Failed"
-                        : "Contract Abandoned";
-
                     var detail = string.IsNullOrWhiteSpace(title)
-                        ? prefix
-                        : $"{prefix}: {title}";
+                        ? "Contract Abandoned"
+                        : $"Contract Abandoned: {title}";
 
                     return new LogEntry
                     {

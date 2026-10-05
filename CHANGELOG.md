@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Contract Payout Pairing & Exact Reward Attribution (`Core/LogParser.cs`, `Models/ContractRecord.cs`, `Models/LedgerRecord.cs`)**:
+  - Implemented bidirectional pairing between nameless in-game HUD reward toasts (`Added notification "Awarded ... aUEC"`) and completed contract events (`Contract Complete`, `<MissionEnded>`, `<EndMission>`).
+  - Seamlessly updates `ContractRecord.Reward` with the exact awarded amount and populates `LedgerRecord.What` with the specific mission title (`Missions-Belohnung: {Title}`) rather than generic fallback labels.
+  - Added buffer matching to pair rewards arriving up to 60 seconds before or after mission completion signals.
+- **Contract Failure vs. Abandonment State Differentiation (`Models/ContractRecord.cs`, `Core/LogParser.cs`, `ViewModels/MainViewModel.QuantumViews.cs`, `Views/MainWindow.axaml`)**:
+  - Introduced `ContractOutcome.Failed` to cleanly distinguish contracts failed due to external events (timer expiration, ship destruction, cargo loss) from voluntary player abandonment (`ContractOutcome.Abandoned`).
+  - Added dedicated UI metrics card for `FEHLGESCHLAGEN` in the Contracts overview HUD alongside `ABGEBROCHEN`, `ERFOLGREICH`, and `ANGENOMMEN`.
+  - Added `Fehlgeschlagen` to contract outcome filter dropdowns and added `Belohnung` category filter to the financial Ledger.
+
+### Changed
+- **Parser Version Bump to v45 (`Core/Database.cs`)**:
+  - Bumped `CurrentParserVersion` from 44 to 45 to trigger a clean re-indexing of historical sessions so past missions gain accurate rewards and failure statuses.
+
+### Fixed
+- **Premature Completion of Multi-Objective Contracts (`Core/LogParser.cs`)**:
+  - Fixed an issue where intermediate step notifications containing "Objective Complete" or "Teilziel" prematurely marked entire multi-step hauling or investigation contracts as finished. Full completion is now strictly gated on final contract completion signals.
+
 
 ## [1.3.0] - 2026-10-02
 ### Added

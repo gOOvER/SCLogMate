@@ -7,6 +7,7 @@ public enum ContractOutcome
     InProgress,
     Completed,
     Abandoned,
+    Failed,
     Unknown
 }
 
@@ -37,6 +38,7 @@ public sealed record ContractRecord
     {
         ContractOutcome.Completed => "Abgeschlossen",
         ContractOutcome.Abandoned => "Abgebrochen",
+        ContractOutcome.Failed => "Fehlgeschlagen",
         ContractOutcome.InProgress => "Aktiv",
         _ => "Unbekannt"
     };
@@ -45,6 +47,7 @@ public sealed record ContractRecord
     {
         ContractOutcome.Completed => "#4ADE80", // Green
         ContractOutcome.Abandoned => "#F87171", // Red
+        ContractOutcome.Failed => "#FB923C", // Orange/Amber
         ContractOutcome.InProgress => "#38BDF8", // Sky Blue
         _ => "#8B949E"
     };
@@ -58,6 +61,7 @@ public sealed record ContractRecord
     {
         ContractOutcome.Completed => "#0E2A18",
         ContractOutcome.Abandoned => "#2D1214",
+        ContractOutcome.Failed => "#2A180E",
         ContractOutcome.InProgress => "#0B2238",
         _ => "#161B22"
     };
@@ -66,6 +70,7 @@ public sealed record ContractRecord
     {
         ContractOutcome.Completed => "#1E6B37",
         ContractOutcome.Abandoned => "#7A272B",
+        ContractOutcome.Failed => "#8C4318",
         ContractOutcome.InProgress => "#1C4E78",
         _ => "#30363D"
     };

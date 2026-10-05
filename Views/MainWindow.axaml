@@ -1268,7 +1268,7 @@
         <TabItem Header="{Binding I18n[SubTab_ContractsHistory]}">
           <DockPanel Margin="0,8,0,0">
             <!-- 1. Top KPI Summary HUD Cards -->
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,*" Margin="0,0,0,10">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,*,*" Margin="0,0,0,10">
               <Border Grid.Column="0" Classes="card" Margin="0,0,5,0">
                 <StackPanel>
                   <TextBlock Classes="label" Text="ANGENOMMEN" />
@@ -1285,12 +1285,19 @@
               </Border>
               <Border Grid.Column="2" Classes="card" Margin="5,0,5,0">
                 <StackPanel>
-                  <TextBlock Classes="label" Text="FEHLGESCHLAGEN" />
+                  <TextBlock Classes="label" Text="ABGEBROCHEN" />
                   <TextBlock Classes="value" Text="{Binding ContractsAbandonedCount}" Foreground="#F87171" />
-                  <TextBlock Text="Abgebrochen / Abandoned" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
+                  <TextBlock Text="Manuell aufgegeben" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
                 </StackPanel>
               </Border>
-              <Border Grid.Column="3" Classes="card" Margin="5,0,0,0">
+              <Border Grid.Column="3" Classes="card" Margin="5,0,5,0">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="FEHLGESCHLAGEN" />
+                  <TextBlock Classes="value" Text="{Binding ContractsFailedCount}" Foreground="#FB923C" />
+                  <TextBlock Text="Timer / Zerstörung" Foreground="#6E8498" FontSize="10" Margin="0,2,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="4" Classes="card" Margin="5,0,0,0">
                 <StackPanel>
                   <TextBlock Classes="label" Text="ERFOLGSQUOTE" />
                   <TextBlock Classes="value" Text="{Binding ContractsCompletionRateText}" Foreground="#38BDF8" />
