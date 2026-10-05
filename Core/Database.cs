@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 41; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v41: Korrektur Missionsbelohnung Ship In Distress auf 58.000 aUEC)
+    public const int CurrentSchemaVersion = 42; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v42: server_shards Tabelle für Shard-Tagebuch mit Good/Avoid-Flags, Notizen & CIG Support)
     public const int CurrentParserVersion = 45; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v45: Contract Payout Pairing & Failed vs. Abandoned Unterscheidung)
 
     public static bool WasParserResetRequired { get; set; }
@@ -1131,6 +1131,39 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v41 (Korrektur Missionsbelohnung Ship In Distress auf 58.000 aUEC) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 42)
+        {
+            try
+            {
+                Exec(db, @"
+                    CREATE TABLE IF NOT EXISTS server_shards (
+                        shard_id TEXT PRIMARY KEY,
+                        shard_number TEXT NOT NULL DEFAULT '',
+                        region TEXT NOT NULL DEFAULT 'PU',
+                        region_flag TEXT NOT NULL DEFAULT '🌐',
+                        first_seen TEXT NOT NULL,
+                        last_seen TEXT NOT NULL,
+                        visit_count INTEGER NOT NULL DEFAULT 1,
+                        total_seconds INTEGER NOT NULL DEFAULT 0,
+                        last_end_reason TEXT NOT NULL DEFAULT 'Normal Quit',
+                        rating TEXT NOT NULL DEFAULT 'Neutral',
+                        notes TEXT NOT NULL DEFAULT ''
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_server_shards_rating ON server_shards(rating);
+                    CREATE INDEX IF NOT EXISTS ix_server_shards_last_seen ON server_shards(last_seen);
+                ");
+
+                PopulateServerShardsFromSessions(db);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v42 (server_shards Tabelle)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 42;");
+            dbSchemaVersion = 42;
+            Logger.Log("DB Schema: Migration auf v42 (server_shards Tabelle & Shard-Tagebuch) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -1409,6 +1442,10 @@ public static class Database
                         s.ExecuteNonQuery();
                     }
                     tx.Commit();
+                    if (parser.Meta.TryGetValue("shard", out var idxShard) && !string.IsNullOrWhiteSpace(idxShard) && idxShard != "—")
+                    {
+                        UpsertShardVisit(idxShard, last ?? first, (long)parser.InGameTime.TotalSeconds, "Normal Quit");
+                    }
                     added++;
                 }
                 catch (Exception ex) { Logger.Error("Index " + name, ex); }
@@ -1525,6 +1562,10 @@ public static class Database
                             s.ExecuteNonQuery();
                         }
                         tx.Commit();
+                        if (parser.Meta.TryGetValue("shard", out var rscShard) && !string.IsNullOrWhiteSpace(rscShard) && rscShard != "—")
+                        {
+                            UpsertShardVisit(rscShard, last ?? first, (long)parser.InGameTime.TotalSeconds, "Normal Quit");
+                        }
                         sessionCount++;
                         eventCount += sessionEvents;
                     }
@@ -1888,7 +1929,21 @@ public static class Database
                         bio TEXT,
                         updated_at TEXT NOT NULL
                     );
-                    CREATE INDEX IF NOT EXISTS ix_pilot_profiles_citizen_record ON pilot_profiles(citizen_record);
+                    CREATE TABLE IF NOT EXISTS server_shards (
+                        shard_id TEXT PRIMARY KEY,
+                        shard_number TEXT NOT NULL DEFAULT '',
+                        region TEXT NOT NULL DEFAULT 'PU',
+                        region_flag TEXT NOT NULL DEFAULT '🌐',
+                        first_seen TEXT NOT NULL,
+                        last_seen TEXT NOT NULL,
+                        visit_count INTEGER NOT NULL DEFAULT 1,
+                        total_seconds INTEGER NOT NULL DEFAULT 0,
+                        last_end_reason TEXT NOT NULL DEFAULT 'Normal Quit',
+                        rating TEXT NOT NULL DEFAULT 'Neutral',
+                        notes TEXT NOT NULL DEFAULT ''
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_server_shards_rating ON server_shards(rating);
+                    CREATE INDEX IF NOT EXISTS ix_server_shards_last_seen ON server_shards(last_seen);
                 ");
 
                 // 3. Kritische Spalten nachziehen (falls eine Tabelle älter war)
@@ -1903,7 +1958,9 @@ public static class Database
                            CREATE INDEX IF NOT EXISTS ix_events_session_kind ON events(session, kind);
                            CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
                            CREATE INDEX IF NOT EXISTS ix_contracts_status ON contracts(status);
-                           CREATE INDEX IF NOT EXISTS ix_user_pois_system ON user_pois(system);");
+                           CREATE INDEX IF NOT EXISTS ix_user_pois_system ON user_pois(system);
+                           CREATE INDEX IF NOT EXISTS ix_server_shards_rating ON server_shards(rating);
+                           CREATE INDEX IF NOT EXISTS ix_server_shards_last_seen ON server_shards(last_seen);");
 
                 // 5. Metadaten synchronisieren
                 Exec(db, $"PRAGMA user_version = {CurrentSchemaVersion};");
@@ -4189,6 +4246,237 @@ public static class Database
         {
             Logger.Error($"Database.SavePilotProfile({profile.Handle})", ex);
         }
+    }
+
+    #endregion
+
+    #region Server- / Shard-Tagebuch
+
+    /// <summary>
+    /// Liest alle bisherigen Shards aus der sessions-Tabelle und befüllt server_shards initial.
+    /// </summary>
+    public static void PopulateServerShardsFromSessions(SqliteConnection db)
+    {
+        try
+        {
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT shard, MIN(start), MAX(end), COUNT(*), SUM(play_time_seconds)
+                FROM sessions
+                WHERE shard IS NOT NULL AND shard != '' AND shard != '—' AND shard != 'Alle Sessions'
+                GROUP BY shard;
+            ";
+            using var reader = cmd.ExecuteReader();
+            var shardsToInsert = new List<(string Shard, string FirstSeen, string LastSeen, int Visits, long Seconds)>();
+            while (reader.Read())
+            {
+                var shard = reader.GetString(0);
+                var first = reader.IsDBNull(1) ? DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) : reader.GetString(1);
+                var last = reader.IsDBNull(2) ? DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) : reader.GetString(2);
+                var visits = reader.IsDBNull(3) ? 1 : reader.GetInt32(3);
+                var sec = reader.IsDBNull(4) ? 0 : reader.GetInt64(4);
+                shardsToInsert.Add((shard, first, last, visits, sec));
+            }
+            reader.Close();
+
+            foreach (var item in shardsToInsert)
+            {
+                var (flag, region, shardNum) = LogParser.ParseShardDetails(item.Shard);
+                using var ins = db.CreateCommand();
+                ins.CommandText = @"
+                    INSERT OR IGNORE INTO server_shards (shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes)
+                    VALUES (@id, @num, @reg, @flag, @first, @last, @visits, @sec, 'Normal Quit', 'Neutral', '');
+                ";
+                ins.Parameters.AddWithValue("@id", item.Shard);
+                ins.Parameters.AddWithValue("@num", shardNum);
+                ins.Parameters.AddWithValue("@reg", region);
+                ins.Parameters.AddWithValue("@flag", flag);
+                ins.Parameters.AddWithValue("@first", item.FirstSeen);
+                ins.Parameters.AddWithValue("@last", item.LastSeen);
+                ins.Parameters.AddWithValue("@visits", item.Visits);
+                ins.Parameters.AddWithValue("@sec", item.Seconds);
+                ins.ExecuteNonQuery();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.PopulateServerShardsFromSessions", ex);
+        }
+    }
+
+    /// <summary>
+    /// Aktualisiert oder legt einen Shard-Eintrag an, wenn ein Server betreten oder beendet wird.
+    /// </summary>
+    public static void UpsertShardVisit(string shardId, DateTime? seenAt, long addSeconds, string? endReason)
+    {
+        if (string.IsNullOrWhiteSpace(shardId) || shardId == "—" || shardId == "Alle Sessions" || shardId == "Kein Server") return;
+        EnsureInitialized();
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                var (flag, region, shardNum) = LogParser.ParseShardDetails(shardId);
+                var ts = (seenAt ?? DateTime.UtcNow).ToString("o", CultureInfo.InvariantCulture);
+
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO server_shards (shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes)
+                    VALUES (@id, @num, @reg, @flag, @ts, @ts, 1, @sec, @end, 'Neutral', '')
+                    ON CONFLICT(shard_id) DO UPDATE SET
+                        last_seen = @ts,
+                        visit_count = server_shards.visit_count + 1,
+                        total_seconds = server_shards.total_seconds + @sec,
+                        last_end_reason = CASE WHEN @end != '' AND @end IS NOT NULL THEN @end ELSE server_shards.last_end_reason END;
+                ";
+                cmd.Parameters.AddWithValue("@id", shardId);
+                cmd.Parameters.AddWithValue("@num", shardNum);
+                cmd.Parameters.AddWithValue("@reg", region);
+                cmd.Parameters.AddWithValue("@flag", flag);
+                cmd.Parameters.AddWithValue("@ts", ts);
+                cmd.Parameters.AddWithValue("@sec", Math.Max(0, addSeconds));
+                cmd.Parameters.AddWithValue("@end", (object?)endReason ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Database.UpsertShardVisit({shardId})", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ändert Bewertung (Good / Avoid / Neutral) und individuelle Notizen für einen Shard.
+    /// </summary>
+    public static void UpdateShardRatingAndNotes(string shardId, string rating, string notes)
+    {
+        if (string.IsNullOrWhiteSpace(shardId)) return;
+        EnsureInitialized();
+        lock (_writeLock)
+        {
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE server_shards
+                    SET rating = @rating, notes = @notes
+                    WHERE shard_id = @id;
+                ";
+                cmd.Parameters.AddWithValue("@rating", rating);
+                cmd.Parameters.AddWithValue("@notes", notes ?? "");
+                cmd.Parameters.AddWithValue("@id", shardId);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Database.UpdateShardRatingAndNotes({shardId})", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Liefert alle erfassten Server-Shards sortiert nach zuletzt gesehen.
+    /// </summary>
+    public static List<ServerShardRecord> GetAllServerShards()
+    {
+        EnsureInitialized();
+        var list = new List<ServerShardRecord>();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes
+                FROM server_shards
+                ORDER BY last_seen DESC;
+            ";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                DateTime? first = null;
+                DateTime? last = null;
+                if (!reader.IsDBNull(4) && DateTime.TryParse(reader.GetString(4), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var f))
+                    first = f;
+                if (!reader.IsDBNull(5) && DateTime.TryParse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var l))
+                    last = l;
+
+                list.Add(new ServerShardRecord
+                {
+                    ShardId = reader.GetString(0),
+                    ShardNumber = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Region = reader.IsDBNull(2) ? "PU" : reader.GetString(2),
+                    RegionFlag = reader.IsDBNull(3) ? "🌐" : reader.GetString(3),
+                    FirstSeen = first,
+                    LastSeen = last,
+                    VisitCount = reader.IsDBNull(6) ? 1 : reader.GetInt32(6),
+                    TotalSeconds = reader.IsDBNull(7) ? 0 : reader.GetInt64(7),
+                    LastEndReason = reader.IsDBNull(8) ? "Normal Quit" : reader.GetString(8),
+                    Rating = reader.IsDBNull(9) ? "Neutral" : reader.GetString(9),
+                    Notes = reader.IsDBNull(10) ? "" : reader.GetString(10)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Database.GetAllServerShards", ex);
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Holt die Shard-Daten eines bestimmten Shards.
+    /// </summary>
+    public static ServerShardRecord? GetServerShard(string shardId)
+    {
+        if (string.IsNullOrWhiteSpace(shardId)) return null;
+        EnsureInitialized();
+        try
+        {
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                SELECT shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes
+                FROM server_shards
+                WHERE shard_id = @id
+                LIMIT 1;
+            ";
+            cmd.Parameters.AddWithValue("@id", shardId);
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                DateTime? first = null;
+                DateTime? last = null;
+                if (!reader.IsDBNull(4) && DateTime.TryParse(reader.GetString(4), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var f))
+                    first = f;
+                if (!reader.IsDBNull(5) && DateTime.TryParse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var l))
+                    last = l;
+
+                return new ServerShardRecord
+                {
+                    ShardId = reader.GetString(0),
+                    ShardNumber = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Region = reader.IsDBNull(2) ? "PU" : reader.GetString(2),
+                    RegionFlag = reader.IsDBNull(3) ? "🌐" : reader.GetString(3),
+                    FirstSeen = first,
+                    LastSeen = last,
+                    VisitCount = reader.IsDBNull(6) ? 1 : reader.GetInt32(6),
+                    TotalSeconds = reader.IsDBNull(7) ? 0 : reader.GetInt64(7),
+                    LastEndReason = reader.IsDBNull(8) ? "Normal Quit" : reader.GetString(8),
+                    Rating = reader.IsDBNull(9) ? "Neutral" : reader.GetString(9),
+                    Notes = reader.IsDBNull(10) ? "" : reader.GetString(10)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Database.GetServerShard({shardId})", ex);
+        }
+        return null;
     }
 
     #endregion

@@ -1089,6 +1089,7 @@ public class PhotinoBridge
     private readonly object _sendLock = new();
     private volatile bool _isWebviewReady = false;
     private bool _hasSyncedLogs = false;
+    private string? _lastEndReason;
 
     private record SessionMetadataCache(
         string? Pilot,
@@ -2403,6 +2404,67 @@ public class PhotinoBridge
                         );
 
                         SendResponse(req.Id, "get_sanitized_diagnostic_summary_response", new { summary });
+                        break;
+                    }
+
+                case "get_sanitized_bug_report":
+                    {
+                        var appVer = "1.3.0";
+                        var dbSchemaVer = Database.CurrentSchemaVersion.ToString();
+                        var parserVer = Database.CurrentParserVersion.ToString();
+                        var sessCount = Database.GetSessionCount();
+                        var evtCount = Database.GetTotalEventCount();
+
+                        string? actGameVer = null;
+                        string? actShard = null;
+                        if (!string.IsNullOrEmpty(_activeSessionName) && _sessionMetaCache.TryGetValue(_activeSessionName, out var m))
+                        {
+                            actGameVer = m.Version;
+                            actShard = m.Shard;
+                        }
+                        if (string.IsNullOrEmpty(actShard) && _parser.Meta.TryGetValue("shard", out var ps))
+                        {
+                            actShard = ps;
+                        }
+
+                        var bugReportText = DiagnosticsRedactor.BuildSanitizedBugReport(
+                            appVer,
+                            dbSchemaVer,
+                            parserVer,
+                            sessCount,
+                            evtCount,
+                            actGameVer,
+                            actShard,
+                            _lastEndReason,
+                            GetRecentSanitizedErrorLines()
+                        );
+
+                        SendResponse(req.Id, "get_sanitized_bug_report_response", new { report = bugReportText });
+                        break;
+                    }
+
+                case "get_server_shards":
+                    {
+                        var shards = Database.GetAllServerShards();
+                        SendResponse(req.Id, "get_server_shards_response", shards);
+                        break;
+                    }
+
+                case "update_shard_rating_and_notes":
+                    {
+                        if (req.Payload.HasValue)
+                        {
+                            var shId = req.Payload.Value.TryGetProperty("shardId", out var sidP) ? sidP.GetString() : null;
+                            var rating = req.Payload.Value.TryGetProperty("rating", out var ratP) ? ratP.GetString() : "Neutral";
+                            var notes = req.Payload.Value.TryGetProperty("notes", out var notP) ? notP.GetString() : "";
+                            if (!string.IsNullOrEmpty(shId))
+                            {
+                                Database.UpdateShardRatingAndNotes(shId, rating ?? "Neutral", notes ?? "");
+                            }
+                        }
+                        var updatedShards = Database.GetAllServerShards();
+                        SendResponse(req.Id, "update_shard_rating_and_notes_response", updatedShards);
+                        Broadcast("SERVER_SHARDS_UPDATED", updatedShards);
                         break;
                     }
 
@@ -7263,6 +7325,26 @@ public class PhotinoBridge
                 if (entry.Kind == EventKind.SessionChange && _parser.Meta.TryGetValue("shard", out var curShard) && !string.IsNullOrEmpty(curShard))
                 {
                     TriggerServerPing(curShard);
+                    Database.UpsertShardVisit(curShard, entry.Time, 0, null);
+                    Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
+                }
+                else if (entry.Kind == EventKind.Crash)
+                {
+                    _lastEndReason = entry.Detail;
+                    if (_parser.Meta.TryGetValue("shard", out var crashShard) && !string.IsNullOrEmpty(crashShard))
+                    {
+                        Database.UpsertShardVisit(crashShard, entry.Time, 0, entry.Detail);
+                        Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
+                    }
+                }
+                else if (entry.Detail != null && entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastEndReason = "Normal Quit";
+                    if (_parser.Meta.TryGetValue("shard", out var exitShard) && !string.IsNullOrEmpty(exitShard))
+                    {
+                        Database.UpsertShardVisit(exitShard, entry.Time, 0, "Normal Quit");
+                        Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
+                    }
                 }
             }
         }
@@ -7270,6 +7352,22 @@ public class PhotinoBridge
         {
             Logger.Error("PhotinoBridge.OnLogLineReceived", ex);
         }
+    }
+
+    private static List<string> GetRecentSanitizedErrorLines()
+    {
+        var lines = new List<string>();
+        try
+        {
+            var debugLog = Path.Combine(Settings.Dir, "SCLogMate.debug.log");
+            if (File.Exists(debugLog))
+            {
+                var allLines = File.ReadAllLines(debugLog);
+                lines.AddRange(allLines.TakeLast(30));
+            }
+        }
+        catch { }
+        return lines;
     }
 
     private void CheckAndTriggerToast(LogEntry entry, LogEventDto dto)

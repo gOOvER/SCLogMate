@@ -558,6 +558,23 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const [copiedBugReport, setCopiedBugReport] = useState(false);
+
+  const handleCopySanitizedBugReport = async () => {
+    try {
+      const res = await bridge.getSanitizedBugReport();
+      if (res?.report) {
+        await navigator.clipboard.writeText(res.report);
+        setCopiedBugReport(true);
+        showToast('✓ 1-Klick Sanitized Bug-Report in Zwischenablage kopiert!');
+        setTimeout(() => setCopiedBugReport(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to copy sanitized bug report:', err);
+      showToast('Fehler beim Generieren des Bug-Reports');
+    }
+  };
+
   const loadCommunityStatus = async () => {
     try {
       const status = await bridge.getCommunityStatus();
@@ -2636,6 +2653,14 @@ export const SettingsView: React.FC = () => {
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>{copiedDiag ? '✓ Diagnose kopiert!' : '🛡️ Anonymisierte Diagnose kopieren'}</span>
+              </button>
+              <button
+                onClick={handleCopySanitizedBugReport}
+                className="px-4 py-2.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-semibold border border-cyan-500/40 transition flex items-center space-x-2 cursor-pointer shadow-[0_0_10px_rgba(0,240,255,0.15)]"
+                title="Generiert einen 1-Klick Sanitized Bug-Report (~1-3 KB) mit System-Details, Shard-Status und bereinigten Log-Fehlern für Discord & GitHub"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{copiedBugReport ? '✓ Bug-Report kopiert!' : '📋 1-Klick Sanitized Bug-Report'}</span>
               </button>
             </div>
           </div>

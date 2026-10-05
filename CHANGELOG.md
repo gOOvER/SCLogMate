@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Server & Shard Log Book with Good/Avoid Ratings & CIG Support Strings (`Core/Database.cs`, `Models/ServerShardRecord.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/PlacesView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Implemented a persistent server and shard diary tracking all visited Star Citizen servers (`server_shards` SQLite table).
+  - Automatically captures shard ID (e.g., `pub_euw1b_12545750_170`), shard number (`#170`), server region (`EU-Central`, `US-East`, `AUS`, `Asia`) with regional flags, visit counts, total playtime, and session disconnect/termination reasons (`Normal Quit`, `Crash / Fatal Error`, etc.).
+  - Added user rating flags: **Good (⭐)** for high-FPS, stable shards, **Avoid (⚠️)** for buggy or high-lag shards, and **Neutral**, alongside custom player notes per shard.
+  - Added 1-click **CIG Support / Issue Council String generator** that copies a standardized, privacy-sanitized server diagnostic string to the clipboard (`Shard: {shardId} | Region: {region} | Total Session Playtime: {duration} | Disconnect/Exit: {reason}`).
+  - Integrated into `PlacesView` as a dedicated **Server- / Shard-Tagebuch** tab featuring KPI HUD cards, real-time search, rating/region filters, inline note editing, and live update broadcasting via `SERVER_SHARDS_UPDATED`.
+- **1-Click Privacy-Sanitized Bug Report Generator (`Core/DiagnosticsRedactor.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/SettingsView.tsx`)**:
+  - Added `BuildSanitizedBugReport` producing an instant ~1–3 KB diagnostic report for Discord support and GitHub issue reporting.
+  - Automatically includes app version, OS architecture, available RAM, SQLite schema and parser versions, active shard state, and the latest sanitized error/crash traces while strictly masking user home paths, Discord webhooks, local IP addresses, and authentication tokens.
+  - Added 1-click export button in the Settings Diagnostics interface.
 - **Contract Payout Pairing & Exact Reward Attribution (`Core/LogParser.cs`, `Models/ContractRecord.cs`, `Models/LedgerRecord.cs`)**:
   - Implemented bidirectional pairing between nameless in-game HUD reward toasts (`Added notification "Awarded ... aUEC"`) and completed contract events (`Contract Complete`, `<MissionEnded>`, `<EndMission>`).
   - Seamlessly updates `ContractRecord.Reward` with the exact awarded amount and populates `LedgerRecord.What` with the specific mission title (`Missions-Belohnung: {Title}`) rather than generic fallback labels.
@@ -17,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `Fehlgeschlagen` to contract outcome filter dropdowns and added `Belohnung` category filter to the financial Ledger.
 
 ### Changed
+- **Database Schema Version Bump to v42 (`Core/Database.cs`)**:
+  - Bumped `CurrentSchemaVersion` from 41 to 42 with automated migration creating `server_shards` and populating it from historical session archives.
 - **Parser Version Bump to v45 (`Core/Database.cs`)**:
   - Bumped `CurrentParserVersion` from 44 to 45 to trigger a clean re-indexing of historical sessions so past missions gain accurate rewards and failure statuses.
 

@@ -100,4 +100,52 @@ Datenpfad: <appdata>\SCLogMate\sessions.db
 Status: Operational ✓
 ====================================================";
     }
+
+    /// <summary>
+    /// Erstellt einen 1-Klick Sanitized Bug-Report (~1-3 KB) ohne Spieler-Handle oder private Pfade
+    /// inklusive Systemumgebung, Datenbank-Status, Shard-Kontext und bereinigten letzten Log-Zeilen/Fehlern.
+    /// </summary>
+    public static string BuildSanitizedBugReport(
+        string appVersion,
+        string dbSchemaVersion,
+        string parserVersion,
+        int sessionCount,
+        int totalEvents,
+        string? activeGameVersion,
+        string? activeShard,
+        string? lastEndReason,
+        System.Collections.Generic.IEnumerable<string>? recentErrorOrCrashLines = null)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== SCLogMate Sanitized Bug-Report ===");
+        sb.AppendLine($"Zeitpunkt (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine($"SCLogMate: {appVersion} (.NET 10 / Photino / React 19)");
+        sb.AppendLine($"OS: {Environment.OSVersion.VersionString} ({(Environment.Is64BitOperatingSystem ? "64-Bit" : "32-Bit")})");
+        sb.AppendLine($"RAM: {Math.Round(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024.0 / 1024.0 / 1024.0, 1)} GB verfügbar");
+        sb.AppendLine($"DB-Schema: v{dbSchemaVersion} | Parser Engine: v{parserVersion}");
+        sb.AppendLine($"Sessions: {sessionCount} | Total Events: {totalEvents:N0}");
+        sb.AppendLine($"Star Citizen: {Sanitize(activeGameVersion ?? "Unbekannt")}");
+        sb.AppendLine($"Shard: {Sanitize(activeShard ?? "—")} | Status/Disconnect: {Sanitize(lastEndReason ?? "Normal")}");
+        sb.AppendLine("----------------------------------------");
+        sb.AppendLine("Recent Diagnostics / Error Trace (Sanitized):");
+
+        var hasLines = false;
+        if (recentErrorOrCrashLines != null)
+        {
+            foreach (var line in System.Linq.Enumerable.TakeLast(recentErrorOrCrashLines, 30))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                sb.AppendLine(Sanitize(line));
+                hasLines = true;
+            }
+        }
+
+        if (!hasLines)
+        {
+            sb.AppendLine("Keine kritischen Fehler oder Abstürze protokolliert (Clean Log State).");
+        }
+
+        sb.AppendLine("========================================");
+        return sb.ToString();
+    }
 }

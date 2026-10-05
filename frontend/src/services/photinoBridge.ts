@@ -232,6 +232,20 @@ export interface CatalogShipDto {
 export type ScannedShipComponentDto = ScannedShipComponent;
 export type ScreenshotLoadoutResultDto = ScreenshotLoadoutResult;
 
+export interface ServerShardDto {
+  shardId: string;
+  shardNumber: string;
+  region: string;
+  regionFlag: string;
+  firstSeen?: string;
+  lastSeen?: string;
+  visitCount: number;
+  totalSeconds: number;
+  lastEndReason: string;
+  rating: 'Good' | 'Avoid' | 'Neutral' | string;
+  notes: string;
+}
+
 export interface FleetResponseDto {
   ships: FleetShipDto[];
   catalog: CatalogShipDto[];
@@ -1486,6 +1500,18 @@ class PhotinoBridge {
 
   public getSanitizedDiagnosticSummary(): Promise<{ summary: string }> {
     return this.sendRequest<{ summary: string }>('get_sanitized_diagnostic_summary');
+  }
+
+  public getSanitizedBugReport(): Promise<{ report: string }> {
+    return this.sendRequest<{ report: string }>('get_sanitized_bug_report');
+  }
+
+  public getServerShards(): Promise<ServerShardDto[]> {
+    return this.sendRequest<ServerShardDto[]>('get_server_shards');
+  }
+
+  public updateShardRatingAndNotes(shardId: string, rating: string, notes: string): Promise<ServerShardDto[]> {
+    return this.sendRequest<ServerShardDto[]>('update_shard_rating_and_notes', { shardId, rating, notes });
   }
 
   public getCommunityStatus(): Promise<CommunityStatusDto> {

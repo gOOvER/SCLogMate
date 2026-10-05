@@ -2015,6 +2015,12 @@
                   <TextBlock Text="{Binding TotalQuantumJumpsCount, StringFormat='{}{0} Quantum-Sprünge'}" Foreground="#C084FC" FontSize="11" FontWeight="Bold" />
                 </StackPanel>
               </Border>
+              <Border Background="#0D2818" BorderBrush="#059669" BorderThickness="1" Padding="10,5" CornerRadius="6">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="🌐" FontSize="12" Foreground="#34D399" />
+                  <TextBlock Text="{Binding TotalShardsCount, StringFormat='{}{0} Shards'}" Foreground="#6EE7B7" FontSize="11" FontWeight="Bold" />
+                </StackPanel>
+              </Border>
             </StackPanel>
           </Grid>
 

@@ -44,6 +44,16 @@ public partial class MainViewModel
     [ObservableProperty] private int totalLocationsVisitedCount;
     [ObservableProperty] private int totalQuantumJumpsCount;
 
+    // ══ SHARDS (SERVER- / SHARD-TAGEBUCH) ══
+    public ObservableCollection<ServerShardRecord> ServerShardsView { get; } = new();
+    [ObservableProperty] private string shardSearchText = "";
+    [ObservableProperty] private string selectedShardRatingFilter = "Alle"; // "Alle", "Gut", "Meiden", "Neutral"
+    public List<string> ShardRatingFilters { get; } = new() { "Alle", "Gut", "Meiden", "Neutral" };
+    [ObservableProperty] private int totalShardsCount;
+    [ObservableProperty] private int goodShardsCount;
+    [ObservableProperty] private int avoidShardsCount;
+    [ObservableProperty] private string totalShardsPlayTimeText = "—";
+
     // ══ SPENDING (AUSGABEN) ══
     public ObservableCollection<ConfirmedPurchaseRecord> ConfirmedPurchasesView { get; } = new();
     public ObservableCollection<StatItem> SpendByShop { get; } = new();
@@ -447,6 +457,7 @@ public partial class MainViewModel
         TotalQuantumJumpsCount = _rawQuantumDestinations.Count;
 
         FilterPlaces();
+        LoadServerShards();
     }
 
     private void FilterPlaces()
@@ -541,6 +552,75 @@ public partial class MainViewModel
         if (string.IsNullOrWhiteSpace(locationName)) return;
         StarmapSearchText = locationName;
         SelectedTabIndex = 4; // Tab '🗺 Karte'
+    }
+
+    // ══ SHARDS METHODEN ══
+
+    public void LoadServerShards()
+    {
+        var shards = Database.GetAllServerShards();
+        TotalShardsCount = shards.Count;
+        GoodShardsCount = shards.Count(s => s.Rating == "Good");
+        AvoidShardsCount = shards.Count(s => s.Rating == "Avoid");
+        var totalSec = shards.Sum(s => s.TotalSeconds);
+        var ts = TimeSpan.FromSeconds(totalSec);
+        TotalShardsPlayTimeText = ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}h {ts.Minutes}m" : $"{ts.Minutes}m";
+
+        FilterServerShards();
+    }
+
+    public void FilterServerShards()
+    {
+        var shards = Database.GetAllServerShards();
+        var q = (ShardSearchText ?? "").Trim();
+        var rating = SelectedShardRatingFilter;
+
+        var filtered = shards.Where(s =>
+        {
+            if (rating == "Gut" && s.Rating != "Good") return false;
+            if (rating == "Meiden" && s.Rating != "Avoid") return false;
+            if (rating == "Neutral" && s.Rating != "Neutral") return false;
+
+            if (!string.IsNullOrEmpty(q))
+            {
+                var match = s.ShardId.Contains(q, StringComparison.OrdinalIgnoreCase)
+                    || s.ShardNumber.Contains(q, StringComparison.OrdinalIgnoreCase)
+                    || s.Region.Contains(q, StringComparison.OrdinalIgnoreCase)
+                    || s.Notes.Contains(q, StringComparison.OrdinalIgnoreCase);
+                if (!match) return false;
+            }
+            return true;
+        });
+
+        ServerShardsView.Clear();
+        foreach (var s in filtered) ServerShardsView.Add(s);
+    }
+
+    partial void OnShardSearchTextChanged(string value) => FilterServerShards();
+    partial void OnSelectedShardRatingFilterChanged(string value) => FilterServerShards();
+
+    [RelayCommand]
+    public void SetShardGood(ServerShardRecord? shard)
+    {
+        if (shard == null) return;
+        Database.UpdateShardRatingAndNotes(shard.ShardId, "Good", shard.Notes);
+        LoadServerShards();
+    }
+
+    [RelayCommand]
+    public void SetShardAvoid(ServerShardRecord? shard)
+    {
+        if (shard == null) return;
+        Database.UpdateShardRatingAndNotes(shard.ShardId, "Avoid", shard.Notes);
+        LoadServerShards();
+    }
+
+    [RelayCommand]
+    public void SetShardNeutral(ServerShardRecord? shard)
+    {
+        if (shard == null) return;
+        Database.UpdateShardRatingAndNotes(shard.ShardId, "Neutral", shard.Notes);
+        LoadServerShards();
     }
 
     // ══ SPENDING METHODEN ══
