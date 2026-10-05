@@ -244,6 +244,7 @@ export interface Translations {
     tabActive: string;
     tabHistory: string;
     tabCatalog: string;
+    tabHauling?: string;
     searchPlaceholder: string;
     clearActive: string;
     colMission: string;

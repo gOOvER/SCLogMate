@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Multi-Contract Hauling Chainer & Cargo Fill-Level Projection (`Core/HaulingChainer.cs`, `Models/HaulingRouteModels.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/HaulingChainerTab.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Implemented an intelligent route optimizer and sequencing engine for multi-contract hauling runs across Stanton and Pyro.
+  - Automatically sequences pickups and deliveries respecting strict precedence constraints (`Pickup(C_i)` before `Delivery(C_i)`), celestial clustering (grouping stops on the same planet/moon sphere), and minimal quantum jump transit distances.
+  - **Frachtraum-Füllstandsprojektion (Capacity Projection)**: Calculates step-by-step SCU cargo hold fill levels at every waypoint stop, with visual color-coded capacity gauges (green, amber, and red alert for overloads) to prevent overbooking before departing.
+  - **1-Click Cargo-Grid Packer Integration**: Direct bridge to the physical 3D Cargo-Fit lattice packing engine (`CargoFitModal`) pre-populated with the exact container box breakdown (32, 24, 16, 8, 4, 2, 1 SCU) for the peak payload.
+  - Added ship selector supporting all major Star Citizen cargo freighters (Crusader C2/M2, Caterpillar, Carrack, Reclaimer, Constellation Taurus/Andromeda, Zeus CL, Freelancer MAX, Corsair, C1 Spirit, Hull A, Cutlass Black, RAFT, etc.).
+  - Includes authentic preset routes ("Hurston Express", "Stanton Interplanetary", "Distribution Center Logistics"), 1-click active contract import directly from Game.log & SQLite, and a custom contract editor.
+  - Integrated into `MissionsView` with dedicated KPI HUD cards, step-by-step timeline, distance/QT estimates, and overload warning alerts.
 - **Server & Shard Log Book with Good/Avoid Ratings & CIG Support Strings (`Core/Database.cs`, `Models/ServerShardRecord.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/PlacesView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
   - Implemented a persistent server and shard diary tracking all visited Star Citizen servers (`server_shards` SQLite table).
   - Automatically captures shard ID (e.g., `pub_euw1b_12545750_170`), shard number (`#170`), server region (`EU-Central`, `US-East`, `AUS`, `Asia`) with regional flags, visit counts, total playtime, and session disconnect/termination reasons (`Normal Quit`, `Crash / Fatal Error`, etc.).

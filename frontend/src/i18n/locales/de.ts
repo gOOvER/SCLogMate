@@ -239,6 +239,7 @@ export const de: Translations = {
     tabActive: 'Aktive Aufträge',
     tabHistory: 'Auftragshistorie',
     tabCatalog: 'Auftragskatalog',
+    tabHauling: 'Hauling Chainer',
     searchPlaceholder: 'Aufträge filtern...',
     clearActive: 'Aufträge leeren',
     colMission: 'Auftrag',

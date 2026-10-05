@@ -239,6 +239,7 @@ export const en: Translations = {
     tabActive: 'Active Missions',
     tabHistory: 'Mission History',
     tabCatalog: 'Mission Catalog',
+    tabHauling: 'Hauling Chainer',
     searchPlaceholder: 'Filter missions...',
     clearActive: 'Clear Active',
     colMission: 'Mission',

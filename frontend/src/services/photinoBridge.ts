@@ -1292,6 +1292,60 @@ export interface CargoFitResultDto {
   compatibleFleetShips: FleetFitMatchDto[];
 }
 
+export interface HaulingJobItemDto {
+  id: string;
+  title: string;
+  pickupLocation: string;
+  deliveryLocation: string;
+  scu: number;
+  commodity: string;
+  rewardAuec: number;
+  contractor: string;
+  isEnabled: boolean;
+}
+
+export interface HaulingWaypointCargoDetailDto {
+  jobId: string;
+  jobTitle: string;
+  commodity: string;
+  scuDelta: number;
+  actionType: string;
+}
+
+export interface HaulingWaypointDto {
+  stepIndex: number;
+  location: string;
+  celestialBody: string;
+  system: string;
+  action: 'Pickup' | 'Delivery' | 'Combined' | string;
+  deltaScu: number;
+  currentLoadScu: number;
+  capacityScu: number;
+  fillPercentage: number;
+  isOverloaded: boolean;
+  overloadAmountScu: number;
+  cargoDetails: HaulingWaypointCargoDetailDto[];
+  distanceToNextGm: number;
+  estimatedQtMinutes: number;
+}
+
+export interface HaulingChainedRouteResultDto {
+  shipName: string;
+  shipCapacityScu: number;
+  totalJobs: number;
+  totalWaypoints: number;
+  totalRewardAuec: number;
+  totalScuMoved: number;
+  peakLoadScu: number;
+  peakFillPercentage: number;
+  isFeasible: boolean;
+  totalDistanceGm: number;
+  estimatedTotalQtMinutes: number;
+  waypoints: HaulingWaypointDto[];
+  warnings: string[];
+  peakBoxBreakdown: Record<number, number>;
+}
+
 export interface PluginSidebarDto {
   label: string;
   icon?: string;
@@ -1536,6 +1590,18 @@ class PhotinoBridge {
 
   public calculateCargoFit(shipName: string, crates: Record<number, number>): Promise<CargoFitResultDto> {
     return this.sendRequest<CargoFitResultDto>('calculate_cargo_fit', { shipName, crates });
+  }
+
+  public calculateHaulingChain(shipName: string, jobs: HaulingJobItemDto[], optimizeOrder: boolean = true): Promise<HaulingChainedRouteResultDto> {
+    return this.sendRequest<HaulingChainedRouteResultDto>('calculate_hauling_chain', { shipName, jobs, optimizeOrder });
+  }
+
+  public getHaulingPresets(presetKey: string = 'hurston_express'): Promise<HaulingJobItemDto[]> {
+    return this.sendRequest<HaulingJobItemDto[]>('get_hauling_presets', { presetKey });
+  }
+
+  public getActiveHaulingJobs(): Promise<HaulingJobItemDto[]> {
+    return this.sendRequest<HaulingJobItemDto[]>('get_active_hauling_jobs');
   }
 
   public getPlugins(): Promise<GetPluginsResultDto> {

@@ -2356,6 +2356,45 @@ public class PhotinoBridge
                         break;
                     }
 
+                case "calculate_hauling_chain":
+                    {
+                        var reqObj = new HaulingChainRequest();
+                        if (req.Payload.HasValue)
+                        {
+                            try
+                            {
+                                reqObj = JsonSerializer.Deserialize<HaulingChainRequest>(req.Payload.Value.GetRawText(), JsonOpts) ?? reqObj;
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error("calculate_hauling_chain deserialization", ex);
+                            }
+                        }
+
+                        var chainResult = HaulingChainer.CalculateHaulingChain(reqObj);
+                        SendResponse(req.Id, "calculate_hauling_chain_response", chainResult);
+                        break;
+                    }
+
+                case "get_hauling_presets":
+                    {
+                        string presetKey = "hurston_express";
+                        if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("presetKey", out var pKey))
+                        {
+                            presetKey = pKey.GetString() ?? presetKey;
+                        }
+                        var presets = HaulingChainer.GetPresetJobs(presetKey);
+                        SendResponse(req.Id, "get_hauling_presets_response", presets);
+                        break;
+                    }
+
+                case "get_active_hauling_jobs":
+                    {
+                        var jobs = GetActiveHaulingJobsFromContracts();
+                        SendResponse(req.Id, "get_active_hauling_jobs_response", jobs);
+                        break;
+                    }
+
                 case "toggle_screenshot_watcher":
                     {
                         bool scrEnable = true;
@@ -5700,6 +5739,81 @@ public class PhotinoBridge
             catalog,
             totalCompleted = Math.Max(totalCompleted, history.Count)
         };
+    }
+
+    private List<HaulingJobItem> GetActiveHaulingJobsFromContracts()
+    {
+        var list = new List<HaulingJobItem>();
+        try
+        {
+            var activeContracts = _parser.ContractsList.Where(c => c.Outcome == ContractOutcome.InProgress).ToList();
+
+            foreach (var c in activeContracts)
+            {
+                bool isHauling = c.Type.Contains("Fracht", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Type.Contains("Transport", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Type.Contains("Lieferung", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Haul", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Cargo", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Delivery", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Fracht", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Covalex", StringComparison.OrdinalIgnoreCase) ||
+                                 c.Title.Contains("Red Wind", StringComparison.OrdinalIgnoreCase);
+
+                if (isHauling || activeContracts.Count <= 5)
+                {
+                    int scu = 16;
+                    var matchScu = Regex.Match(c.Title, @"(\d+)\s*SCU", RegexOptions.IgnoreCase);
+                    if (matchScu.Success && int.TryParse(matchScu.Groups[1].Value, out int parsedScu))
+                    {
+                        scu = Math.Max(1, parsedScu);
+                    }
+
+                    string pickup = "Everus Harbor (Hurston)";
+                    string delivery = "Lorville Teasa (Hurston)";
+
+                    if (c.System.Contains("Crusader", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pickup = "Seraphim Station (Crusader)";
+                        delivery = "Orison Cloudview (Crusader)";
+                    }
+                    else if (c.System.Contains("ArcCorp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pickup = "Baijini Point (ArcCorp)";
+                        delivery = "Area18 (ArcCorp)";
+                    }
+                    else if (c.System.Contains("microTech", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pickup = "Port Tressler (microTech)";
+                        delivery = "New Babbage (microTech)";
+                    }
+
+                    list.Add(new HaulingJobItem
+                    {
+                        Id = !string.IsNullOrWhiteSpace(c.MissionId) ? c.MissionId : Guid.NewGuid().ToString("N"),
+                        Title = c.Title,
+                        PickupLocation = pickup,
+                        DeliveryLocation = delivery,
+                        Scu = scu,
+                        Commodity = "Allgemeine Fracht",
+                        RewardAuec = c.Reward > 0 ? c.Reward : 35000,
+                        Contractor = !string.IsNullOrWhiteSpace(c.Issuer) && c.Issuer != "Unbekannt" ? c.Issuer : "Covalex / Red Wind",
+                        IsEnabled = true
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GetActiveHaulingJobsFromContracts", ex);
+        }
+
+        if (list.Count == 0)
+        {
+            return HaulingChainer.GetPresetJobs("hurston_express");
+        }
+
+        return list;
     }
 
     private List<FactionReputationDto> GetReputationData()
