@@ -5,7 +5,6 @@ import {
   UserPoiDto,
   CopiedLocationReading,
   ExecHangarSnapshotDto,
-  ServerShardDto,
 } from '../services/photinoBridge';
 import {
   Compass,
@@ -23,12 +22,6 @@ import {
   RotateCcw,
   Zap,
   Edit2,
-  Server,
-  Star,
-  AlertTriangle,
-  ClipboardCopy,
-  CheckCircle2,
-  Clock,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -38,21 +31,15 @@ export interface PlacesViewProps {
 
 export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
   const { t, locale } = useI18n();
-  const [activeTab, setActiveTab] = useState<'starmap' | 'pois' | 'contested' | 'shards'>('pois');
+  const [activeTab, setActiveTab] = useState<'starmap' | 'pois' | 'contested'>('pois');
   const [places, setPlaces] = useState<PlaceItemDto[]>([]);
   const [userPois, setUserPois] = useState<UserPoiDto[]>([]);
-  const [serverShards, setServerShards] = useState<ServerShardDto[]>([]);
   const [lastCopiedLoc, setLastCopiedLoc] = useState<CopiedLocationReading | null>(null);
   const [execHangar, setExecHangar] = useState<ExecHangarSnapshotDto | null>(null);
   const [search, setSearch] = useState<string>(initialSearch || '');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [poiCategoryFilter, setPoiCategoryFilter] = useState<string>('all');
-  const [shardRatingFilter, setShardRatingFilter] = useState<string>('all');
-  const [shardRegionFilter, setShardRegionFilter] = useState<string>('all');
-  const [editingNotesShardId, setEditingNotesShardId] = useState<string | null>(null);
-  const [editingNotesText, setEditingNotesText] = useState<string>('');
-  const [copiedCigShardId, setCopiedCigShardId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | number | null>(null);
 
   // New POI modal
@@ -129,74 +116,11 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     }
   };
 
-  const fetchServerShards = async () => {
-    try {
-      const res = await bridge.getServerShards();
-      setServerShards(res || []);
-    } catch (err) {
-      console.error('Failed to load server shards:', err);
-    }
-  };
-
-  const handleUpdateShardRating = async (shardId: string, rating: string, currentNotes: string) => {
-    try {
-      const res = await bridge.updateShardRatingAndNotes(shardId, rating, currentNotes);
-      setServerShards(res || []);
-    } catch (err) {
-      console.error('Failed to update shard rating:', err);
-    }
-  };
-
-  const handleSaveShardNotes = async (shardId: string, rating: string) => {
-    try {
-      const res = await bridge.updateShardRatingAndNotes(shardId, rating, editingNotesText);
-      setServerShards(res || []);
-      setEditingNotesShardId(null);
-    } catch (err) {
-      console.error('Failed to save shard notes:', err);
-    }
-  };
-
-  const handleCopyCigSupport = (shard: ServerShardDto) => {
-    const endReason = shard.lastEndReason || 'Normal Quit';
-    const durStr = formatShardDuration(shard.totalSeconds);
-    const supportStr = `Shard: ${shard.shardId} | Region: ${shard.region} | Total Session Playtime: ${durStr} | Disconnect/Exit: ${endReason}`;
-    navigator.clipboard.writeText(supportStr).then(() => {
-      setCopiedCigShardId(shard.shardId);
-      setTimeout(() => setCopiedCigShardId(null), 2500);
-    });
-  };
-
-  const formatShardDuration = (totalSeconds: number) => {
-    if (!totalSeconds || totalSeconds <= 0) return '—';
-    const hours = Math.floor(totalSeconds / 3600);
-    const mins = Math.floor((totalSeconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m ${Math.floor(totalSeconds % 60)}s`;
-  };
-
-  const formatShardDate = (isoStr?: string) => {
-    if (!isoStr) return '—';
-    try {
-      const d = new Date(isoStr);
-      return d.toLocaleDateString(locale === 'en' ? 'en-US' : 'de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return isoStr;
-    }
-  };
-
   useEffect(() => {
     fetchPlaces();
     fetchUserPois();
     fetchLastCopied();
     fetchExecHangar();
-    fetchServerShards();
 
     // Listen to live /showlocation clipboard events
     const unsub = bridge.on<CopiedLocationReading>('LOCATION_COPIED', (data: CopiedLocationReading) => {
@@ -210,11 +134,6 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
 
     const unsubPois = bridge.on('USER_POIS_UPDATED', () => {
       fetchUserPois();
-    });
-
-    const unsubShards = bridge.on('SERVER_SHARDS_UPDATED', (data: any) => {
-      if (Array.isArray(data)) setServerShards(data);
-      else fetchServerShards();
     });
 
     const timer = setInterval(() => {
@@ -245,7 +164,6 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
       unsub();
       unsubHangar();
       unsubPois();
-      unsubShards();
       window.removeEventListener('user-poi-saved', handlePoiSavedEvent);
       clearInterval(timer);
     };
@@ -316,37 +234,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
     });
   }, [userPois, systemFilter, poiCategoryFilter, search]);
 
-  const shardRatingOptions = [
-    { id: 'all', label: locale === 'en' ? 'All Ratings' : 'Alle Bewertungen' },
-    { id: 'Good', label: locale === 'en' ? '⭐ Good (Recommended)' : '⭐ Gut (Empfohlen)' },
-    { id: 'Avoid', label: locale === 'en' ? '⚠️ Avoid (Problematic)' : '⚠️ Meiden (Problematisch)' },
-    { id: 'Neutral', label: locale === 'en' ? 'Neutral' : 'Neutral' },
-  ];
 
-  const shardRegionOptions = [
-    { id: 'all', label: locale === 'en' ? 'All Regions' : 'Alle Regionen' },
-    { id: 'EU', label: '🇪🇺 Europe (EU)' },
-    { id: 'US', label: '🇺🇸 North America (US)' },
-    { id: 'AUS', label: '🇦🇺 Australia (AUS)' },
-    { id: 'Asia', label: '🌏 Asia (Asia)' },
-  ];
-
-  const filteredShards = useMemo(() => {
-    return serverShards.filter((s) => {
-      if (shardRatingFilter !== 'all' && s.rating !== shardRatingFilter) return false;
-      if (shardRegionFilter !== 'all' && !s.region.toLowerCase().includes(shardRegionFilter.toLowerCase())) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const matchId = s.shardId.toLowerCase().includes(q);
-        const matchNum = s.shardNumber.toLowerCase().includes(q);
-        const matchRegion = s.region.toLowerCase().includes(q);
-        const matchNotes = (s.notes || '').toLowerCase().includes(q);
-        const matchEnd = (s.lastEndReason || '').toLowerCase().includes(q);
-        if (!matchId && !matchNum && !matchRegion && !matchNotes && !matchEnd) return false;
-      }
-      return true;
-    });
-  }, [serverShards, shardRatingFilter, shardRegionFilter, search]);
 
   const handleCopyPlace = (place: PlaceItemDto) => {
     const text = `${place.name} · ${place.parentBody ? `${place.parentBody}, ` : ''}${place.system}`;
@@ -544,71 +432,30 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab('shards')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-mono font-semibold rounded-t cursor-pointer transition ${
-              activeTab === 'shards'
-                ? 'bg-slate-800 text-cyan-300 border-b-2 border-cyan-400 shadow-[0_2px_8px_rgba(0,240,255,0.15)]'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Server className="w-4 h-4 text-emerald-400" />
-            <span>{locale === 'en' ? 'Server / Shards Log' : 'Server- / Shard-Tagebuch'}</span>
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-slate-900 text-emerald-400 border border-slate-700">
-              {serverShards.length}
-            </span>
-          </button>
         </div>
 
         {/* Global System Filter */}
-        {activeTab !== 'shards' && (
-          <div className="flex items-center bg-slate-900/80 p-1 rounded-md border border-slate-800">
-            {['all', 'Stanton', 'Pyro', 'Nyx'].map((sys) => (
-              <button
-                key={sys}
-                onClick={() => setSystemFilter(sys)}
-                className={`px-3 py-1 text-[11px] font-semibold rounded cursor-pointer transition ${
-                  systemFilter === sys
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {sys === 'all' ? (locale === 'en' ? 'All Systems' : 'Alle Systeme') : sys}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center bg-slate-900/80 p-1 rounded-md border border-slate-800">
+          {['all', 'Stanton', 'Pyro', 'Nyx'].map((sys) => (
+            <button
+              key={sys}
+              onClick={() => setSystemFilter(sys)}
+              className={`px-3 py-1 text-[11px] font-semibold rounded cursor-pointer transition ${
+                systemFilter === sys
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {sys === 'all' ? (locale === 'en' ? 'All Systems' : 'Alle Systeme') : sys}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
       <div className="sc-glass rounded-lg p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {activeTab === 'shards' ? (
-            <>
-              <select
-                value={shardRatingFilter}
-                onChange={(e) => setShardRatingFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 cursor-pointer font-mono"
-              >
-                {shardRatingOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={shardRegionFilter}
-                onChange={(e) => setShardRegionFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 cursor-pointer font-mono"
-              >
-                {shardRegionOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : activeTab === 'pois' ? (
+          {activeTab === 'pois' ? (
             <select
               value={poiCategoryFilter}
               onChange={(e) => setPoiCategoryFilter(e.target.value)}
@@ -640,9 +487,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
           <input
             type="text"
             placeholder={
-              activeTab === 'shards'
-                ? 'Shard #, ID, Region oder Notiz suchen...'
-                : activeTab === 'pois'
+              activeTab === 'pois'
                 ? 'POI Name, Notiz, Himmelskörper filtern...'
                 : 'Ort oder Station filtern...'
             }
@@ -1076,256 +921,7 @@ export const PlacesView: React.FC<PlacesViewProps> = ({ initialSearch }) => {
         </div>
       )}
 
-      {/* TAB 4: SERVER- / SHARD-TAGEBUCH */}
-      {activeTab === 'shards' && (
-        <div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-1">
-          {/* KPI HUD */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="sc-glass p-3.5 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                <span>Besuchte Shards</span>
-                <Server className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div className="mt-1.5 text-2xl font-black font-mono text-cyan-300">
-                {serverShards.length}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Automatisch aus Star Citizen Logs erfasst</div>
-            </div>
 
-            <div className="sc-glass p-3.5 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                <span>Gute Server (⭐)</span>
-                <Star className="w-4 h-4 fill-emerald-400 text-emerald-400" />
-              </div>
-              <div className="mt-1.5 text-2xl font-black font-mono text-emerald-300">
-                {serverShards.filter((s) => s.rating === 'Good').length}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Hohe Server-FPS, stabile Sessions</div>
-            </div>
-
-            <div className="sc-glass p-3.5 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                <span>Zu meiden (⚠️)</span>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-              </div>
-              <div className="mt-1.5 text-2xl font-black font-mono text-rose-300">
-                {serverShards.filter((s) => s.rating === 'Avoid').length}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">30k Crashes, Lags oder Griefing</div>
-            </div>
-
-            <div className="sc-glass p-3.5 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                <span>Erfasste Spielzeit</span>
-                <Clock className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="mt-1.5 text-2xl font-black font-mono text-amber-300">
-                {formatShardDuration(serverShards.reduce((acc, s) => acc + s.totalSeconds, 0))}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Gesamte aktive Zeit auf Servern</div>
-            </div>
-          </div>
-
-          {/* Shards List / Cards */}
-          {filteredShards.length === 0 ? (
-            <div className="sc-glass p-8 rounded-lg border border-slate-800 text-center text-slate-400 font-mono text-xs">
-              Keine Server-Shards gefunden, die den Kriterien entsprechen.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
-              {filteredShards.map((shard) => {
-                const isGood = shard.rating === 'Good';
-                const isAvoid = shard.rating === 'Avoid';
-                const isCopied = copiedCigShardId === shard.shardId;
-                const isEditingNotes = editingNotesShardId === shard.shardId;
-
-                return (
-                  <div
-                    key={shard.shardId}
-                    className={`sc-glass rounded-lg p-4 border transition sc-hud-corner flex flex-col justify-between space-y-3 ${
-                      isGood
-                        ? 'border-emerald-500/40 bg-emerald-950/10'
-                        : isAvoid
-                        ? 'border-rose-500/40 bg-rose-950/10'
-                        : 'border-slate-800 bg-[#040914]/90'
-                    }`}
-                  >
-                    {/* Header */}
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xl" title={shard.region}>
-                            {shard.regionFlag || '🌐'}
-                          </span>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-white font-mono">
-                                {shard.shardNumber ? `Shard ${shard.shardNumber}` : shard.shardId}
-                              </span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
-                                {shard.region}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-400 font-mono select-all mt-0.5">
-                              {shard.shardId}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Rating Badge */}
-                        <div>
-                          {isGood && (
-                            <span className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]">
-                              <Star className="w-3 h-3 fill-emerald-400 text-emerald-400" />
-                              Gut
-                            </span>
-                          )}
-                          {isAvoid && (
-                            <span className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(239,68,68,0.25)]">
-                              <AlertTriangle className="w-3 h-3 text-rose-400" />
-                              Meiden
-                            </span>
-                          )}
-                          {!isGood && !isAvoid && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                              Neutral
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stat Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-800/80 font-mono text-[11px]">
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block text-[10px] uppercase">Besuche</span>
-                          <span className="text-slate-200 font-bold">{shard.visitCount} ×</span>
-                        </div>
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block text-[10px] uppercase">Spielzeit</span>
-                          <span className="text-amber-300 font-bold">{formatShardDuration(shard.totalSeconds)}</span>
-                        </div>
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block text-[10px] uppercase">Zuletzt gesehen</span>
-                          <span className="text-cyan-300">{formatShardDate(shard.lastSeen)}</span>
-                        </div>
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block text-[10px] uppercase">Letzter Ausgang</span>
-                          <span className={shard.lastEndReason?.includes('Crash') ? 'text-rose-400 font-bold' : 'text-slate-300'}>
-                            {shard.lastEndReason || 'Normal'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Notes Box / Editor */}
-                      <div className="mt-3">
-                        {isEditingNotes ? (
-                          <div className="space-y-2">
-                            <textarea
-                              rows={2}
-                              value={editingNotesText}
-                              onChange={(e) => setEditingNotesText(e.target.value)}
-                              placeholder="Notizen zu Server-FPS, Events, Piratenaktivität eingeben..."
-                              className="w-full bg-slate-950 border border-cyan-500/50 rounded p-2 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                            />
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setEditingNotesShardId(null)}
-                                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono transition cursor-pointer"
-                              >
-                                Abbrechen
-                              </button>
-                              <button
-                                onClick={() => handleSaveShardNotes(shard.shardId, shard.rating)}
-                                className="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold transition cursor-pointer"
-                              >
-                                Speichern
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between gap-2 p-2 rounded bg-slate-950/60 border border-slate-800/60 text-xs">
-                            <div className="text-slate-300 font-sans">
-                              {shard.notes ? (
-                                <span className="text-slate-200">📝 {shard.notes}</span>
-                              ) : (
-                                <span className="text-slate-500 italic text-[11px]">Keine Notizen zu diesem Shard hinterlegt.</span>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => {
-                                setEditingNotesShardId(shard.shardId);
-                                setEditingNotesText(shard.notes || '');
-                              }}
-                              className="text-cyan-400 hover:text-cyan-300 text-[11px] font-mono flex items-center gap-1 cursor-pointer shrink-0 ml-2"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                              {shard.notes ? 'Bearbeiten' : '+ Notiz'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Bottom Action Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-800/80">
-                      {/* Rating Buttons */}
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleUpdateShardRating(shard.shardId, 'Good', shard.notes)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono transition cursor-pointer ${
-                            isGood
-                              ? 'bg-emerald-600 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.4)]'
-                              : 'bg-slate-800/80 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-300 border border-slate-700'
-                          }`}
-                          title="Als guten, stabilen Server markieren"
-                        >
-                          <Star className="w-3 h-3" />
-                          Gut
-                        </button>
-                        <button
-                          onClick={() => handleUpdateShardRating(shard.shardId, 'Avoid', shard.notes)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono transition cursor-pointer ${
-                            isAvoid
-                              ? 'bg-rose-600 text-white font-bold shadow-[0_0_8px_rgba(239,68,68,0.4)]'
-                              : 'bg-slate-800/80 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700'
-                          }`}
-                          title="Als problematischen Server markieren (z.B. Lags, Bugs, 30k)"
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          Meiden
-                        </button>
-                        {(isGood || isAvoid) && (
-                          <button
-                            onClick={() => handleUpdateShardRating(shard.shardId, 'Neutral', shard.notes)}
-                            className="px-2 py-1 rounded text-[10px] font-mono text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 transition cursor-pointer"
-                            title="Bewertung zurücksetzen"
-                          >
-                            Zurücksetzen
-                          </button>
-                        )}
-                      </div>
-
-                      {/* 1-Click CIG Support String Button */}
-                      <button
-                        onClick={() => handleCopyCigSupport(shard)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-semibold transition cursor-pointer border ${
-                          isCopied
-                            ? 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
-                            : 'bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border-cyan-800/80 hover:border-cyan-600 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                        }`}
-                        title="Kopiert Shard-ID, Region, Spielzeit und Disconnect-Status datenschutzkonform für CIG Support & Issue Council"
-                      >
-                        {isCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
-                        <span>{isCopied ? 'CIG String kopiert!' : 'CIG Support-String'}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* MODAL: ADD NEW POI */}
       {showAddModal && (

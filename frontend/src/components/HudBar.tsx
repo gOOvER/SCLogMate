@@ -84,33 +84,18 @@ export const HudBar: React.FC<HudBarProps> = ({
     return 'text-rose-400';
   }, [telemetry.serverPingMs]);
 
-  const serverTooltipText = useMemo(() => {
-    if (!telemetry.serverShard || telemetry.serverShard === '—' || telemetry.serverShard === 'Kein Server') {
-      return 'Keine Serververbindung im aktuellen Log gefunden.';
-    }
-    const regionText = telemetry.serverRegionName && telemetry.serverRegionName !== 'Unbekannt'
-      ? `${telemetry.serverRegionName} (${telemetry.serverRegionCode})`
-      : telemetry.serverRegionCode;
-    const pingText = telemetry.serverPingMs != null ? `${telemetry.serverPingMs} ms` : 'Wird gemessen...';
-    const pilotText = telemetry.pilotName && telemetry.pilotName !== '—'
-      ? `${telemetry.pilotName}${telemetry.citizenRecord ? ` (${telemetry.citizenRecord})` : ''}`
-      : 'Unbekannter Pilot';
-    const versionText = telemetry.serverVersion && telemetry.serverVersion !== '—' ? telemetry.serverVersion : '—';
-
-    return `Vollständiger Shard-Name:\n${telemetry.serverShard}\n\nRegion: ${regionText}\nLatenz (RTT): ${pingText}\nKanal: LIVE\nSpieler: ${pilotText}\nStar Citizen Version: ${versionText}`;
-  }, [telemetry]);
-
   const [isDossierOpen, setIsDossierOpen] = useState(false);
+  const [dossierInitialTab, setDossierInitialTab] = useState<'pilot' | 'shards'>('pilot');
   const [dossierData, setDossierData] = useState<PilotProfile | null>(null);
 
-  const handleOpenDossier = async () => {
-    if (!telemetry.pilotName || telemetry.pilotName === '—' || telemetry.pilotName === 'Unbekannter Pilot' || telemetry.pilotName === 'Kein Pilot erkannt') {
-      return;
-    }
+  const handleOpenDossier = async (initialTab: 'pilot' | 'shards' = 'pilot') => {
+    setDossierInitialTab(initialTab);
+    const pilotName = telemetry.pilotName && telemetry.pilotName !== '—' && telemetry.pilotName !== 'Unbekannter Pilot' && telemetry.pilotName !== 'Kein Pilot erkannt'
+      ? telemetry.pilotName
+      : 'Pilot';
 
-    // Sofort mit Telemetry-Daten vorbefüllen für 0ms Latenz
     const immediateProfile: PilotProfile = {
-      handle: telemetry.pilotName,
+      handle: pilotName,
       citizenRecord: telemetry.citizenRecord || '',
       title: telemetry.pilotTitle || '',
       avatarUrl: telemetry.pilotAvatarUrl,
@@ -120,16 +105,18 @@ export const HudBar: React.FC<HudBarProps> = ({
       orgSid: telemetry.pilotOrgSid,
       orgRank: telemetry.pilotOrgRank,
       orgLogoUrl: telemetry.pilotOrgLogoUrl,
-      profileUrl: telemetry.pilotProfileUrl || `https://robertsspaceindustries.com/citizens/${encodeURIComponent(telemetry.pilotName)}`,
+      profileUrl: telemetry.pilotProfileUrl || `https://robertsspaceindustries.com/citizens/${encodeURIComponent(pilotName)}`,
       isVerified: true,
     };
     setDossierData(immediateProfile);
     setIsDossierOpen(true);
 
     try {
-      const full = await bridge.getPilotDossier(telemetry.pilotName);
-      if (full) {
-        setDossierData(full);
+      if (pilotName !== 'Pilot') {
+        const full = await bridge.getPilotDossier(pilotName);
+        if (full) {
+          setDossierData(full);
+        }
       }
     } catch (e) {
       console.error('Error fetching dossier:', e);
@@ -141,20 +128,30 @@ export const HudBar: React.FC<HudBarProps> = ({
       {/* ══ ZEILE 1: 3 KARTEN (Server & Instanz, Standort, Schiff) ══ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         {/* KARTE 1: PILOT & SERVER */}
-        <div
-          onClick={handleOpenDossier}
-          className="bg-[#051122]/80 border border-cyan-950/80 hover:border-cyan-700/80 rounded-lg p-2.5 flex flex-col justify-between backdrop-blur-sm transition-all shadow-sm cursor-pointer group relative"
-          title={`${serverTooltipText}\n\nKlicken für vollständiges RSI Citizen Dossier`}
-        >
+        {/* KARTE 1: PILOT & SERVER */}
+        <div className="bg-[#051122]/80 border border-cyan-950/80 hover:border-cyan-700/80 rounded-lg p-2.5 flex flex-col justify-between backdrop-blur-sm transition-all shadow-sm group relative">
           {/* Header: Label + Region-Badge mit Flagge & Ping */}
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 group-hover:text-cyan-300 transition-colors">
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenDossier('pilot');
+              }}
+              className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 hover:text-cyan-300 transition-colors cursor-pointer"
+            >
               <Server className="w-3 h-3 text-cyan-400" />
-              PILOT & SERVER
+              PILOT &amp; SERVER
             </span>
 
-            {/* Region & Ping Badge */}
-            <div className="flex items-center gap-1.5 bg-[#030814] px-2 py-0.5 rounded border border-cyan-950 text-[10px] font-mono">
+            {/* Region & Ping Badge -> Öffnet Shard-Tagebuch */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenDossier('shards');
+              }}
+              className="flex items-center gap-1.5 bg-[#030814] hover:bg-cyan-950/50 hover:border-cyan-500/60 px-2 py-0.5 rounded border border-cyan-950 text-[10px] font-mono cursor-pointer transition shadow-xs"
+              title="Klicken für Server- &amp; Shard-Tagebuch"
+            >
               <RegionFlag regionCode={telemetry.serverRegionCode} />
               <span className="font-bold text-amber-300">
                 {telemetry.serverRegionCode && telemetry.serverRegionCode !== '—' && telemetry.serverRegionCode !== 'ALL'
@@ -171,8 +168,12 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
           </div>
 
-          {/* Hauptbereich: Pilot Avatar + Name + Citizen Record + Title + Org */}
-          <div className="flex items-center gap-2 my-0.5 min-w-0">
+          {/* Hauptbereich: Pilot Avatar + Name + Citizen Record + Title + Org -> Öffnet Citizen Dossier */}
+          <div
+            onClick={() => handleOpenDossier('pilot')}
+            className="flex items-center gap-2 my-0.5 min-w-0 cursor-pointer hover:bg-cyan-950/20 p-1 -mx-1 rounded transition"
+            title="Klicken für Citizen Dossier &amp; RSI-Profil"
+          >
             {/* Avatar */}
             <div className="w-8 h-8 rounded-full bg-cyan-950/80 border border-cyan-700/60 flex items-center justify-center text-cyan-400 shrink-0 overflow-hidden shadow-xs">
               {telemetry.pilotAvatarUrl ? (
@@ -227,12 +228,24 @@ export const HudBar: React.FC<HudBarProps> = ({
             </div>
           </div>
 
-          {/* Subline: SC Version · Shard Nummer */}
-          <div className="text-[11px] font-mono text-slate-400 truncate flex items-center gap-2 mt-0.5 pt-1 border-t border-cyan-950/40">
-            <span className="text-cyan-400 font-semibold shrink-0">{cleanVersion}</span>
-            <span className="text-slate-600 shrink-0">·</span>
-            <span className="text-slate-300 font-medium truncate">
-              {displayShard}
+          {/* Subline: SC Version · Shard Nummer -> Öffnet Server- & Shard-Tagebuch */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDossier('shards');
+            }}
+            className="text-[11px] font-mono text-slate-400 truncate flex items-center justify-between mt-0.5 pt-1 border-t border-cyan-950/40 cursor-pointer hover:bg-cyan-950/30 px-1.5 py-0.5 -mx-0.5 rounded transition group/shard"
+            title="Klicken für Server- &amp; Shard-Tagebuch"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <span className="text-cyan-400 font-semibold shrink-0">{cleanVersion}</span>
+              <span className="text-slate-600 shrink-0">·</span>
+              <span className="text-slate-300 font-medium truncate group-hover/shard:text-cyan-300">
+                {displayShard}
+              </span>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-mono opacity-80 group-hover/shard:opacity-100 flex items-center gap-0.5 shrink-0 ml-1">
+              <Server className="w-2.5 h-2.5" /> Shard-Log &rarr;
             </span>
           </div>
         </div>
@@ -564,10 +577,12 @@ export const HudBar: React.FC<HudBarProps> = ({
         </div>
       </div>
 
-      {/* Pilot Citizen Dossier Modal */}
+      {/* Pilot Citizen Dossier & Shard Modal */}
       <PilotDossierModal
         isOpen={isDossierOpen}
         profile={dossierData}
+        telemetry={telemetry}
+        initialTab={dossierInitialTab}
         onClose={() => setIsDossierOpen(false)}
       />
     </div>
