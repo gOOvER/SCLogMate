@@ -14,10 +14,16 @@ import {
   Sparkles,
   Database,
   ChevronUp,
+  Trash2,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-const LEVEL_THRESHOLDS = [0, 1000, 3000, 7500, 15000, 30000];
+const DEFAULT_THRESHOLDS = [0, 1000, 3000, 7500, 15000, 30000];
+
+const getFactionThresholds = (f?: FactionReputationDto | null): number[] => {
+  if (f?.thresholds && f.thresholds.length > 0) return f.thresholds;
+  return DEFAULT_THRESHOLDS;
+};
 
 export const ReputationView: React.FC = () => {
   const { t, locale } = useI18n();
@@ -32,6 +38,8 @@ export const ReputationView: React.FC = () => {
   const [calibXp, setCalibXp] = useState<number>(0);
   const [calibMissions, setCalibMissions] = useState<number>(0);
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
+  const [isCleaningScreenshots, setIsCleaningScreenshots] = useState<boolean>(false);
+  const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
 
   const fetchReputation = async () => {
     try {
@@ -41,6 +49,21 @@ export const ReputationView: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load reputation:', err);
+    }
+  };
+
+  const handleCleanReputationScreenshots = async () => {
+    if (!confirm('Möchtest du alle erkannten Ruf-Screenshots (mobiGlas Delphi) im Screenshot-Ordner löschen?')) return;
+    try {
+      setIsCleaningScreenshots(true);
+      const res = await bridge.cleanupScreenshots('reputation');
+      setCleanFeedback(res.message || `${res.deletedCount} Ruf-Screenshots gelöscht.`);
+      setTimeout(() => setCleanFeedback(null), 6000);
+    } catch (err: any) {
+      setCleanFeedback(`✕ Fehler: ${err?.message || 'Löschen fehlgeschlagen'}`);
+      setTimeout(() => setCleanFeedback(null), 6000);
+    } finally {
+      setIsCleaningScreenshots(false);
     }
   };
 
@@ -54,10 +77,11 @@ export const ReputationView: React.FC = () => {
     return () => unbind();
   }, []);
 
-  // Quick set level (Rang 1 - 6) directly on card
+  // Quick set level directly on card
   const handleQuickSetLevel = async (faction: FactionReputationDto, level: number) => {
     try {
-      const targetXp = LEVEL_THRESHOLDS[Math.max(0, Math.min(5, level - 1))];
+      const th = getFactionThresholds(faction);
+      const targetXp = th[Math.max(0, Math.min(th.length - 1, level - 1))];
       await bridge.sendRequest('set_reputation', {
         factionId: faction.id,
         level,
@@ -198,7 +222,11 @@ export const ReputationView: React.FC = () => {
           </div>
           <div className="mt-1 text-sm font-bold font-mono text-amber-300 truncate" title={highestLevelFaction?.levelTitle}>
             {highestLevelFaction && highestLevelFaction.currentXp > 0 ? (
-              <span>Rang {highestLevelFaction.currentLevel} · {highestLevelFaction.shortName}</span>
+              <span>
+                {highestLevelFaction.hasPrestige && highestLevelFaction.currentLevel >= 4
+                  ? `Prestige ${highestLevelFaction.currentLevel - 3} · ${highestLevelFaction.shortName}`
+                  : `Rang ${highestLevelFaction.currentLevel} · ${highestLevelFaction.shortName}`}
+              </span>
             ) : (
               <span className="text-slate-500">Noch keine Beziehung</span>
             )}
@@ -315,6 +343,23 @@ export const ReputationView: React.FC = () => {
               className="w-full pl-8 pr-2.5 py-1 text-xs font-mono bg-[#030a16] border border-cyan-950 rounded text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-600"
             />
           </div>
+
+          {/* Screenshot Cleanup Button */}
+          <button
+            onClick={handleCleanReputationScreenshots}
+            disabled={isCleaningScreenshots}
+            className="px-2.5 py-1 rounded text-xs font-mono transition cursor-pointer border flex items-center gap-1.5 bg-[#1a0f14] hover:bg-[#2e1520] text-rose-300 border-rose-800/60 hover:border-rose-500 shrink-0 disabled:opacity-40"
+            title="Ruf-Screenshots (mobiGlas Delphi) im Screenshot-Ordner löschen"
+          >
+            <Trash2 className={`w-3 h-3 ${isCleaningScreenshots ? 'animate-spin text-amber-400' : 'text-rose-400'}`} />
+            <span>{isCleaningScreenshots ? 'Lösche...' : (locale === 'en' ? 'Clean Ruf Shots' : 'Ruf-Screenshots löschen')}</span>
+          </button>
+
+          {cleanFeedback && (
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 animate-fade-in shrink-0">
+              {cleanFeedback}
+            </span>
+          )}
         </div>
       </div>
 
@@ -329,38 +374,73 @@ export const ReputationView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {filtered.map((f) => {
               const catClass = getCategoryColor(f.category);
+              const thresholds = getFactionThresholds(f);
+              const isPrestigeActive = f.hasPrestige && f.currentLevel >= 4;
 
               return (
                 <div
                   key={f.id}
-                  className="bg-[#030c1a]/90 border border-cyan-950/90 rounded-lg p-3 flex flex-col justify-between hover:border-cyan-700/60 transition shadow-sm group"
+                  className={`border rounded-lg p-3 flex flex-col justify-between transition shadow-sm group ${
+                    isPrestigeActive
+                      ? 'bg-[#0a0f1d]/90 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)] hover:border-amber-400'
+                      : 'bg-[#030c1a]/90 border-cyan-950/90 hover:border-cyan-700/60'
+                  }`}
                 >
                   <div>
                     {/* Header: Icon, Name, Category & Level */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded bg-[#061426] border border-cyan-900/60 text-cyan-300 flex items-center justify-center text-base shadow-sm shrink-0">
+                        <div
+                          className={`w-8 h-8 rounded border flex items-center justify-center text-base shadow-sm shrink-0 ${
+                            isPrestigeActive
+                              ? 'bg-[#181205] border-amber-500/60 text-amber-300'
+                              : 'bg-[#061426] border-cyan-900/60 text-cyan-300'
+                          }`}
+                        >
                           {f.icon || '🛡'}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-bold text-xs font-mono text-slate-100 group-hover:text-cyan-300 transition truncate" title={f.name}>
+                          <h3
+                            className={`font-bold text-xs font-mono transition truncate ${
+                              isPrestigeActive
+                                ? 'text-amber-200 group-hover:text-amber-400'
+                                : 'text-slate-100 group-hover:text-cyan-300'
+                            }`}
+                            title={f.name}
+                          >
                             {f.name}
                           </h3>
                           <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
                             <span className={`px-1.5 py-0.2 rounded border text-[9px] ${catClass}`}>
                               {f.category}
                             </span>
+                            {f.standing && (
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-semibold border ${
+                                isPrestigeActive
+                                  ? 'bg-amber-950/60 border-amber-600/40 text-amber-300'
+                                  : 'bg-slate-900 border-slate-700 text-slate-300'
+                              }`}>
+                                {f.standing}
+                              </span>
+                            )}
                             <span className="text-slate-600">·</span>
                             <span className="truncate text-slate-400">{f.system}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Rank Badge */}
+                      {/* Rank / Prestige Badge */}
                       <div className="flex flex-col items-end shrink-0">
-                        <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-cyan-950/80 border border-cyan-700 text-cyan-300 shadow-sm">
-                          Rang {f.currentLevel}
-                        </span>
+                        {isPrestigeActive ? (
+                          <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-950/80 border border-amber-500 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)] flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-400" />
+                            Prestige {f.currentLevel - 3}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-cyan-950/80 border border-cyan-700 text-cyan-300 shadow-sm">
+                            Rang {f.currentLevel}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -368,6 +448,22 @@ export const ReputationView: React.FC = () => {
                     <p className="text-[11px] text-slate-400 mt-2 leading-relaxed line-clamp-2" title={f.description}>
                       {f.description}
                     </p>
+
+                    {/* Prestige Rewards Callout */}
+                    {f.hasPrestige && f.prestigeReward && (
+                      <div className="mt-2 p-2 rounded bg-amber-950/30 border border-amber-600/35 text-[10px] font-mono text-amber-200/90 flex items-start gap-1.5 shadow-sm">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="leading-snug">
+                          <div className="font-bold text-amber-300 flex items-center gap-1">
+                            <span>Prestige-Schiffsbelohnungen</span>
+                            <span className="text-[9px] px-1 py-0.1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-normal">
+                              Levski / Nyx
+                            </span>
+                          </div>
+                          <div className="text-amber-200/80 text-[9.5px] mt-0.5">{f.prestigeReward}</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Level Progress & Telemetry */}
@@ -384,7 +480,11 @@ export const ReputationView: React.FC = () => {
                     {/* Progress Bar */}
                     <div className="w-full h-2 rounded bg-[#020712] border border-cyan-950 overflow-hidden relative shadow-inner">
                       <div
-                        className="h-full rounded bg-gradient-to-r from-cyan-500 via-sky-400 to-amber-400 transition-all duration-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
+                        className={`h-full rounded transition-all duration-500 ${
+                          isPrestigeActive
+                            ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 shadow-[0_0_10px_rgba(245,158,11,0.5)]'
+                            : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-amber-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]'
+                        }`}
                         style={{ width: `${Math.min(100, Math.max(0, f.progressPercent))}%` }}
                       />
                     </div>
@@ -397,24 +497,39 @@ export const ReputationView: React.FC = () => {
 
                     {/* ══ MOBIGLAS DELPHI QUICK TIER SELECTOR ══ */}
                     <div className="pt-1.5 border-t border-cyan-950/60 flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider mr-1">
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider mr-1 shrink-0">
                           Delphi:
                         </span>
-                        {[1, 2, 3, 4, 5, 6].map((lvl) => (
-                          <button
-                            key={lvl}
-                            onClick={() => handleQuickSetLevel(f, lvl)}
-                            title={`Direkt auf Rang ${lvl} (${LEVEL_THRESHOLDS[lvl - 1].toLocaleString('de-DE')} XP) stellen`}
-                            className={`w-5 h-5 rounded text-[9px] font-mono font-bold flex items-center justify-center cursor-pointer transition ${
-                              f.currentLevel === lvl
-                                ? 'bg-cyan-500 text-black shadow-[0_0_8px_rgba(6,182,212,0.5)]'
-                                : 'bg-[#061426] border border-cyan-950 text-slate-400 hover:text-cyan-300 hover:border-cyan-700'
-                            }`}
-                          >
-                            {lvl}
-                          </button>
-                        ))}
+                        {thresholds.map((thXp, idx) => {
+                          const lvl = idx + 1;
+                          const isP = f.hasPrestige && lvl >= 4;
+                          const label = isP ? `P${lvl - 3}` : `${lvl}`;
+                          const rankName = f.customTitles && f.customTitles[idx]
+                            ? f.customTitles[idx]
+                            : (isP ? `Prestige ${lvl - 3}` : `Rang ${lvl}`);
+                          const title = `${rankName} (${thXp.toLocaleString('de-DE')} XP)`;
+                          const isActive = f.currentLevel === lvl;
+
+                          return (
+                            <button
+                              key={lvl}
+                              onClick={() => handleQuickSetLevel(f, lvl)}
+                              title={title}
+                              className={`h-5 min-w-[20px] px-1 rounded text-[9px] font-mono font-bold flex items-center justify-center cursor-pointer transition shrink-0 ${
+                                isActive
+                                  ? isP
+                                    ? 'bg-amber-400 text-black shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                                    : 'bg-cyan-500 text-black shadow-[0_0_8px_rgba(6,182,212,0.5)]'
+                                  : isP
+                                  ? 'bg-[#181205] border border-amber-900/60 text-amber-400/80 hover:text-amber-300 hover:border-amber-600'
+                                  : 'bg-[#061426] border border-cyan-950 text-slate-400 hover:text-cyan-300 hover:border-cyan-700'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       <button
@@ -459,31 +574,48 @@ export const ReputationView: React.FC = () => {
 
             {/* Delphi Rank Presets */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                1. Rufstufe (Delphi Delphi-Rang wählen)
-              </span>
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                  1. Rufstufe (Delphi-Rang wählen)
+                </span>
+                {calibratingFaction.hasPrestige && (
+                  <span className="text-[10px] text-amber-400 flex items-center gap-1 font-bold">
+                    <Sparkles className="w-3 h-3" /> Prestige-Track aktiv
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { lvl: 1, xp: 0, title: 'Rang 1' },
-                  { lvl: 2, xp: 1000, title: 'Rang 2' },
-                  { lvl: 3, xp: 3000, title: 'Rang 3' },
-                  { lvl: 4, xp: 7500, title: 'Rang 4' },
-                  { lvl: 5, xp: 15000, title: 'Rang 5' },
-                  { lvl: 6, xp: 30000, title: 'Rang 6' },
-                ].map((item) => (
-                  <button
-                    key={item.lvl}
-                    onClick={() => setCalibXp(item.xp)}
-                    className={`px-2 py-1.5 rounded border text-left cursor-pointer transition ${
-                      calibXp >= item.xp && (item.lvl === 6 || calibXp < LEVEL_THRESHOLDS[item.lvl])
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500 font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                        : 'bg-[#061426] border-cyan-950 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="text-[11px]">{item.title}</div>
-                    <div className="text-[9px] text-slate-500">{item.xp.toLocaleString('de-DE')} XP</div>
-                  </button>
-                ))}
+                {getFactionThresholds(calibratingFaction).map((thXp, idx) => {
+                  const lvl = idx + 1;
+                  const isP = calibratingFaction.hasPrestige && lvl >= 4;
+                  const rankName = calibratingFaction.customTitles && calibratingFaction.customTitles[idx]
+                    ? calibratingFaction.customTitles[idx]
+                    : (isP ? `Prestige ${lvl - 3}` : `Rang ${lvl}`);
+                  const ths = getFactionThresholds(calibratingFaction);
+                  const isSelected = calibXp >= thXp && (lvl === ths.length || calibXp < ths[lvl]);
+
+                  return (
+                    <button
+                      key={lvl}
+                      onClick={() => setCalibXp(thXp)}
+                      className={`px-2 py-1.5 rounded border text-left cursor-pointer transition ${
+                        isSelected
+                          ? isP
+                            ? 'bg-amber-950 text-amber-300 border-amber-500 font-bold shadow-[0_0_8px_rgba(245,158,11,0.4)]'
+                            : 'bg-cyan-950 text-cyan-300 border-cyan-500 font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                          : isP
+                          ? 'bg-[#150f04] border-amber-950 text-amber-400/70 hover:text-amber-200'
+                          : 'bg-[#061426] border-cyan-950 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="text-[11px] flex items-center gap-1">
+                        {isP && <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                        <span className="truncate" title={rankName}>{rankName}</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500">{thXp.toLocaleString('de-DE')} XP</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

@@ -7,15 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **Dynamic Log Entry & Event Detail Localization (`frontend/src/utils/eventTranslation.ts`, `frontend/src/views/EventsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/components/RegionFlag.tsx`, `frontend/src/i18n/`, `Core/Photino/PhotinoBridge.cs`)**:
+- **Complete Reputation & Factions Overhaul with Authentic Tiered XP & Dynamic Faction Catalog (`Core/ReputationService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ReputationView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Overhauled the entire reputation calculation and faction tracking system to accurately reflect Star Citizen Alpha 4.9 / 4.10 mechanics.
+  - Fixed greedy substring matching in `MatchFaction` (e.g. `orison` keyword previously misclassified all 108+ Orison Relief material supply missions as Crusader Security, inflating XP to 234,500 and overflowing progress gauges).
+  - Replaced naive `amount / 10` and flat 250 XP reward formulas with realistic tiered mission XP (`CalculateMissionXp`) accounting for risk level, objective complexity, danger indicators (`Very Dangerous`, `Ship in Distress`, `Missing Persons`, `Flight Recorder`), and hauling scale (`Small`, `Medium`, `Large`).
+  - Added SQLite schema migration v44 (`CurrentSchemaVersion = 44`) with automated idempotent event reconciliation (`ReconcileFactionReputationsFromEvents`), cleanly reconstructing historical reputations and mission counts from `MissionTaken`, `MissionReward`, and `MissionDone` events across all sessions.
+  - Automatically re-synchronizes reputation standings during `IndexNew` and `RescanAll` passes.
+- **Dynamic Application Version Display & Stale Pre-Release Label Cleanups (`frontend/src/views/AboutView.tsx`, `frontend/src/App.tsx`, `frontend/src/components/MasterHeader.tsx`, `frontend/src/services/photinoBridge.ts`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Fixed a display bug where the About view ("Über SCLogMate") displayed a hardcoded, outdated version label (`v1.0.0-rc3`) instead of the active application version (`v1.3.0`).
+  - Connected `AboutView` to dynamically resolve its version from the backend status (`Updater.CurrentVersion`) with prop passing and async fallback.
+  - Replaced stale hardcoded `v17 Schema` and `(ab RC3)` labels in AboutView with dynamic `v{dbSchema}` and clean `GNU AGPLv3`.
+  - Updated legacy fallback versions (`v1.0.0-rc2`) in `MasterHeader`, `App.tsx` footer, and diagnostics summaries to use the current runtime version.
+- **Server & Shard Diary Playtime & Visit Count Reconciliation (`Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/ServerShardsTab.tsx`)**:
+  - Fixed a critical bug causing the total recorded playtime ("Erfasste Spielzeit") and visit counts in the Server & Shard Diary to multiply on every re-indexing pass (e.g. 1327 hrs instead of 443 hrs).
+  - Replaced non-idempotent per-session additions in `IndexNew` and `RescanAll` with an idempotent, single-pass reconciliation query (`PopulateServerShardsFromSessions`) that aggregates the true total seconds and visit count directly from the `sessions` table using `ON CONFLICT(shard_id) DO UPDATE SET`.
+  - Fixed live event tracking in `PhotinoBridge.cs`: `Crash` and `EndSession` events now update the last exit reason without erroneously incrementing the session `visit_count`.
+  - Added SQLite schema migration v43 (`CurrentSchemaVersion = 43`) to automatically correct inflated playtime and visit statistics on existing databases while preserving all user-defined ratings and notes.
+  - Fully internationalized `ServerShardsTab.tsx` with locale-aware duration formatting (`X hrs Y mins` vs `X Std Y Min`) and complete English/German UI labels.
+- **Dynamic Log Entry & Event Detail Localization (`frontend/src/utils/eventTranslation.ts`, `frontend/src/views/EventsView.tsx`, `frontend/src/views/FinancesView.tsx`, `frontend/src/views/BlackboxView.tsx`, `frontend/src/components/RegionFlag.tsx`, `frontend/src/i18n/`, `Core/Photino/PhotinoBridge.cs`)**:
   - Fixed an issue where switching the app language to English left event log entries, details, drawer fields, and combat analytics in German.
-  - Implemented a high-performance regex/pattern-based dynamic translation engine (`eventTranslation.ts`) that instantly translates both live stream events and historical session records when switching between English and German.
+  - Implemented a high-performance, modular dynamic translation engine (`eventTranslation.ts`) with pluggable language bundles (`EventTranslationBundle`), multilingual dictionary reverse-lookup, and an open registration API (`registerEventTranslationBundle`, `registerTitleTranslations`) that allows arbitrary community language packs (French, Spanish, etc.) to be plugged in effortlessly without modifying core logic.
+  - Expanded translation coverage for player loadout entries, personal ship boarding (`Eigenes Schiff betreten`), ASOP fleet status (`(alle bereit)`, `im Claim/Expedite`), mission taken categories (`Fracht/Transport`, `k.A.`, difficulty levels), medical incapacitation and emergency services messages, refining completion, and flight recorder telemetry timelines (`BlackboxView.tsx`).
   - Covers all core Star Citizen gameplay categories: armistice & lawless zones, ATC & hangar doors, pilot seat & sortie transitions, server connects & disconnects, multi-step contract objectives (e.g. `Teilziel: Fracht geliefert`), quantum travel, refinery work orders, and casualty records.
   - Fully internationalized the Combat Analytics view (K/D ratios, kit losses, death cause distribution, hazard hotspots, and casualty incident cards).
   - Added bidirectional `set_language` IPC synchronization to align backend settings and DTO cleanup with the active UI locale.
   - Enhanced `cleanMissionSearch` to strip objective progress prefixes, allowing 1-click navigation directly to the corresponding contract in the Mission Manager.
+- **Settings Sub-Tab Navigation & Explicit Selection Fix (`frontend/src/App.tsx`)**:
+  - Fixed a navigation bug where clicking on the "Einstellungen" (`settings`) sub-tab pill had no effect when navigating from other views due to `handleSelectTab` retaining previous sub-tabs instead of directly activating the clicked tab.
+  - Sub-tab pills now explicitly activate the targeted view immediately.
+
+### Changed
+- **Tools Promoted to Primary Sidebar Item Before Settings (`frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`)**:
+  - Promoted "Werkzeuge" (`tools`) to a dedicated top-level primary navigation item in the main sidebar positioned directly before "Einstellungen" (`settings`).
+  - Removed "Werkzeuge" from the "Einstellungen" sub-tab bar, eliminating double-nested tab strips over `ToolsView` and giving direct 1-click access to maintenance, `user.cfg Studio`, and backups.
+- **Tools & Diagnostics Streamlining & Deduplication (`frontend/src/views/ToolsView.tsx`)**:
+  - Consolidated duplicate backups into a unified `Backups` center featuring clean sub-views for `Tastenbelegungen & Actionmaps` (with Cloud Sync) and `user.cfg Snapshots` (with 1-click restore and comparison), eliminating redundant backup sections.
+  - Streamlined `user.cfg Studio` into two focused views: `Live-Editor` and `Tuning-Schalter`, removing duplicate emoji icons (`📝`, `🎛️`, `💾`, `📖`, `⚡`, `🎨`, `💻`) and cluttered tab bars.
+  - Converted the `Befehls-Lexikon` sub-tab into interactive inline hover/click tooltips (`CvarHelpTooltip`) beside every tuning switch, plus a dedicated searchable lexicon modal dialog with 1-click value insertion.
+  - Removed the obsolete and alarming `[MUSS OBEN STEHEN]` badge from `Con_Restricted = 0` (SCLogMate automatically prepends it as the first line of `user.cfg` upon every save).
+- **Consolidated 6-Hub Navigation Architecture & Sleek Sub-Tab Bar (`frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`, `frontend/src/i18n/types.ts`, `frontend/src/i18n/locales/de.ts`, `frontend/src/i18n/locales/en.ts`)**:
+  - Streamlined SCLogMate's overloaded 17-tab sidebar into 6 intuitive, logical primary hubs with zero clutter and zero duplicates:
+    - **Logbuch & Ereignisse (`events`)**: Bundles Live-Events and Flight Recorder (Blackbox) into a unified timeline center.
+    - **Missionen & Ruf (`missions`)**: Unifies the Contract Manager (with Multi-Contract Hauling Chainer) and Reputation & Factions (mobiGlas Delphi).
+    - **Finanzen & Handel (`finances`)**: Groups Ledger & Bilanzen, Market Commodity Routes, and Refinery Work Orders.
+    - **Universum & Navigation (`starmap`)**: Combines 3D Starmap and Places & POIs.
+    - **Hangar & Logistik (`hangar`)**: Consolidates Player Fleet & Ships, Warehouse Inventory, FPS Equipment Loadouts, Blueprints, and Star Citizen Wiki Explorer.
+    - **System & Optionen (`settings`)**: Unifies Settings, Diagnostics & Tools, and About SCLogMate.
+  - Added an aerospace-styled, glassmorphic Sub-Tab Pill Bar directly above view content with real-time badges (e.g. `Lager (1.234)`, `Live-Events (32)`, `Raffinerie (2)`) and section breadcrumb hierarchy.
+  - Implemented `resolveMainTab` intelligent routing to ensure 100% backward-compatibility for all existing deep links, HUD navigation buttons, search filters, and location-detected popups.
 
 ### Added
+- **Star Citizen Screenshot Manager & OCR-Powered Selective Cleanup (`Core/ScreenshotCleanupService.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/views/FleetView.tsx`, `frontend/src/views/ReputationView.tsx`, `frontend/src/services/photinoBridge.ts`, `frontend/src/i18n/`)**:
+  - Added a Star Citizen screenshot management and selective cleanup suite in `ToolsView` (under Maintenance & Diagnostics).
+  - Automatically classifies screenshots using cached native WinRT OCR and pattern detection into:
+    - **Ship Loadout (`loadout`)**: VLM and ASOP Fleet Manager captures with component count and livery recognition.
+    - **Reputation & Delphi (`reputation`)**: mobiGlas Delphi standing and faction progression screenshots (e.g. Recco Battaglia, Bounty Hunters Guild, etc.).
+    - **Contracts (`contract`)**: mobiGlas contract manager and reward screens.
+    - **Blank / Corrupt HDR Frames (`blank`)**: Automatically identifies 101 KB blank black frames produced by Star Citizen's fullscreen HDR capture bug.
+    - **Other (`other`)**: General gameplay, scenic, and combat screenshots.
+  - Supports 1-click targeted batch cleanup:
+    - **Delete All**: Clears all screenshots in the directory with safety confirmation.
+    - **Delete Loadout**: Clears only ship loadout and component screenshots.
+    - **Delete Reputation**: Clears only mobiGlas Delphi and reputation screenshots.
+    - **Delete Blank HDR Frames**: Clears only corrupt 101 KB blank black frames.
+    - **Delete Selected**: Multi-select individual screenshots across categories to delete.
+  - Includes an interactive gallery and table with category filter pills, real-time search, multi-selection checkboxes, direct Windows Explorer folder opening, and safety confirmation modals.
+  - Added 1-click quick-clean action buttons in `ReputationView` ("Ruf-Screenshots löschen") and `FleetView` ("Screenshots bereinigen").
+- **Last Cloud Backup Timestamp Display (`Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Added real-time date and time display (`Stand: dd.MM.yyyy HH:mm Uhr`) directly inside the Cloud Backup status badge.
+  - Dynamically calculates the latest backup timestamp across all cloud logs, keybinds, and `user.cfg` snapshots, automatically updating after manual or automatic synchronizations.
+- **Prestige Tier Mechanics & Ship Unlock Tracks for Mission Givers (`Core/ReputationService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ReputationView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Implemented multi-tier Prestige ranks for mission givers, featuring Recco Battaglia's authentic Levski / Nyx progression with dedicated ship unlock milestones: Prospective Associate, Associate, Trusted Associate, Prestige 1 (10,800 XP – Drake Golem), Prestige 2 (30,000 XP – MISC Prospector), and Prestige 3 (69,600 XP – ARGO MOLE).
+  - Added authentic mobiGlas Delphi standing badges (`STANDING: NEUTRAL`, etc.) and expanded faction catalog to 29 organizations, adding `Intersec Defense Solutions` and aligning `Ling Family Hauling`, `Orison Relief Services`, `Alliance Aid`, `Adagio Holdings`, `People's Alliance of Levski`, `Shubin Interstellar`, `BitZeros`, `United Wayfarers`, `Foxwell Enforcement`, and `Citizens for Prosperity`.
+  - Added dynamic Delphi tier quick-set selectors (`[1]..[6]` / `[P1]..[P3]`) and golden amber Prestige styling, glowing badges, and ship unlock callout cards in `ReputationView.tsx`.
+  - Upgraded the Delphi calibration modal with dynamic faction-specific rank presets and fine-grained adjustment tools.
 - **Multi-Contract Hauling Chainer & Cargo Fill-Level Projection (`Core/HaulingChainer.cs`, `Models/HaulingRouteModels.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/HaulingChainerTab.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
   - Implemented an intelligent route optimizer and sequencing engine for multi-contract hauling runs across Stanton and Pyro.
   - Automatically sequences pickups and deliveries respecting strict precedence constraints (`Pickup(C_i)` before `Delivery(C_i)`), celestial clustering (grouping stops on the same planet/moon sphere), and minimal quantum jump transit distances.

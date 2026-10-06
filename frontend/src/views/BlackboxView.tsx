@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { translateEventDetail, translateEventTitle } from '../utils/eventTranslation';
 
 export const BlackboxView: React.FC = () => {
   const { t, locale } = useI18n();
@@ -279,7 +280,7 @@ export const BlackboxView: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Alle ({timeline.length})
+            {locale === 'en' ? `All (${timeline.length})` : `Alle (${timeline.length})`}
           </button>
           <button
             onClick={() => setFilterKind('quantum')}
@@ -309,7 +310,7 @@ export const BlackboxView: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Verluste
+            {locale === 'en' ? 'Losses' : 'Verluste'}
           </button>
         </div>
       </div>
@@ -319,8 +320,8 @@ export const BlackboxView: React.FC = () => {
         {filteredTimeline.length === 0 ? (
           <div className="sc-glass rounded-lg p-12 border border-slate-800 text-center flex flex-col items-center justify-center space-y-2">
             <Compass className="w-10 h-10 text-slate-600" />
-            <div className="text-slate-300 font-medium">Keine Flugereignisse erfasst</div>
-            <div className="text-xs text-slate-500">Starte das Spiel und fliege Quantum-Routen, um Telemetriedaten aufzuzeichnen.</div>
+            <div className="text-slate-300 font-medium">{locale === 'en' ? 'No flight events recorded' : 'Keine Flugereignisse erfasst'}</div>
+            <div className="text-xs text-slate-500">{locale === 'en' ? 'Launch the game and fly quantum routes to record telemetry data.' : 'Starte das Spiel und fliege Quantum-Routen, um Telemetriedaten aufzuzeichnen.'}</div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -341,7 +342,7 @@ export const BlackboxView: React.FC = () => {
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-100">{item.title}</span>
+                        <span className="text-xs font-bold text-slate-100">{translateEventTitle(item.title, locale)}</span>
                         {item.ship && (
                           <span className="px-2 py-0.2 text-[10px] font-mono rounded bg-slate-800 text-cyan-300 border border-slate-700">
                             {item.ship}
@@ -350,7 +351,7 @@ export const BlackboxView: React.FC = () => {
                       </div>
 
                       <div className="text-xs text-slate-400 mt-1 leading-relaxed">
-                        {item.subtitle}
+                        {translateEventDetail(item.subtitle, locale)}
                       </div>
 
                       {item.location && (

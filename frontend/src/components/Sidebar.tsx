@@ -1,12 +1,6 @@
 import React from 'react';
 import {
-  Award,
-  Box,
   Coins,
-  Compass,
-  FileCode2,
-  Info,
-  MapPin,
   Maximize2,
   Minimize2,
   Radar,
@@ -14,11 +8,8 @@ import {
   Scroll,
   Settings,
   Shield,
-  ShoppingBag,
   Target,
   Wrench,
-  BookOpen,
-  Flame,
   Puzzle,
   Activity,
   Cpu,
@@ -42,6 +33,7 @@ export type NavTabId =
   | 'refinery'
   | 'market'
   | 'fleet'
+  | 'hangar'
   | 'wiki'
   | 'warehouse'
   | 'blueprints'
@@ -50,6 +42,38 @@ export type NavTabId =
   | 'settings'
   | 'about'
   | (string & {});
+
+export function resolveMainTab(tab: NavTabId): NavTabId {
+  switch (tab) {
+    case 'events':
+    case 'blackbox':
+      return 'events';
+    case 'missions':
+    case 'reputation':
+      return 'missions';
+    case 'finances':
+    case 'market':
+    case 'refinery':
+      return 'finances';
+    case 'starmap':
+    case 'places':
+      return 'starmap';
+    case 'hangar':
+    case 'fleet':
+    case 'warehouse':
+    case 'loadout':
+    case 'blueprints':
+    case 'wiki':
+      return 'hangar';
+    case 'tools':
+      return 'tools';
+    case 'settings':
+    case 'about':
+      return 'settings';
+    default:
+      return tab;
+  }
+}
 
 interface NavItem {
   id: NavTabId;
@@ -102,7 +126,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   warehouseCount,
   liveEventCount,
   refineryCount,
-  autoLoadCount,
   plugins = [],
 }) => {
   const { t } = useI18n();
@@ -116,34 +139,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: getPluginIcon(p.sidebar?.icon),
     }));
 
+  const resolvedActive = resolveMainTab(activeTab);
+
   const navGroups: NavGroup[] = [
     {
       title: t('nav.categoryCore'),
       items: [
-        { id: 'events', label: t('nav.events'), icon: Scroll, badge: liveEventCount },
-        { id: 'finances', label: t('nav.finances'), icon: Coins },
-        { id: 'missions', label: t('nav.missions'), icon: Target },
-        { id: 'reputation', label: t('nav.reputation'), icon: Award },
+        { id: 'events', label: t('nav.hubLogbook'), icon: Scroll, badge: liveEventCount },
+        { id: 'missions', label: t('nav.hubMissions'), icon: Target },
+        { id: 'finances', label: t('nav.hubFinances'), icon: Coins, badge: refineryCount },
       ],
     },
     {
       title: t('nav.categoryUniverse'),
       items: [
-        { id: 'starmap', label: t('nav.starmap'), icon: Radar },
-        { id: 'places', label: t('nav.places'), icon: Compass },
-        { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
-        { id: 'refinery', label: t('nav.refinery'), icon: Flame, badge: refineryCount },
-      ],
-    },
-    {
-      title: t('nav.categoryHangar'),
-      items: [
-        { id: 'market', label: t('nav.market'), icon: ShoppingBag, badge: autoLoadCount },
-        { id: 'fleet', label: t('nav.fleet'), icon: Rocket },
-        { id: 'wiki', label: t('nav.wiki'), icon: BookOpen },
-        { id: 'warehouse', label: t('nav.warehouse'), icon: Box, badge: warehouseCount },
-        { id: 'blueprints', label: t('nav.blueprints'), icon: FileCode2 },
-        { id: 'loadout', label: t('nav.loadout'), icon: Shield },
+        { id: 'starmap', label: t('nav.hubUniverse'), icon: Radar },
+        { id: 'hangar', label: t('nav.hubHangar'), icon: Rocket, badge: warehouseCount },
       ],
     },
     ...(pluginItems.length > 0
@@ -159,7 +170,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'tools', label: t('nav.tools'), icon: Wrench },
         { id: 'settings', label: t('nav.settings'), icon: Settings },
-        { id: 'about', label: t('nav.about'), icon: Info },
       ],
     },
   ];
@@ -211,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
             {group.items.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isActive = resolvedActive === item.id;
               return (
                 <button
                   key={item.id}

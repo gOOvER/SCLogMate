@@ -113,6 +113,12 @@ export interface Translations {
     tools: string;
     settings: string;
     about: string;
+    hubLogbook: string;
+    hubMissions: string;
+    hubFinances: string;
+    hubUniverse: string;
+    hubHangar: string;
+    hubSystem: string;
   };
   dashboard: {
     financialNet: string;

@@ -36,7 +36,7 @@ public class IpcMessage
 public class AppStatusDto
 {
     [JsonPropertyName("version")]
-    public string Version { get; set; } = "1.0.0-rc2";
+    public string Version { get; set; } = $"v{Updater.CurrentVersion}";
 
     [JsonPropertyName("isLiveWatching")]
     public bool IsLiveWatching { get; set; }
@@ -61,6 +61,9 @@ public class AppStatusDto
 
     [JsonPropertyName("lastEventTime")]
     public string? LastEventTime { get; set; }
+
+    [JsonPropertyName("dbSchemaVersion")]
+    public int DbSchemaVersion { get; set; } = Database.CurrentSchemaVersion;
 }
 
 public class SessionSummaryDto
@@ -550,6 +553,9 @@ public class FactionReputationDto
     [JsonPropertyName("currentLevel")]
     public int CurrentLevel { get; set; }
 
+    [JsonPropertyName("maxLevel")]
+    public int MaxLevel { get; set; } = 6;
+
     [JsonPropertyName("levelTitle")]
     public string LevelTitle { get; set; } = "";
 
@@ -558,6 +564,21 @@ public class FactionReputationDto
 
     [JsonPropertyName("progressText")]
     public string ProgressText { get; set; } = "";
+
+    [JsonPropertyName("hasPrestige")]
+    public bool HasPrestige { get; set; }
+
+    [JsonPropertyName("prestigeReward")]
+    public string? PrestigeReward { get; set; }
+
+    [JsonPropertyName("thresholds")]
+    public int[] Thresholds { get; set; } = Array.Empty<int>();
+
+    [JsonPropertyName("standing")]
+    public string Standing { get; set; } = "Neutral";
+
+    [JsonPropertyName("customTitles")]
+    public List<string> CustomTitles { get; set; } = new();
 }
 
 public class BlueprintDto
@@ -847,6 +868,7 @@ public class ToolsStatusDto
     [JsonPropertyName("cloudAutoDetected")] public bool CloudAutoDetected { get; set; }
     [JsonPropertyName("autoCloudSyncEnabled")] public bool AutoCloudSyncEnabled { get; set; } = true;
     [JsonPropertyName("cloudLogCount")] public int CloudLogCount { get; set; }
+    [JsonPropertyName("cloudLastBackupTime")] public string? CloudLastBackupTime { get; set; }
     [JsonPropertyName("keybindItems")] public List<KeybindBackupItemDto> KeybindItems { get; set; } = new();
     [JsonPropertyName("configBackups")] public List<ConfigBackupItemDto> ConfigBackups { get; set; } = new();
     [JsonPropertyName("keybindsDir")] public string KeybindsDir { get; set; } = MaintenanceService.LocalKeybindsBackupDir;
@@ -866,6 +888,9 @@ public class ToolsStatusDto
     [JsonPropertyName("performanceIndexGpu")] public string PerformanceIndexGpu { get; set; } = "";
     [JsonPropertyName("psoCacheGenTime")] public string PsoCacheGenTime { get; set; } = "";
     [JsonPropertyName("dataCoreLoadTime")] public string DataCoreLoadTime { get; set; } = "";
+    [JsonPropertyName("screenshotCount")] public int ScreenshotCount { get; set; }
+    [JsonPropertyName("screenshotSizeMb")] public double ScreenshotSizeMb { get; set; }
+    [JsonPropertyName("screenshotFolder")] public string? ScreenshotFolder { get; set; }
 }
 
 public class SettingsDto
@@ -1112,6 +1137,7 @@ public class PhotinoBridge
     private readonly NativeMiniHudOverlay _miniHudOverlay = new();
     private readonly NativeToastOverlay _toastOverlay = new();
     private readonly ScreenshotLoadoutWatcher _screenshotWatcher;
+    private readonly ScreenshotCleanupService _screenshotCleanup;
 
     private Updater.Info? _latestUpdateInfo;
     private System.Threading.Timer? _updateCheckTimer;
@@ -1153,6 +1179,7 @@ public class PhotinoBridge
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
 
         _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
+        _screenshotCleanup = new ScreenshotCleanupService(_ocrEngine);
         _screenshotWatcher.OnLoadoutDetected += res =>
         {
             try
@@ -2418,7 +2445,7 @@ public class PhotinoBridge
 
                 case "get_sanitized_diagnostic_summary":
                     {
-                        var appVer = "1.0.0-rc2";
+                        var appVer = Updater.CurrentVersion;
                         var dbSchemaVer = Database.CurrentSchemaVersion.ToString();
                         var parserVer = Database.CurrentParserVersion.ToString();
                         var sessCount = Database.GetSessionCount();
@@ -2448,7 +2475,7 @@ public class PhotinoBridge
 
                 case "get_sanitized_bug_report":
                     {
-                        var appVer = "1.3.0";
+                        var appVer = Updater.CurrentVersion;
                         var dbSchemaVer = Database.CurrentSchemaVersion.ToString();
                         var parserVer = Database.CurrentParserVersion.ToString();
                         var sessCount = Database.GetSessionCount();
@@ -2608,9 +2635,11 @@ public class PhotinoBridge
                         int missions = p.TryGetProperty("missions", out var mP) ? mP.GetInt32() : 0;
                         if (p.TryGetProperty("level", out var lvlP))
                         {
-                            int lvl = Math.Clamp(lvlP.GetInt32(), 1, 6);
-                            int[] thresholds = { 0, 1000, 3000, 7500, 15000, 30000 };
-                            xp = thresholds[lvl - 1];
+                            int lvl = lvlP.GetInt32();
+                            var targetFac = ReputationCatalog.GetAllFactions().FirstOrDefault(f => f.Id.Equals(fId, StringComparison.OrdinalIgnoreCase));
+                            var th = targetFac?.Thresholds ?? new[] { 0, 1000, 3000, 7500, 15000, 30000 };
+                            lvl = Math.Clamp(lvl, 1, th.Length);
+                            xp = th[lvl - 1];
                         }
                         Database.SetFactionReputation(fId, xp, missions, DateTime.UtcNow);
                         SendResponse(req.Id, "set_reputation_response", new { success = true });
@@ -2965,6 +2994,63 @@ public class PhotinoBridge
                 case "clear_crash_dumps":
                     SendResponse(req.Id, "clear_crash_dumps_response", ClearCrashDumps());
                     break;
+
+                case "get_screenshot_cleanup_status":
+                {
+                    string? folderParam = null;
+                    bool autoScan = true;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("folder", out var fProp))
+                            folderParam = fProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("autoScan", out var aProp))
+                            autoScan = aProp.GetBoolean();
+                    }
+                    var scStatus = await _screenshotCleanup.GetStatusAsync(folderParam, autoScan);
+                    SendResponse(req.Id, "get_screenshot_cleanup_status_response", scStatus);
+                    break;
+                }
+
+                case "cleanup_screenshots":
+                {
+                    string cleanMode = "all";
+                    List<string>? cleanPaths = null;
+                    string? targetFolder = null;
+                    if (req.Payload.HasValue)
+                    {
+                        if (req.Payload.Value.TryGetProperty("mode", out var mProp))
+                            cleanMode = mProp.GetString() ?? "all";
+                        if (req.Payload.Value.TryGetProperty("folder", out var fProp))
+                            targetFolder = fProp.GetString();
+                        if (req.Payload.Value.TryGetProperty("filePaths", out var pathsProp) && pathsProp.ValueKind == JsonValueKind.Array)
+                        {
+                            cleanPaths = new List<string>();
+                            foreach (var el in pathsProp.EnumerateArray())
+                            {
+                                var p = el.GetString();
+                                if (!string.IsNullOrWhiteSpace(p)) cleanPaths.Add(p);
+                            }
+                        }
+                    }
+                    var cleanRes = await _screenshotCleanup.DeleteScreenshotsAsync(cleanMode, cleanPaths, targetFolder);
+                    Broadcast("TOOLS_UPDATED", GetToolsStatus());
+                    if (cleanRes.DeletedCount > 0)
+                    {
+                        _toastOverlay.ShowToast("📷", "SCREENSHOTS BEREINIGT", $"{cleanRes.DeletedCount} Screenshots gelöscht", cleanRes.Message, 0x0038BDF8u);
+                    }
+                    SendResponse(req.Id, "cleanup_screenshots_response", cleanRes);
+                    break;
+                }
+
+                case "open_screenshot_folder":
+                {
+                    string? openFolder = null;
+                    if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("folder", out var fProp2))
+                        openFolder = fProp2.GetString();
+                    bool opened = _screenshotCleanup.OpenFolderInExplorer(openFolder);
+                    SendResponse(req.Id, "open_screenshot_folder_response", new { success = opened });
+                    break;
+                }
 
                 case "save_user_cfg":
                     string cfgContent = "";
@@ -4690,7 +4776,7 @@ public class PhotinoBridge
 
         return new AppStatusDto
         {
-            Version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0-rc2",
+            Version = $"v{Updater.CurrentVersion}",
             IsLiveWatching = _tailer != null,
             LogPath = _currentLogPath,
             ActiveSessionName = _activeSessionName ?? "Live Session",
@@ -4699,6 +4785,7 @@ public class PhotinoBridge
             TotalSpend = spend,
             TotalNet = income - spend,
             LastEventTime = _lastEventTime?.ToString("HH:mm:ss"),
+            DbSchemaVersion = Database.CurrentSchemaVersion,
         };
     }
 
@@ -5854,28 +5941,16 @@ public class PhotinoBridge
             // einmalig historische Missions-Events als Initialwert einlesen und fest in SQLite speichern.
             if (!hasSavedData)
             {
-                var missionEvents = Database.LoadRecentEvents(5000)
-                    .Where(e => e.Kind is EventKind.Mission or EventKind.MissionDone or EventKind.MissionReward)
-                    .ToList();
+                Database.ReconcileFactionReputations();
+                savedRep = Database.LoadFactionReputations();
 
-                foreach (var ev in missionEvents)
+                foreach (var f in list)
                 {
-                    var matched = ReputationCatalog.MatchFaction(ev.Detail) ?? ReputationCatalog.MatchFaction(ev.Ship);
-                    if (matched != null)
+                    if (savedRep.TryGetValue(f.Id, out var saved))
                     {
-                        var target = list.FirstOrDefault(f => f.Id == matched.Id);
-                        if (target != null)
-                        {
-                            target.CompletedMissions++;
-                            target.CurrentXp += 250;
-                        }
+                        f.CurrentXp = saved.Xp;
+                        f.CompletedMissions = saved.Missions;
                     }
-                }
-
-                // Initial-Stände fest in SQLite sichern
-                foreach (var f in list.Where(x => x.CurrentXp > 0 || x.CompletedMissions > 0))
-                {
-                    Database.SetFactionReputation(f.Id, f.CurrentXp, f.CompletedMissions, DateTime.UtcNow);
                 }
             }
         }
@@ -5896,9 +5971,15 @@ public class PhotinoBridge
             CurrentXp = f.CurrentXp,
             CompletedMissions = f.CompletedMissions,
             CurrentLevel = f.CurrentLevel,
+            MaxLevel = f.MaxLevel,
             LevelTitle = f.LevelTitle,
             ProgressPercent = f.LevelProgressPercent,
             ProgressText = f.ProgressText,
+            HasPrestige = f.HasPrestige,
+            PrestigeReward = f.PrestigeReward,
+            Thresholds = f.Thresholds,
+            Standing = f.Standing,
+            CustomTitles = f.CustomTitles ?? new(),
         }).ToList();
     }
 
@@ -6720,16 +6801,56 @@ public class PhotinoBridge
         var configList = MaintenanceService.ListConfigBackups(settings.CloudStoragePath);
 
         int cloudLogCount = 0;
+        string? cloudLastBackupTime = null;
         var chosenCloud = !string.IsNullOrWhiteSpace(settings.CloudStoragePath) ? settings.CloudStoragePath : effectiveCloud;
         if (!string.IsNullOrWhiteSpace(chosenCloud))
         {
             try
             {
-                var cloudLogsDir = Path.Combine(chosenCloud, "SCLogMate", "Logs");
-                if (Directory.Exists(cloudLogsDir))
+                var cloudBase = Path.Combine(chosenCloud, "SCLogMate");
+                if (Directory.Exists(cloudBase))
                 {
-                    cloudLogCount = Directory.GetFiles(cloudLogsDir, "*.log").Length;
+                    var cloudLogsDir = Path.Combine(cloudBase, "Logs");
+                    if (Directory.Exists(cloudLogsDir))
+                    {
+                        cloudLogCount = Directory.GetFiles(cloudLogsDir, "*.log").Length;
+                    }
+
+                    var dirInfo = new DirectoryInfo(cloudBase);
+                    var allFiles = dirInfo.GetFiles("*.*", SearchOption.AllDirectories);
+                    if (allFiles.Length > 0)
+                    {
+                        DateTime maxTime = DateTime.MinValue;
+                        foreach (var fi in allFiles)
+                        {
+                            if (fi.LastWriteTime > maxTime) maxTime = fi.LastWriteTime;
+                            if (fi.CreationTime > maxTime) maxTime = fi.CreationTime;
+                        }
+                        if (maxTime > DateTime.MinValue)
+                        {
+                            cloudLastBackupTime = maxTime.ToString("dd.MM.yyyy HH:mm");
+                        }
+                    }
                 }
+            }
+            catch { }
+        }
+
+        var scFolderResolved = _screenshotCleanup.ResolveScreenshotFolder();
+        int scCount = 0;
+        double scSizeMb = 0;
+        if (!string.IsNullOrEmpty(scFolderResolved) && Directory.Exists(scFolderResolved))
+        {
+            try
+            {
+                var di = new DirectoryInfo(scFolderResolved);
+                var scFiles = di.EnumerateFiles("*.*", SearchOption.TopDirectoryOnly)
+                    .Where(f => f.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                                f.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                                f.Extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                scCount = scFiles.Count;
+                scSizeMb = Math.Round((double)scFiles.Sum(f => f.Length) / (1024 * 1024), 1);
             }
             catch { }
         }
@@ -6738,6 +6859,9 @@ public class PhotinoBridge
         {
             ShaderCacheMb = shaderMb,
             CrashDumpsMb = crashMb,
+            ScreenshotCount = scCount,
+            ScreenshotSizeMb = scSizeMb,
+            ScreenshotFolder = scFolderResolved,
             UserCfgPath = cfgPath,
             UserCfgExists = cfgExists,
             UserCfgContent = cfgContent,
@@ -6751,6 +6875,7 @@ public class PhotinoBridge
             CloudAutoDetected = string.IsNullOrWhiteSpace(settings.CloudStoragePath) && !string.IsNullOrWhiteSpace(effectiveCloud),
             AutoCloudSyncEnabled = settings.AutoCloudSyncEnabled,
             CloudLogCount = cloudLogCount,
+            CloudLastBackupTime = cloudLastBackupTime,
             KeybindBackups = keybindList.Select(k => $"{k.Name} ({k.FileCount} Dateien, {k.SizeFormatted})").ToList(),
             KeybindItems = keybindList.Select(k => new KeybindBackupItemDto
             {
@@ -7435,7 +7560,7 @@ public class PhotinoBridge
                     var fac = ReputationCatalog.MatchFaction(entry.Detail) ?? ReputationCatalog.MatchFaction(entry.Ship);
                     if (fac != null)
                     {
-                        int xpGained = (int)Math.Max(250, Math.Min(3500, entry.Amount > 0 ? entry.Amount / 10 : 500));
+                        int xpGained = ReputationCatalog.CalculateMissionXp(entry.Detail ?? "", entry.Amount, entry.Ship, null);
                         Database.AddFactionReputationXp(fac.Id, xpGained, entry.Time);
                         Broadcast("reputation_response", GetReputationData());
                     }
@@ -7454,7 +7579,7 @@ public class PhotinoBridge
                 if (entry.Kind == EventKind.SessionChange && _parser.Meta.TryGetValue("shard", out var curShard) && !string.IsNullOrEmpty(curShard))
                 {
                     TriggerServerPing(curShard);
-                    Database.UpsertShardVisit(curShard, entry.Time, 0, null);
+                    Database.UpsertShardVisit(curShard, entry.Time, 0, null, true);
                     Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
                 }
                 else if (entry.Kind == EventKind.Crash)
@@ -7462,7 +7587,7 @@ public class PhotinoBridge
                     _lastEndReason = entry.Detail;
                     if (_parser.Meta.TryGetValue("shard", out var crashShard) && !string.IsNullOrEmpty(crashShard))
                     {
-                        Database.UpsertShardVisit(crashShard, entry.Time, 0, entry.Detail);
+                        Database.UpsertShardVisit(crashShard, entry.Time, 0, entry.Detail, false);
                         Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
                     }
                 }
@@ -7471,7 +7596,7 @@ public class PhotinoBridge
                     _lastEndReason = "Normal Quit";
                     if (_parser.Meta.TryGetValue("shard", out var exitShard) && !string.IsNullOrEmpty(exitShard))
                     {
-                        Database.UpsertShardVisit(exitShard, entry.Time, 0, "Normal Quit");
+                        Database.UpsertShardVisit(exitShard, entry.Time, 0, "Normal Quit", false);
                         Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
                     }
                 }

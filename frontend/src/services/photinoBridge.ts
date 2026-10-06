@@ -23,6 +23,7 @@ export interface AppStatus {
   totalSpend: number;
   totalNet: number;
   lastEventTime: string | null;
+  dbSchemaVersion?: number;
 }
 
 export interface HudTelemetry {
@@ -297,9 +298,15 @@ export interface FactionReputationDto {
   currentXp: number;
   completedMissions: number;
   currentLevel: number;
+  maxLevel: number;
   levelTitle: string;
   progressPercent: number;
   progressText: string;
+  hasPrestige?: boolean;
+  prestigeReward?: string;
+  thresholds?: number[];
+  standing?: string;
+  customTitles?: string[];
 }
 
 export interface BlueprintDto {
@@ -736,6 +743,7 @@ export interface ToolsStatusDto {
   cloudAutoDetected?: boolean;
   autoCloudSyncEnabled?: boolean;
   cloudLogCount?: number;
+  cloudLastBackupTime?: string;
   keybindItems?: KeybindBackupItemDto[];
   configBackups?: ConfigBackupItemDto[];
   keybindsDir?: string;
@@ -753,6 +761,49 @@ export interface ToolsStatusDto {
   performanceIndexGpu?: string;
   psoCacheGenTime?: string;
   dataCoreLoadTime?: string;
+  screenshotCount?: number;
+  screenshotSizeMb?: number;
+  screenshotFolder?: string | null;
+}
+
+export interface ScreenshotItemDto {
+  fileName: string;
+  filePath: string;
+  fileSizeBytes: number;
+  sizeFormatted: string;
+  lastModified: string;
+  lastModifiedFormatted: string;
+  category: 'loadout' | 'reputation' | 'contract' | 'blank' | 'other' | 'unscanned';
+  categoryLabel: string;
+  details: string;
+}
+
+export interface ScreenshotCleanupStatusDto {
+  folderPath: string;
+  folderExists: boolean;
+  totalCount: number;
+  totalSizeMb: number;
+  totalSizeFormatted: string;
+  loadoutCount: number;
+  loadoutSizeMb: number;
+  reputationCount: number;
+  reputationSizeMb: number;
+  contractCount: number;
+  contractSizeMb: number;
+  blankCount: number;
+  blankSizeMb: number;
+  otherCount: number;
+  otherSizeMb: number;
+  items: ScreenshotItemDto[];
+}
+
+export interface ScreenshotDeleteResultDto {
+  success: boolean;
+  deletedCount: number;
+  freedBytes: number;
+  freedSizeFormatted: string;
+  message: string;
+  status: ScreenshotCleanupStatusDto;
 }
 
 export interface ScanRegionDto {
@@ -1552,6 +1603,22 @@ class PhotinoBridge {
     return this.sendRequest<{ isWatching: boolean; folder?: string }>('toggle_screenshot_watcher', { enabled, folder });
   }
 
+  public getScreenshotCleanupStatus(folder?: string, autoScan = true): Promise<ScreenshotCleanupStatusDto> {
+    return this.sendRequest<ScreenshotCleanupStatusDto>('get_screenshot_cleanup_status', { folder, autoScan });
+  }
+
+  public cleanupScreenshots(
+    mode: 'all' | 'reputation' | 'loadout' | 'contract' | 'blank' | 'other' | 'selected',
+    filePaths?: string[],
+    folder?: string
+  ): Promise<ScreenshotDeleteResultDto> {
+    return this.sendRequest<ScreenshotDeleteResultDto>('cleanup_screenshots', { mode, filePaths, folder });
+  }
+
+  public openScreenshotFolder(folder?: string): Promise<{ success: boolean }> {
+    return this.sendRequest<{ success: boolean }>('open_screenshot_folder', { folder });
+  }
+
   public getSanitizedDiagnosticSummary(): Promise<{ summary: string }> {
     return this.sendRequest<{ summary: string }>('get_sanitized_diagnostic_summary');
   }
@@ -1813,14 +1880,14 @@ class PhotinoBridge {
 
       case 'get_sanitized_diagnostic_summary':
         return {
-          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.0.0-rc3\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.3.0\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
         };
 
       case 'check_update':
         return {
           updateAvailable: false,
-          currentVersion: 'v1.0.0-rc3',
-          newVersion: 'v1.0.0-rc3',
+          currentVersion: 'v1.3.0',
+          newVersion: 'v1.3.0',
           releaseNotes: '',
           htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
         } as UpdateInfoDto;
@@ -1887,7 +1954,7 @@ class PhotinoBridge {
 
       case 'get_status':
         return {
-          version: '1.0.0-photino-preview',
+          version: 'v1.3.0',
           isLiveWatching: true,
           logPath: 'C:\\Games\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log',
           activeSessionName: 'Game.log (Aktuell)',
@@ -1896,6 +1963,7 @@ class PhotinoBridge {
           totalSpend: 980000,
           totalNet: 3270000,
           lastEventTime: new Date().toLocaleTimeString(),
+          dbSchemaVersion: 43,
         } as AppStatus;
 
       case 'get_sessions':
@@ -2678,8 +2746,103 @@ class PhotinoBridge {
       case 'get_tools_status':
       case 'clear_shader_cache':
       case 'clear_crash_dumps':
-      case 'save_user_cfg':
-      case 'backup_keybinds':
+        return {
+          shaderCacheMb: type === 'clear_shader_cache' ? 0 : 342.5,
+          crashDumpsMb: type === 'clear_crash_dumps' ? 0 : 85.2,
+          screenshotCount: 47,
+          screenshotSizeMb: 18.4,
+          screenshotFolder: 'J:\\StarCitizen\\LIVE\\ScreenShots',
+          userCfgPath: 'J:\\StarCitizen\\LIVE\\user.cfg',
+          userCfgExists: true,
+          userCfgContent: payload?.cfgContent || 'r_VSync = 0\nr_MotionBlur = 0\nsys_maxfps = 120\nr_TexturesStreamPoolSize = 6144\nr_DisplayInfo = 1\ng_language = english',
+          totalRamGb: 64,
+          ramStatus: '64 GB (Optimal)',
+          driveName: 'J:',
+          freeDiskGb: 485.6,
+          pagefileStatus: 'Aktiv (NVMe SSD)',
+          cloudStoragePath: 'C:\\Users\\Pilot\\OneDrive\\StarCitizen',
+          keybindBackups: [
+            'backup_2026-03-01_dualstick (5 Dateien, 1.2 MB)',
+            'backup_2026-02-15_flight (4 Dateien, 980 KB)',
+          ],
+          keybindItems: [],
+          configBackups: [],
+          keybindsDir: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\keybind_backups',
+          configDir: 'C:\\Users\\Pilot\\AppData\\Roaming\\SCLogMate\\config_backups',
+        };
+
+      case 'get_screenshot_cleanup_status':
+        return {
+          folderPath: 'J:\\StarCitizen\\LIVE\\ScreenShots',
+          folderExists: true,
+          totalCount: 47,
+          totalSizeMb: 18.4,
+          totalSizeFormatted: '18.4 MB',
+          loadoutCount: 24,
+          loadoutSizeMb: 11.2,
+          reputationCount: 0,
+          reputationSizeMb: 0,
+          contractCount: 0,
+          contractSizeMb: 0,
+          blankCount: 12,
+          blankSizeMb: 1.2,
+          otherCount: 11,
+          otherSizeMb: 6.0,
+          items: [
+            {
+              fileName: 'ScreenShot-2026-09-20_06-38-22-CE2.jpg',
+              filePath: 'J:\\StarCitizen\\LIVE\\ScreenShots\\ScreenShot-2026-09-20_06-38-22-CE2.jpg',
+              fileSizeBytes: 474065,
+              sizeFormatted: '463 KB',
+              lastModified: '2026-09-20T06:38:22Z',
+              lastModifiedFormatted: '20.09.2026 06:38:22',
+              category: 'loadout',
+              categoryLabel: 'Schiffsausrüstung',
+              details: 'ARGO MOTH (Rockwell Livery)',
+            },
+            {
+              fileName: 'ScreenShot-2026-10-06_15-13-22-BD4.jpg',
+              filePath: 'J:\\StarCitizen\\LIVE\\ScreenShots\\ScreenShot-2026-10-06_15-13-22-BD4.jpg',
+              fileSizeBytes: 101411,
+              sizeFormatted: '99 KB',
+              lastModified: '2026-10-06T15:13:22Z',
+              lastModifiedFormatted: '06.10.2026 15:13:22',
+              category: 'blank',
+              categoryLabel: 'Leerer Frame (HDR-Bug)',
+              details: 'Schwarzer 2560x1440 Frame',
+            },
+          ],
+        } as ScreenshotCleanupStatusDto;
+
+      case 'cleanup_screenshots':
+        return {
+          success: true,
+          deletedCount: (payload?.filePaths?.length as number) || 24,
+          freedBytes: 11744051,
+          freedSizeFormatted: '11.2 MB',
+          message: 'Screenshots erfolgreich bereinigt.',
+          status: {
+            folderPath: 'J:\\StarCitizen\\LIVE\\ScreenShots',
+            folderExists: true,
+            totalCount: 23,
+            totalSizeMb: 7.2,
+            totalSizeFormatted: '7.2 MB',
+            loadoutCount: 0,
+            loadoutSizeMb: 0,
+            reputationCount: 0,
+            reputationSizeMb: 0,
+            contractCount: 0,
+            contractSizeMb: 0,
+            blankCount: 12,
+            blankSizeMb: 1.2,
+            otherCount: 11,
+            otherSizeMb: 6.0,
+            items: [],
+          },
+        } as ScreenshotDeleteResultDto;
+
+      case 'open_screenshot_folder':
+        return { success: true };
       case 'restore_keybinds':
       case 'backup_user_cfg':
       case 'restore_user_cfg':
@@ -2688,8 +2851,11 @@ class PhotinoBridge {
       case 'sync_logs_cloud':
       case 'open_folder':
         return {
-          shaderCacheMb: type === 'clear_shader_cache' ? 0 : 342.5,
-          crashDumpsMb: type === 'clear_crash_dumps' ? 0 : 85.2,
+          shaderCacheMb: 342.5,
+          crashDumpsMb: 85.2,
+          screenshotCount: 47,
+          screenshotSizeMb: 18.4,
+          screenshotFolder: 'J:\\StarCitizen\\LIVE\\ScreenShots',
           userCfgPath: 'J:\\StarCitizen\\LIVE\\user.cfg',
           userCfgExists: true,
           userCfgContent: payload?.cfgContent || 'r_VSync = 0\nr_MotionBlur = 0\nsys_maxfps = 120\nr_TexturesStreamPoolSize = 6144\nr_DisplayInfo = 1\ng_language = english',

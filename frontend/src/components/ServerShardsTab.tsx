@@ -105,11 +105,11 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
   };
 
   const formatShardDuration = (seconds: number) => {
-    if (seconds <= 0) return '0 min';
+    if (seconds <= 0) return locale === 'en' ? '0 min' : '0 Min';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    if (hrs > 0) return `${hrs} Std ${mins} Min`;
-    return `${mins} Min`;
+    if (hrs > 0) return locale === 'en' ? `${hrs} hrs ${mins} mins` : `${hrs} Std ${mins} Min`;
+    return locale === 'en' ? `${mins} mins` : `${mins} Min`;
   };
 
   const filteredShards = useMemo(() => {
@@ -184,7 +184,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Shard-ID / Notiz suchen..."
+              placeholder={locale === 'en' ? 'Search shard ID / notes...' : 'Shard-ID / Notiz suchen...'}
               className="bg-slate-900/80 border border-slate-800 rounded pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-52 font-mono"
             />
             {search && (
@@ -202,7 +202,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
             onClick={fetchServerShards}
             disabled={loading}
             className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 transition cursor-pointer"
-            title="Aktualisieren"
+            title={locale === 'en' ? 'Refresh' : 'Aktualisieren'}
           >
             <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -213,53 +213,53 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="sc-glass p-3 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-            <span>Besuchte Shards</span>
+            <span>{locale === 'en' ? 'Visited Shards' : 'Besuchte Shards'}</span>
             <Server className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="mt-1 text-2xl font-black font-mono text-cyan-300">
             {serverShards.length}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Automatisch aus Star Citizen Logs erfasst</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{locale === 'en' ? 'Recorded automatically from Star Citizen logs' : 'Automatisch aus Star Citizen Logs erfasst'}</div>
         </div>
 
         <div className="sc-glass p-3 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-            <span>Gute Server (⭐)</span>
+            <span>{locale === 'en' ? 'Good Servers (⭐)' : 'Gute Server (⭐)'}</span>
             <Star className="w-4 h-4 fill-emerald-400 text-emerald-400" />
           </div>
           <div className="mt-1 text-2xl font-black font-mono text-emerald-300">
             {serverShards.filter((s) => s.rating === 'Good').length}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Hohe Server-FPS, stabile Sessions</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{locale === 'en' ? 'High server FPS, stable sessions' : 'Hohe Server-FPS, stabile Sessions'}</div>
         </div>
 
         <div className="sc-glass p-3 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-            <span>Zu meiden (⚠️)</span>
+            <span>{locale === 'en' ? 'Avoid Shards (⚠️)' : 'Zu meiden (⚠️)'}</span>
             <AlertTriangle className="w-4 h-4 text-rose-400" />
           </div>
           <div className="mt-1 text-2xl font-black font-mono text-rose-300">
             {serverShards.filter((s) => s.rating === 'Avoid').length}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">30k Crashes, Lags oder Griefing</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{locale === 'en' ? '30k crashes, lags or griefing' : '30k Crashes, Lags oder Griefing'}</div>
         </div>
 
         <div className="sc-glass p-3 rounded-lg border border-cyan-950/80 bg-[#040914]/90 sc-hud-corner">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-            <span>Erfasste Spielzeit</span>
+            <span>{locale === 'en' ? 'Recorded Playtime' : 'Erfasste Spielzeit'}</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
           <div className="mt-1 text-2xl font-black font-mono text-amber-300">
             {formatShardDuration(serverShards.reduce((acc, s) => acc + s.totalSeconds, 0))}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Gesamte aktive Zeit auf Servern</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{locale === 'en' ? 'Total active playtime on servers' : 'Gesamte aktive Zeit auf Servern'}</div>
         </div>
       </div>
 
       {/* Shards Cards Grid */}
       {filteredShards.length === 0 ? (
         <div className="sc-glass p-8 rounded-lg border border-slate-800 text-center text-slate-400 font-mono text-xs">
-          Keine Server-Shards gefunden, die den Kriterien entsprechen.
+          {locale === 'en' ? 'No server shards found matching the criteria.' : 'Keine Server-Shards gefunden, die den Kriterien entsprechen.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto pr-1">
@@ -300,7 +300,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                           </span>
                           {isCurrent && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/60 animate-pulse">
-                              AKTUELL AKTIV
+                              {locale === 'en' ? 'CURRENTLY ACTIVE' : 'AKTUELL AKTIV'}
                             </span>
                           )}
                         </div>
@@ -315,13 +315,13 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                       {isGood && (
                         <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]">
                           <Star className="w-3 h-3 fill-emerald-400 text-emerald-400" />
-                          Gut
+                          {locale === 'en' ? 'Good' : 'Gut'}
                         </span>
                       )}
                       {isAvoid && (
                         <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]">
                           <AlertTriangle className="w-3 h-3 text-rose-400" />
-                          Meiden
+                          {locale === 'en' ? 'Avoid' : 'Meiden'}
                         </span>
                       )}
                       {!isGood && !isAvoid && (
@@ -335,17 +335,17 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                   {/* Metadata Row */}
                   <div className="mt-2.5 pt-2 border-t border-slate-800/60 grid grid-cols-3 gap-2 text-[11px] font-mono text-slate-400">
                     <div>
-                      <span className="text-slate-500 block text-[10px]">Besuche:</span>
+                      <span className="text-slate-500 block text-[10px]">{locale === 'en' ? 'Visits:' : 'Besuche:'}</span>
                       <span className="text-slate-200 font-semibold">{shard.visitCount}x</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[10px]">Spielzeit:</span>
+                      <span className="text-slate-500 block text-[10px]">{locale === 'en' ? 'Playtime:' : 'Spielzeit:'}</span>
                       <span className="text-cyan-300 font-semibold">
                         {formatShardDuration(shard.totalSeconds)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[10px]">Letzter Exit:</span>
+                      <span className="text-slate-500 block text-[10px]">{locale === 'en' ? 'Last Exit:' : 'Letzter Exit:'}</span>
                       <span className="text-amber-300 truncate block" title={shard.lastEndReason || 'Normal Quit'}>
                         {shard.lastEndReason || 'Normal Quit'}
                       </span>
@@ -359,7 +359,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                         <textarea
                           value={editingNotesText}
                           onChange={(e) => setEditingNotesText(e.target.value)}
-                          placeholder="Eigene Notizen zu diesem Shard eingeben (z. B. 'Sehr stabil', 'Griefing an Seraphim', 'Lags')..."
+                          placeholder={locale === 'en' ? "Enter personal notes for this shard (e.g. 'Very stable', 'Griefing at Seraphim', 'Lags')..." : "Eigene Notizen zu diesem Shard eingeben (z. B. 'Sehr stabil', 'Griefing an Seraphim', 'Lags')..."}
                           className="w-full bg-slate-900 border border-cyan-500/50 rounded p-1.5 text-xs text-slate-200 focus:outline-none resize-none h-16"
                         />
                         <div className="flex justify-end gap-1.5">
@@ -370,13 +370,13 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                             }}
                             className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
                           >
-                            Abbrechen
+                            {locale === 'en' ? 'Cancel' : 'Abbrechen'}
                           </button>
                           <button
                             onClick={() => handleSaveNotes(shard.shardId)}
                             className="px-2 py-0.5 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[10px] flex items-center gap-1"
                           >
-                            <Check className="w-3 h-3" /> Speichern
+                            <Check className="w-3 h-3" /> {locale === 'en' ? 'Save' : 'Speichern'}
                           </button>
                         </div>
                       </div>
@@ -386,7 +386,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                           {shard.notes ? (
                             <span>„{shard.notes}“</span>
                           ) : (
-                            <span className="text-slate-500 not-italic">Keine Notiz vorhanden.</span>
+                            <span className="text-slate-500 not-italic">{locale === 'en' ? 'No notes available.' : 'Keine Notiz vorhanden.'}</span>
                           )}
                         </div>
                         <button
@@ -395,7 +395,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                             setEditingNotesText(shard.notes || '');
                           }}
                           className="text-slate-500 hover:text-cyan-400 p-0.5 rounded cursor-pointer transition shrink-0"
-                          title="Notiz bearbeiten"
+                          title={locale === 'en' ? 'Edit note' : 'Notiz bearbeiten'}
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
@@ -408,7 +408,7 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
                   {/* Rating Selector */}
                   <div className="flex items-center gap-1 text-[11px] font-mono">
-                    <span className="text-slate-500 text-[10px] mr-1">Bewertung:</span>
+                    <span className="text-slate-500 text-[10px] mr-1">{locale === 'en' ? 'Rating:' : 'Bewertung:'}</span>
                     <button
                       onClick={() => handleSetRating(shard.shardId, isGood ? 'Neutral' : 'Good')}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border transition cursor-pointer flex items-center gap-1 ${
@@ -416,10 +416,10 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                           ? 'bg-emerald-950 text-emerald-300 border-emerald-500/80'
                           : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-emerald-400 hover:border-emerald-700'
                       }`}
-                      title="Als stabilen / guten Shard markieren"
+                      title={locale === 'en' ? 'Mark as stable / good shard' : 'Als stabilen / guten Shard markieren'}
                     >
                       <Star className="w-2.5 h-2.5" />
-                      <span>Gut</span>
+                      <span>{locale === 'en' ? 'Good' : 'Gut'}</span>
                     </button>
 
                     <button
@@ -429,10 +429,10 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                           ? 'bg-rose-950 text-rose-300 border-rose-500/80'
                           : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-rose-400 hover:border-rose-700'
                       }`}
-                      title="Als instabilen / fehlerhaften Shard markieren"
+                      title={locale === 'en' ? 'Mark as unstable / laggy shard' : 'Als instabilen / fehlerhaften Shard markieren'}
                     >
                       <AlertTriangle className="w-2.5 h-2.5" />
-                      <span>Meiden</span>
+                      <span>{locale === 'en' ? 'Avoid' : 'Meiden'}</span>
                     </button>
                   </div>
 
@@ -440,17 +440,17 @@ export const ServerShardsTab: React.FC<ServerShardsTabProps> = ({ currentShardId
                   <button
                     onClick={() => handleCopyCigSupport(shard)}
                     className="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-300 text-[10px] font-mono transition cursor-pointer shadow-xs"
-                    title="Kopiert standardisierten Diagnosestring für CIG Support & Issue Council Reports"
+                    title={locale === 'en' ? 'Copies standardized diagnostic string for CIG support & issue council reports' : 'Kopiert standardisierten Diagnosestring für CIG Support & Issue Council Reports'}
                   >
                     {isCopied ? (
                       <>
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-400 font-bold">Kopiert!</span>
+                        <span className="text-emerald-400 font-bold">{locale === 'en' ? 'Copied!' : 'Kopiert!'}</span>
                       </>
                     ) : (
                       <>
                         <ClipboardCopy className="w-3 h-3 text-cyan-400" />
-                        <span>CIG-String kopieren</span>
+                        <span>{locale === 'en' ? 'Copy CIG String' : 'CIG-String kopieren'}</span>
                       </>
                     )}
                   </button>

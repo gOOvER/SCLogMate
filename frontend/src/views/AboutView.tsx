@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   ExternalLink,
@@ -10,13 +10,32 @@ import {
   Globe,
   RefreshCw,
 } from 'lucide-react';
-import { bridge } from '../services/photinoBridge';
+import { bridge, AppStatus } from '../services/photinoBridge';
 import { useI18n } from '../i18n';
 
-export const AboutView: React.FC = () => {
+interface AboutViewProps {
+  status?: AppStatus | null;
+  version?: string;
+}
+
+export const AboutView: React.FC<AboutViewProps> = ({ status, version: propVersion }) => {
   const { t } = useI18n();
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+  const [fetchedStatus, setFetchedStatus] = useState<AppStatus | null>(null);
+
+  const activeStatus = status || fetchedStatus;
+  const rawVersion = propVersion || activeStatus?.version || 'v1.3.0';
+  const appVersion = rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
+  const dbSchema = activeStatus?.dbSchemaVersion ?? 43;
+
+  useEffect(() => {
+    if (!status) {
+      bridge.sendRequest<AppStatus>('get_status').then((st) => {
+        if (st) setFetchedStatus(st);
+      }).catch(() => {});
+    }
+  }, [status]);
 
   const handleCheckUpdate = async () => {
     try {
@@ -26,7 +45,7 @@ export const AboutView: React.FC = () => {
       if (res && res.updateAvailable) {
         setUpdateStatusMsg(t('about.updateAvailable', { version: res.newVersion }) || `Update ${res.newVersion} available!`);
       } else {
-        setUpdateStatusMsg(t('about.upToDate', { version: res?.currentVersion || 'v1.0.0-rc3' }) || `SCLogMate is up to date (${res?.currentVersion || 'v1.0.0-rc3'}).`);
+        setUpdateStatusMsg(t('about.upToDate', { version: res?.currentVersion || appVersion }) || `SCLogMate is up to date (${res?.currentVersion || appVersion}).`);
       }
     } catch (e) {
       setUpdateStatusMsg(t('about.checkError') || 'Error checking for updates');
@@ -51,7 +70,7 @@ export const AboutView: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-black text-white tracking-wider">SCLogMate</h1>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-sky-950 text-sky-400 border border-sky-800">
-                  v1.0.0-rc3
+                  {appVersion}
                 </span>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
                   LIVE COMPANION
@@ -219,7 +238,7 @@ export const AboutView: React.FC = () => {
           </div>
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80">
             <div className="text-slate-400">Datenbank</div>
-            <div className="font-bold text-white mt-1">SQLite 3 (v17 Schema)</div>
+            <div className="font-bold text-white mt-1">SQLite 3 (v{dbSchema} Schema)</div>
           </div>
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80">
             <div className="text-slate-400">Optische OCR</div>
@@ -231,7 +250,7 @@ export const AboutView: React.FC = () => {
           </div>
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80">
             <div className="text-slate-400">Lizenz</div>
-            <div className="font-bold text-white mt-1">GNU AGPLv3 (ab RC3)</div>
+            <div className="font-bold text-white mt-1">GNU AGPLv3</div>
           </div>
         </div>
       </div>

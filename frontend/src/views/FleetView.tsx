@@ -24,6 +24,7 @@ import {
   Eye,
   Zap,
   ChevronDown,
+  Trash2,
 } from 'lucide-react';
 import { ShipCompareModal } from '../components/ShipCompareModal';
 import { ShipLoadoutModal } from '../components/ShipLoadoutModal';
@@ -73,6 +74,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
 
   // Screenshot scan state
   const [isScanningScreenshot, setIsScanningScreenshot] = useState<boolean>(false);
+  const [isCleaningScreenshots, setIsCleaningScreenshots] = useState<boolean>(false);
   const [screenshotFeedback, setScreenshotFeedback] = useState<string | null>(null);
 
   // Inline pledge editing state
@@ -202,6 +204,21 @@ export const FleetView: React.FC<FleetViewProps> = ({
     } finally {
       setIsScanningScreenshot(false);
       setTimeout(() => setScreenshotFeedback(null), 8000);
+    }
+  };
+
+  const handleCleanLoadoutScreenshots = async () => {
+    if (!confirm('Möchtest du alle erkannten Schiffsausrüstungs-Screenshots (VLM / ASOP) im Screenshot-Ordner löschen?')) return;
+    try {
+      setIsCleaningScreenshots(true);
+      const res = await bridge.cleanupScreenshots('loadout');
+      setScreenshotFeedback(res.message || `${res.deletedCount} Screenshots gelöscht.`);
+      setTimeout(() => setScreenshotFeedback(null), 6000);
+    } catch (err: any) {
+      setScreenshotFeedback(`✕ Fehler: ${err?.message || 'Löschen fehlgeschlagen'}`);
+      setTimeout(() => setScreenshotFeedback(null), 6000);
+    } finally {
+      setIsCleaningScreenshots(false);
     }
   };
 
@@ -452,6 +469,17 @@ export const FleetView: React.FC<FleetViewProps> = ({
             >
               <Clipboard className="w-3.5 h-3.5 text-cyan-400" />
               <span>{t('fleet.clipboardScan')} (Strg+V)</span>
+            </button>
+
+            {/* 🗑️ Ausrüstungs-Screenshots bereinigen */}
+            <button
+              onClick={handleCleanLoadoutScreenshots}
+              disabled={isCleaningScreenshots || isScanningScreenshot}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition shadow-sm cursor-pointer border bg-[#1a0f14] hover:bg-[#2e1520] text-rose-300 border-rose-800/60 hover:border-rose-500 disabled:opacity-40"
+              title="Erkannte Schiffsausrüstungs-Screenshots (VLM / ASOP) im Screenshot-Ordner löschen"
+            >
+              <Trash2 className={`w-3.5 h-3.5 ${isCleaningScreenshots ? 'animate-spin text-amber-400' : 'text-rose-400'}`} />
+              <span>{isCleaningScreenshots ? 'Lösche...' : 'Screenshots bereinigen'}</span>
             </button>
 
             {screenshotFeedback && (

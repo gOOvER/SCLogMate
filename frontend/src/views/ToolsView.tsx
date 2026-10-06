@@ -41,6 +41,10 @@ import {
   ArrowLeftRight,
   Search,
   AlertTriangle,
+  HelpCircle,
+  Camera,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import {
   bridge,
@@ -49,6 +53,8 @@ import {
   KeybindBackupItemDto,
   HotasStatusDto,
   SettingsDto,
+  ScreenshotCleanupStatusDto,
+  ScreenshotItemDto,
 } from '../services/photinoBridge';
 import { useI18n } from '../i18n';
 
@@ -579,11 +585,75 @@ function mergeCfgContent(
   return resultLines.join('\n');
 }
 
+export const CvarHelpTooltip: React.FC<{ command: string; align?: 'left' | 'right' | 'center' }> = ({
+  command,
+  align = 'right',
+}) => {
+  const [open, setOpen] = useState(false);
+  const entry = useMemo(() => {
+    const cmdLower = command.toLowerCase();
+    return CFG_REFERENCE_ENTRIES.find((e) => e.command.toLowerCase() === cmdLower);
+  }, [command]);
+
+  if (!entry) return null;
+
+  return (
+    <div
+      className="relative inline-flex items-center ml-1.5"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-label={`Erklärung zu ${entry.command}`}
+        className="p-0.5 rounded text-slate-500 hover:text-sky-300 hover:bg-slate-800/80 transition-colors inline-flex items-center justify-center cursor-pointer focus:outline-none"
+        title="Befehls-Erklärung anzeigen"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+
+      {open && (
+        <div
+          role="tooltip"
+          className={`absolute z-50 w-72 p-3 rounded-xl bg-slate-900/98 backdrop-blur-md border border-slate-700 shadow-2xl text-left pointer-events-auto transition-all ${
+            align === 'left' ? 'left-0' : align === 'center' ? 'left-1/2 -translate-x-1/2' : 'right-0'
+          } bottom-full mb-1.5`}
+        >
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 gap-2">
+            <span className="font-mono text-xs font-bold text-sky-300 truncate">{entry.command}</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-950/80 text-sky-400 font-semibold border border-sky-800/60 uppercase">
+              {entry.tag}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-300 mt-2 leading-relaxed font-normal">
+            {entry.explanation}
+          </p>
+          <div className="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1 text-[10px] font-mono">
+            <div className="text-slate-400">
+              Werte: <span className="text-slate-300">{entry.valueDescription}</span>
+            </div>
+            <div className="text-emerald-400 font-semibold">
+              Empfehlung: <span className="text-white">{entry.recommended}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ToolsView: React.FC = () => {
   const { locale } = useI18n();
   // Navigation: Maintenance, user.cfg Studio, Backups, and HOTAS & Joysticks
   const [activeTab, setActiveTab] = useState<'maintenance' | 'cfg' | 'keybinds' | 'hotas'>('cfg');
-  const [cfgView, setCfgView] = useState<'editor' | 'tuning' | 'backups' | 'reference'>('editor');
+  const [cfgView, setCfgView] = useState<'editor' | 'tuning'>('editor');
+  const [backupSubTab, setBackupSubTab] = useState<'keybinds' | 'usercfg'>('keybinds');
+  const [showLexiconModal, setShowLexiconModal] = useState(false);
   const [editorPopout, setEditorPopout] = useState(false);
 
   const [status, setStatus] = useState<ToolsStatusDto | null>(null);
@@ -623,6 +693,21 @@ export const ToolsView: React.FC = () => {
   const [cloudPath, setCloudPath] = useState('');
   const [configNote, setConfigNote] = useState('');
   const [keybindNote, setKeybindNote] = useState('');
+
+  // Screenshot Cleanup & Gallery State
+  const [screenshotStatus, setScreenshotStatus] = useState<ScreenshotCleanupStatusDto | null>(null);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [screenshotActionLoading, setScreenshotActionLoading] = useState<string | null>(null);
+  const [screenshotFilter, setScreenshotFilter] = useState<'all' | 'loadout' | 'reputation' | 'contract' | 'blank' | 'other'>('all');
+  const [screenshotSearch, setScreenshotSearch] = useState('');
+  const [selectedScreenshotPaths, setSelectedScreenshotPaths] = useState<Set<string>>(new Set());
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    open: boolean;
+    mode: 'all' | 'reputation' | 'loadout' | 'contract' | 'blank' | 'other' | 'selected';
+    count: number;
+    label: string;
+    paths?: string[];
+  } | null>(null);
 
   // Tuning Controls
   const [consoleUnlocked, setConsoleUnlocked] = useState(true);
@@ -940,6 +1025,69 @@ export const ToolsView: React.FC = () => {
     }
   };
 
+  const loadScreenshotStatus = async (autoScan = true) => {
+    try {
+      setScreenshotLoading(true);
+      const res = await bridge.getScreenshotCleanupStatus(undefined, autoScan);
+      setScreenshotStatus(res);
+    } catch (err: any) {
+      console.error('Failed to load screenshot status:', err);
+    } finally {
+      setScreenshotLoading(false);
+    }
+  };
+
+  const handleOpenScreenshotFolder = async () => {
+    try {
+      await bridge.openScreenshotFolder();
+    } catch (err: any) {
+      console.error(err);
+      showToast('Konnte Screenshot-Ordner nicht öffnen.');
+    }
+  };
+
+  const handleExecuteDelete = async (
+    mode: 'all' | 'reputation' | 'loadout' | 'contract' | 'blank' | 'other' | 'selected',
+    paths?: string[]
+  ) => {
+    setScreenshotActionLoading(mode);
+    try {
+      const res = await bridge.cleanupScreenshots(mode, paths);
+      if (res.status) {
+        setScreenshotStatus(res.status);
+      } else {
+        await loadScreenshotStatus(false);
+      }
+      setSelectedScreenshotPaths(new Set());
+      setDeleteConfirmModal(null);
+      showToast(res.message || `${res.deletedCount} Screenshots erfolgreich gelöscht.`);
+      await loadStatus();
+    } catch (err: any) {
+      console.error(err);
+      showToast(err?.message || 'Fehler beim Löschen der Screenshots');
+    } finally {
+      setScreenshotActionLoading(null);
+    }
+  };
+
+  const handleToggleSelectScreenshot = (path: string) => {
+    const next = new Set(selectedScreenshotPaths);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+    }
+    setSelectedScreenshotPaths(next);
+  };
+
+  const handleSelectAllCategory = (items: ScreenshotItemDto[]) => {
+    if (selectedScreenshotPaths.size === items.length && items.length > 0) {
+      setSelectedScreenshotPaths(new Set());
+    } else {
+      setSelectedScreenshotPaths(new Set(items.map((i) => i.filePath)));
+    }
+  };
+
   const handleSaveUserCfg = async () => {
     setActionLoading('saveCfg');
     try {
@@ -1063,6 +1211,7 @@ export const ToolsView: React.FC = () => {
     try {
       const res = await bridge.send<{ success: boolean; message: string }>('sync_logs_cloud');
       showToast(res.message || 'Logs erfolgreich in Cloud gesichert!');
+      await loadStatus();
     } catch (err) {
       console.error(err);
       showToast('Fehler beim Synchronisieren in die Cloud');
@@ -1151,6 +1300,7 @@ export const ToolsView: React.FC = () => {
 
   useEffect(() => {
     loadStatus();
+    loadScreenshotStatus(true);
     loadHotasStatus();
     bridge.getSettings().then((st: SettingsDto) => {
       if (st && st.hotasProfilerEnabled !== undefined) {
@@ -1339,11 +1489,6 @@ export const ToolsView: React.FC = () => {
         >
           <FileText className="w-4 h-4" />
           <span>user.cfg Studio</span>
-          {status?.configBackups && status.configBackups.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-sky-950 text-sky-400 text-[10px] font-mono border border-sky-800 font-bold">
-              {status.configBackups.length}
-            </span>
-          )}
         </button>
 
         <button
@@ -1356,9 +1501,9 @@ export const ToolsView: React.FC = () => {
         >
           <Archive className="w-4 h-4" />
           <span>Backups</span>
-          {status?.keybindItems && status.keybindItems.length > 0 && (
+          {((status?.keybindItems?.length || 0) + (status?.configBackups?.length || 0)) > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
-              {status.keybindItems.length}
+              {(status?.keybindItems?.length || 0) + (status?.configBackups?.length || 0)}
             </span>
           )}
         </button>
@@ -1407,7 +1552,7 @@ export const ToolsView: React.FC = () => {
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>📝 Live-Editor</span>
+                <span>Live-Editor</span>
               </button>
 
               <button
@@ -1419,43 +1564,42 @@ export const ToolsView: React.FC = () => {
                 }`}
               >
                 <Sliders className="w-3.5 h-3.5" />
-                <span>🎛️ Tuning-Schalter</span>
-              </button>
-
-              <button
-                onClick={() => setCfgView('backups')}
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  cfgView === 'backups'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Archive className="w-3.5 h-3.5" />
-                <span>💾 Backups ({status?.configBackups?.length || 0})</span>
-              </button>
-
-              <button
-                onClick={() => setCfgView('reference')}
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  cfgView === 'reference'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>📖 Befehls-Lexikon</span>
+                <span>Tuning-Schalter</span>
               </button>
             </div>
 
-            <div className="flex items-center space-x-3 px-2 text-[11px] font-mono text-slate-400">
-              <span className="flex items-center space-x-1 text-emerald-400">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Auto-Backup aktiv</span>
-              </span>
-              <span>•</span>
-              <span className="truncate max-w-[240px] text-slate-500" title={status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}>
-                {status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowLexiconModal(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/60 transition cursor-pointer"
+                title="Befehls-Lexikon nach Parametern durchsuchen"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Befehls-Lexikon</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('keybinds');
+                  setBackupSubTab('usercfg');
+                }}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/60 transition cursor-pointer"
+                title="Zu den archivierten user.cfg Snapshots wechseln"
+              >
+                <Archive className="w-3.5 h-3.5 text-purple-400" />
+                <span>Backups ({status?.configBackups?.length || 0})</span>
+              </button>
+
+              <div className="hidden lg:flex items-center space-x-2 pl-2 border-l border-slate-800 text-[11px] font-mono text-slate-400">
+                <span className="flex items-center space-x-1 text-emerald-400">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Auto-Backup aktiv</span>
+                </span>
+                <span>•</span>
+                <span className="truncate max-w-[200px] text-slate-500" title={status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}>
+                  {status?.userCfgPath || 'StarCitizen\\LIVE\\user.cfg'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1505,7 +1649,7 @@ export const ToolsView: React.FC = () => {
                     className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-sky-400 hover:text-sky-300 text-xs font-bold border border-slate-700 transition cursor-pointer"
                     title="165 FPS Limit, VSync Aus, 8GB StreamPool, DisplayInfo=1"
                   >
-                    ⚡ High FPS
+                    High FPS
                   </button>
 
                   <button
@@ -1513,7 +1657,7 @@ export const ToolsView: React.FC = () => {
                     className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-purple-400 hover:text-purple-300 text-xs font-bold border border-slate-700 transition cursor-pointer"
                     title="Unbegrenzt FPS, VSync Ein, 12GB StreamPool, SSDO"
                   >
-                    🎨 Immersion
+                    Immersion
                   </button>
 
                   <button
@@ -1521,7 +1665,7 @@ export const ToolsView: React.FC = () => {
                     className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer"
                     title="60 FPS Cap, 4GB StreamPool"
                   >
-                    💻 60 FPS Cap
+                    60 FPS Cap
                   </button>
 
                   <button
@@ -1634,14 +1778,17 @@ export const ToolsView: React.FC = () => {
                     </button>
                     <span>•</span>
                     <button
-                      onClick={() => setCfgView('reference')}
+                      onClick={() => setShowLexiconModal(true)}
                       className="text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
                     >
                       Befehls-Lexikon →
                     </button>
                     <span>•</span>
                     <button
-                      onClick={() => setCfgView('backups')}
+                      onClick={() => {
+                        setActiveTab('keybinds');
+                        setBackupSubTab('usercfg');
+                      }}
                       className="text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
                     >
                       Zu den Backups ({status?.configBackups?.length || 0}) →
@@ -1702,14 +1849,12 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <div className="flex items-center space-x-1.5">
+                          <div className="flex items-center justify-between">
                             <span className="text-slate-200 font-semibold">Entwicklerkonsole freigeben</span>
-                            <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 text-[9px] font-bold border border-amber-800">
-                              MUSS OBEN STEHEN
-                            </span>
+                            <CvarHelpTooltip command="Con_Restricted" />
                           </div>
                           <span className="text-[11px] text-slate-400 font-mono">Con_Restricted = {consoleUnlocked ? 0 : 1}</span>
-                          <span className="text-[10px] text-slate-500 block mt-0.5">Schaltet Taste ^ / ~ frei; aktiviert user.cfg</span>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">Schaltet Taste ^ / ~ frei (wird von SCLogMate automatisch an den Dateianfang gesetzt)</span>
                         </div>
                       </label>
 
@@ -1725,7 +1870,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Multithreading aktivieren</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Multithreading aktivieren</span>
+                            <CvarHelpTooltip command="r_multithreaded" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_multithreaded = {multithreaded ? 1 : 0}</span>
                           <span className="text-[10px] text-emerald-400 block mt-0.5">Optimal für 5800X3D (16 Threads)</span>
                         </div>
@@ -1749,7 +1897,10 @@ export const ToolsView: React.FC = () => {
                     <div className="space-y-3 pt-3 text-xs">
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-slate-200 font-semibold">Max FPS Limit:</span>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-200 font-semibold">Max FPS Limit:</span>
+                            <CvarHelpTooltip command="sys_maxFps" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">sys_maxFps = {maxFps}</span>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -1799,7 +1950,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">VSync im Spiel ausschalten</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">VSync im Spiel ausschalten</span>
+                            <CvarHelpTooltip command="r_VSync" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_VSync = {vsyncOff ? 0 : 1}</span>
                           <span className="text-[10px] text-slate-500 block">Bei G-Sync/FreeSync immer auf 0 setzen</span>
                         </div>
@@ -1817,39 +1971,48 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Full GPU Sync lockern (0)</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Full GPU Sync lockern (0)</span>
+                            <CvarHelpTooltip command="r_enable_full_gpu_sync" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_enable_full_gpu_sync = {fullGpuSyncOff ? 0 : 1}</span>
                           <span className="text-[10px] text-slate-500 block">Reduziert Input-Lag &amp; liefert bessere FPS</span>
                         </div>
                       </label>
 
                       <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/60">
-                        <label className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-800/50">
-                          <input
-                            type="checkbox"
-                            checked={fullscreenWindow}
-                            onChange={(e) => {
-                              const val = e.target.checked;
-                              setFullscreenWindow(val);
-                              updateSingleCvar('r_FullscreenWindow', val ? 1 : 0);
-                            }}
-                            className="rounded border-slate-700 text-sky-600 bg-slate-800"
-                          />
-                          <span className="text-[11px] text-slate-300">FullscreenWindow</span>
+                        <label className="flex items-center justify-between cursor-pointer p-1.5 rounded-lg hover:bg-slate-800/50">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={fullscreenWindow}
+                              onChange={(e) => {
+                                const val = e.target.checked;
+                                setFullscreenWindow(val);
+                                updateSingleCvar('r_FullscreenWindow', val ? 1 : 0);
+                              }}
+                              className="rounded border-slate-700 text-sky-600 bg-slate-800"
+                            />
+                            <span className="text-[11px] text-slate-300">FullscreenWindow</span>
+                          </div>
+                          <CvarHelpTooltip command="r_FullscreenWindow" />
                         </label>
 
-                        <label className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-800/50">
-                          <input
-                            type="checkbox"
-                            checked={borderlessWindow}
-                            onChange={(e) => {
-                              const val = e.target.checked;
-                              setBorderlessWindow(val);
-                              updateSingleCvar('r_BorderlessWindow', val ? 1 : 0);
-                            }}
-                            className="rounded border-slate-700 text-sky-600 bg-slate-800"
-                          />
-                          <span className="text-[11px] text-slate-300">BorderlessWindow</span>
+                        <label className="flex items-center justify-between cursor-pointer p-1.5 rounded-lg hover:bg-slate-800/50">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={borderlessWindow}
+                              onChange={(e) => {
+                                const val = e.target.checked;
+                                setBorderlessWindow(val);
+                                updateSingleCvar('r_BorderlessWindow', val ? 1 : 0);
+                              }}
+                              className="rounded border-slate-700 text-sky-600 bg-slate-800"
+                            />
+                            <span className="text-[11px] text-slate-300">BorderlessWindow</span>
+                          </div>
+                          <CvarHelpTooltip command="r_BorderlessWindow" />
                         </label>
                       </div>
                     </div>
@@ -1871,7 +2034,10 @@ export const ToolsView: React.FC = () => {
                     <div className="space-y-3 pt-3 text-xs">
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-slate-200 font-semibold">VRAM Textur-Pool:</span>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-200 font-semibold">VRAM Textur-Pool:</span>
+                            <CvarHelpTooltip command="r_TexturesStreamPoolSize" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_TexturesStreamPoolSize</span>
                         </div>
                         <select
@@ -1891,7 +2057,10 @@ export const ToolsView: React.FC = () => {
 
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-slate-200 font-semibold">Geometriedaten-Pool:</span>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-200 font-semibold">Geometriedaten-Pool:</span>
+                            <CvarHelpTooltip command="e_StreamCgfPoolSize" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">e_StreamCgfPoolSize</span>
                         </div>
                         <select
@@ -1921,7 +2090,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-sky-600 focus:ring-sky-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Dynamisches Textur-Streaming</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Dynamisches Textur-Streaming</span>
+                            <CvarHelpTooltip command="r_TexturesStreaming" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_TexturesStreaming = {texturesStreaming ? 1 : 0}</span>
                           <span className="text-[10px] text-slate-500 block">Sollte immer auf 1 stehen</span>
                         </div>
@@ -1955,7 +2127,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Native HDR-Ausgabe</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Native HDR-Ausgabe</span>
+                            <CvarHelpTooltip command="r_HDRDisplayOutput" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_HDRDisplayOutput = {hdrOutput ? 1 : 0}</span>
                           <span className="text-[10px] text-slate-500 block">Erfordert vorher in Windows aktiviertes HDR</span>
                         </div>
@@ -1963,7 +2138,10 @@ export const ToolsView: React.FC = () => {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">Max Nits:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">Max Nits:</span>
+                            <CvarHelpTooltip command="r_HDRDisplayMaxNits" />
+                          </div>
                           <select
                             value={hdrMaxNits}
                             onChange={(e) => {
@@ -1981,7 +2159,10 @@ export const ToolsView: React.FC = () => {
                         </div>
 
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">Ref White:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">Ref White:</span>
+                            <CvarHelpTooltip command="r_HDRDisplayRefWhite" />
+                          </div>
                           <select
                             value={hdrRefWhite}
                             onChange={(e) => {
@@ -2010,7 +2191,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Hardware-Limits einhalten</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Hardware-Limits einhalten</span>
+                            <CvarHelpTooltip command="r_HDRDisplayDeviceLimits" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_HDRDisplayDeviceLimits = {hdrDeviceLimits ? 1 : 0}</span>
                         </div>
                       </label>
@@ -2043,7 +2227,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Asynchrone Shader-Aktivierung</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Asynchrone Shader-Aktivierung</span>
+                            <CvarHelpTooltip command="r_shadersasyncactivation" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_shadersasyncactivation = {shadersAsync ? 1 : 0}</span>
                           <span className="text-[10px] text-emerald-400 block">Verhindert Stuttering bei neuen Shadern</span>
                         </div>
@@ -2061,7 +2248,10 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Global Shadow Map Cache</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Global Shadow Map Cache</span>
+                            <CvarHelpTooltip command="r_GsmCache" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_GsmCache = {gsmCache ? 1 : 0}</span>
                           <span className="text-[10px] text-slate-400 block">Entlastet CPU in Städten (Lorville, Area18)</span>
                         </div>
@@ -2095,14 +2285,22 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-rose-600 focus:ring-rose-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Bewegungsunschärfe deaktivieren</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Bewegungsunschärfe deaktivieren</span>
+                            <CvarHelpTooltip command="r_MotionBlur" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">r_MotionBlur = {motionBlurOff ? 0 : 1}</span>
                           <span className="text-[10px] text-slate-500 block">Erhöht Bildschärfe bei schnellen Drehungen</span>
                         </div>
                       </label>
 
                       <div>
-                        <span className="text-slate-200 font-semibold block mb-1">SSDO Umgebungsverdeckung:</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-200 font-semibold">SSDO Umgebungsverdeckung:</span>
+                            <CvarHelpTooltip command="r_ssdo" />
+                          </div>
+                        </div>
                         <select
                           value={ssdoLevel}
                           onChange={(e) => {
@@ -2120,7 +2318,10 @@ export const ToolsView: React.FC = () => {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">Partikelqualität:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">Partikelqualität:</span>
+                            <CvarHelpTooltip command="e_ParticlesQuality" />
+                          </div>
                           <select
                             value={particlesQuality}
                             onChange={(e) => {
@@ -2137,7 +2338,10 @@ export const ToolsView: React.FC = () => {
                         </div>
 
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">Detail-Distanz:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">Detail-Distanz:</span>
+                            <CvarHelpTooltip command="r_DetailDistance" />
+                          </div>
                           <input
                             type="number"
                             min={5}
@@ -2181,14 +2385,22 @@ export const ToolsView: React.FC = () => {
                           className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-800 cursor-pointer"
                         />
                         <div className="flex-1">
-                          <span className="text-slate-200 font-semibold block">Hardware-Mauszeiger (0)</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-200 font-semibold block">Hardware-Mauszeiger (0)</span>
+                            <CvarHelpTooltip command="pl_pit.forceSoftwareCursor" />
+                          </div>
                           <span className="text-[11px] text-slate-400 font-mono">pl_pit.forceSoftwareCursor = {hardwareCursor ? 0 : 1}</span>
                           <span className="text-[10px] text-emerald-400 block">Verhindert träge oder ruckelnde Zeiger</span>
                         </div>
                       </label>
 
                       <div>
-                        <span className="text-slate-300 font-semibold block mb-1">r_DisplayInfo Telemetrie:</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-300 font-semibold block">r_DisplayInfo Telemetrie:</span>
+                            <CvarHelpTooltip command="r_DisplayInfo" />
+                          </div>
+                        </div>
                         <select
                           value={displayInfo}
                           onChange={(e) => {
@@ -2208,7 +2420,10 @@ export const ToolsView: React.FC = () => {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">g_language:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">g_language:</span>
+                            <CvarHelpTooltip command="g_language" />
+                          </div>
                           <select
                             value={langEnglish ? 'english' : 'german_(germany)'}
                             onChange={(e) => {
@@ -2224,7 +2439,10 @@ export const ToolsView: React.FC = () => {
                         </div>
 
                         <div>
-                          <span className="text-slate-300 font-semibold block mb-1">g_languageAudio:</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300 font-semibold block">g_languageAudio:</span>
+                            <CvarHelpTooltip command="g_languageAudio" />
+                          </div>
                           <select
                             value={langAudioEnglish ? 'english' : 'german_(germany)'}
                             onChange={(e) => {
@@ -2249,232 +2467,6 @@ export const ToolsView: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* 3. SUB-VIEW: BEFEHLS-LEXIKON & REFERENZ */}
-          {cfgView === 'reference' && (
-            <div className="space-y-6">
-              <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/80 to-sky-950/40 border border-emerald-800/40 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center space-x-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner shrink-0">
-                      <BookOpen className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-bold text-white tracking-wide">
-                        STAR CITIZEN BEFEHLS-LEXIKON &amp; REFERENZ
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Komplette Übersicht mit Erklärungen, optimalen Richtwerten und 1-Klick-Übernahme in deine Live-Konfiguration.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <button
-                      onClick={() => {
-                        applyPreset('5800x3d_5070');
-                        setCfgView('editor');
-                      }}
-                      className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md shadow-amber-600/25 border border-amber-400 transition cursor-pointer"
-                    >
-                      <Rocket className="w-4 h-4" />
-                      <span>5800X3D &amp; 5070 Profil anwenden</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-emerald-900/30">
-                  <input
-                    type="text"
-                    placeholder="Befehl oder Stichwort suchen (z. B. SSDO, Nits, StreamPool, VSync, Con_Restricted)..."
-                    value={searchRef}
-                    onChange={(e) => setSearchRef(e.target.value)}
-                    className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredEntries.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex flex-col justify-between space-y-3"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="text-[10px] font-bold text-emerald-400 font-mono uppercase tracking-wider">
-                          {item.category}
-                        </span>
-                        <span className="text-[9px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold border border-slate-700">
-                          {item.tag}
-                        </span>
-                      </div>
-
-                      <div className="font-mono font-bold text-sm text-sky-300">
-                        {item.command} = {item.recommended}
-                      </div>
-
-                      <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                        {item.explanation}
-                      </p>
-
-                      <div className="mt-2 text-[11px] text-slate-500 font-mono">
-                        Wertebereich: <span className="text-slate-400">{item.valueDescription}</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        Empfehlung: <strong className="text-emerald-300">{item.recommended}</strong>
-                      </span>
-
-                      <button
-                        onClick={() => {
-                          updateSingleCvar(item.command, item.recommended);
-                          showToast(`✓ ${item.command} = ${item.recommended} in user.cfg eingefügt`);
-                        }}
-                        className="flex items-center space-x-1 px-3 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-[11px] font-semibold transition cursor-pointer"
-                      >
-                        <CheckCheck className="w-3 h-3" />
-                        <span>Wert übernehmen</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 4. SUB-VIEW: BACKUP TRESOR */}
-          {cfgView === 'backups' && (
-            <div className="space-y-6">
-              <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900/80 to-sky-950/40 border border-purple-800/40 backdrop-blur shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center space-x-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
-                      <Archive className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2.5">
-                        <h2 className="text-base font-bold text-white tracking-wide">
-                          USER.CFG BACKUPS &amp; 1-KLICK ROLLBACK
-                        </h2>
-                        <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-bold">
-                          {status?.configBackups?.length || 0} Snapshots
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Jede Speicherung wird automatisch hier, im LIVE-Ordner (.bak) und in deiner Cloud archiviert. Du kannst jederzeit mit einem Klick auf einen früheren Stand zurückrollen.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <button
-                      onClick={() => handleOpenFolder('config')}
-                      className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
-                      title="Config-Backup-Ordner im Windows Explorer öffnen"
-                    >
-                      <FolderOpen className="w-4 h-4 text-sky-400" />
-                      <span>Ordner öffnen</span>
-                    </button>
-
-                    <button
-                      onClick={handleBackupUserCfgSnapshot}
-                      disabled={actionLoading !== null}
-                      className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/25 border border-purple-400 transition cursor-pointer"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Jetzt sichern</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-3 border-t border-purple-900/40">
-                  <input
-                    type="text"
-                    placeholder="Optionale Notiz für manuelles Backup (z. B. Vor Grafik-Update, Vor Patch 4.0, RTX 5070 Tuning)..."
-                    value={configNote}
-                    onChange={(e) => setConfigNote(e.target.value)}
-                    className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono"
-                  />
-                  <button
-                    onClick={handleBackupUserCfgSnapshot}
-                    disabled={actionLoading !== null}
-                    className="px-4 py-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-purple-200 text-xs font-semibold border border-purple-800 transition cursor-pointer shrink-0"
-                  >
-                    Snapshot anlegen
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-                    Archivierte Snapshot-Versionen
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    Sortiert nach Datum (Neueste zuerst)
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 overflow-y-auto max-h-[500px] pr-1">
-                  {status?.configBackups && status.configBackups.length > 0 ? (
-                    status.configBackups.map((c, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-200 truncate font-mono group-hover:text-purple-300 transition">
-                            {c.name}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1 font-mono">
-                            <span className="flex items-center space-x-1">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              <span>{c.createdAt}</span>
-                            </span>
-                            <span>•</span>
-                            <span>{c.sizeFormatted}</span>
-                            <span>•</span>
-                            <span
-                              className={`px-2 py-0.5 rounded font-semibold border text-[10px] ${
-                                c.locationType.includes('Cloud')
-                                  ? 'bg-sky-950 text-sky-400 border-sky-800'
-                                  : 'bg-slate-900 text-slate-400 border-slate-700'
-                              }`}
-                            >
-                              {c.locationType}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2 shrink-0">
-                          <button
-                            onClick={() => handleRestoreConfigSnapshot(c)}
-                            disabled={actionLoading !== null}
-                            className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-purple-200 text-xs font-bold border border-purple-800 transition cursor-pointer"
-                            title="Diesen Stand wieder in die LIVE user.cfg einspielen (aktueller Stand wird zuvor automatisch gesichert)"
-                          >
-                            <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === `restoreCfg_${c.name}` ? 'animate-spin' : ''}`} />
-                            <span>Wiederherstellen</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-8 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic space-y-2">
-                      <Archive className="w-8 h-8 text-slate-600 mx-auto" />
-                      <p>Noch keine user.cfg-Snapshots vorhanden.</p>
-                      <p className="text-[11px] text-slate-600">
-                        Klicke oben auf "Jetzt sichern", oder passe einen Wert an — vor jeder Änderung wird automatisch ein Stand gesichert.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2483,7 +2475,7 @@ export const ToolsView: React.FC = () => {
           ══════════════════════════════════════════════════════════════ */}
       {activeTab === 'maintenance' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Shader Cache Card */}
             <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between">
               <div>
@@ -2534,6 +2526,380 @@ export const ToolsView: React.FC = () => {
                 <Trash2 className="w-4 h-4" />
                 <span>{actionLoading === 'dumps' ? 'Lösche...' : 'Crash-Dumps bereinigen'}</span>
               </button>
+            </div>
+
+            {/* Screenshots & OCR Card */}
+            <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <Camera className="w-5 h-5 text-sky-400" />
+                    <h3 className="text-sm font-semibold text-white">Star Citizen Screenshots</h3>
+                  </div>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-sky-950/70 text-sky-400 border border-sky-800/70 font-mono font-bold">
+                    {screenshotStatus ? `${screenshotStatus.totalCount} Bilder · ${screenshotStatus.totalSizeFormatted}` : `${status?.screenshotCount || 0} Bilder`}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                  Verwaltet und bereinigt den Screenshot-Ordner gezielt nach Schiffsausrüstung (VLM/ASOP), Delphi-Ruf, leeren HDR-Frames oder komplett.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadScreenshotStatus(true)}
+                  disabled={screenshotLoading}
+                  className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 text-xs font-semibold border border-sky-500/30 transition cursor-pointer disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${screenshotLoading ? 'animate-spin' : ''}`} />
+                  <span>{screenshotLoading ? 'Scanne...' : 'Neu scannen'}</span>
+                </button>
+                <button
+                  onClick={handleOpenScreenshotFolder}
+                  className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
+                  title="Ordner im Windows Explorer öffnen"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ SCREENSHOT CLEANUP & INTERACTIVE GALLERY SUITE ══ */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 border border-slate-800 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-inner shrink-0">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2.5">
+                    <h3 className="text-sm font-bold text-white tracking-wide">
+                      STAR CITIZEN SCREENSHOT-ORDNER &amp; OCR-BEREINIGUNG
+                    </h3>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-950/90 text-sky-400 border border-sky-800/80 font-mono font-bold">
+                      {screenshotStatus ? `${screenshotStatus.totalCount} Aufnahmen (${screenshotStatus.totalSizeFormatted})` : 'Aktiv'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Erkennt und bereinigt Screenshots gezielt nach Schiffsausrüstung (VLM/ASOP), Delphi-Ruf, Aufträgen oder fehlerhaften HDR-Dateien.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadScreenshotStatus(true)}
+                  disabled={screenshotLoading}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer disabled:opacity-40"
+                  title="Screenshots neu einlesen und OCR-Klassifizierung aktualisieren"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${screenshotLoading ? 'animate-spin text-sky-400' : ''}`} />
+                  <span>{screenshotLoading ? 'Scanne...' : 'Neu scannen'}</span>
+                </button>
+                <button
+                  onClick={handleOpenScreenshotFolder}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                  title="Ordner im Windows Explorer öffnen"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>Ordner öffnen</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Path indicator */}
+            {screenshotStatus?.folderPath && (
+              <div className="text-[11px] font-mono px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-400 flex items-center justify-between">
+                <span className="truncate">Ordner: <span className="text-slate-200">{screenshotStatus.folderPath}</span></span>
+                <span className="text-[10px] text-emerald-400 shrink-0 ml-2">✓ Bereit</span>
+              </div>
+            )}
+
+            {/* Quick-Action KPI Cluster with Delete Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 1. Schiffsausrüstung (VLM / ASOP) */}
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-emerald-800/50 transition flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Schiffsausrüstung (VLM / ASOP)</span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">{screenshotStatus?.loadoutCount ?? 0}</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-white">
+                    {screenshotStatus ? `${screenshotStatus.loadoutSizeMb.toFixed(1)} MB` : '0 MB'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                    Erkannte Flotten- &amp; Komponenten-Scans.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteConfirmModal({
+                    open: true,
+                    mode: 'loadout',
+                    count: screenshotStatus?.loadoutCount || 0,
+                    label: 'Schiffsausrüstungs-Screenshots (VLM / ASOP)'
+                  })}
+                  disabled={(screenshotStatus?.loadoutCount || 0) === 0 || screenshotActionLoading !== null}
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Ausrüstung löschen</span>
+                </button>
+              </div>
+
+              {/* 2. Delphi Ruf & Faktionen */}
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-amber-800/50 transition flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Ruf &amp; Delphi-Faktionen</span>
+                    <span className="text-xs font-mono font-bold text-amber-400">{screenshotStatus?.reputationCount ?? 0}</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-white">
+                    {screenshotStatus ? `${screenshotStatus.reputationSizeMb.toFixed(1)} MB` : '0 MB'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                    mobiGlas Ruf- &amp; Faktionsabgleiche.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteConfirmModal({
+                    open: true,
+                    mode: 'reputation',
+                    count: screenshotStatus?.reputationCount || 0,
+                    label: 'Ruf- & Delphi-Screenshots'
+                  })}
+                  disabled={(screenshotStatus?.reputationCount || 0) === 0 || screenshotActionLoading !== null}
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Ruf löschen</span>
+                </button>
+              </div>
+
+              {/* 3. Leere Frames (101 KB HDR-Bug) */}
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-rose-800/50 transition flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Leere Frames (HDR-Bug)</span>
+                    <span className="text-xs font-mono font-bold text-rose-400">{screenshotStatus?.blankCount ?? 0}</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-white">
+                    {screenshotStatus ? `${screenshotStatus.blankSizeMb.toFixed(1)} MB` : '0 MB'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                    Schwarze 101 KB Star Citizen HDR-Frames.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteConfirmModal({
+                    open: true,
+                    mode: 'blank',
+                    count: screenshotStatus?.blankCount || 0,
+                    label: 'fehlerhafte / leere HDR-Frames (101 KB)'
+                  })}
+                  disabled={(screenshotStatus?.blankCount || 0) === 0 || screenshotActionLoading !== null}
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30 transition disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Leere Frames löschen</span>
+                </button>
+              </div>
+
+              {/* 4. Alle Screenshots bereinigen */}
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-800/50 transition flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Gesamter Ordner</span>
+                    <span className="text-xs font-mono font-bold text-sky-400">{screenshotStatus?.totalCount ?? 0}</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-white">
+                    {screenshotStatus ? screenshotStatus.totalSizeFormatted : '0 MB'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                    Alle Aufnahmen im Screenshot-Ordner.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteConfirmModal({
+                    open: true,
+                    mode: 'all',
+                    count: screenshotStatus?.totalCount || 0,
+                    label: 'ALLE Screenshots im Ordner'
+                  })}
+                  disabled={(screenshotStatus?.totalCount || 0) === 0 || screenshotActionLoading !== null}
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-2.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-200 text-xs font-semibold border border-rose-500/40 transition disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Alle löschen</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Category Filter Tabs & Search & Interactive Selection */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'all', label: 'Alle', count: screenshotStatus?.totalCount ?? 0 },
+                    { id: 'loadout', label: 'Schiffsausrüstung', count: screenshotStatus?.loadoutCount ?? 0 },
+                    { id: 'reputation', label: 'Ruf / Delphi', count: screenshotStatus?.reputationCount ?? 0 },
+                    { id: 'blank', label: 'Leere HDR-Frames', count: screenshotStatus?.blankCount ?? 0 },
+                    { id: 'other', label: 'Sonstige', count: screenshotStatus?.otherCount ?? 0 },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setScreenshotFilter(tab.id as any)}
+                      className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-lg transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                        screenshotFilter === tab.id
+                          ? 'bg-sky-950/80 text-sky-300 border border-sky-500/70 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-[10px] text-slate-500">({tab.count})</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search & Actions */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex items-center min-w-[140px] sm:min-w-[180px]">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Datei, Schiff suchen..."
+                      value={screenshotSearch}
+                      onChange={(e) => setScreenshotSearch(e.target.value)}
+                      className="w-full pl-8 pr-2.5 py-1 text-xs font-mono bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+
+                  {selectedScreenshotPaths.size > 0 && (
+                    <button
+                      onClick={() => setDeleteConfirmModal({
+                        open: true,
+                        mode: 'selected',
+                        count: selectedScreenshotPaths.size,
+                        label: `${selectedScreenshotPaths.size} ausgewählte Screenshots`,
+                        paths: Array.from(selectedScreenshotPaths)
+                      })}
+                      className="flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{selectedScreenshotPaths.size} löschen</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Table / List */}
+              <div className="rounded-xl border border-slate-800 bg-slate-950/80 overflow-hidden max-h-[360px] overflow-y-auto">
+                {(() => {
+                  const filtered = (screenshotStatus?.items || []).filter((item) => {
+                    if (screenshotFilter !== 'all' && item.category !== screenshotFilter) return false;
+                    if (screenshotSearch.trim()) {
+                      const q = screenshotSearch.toLowerCase();
+                      return item.fileName.toLowerCase().includes(q) || item.details.toLowerCase().includes(q);
+                    }
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs font-mono text-slate-500">
+                        Keine Screenshots für diesen Filter gefunden.
+                      </div>
+                    );
+                  }
+
+                  const allSelected = filtered.length > 0 && filtered.every((i) => selectedScreenshotPaths.has(i.filePath));
+
+                  return (
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-slate-900/90 text-slate-400 text-[10px] uppercase border-b border-slate-800 sticky top-0 z-10 backdrop-blur-sm">
+                        <tr>
+                          <th className="p-2.5 w-10 text-center">
+                            <button
+                              onClick={() => handleSelectAllCategory(filtered)}
+                              className="text-slate-400 hover:text-white cursor-pointer"
+                              title={allSelected ? 'Alle abwählen' : 'Alle dieser Kategorie auswählen'}
+                            >
+                              {allSelected ? <CheckSquare className="w-4 h-4 text-sky-400" /> : <Square className="w-4 h-4 text-slate-500" />}
+                            </button>
+                          </th>
+                          <th className="p-2.5">Dateiname</th>
+                          <th className="p-2.5">Datum / Uhrzeit</th>
+                          <th className="p-2.5">Kategorie</th>
+                          <th className="p-2.5">Erkannte Details</th>
+                          <th className="p-2.5 text-right">Größe</th>
+                          <th className="p-2.5 w-10 text-center">Löschen</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {filtered.map((item) => {
+                          const isSelected = selectedScreenshotPaths.has(item.filePath);
+                          const catBadgeColor =
+                            item.category === 'loadout'
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : item.category === 'reputation'
+                              ? 'bg-amber-950 text-amber-300 border-amber-800'
+                              : item.category === 'blank'
+                              ? 'bg-rose-950 text-rose-300 border-rose-800'
+                              : 'bg-slate-900 text-slate-400 border-slate-700';
+
+                          return (
+                            <tr
+                              key={item.filePath}
+                              className={`hover:bg-slate-900/50 transition ${isSelected ? 'bg-sky-950/20' : ''}`}
+                            >
+                              <td className="p-2.5 text-center">
+                                <button
+                                  onClick={() => handleToggleSelectScreenshot(item.filePath)}
+                                  className="text-slate-400 hover:text-white cursor-pointer"
+                                >
+                                  {isSelected ? <CheckSquare className="w-4 h-4 text-sky-400" /> : <Square className="w-4 h-4 text-slate-600" />}
+                                </button>
+                              </td>
+                              <td className="p-2.5 text-slate-200 truncate max-w-[220px]" title={item.fileName}>
+                                {item.fileName}
+                              </td>
+                              <td className="p-2.5 text-slate-400 whitespace-nowrap">
+                                {item.lastModifiedFormatted}
+                              </td>
+                              <td className="p-2.5 whitespace-nowrap">
+                                <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${catBadgeColor}`}>
+                                  {item.categoryLabel}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-slate-300 truncate max-w-[240px]" title={item.details}>
+                                {item.details}
+                              </td>
+                              <td className="p-2.5 text-right text-slate-400 whitespace-nowrap font-mono">
+                                {item.sizeFormatted}
+                              </td>
+                              <td className="p-2.5 text-center">
+                                <button
+                                  onClick={() => setDeleteConfirmModal({
+                                    open: true,
+                                    mode: 'selected',
+                                    count: 1,
+                                    label: `Screenshot '${item.fileName}'`,
+                                    paths: [item.filePath]
+                                  })}
+                                  className="text-slate-500 hover:text-rose-400 transition cursor-pointer p-1"
+                                  title="Diesen Screenshot löschen"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
             </div>
           </div>
 
@@ -2704,207 +3070,393 @@ export const ToolsView: React.FC = () => {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          TAB 3: STEUERUNGS-TRESOR (KEYBINDS & CLOUD)
+          TAB 3: ZENTRALER BACKUP-TRESOR (KEYBINDS, CLOUD & USER.CFG)
           ══════════════════════════════════════════════════════════════ */}
       {activeTab === 'keybinds' && (
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900/80 to-sky-950/40 border border-purple-800/30 backdrop-blur shadow-xl space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center space-x-3.5">
-                <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
-                  <Cloud className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h2 className="text-sm font-bold text-white tracking-wide">CLOUD-SPEICHER &amp; SYNCHRONISATION</h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
-                      {cloudDisplay}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Hinterlege deinen Cloud-Ordner (Google Drive / OneDrive / Dropbox) zur standortübergreifenden Sicherung.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleExportLogsZip}
-                  disabled={actionLoading !== null}
-                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Logs als ZIP</span>
-                </button>
-                <button
-                  onClick={handleSyncLogsCloud}
-                  disabled={actionLoading !== null}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-sky-950/70 hover:bg-sky-900/80 text-sky-300 text-xs font-bold border border-sky-800/80 transition cursor-pointer"
-                >
-                  <Cloud className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Logs in Cloud sichern</span>
-                </button>
-                <button
-                  onClick={() => handleOpenFolder('cloud')}
-                  title="Cloud-Ordner im Explorer öffnen"
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
-                >
-                  <FolderOpen className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 pt-2 border-t border-slate-800/80">
-              <input
-                type="text"
-                placeholder="Cloud-Pfad (z. B. I:\Meine Ablage\Backup\StarCitizen)..."
-                value={cloudPath}
-                onChange={(e) => setCloudPath(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500"
-              />
+          {/* Sub-Tabs for Backups */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-800">
+            <div className="flex items-center space-x-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
               <button
-                onClick={handleSaveCloudPath}
-                disabled={actionLoading !== null}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold border border-purple-400 transition cursor-pointer shrink-0"
+                onClick={() => setBackupSubTab('keybinds')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  backupSubTab === 'keybinds'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
               >
-                Pfad speichern
+                <Key className="w-3.5 h-3.5" />
+                <span>Tastenbelegungen &amp; Actionmaps</span>
+                {status?.keybindItems && status.keybindItems.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
+                    {status.keybindItems.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setBackupSubTab('usercfg')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  backupSubTab === 'usercfg'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>user.cfg Snapshots</span>
+                {status?.configBackups && status.configBackups.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 text-[10px] font-mono border border-purple-800 font-bold">
+                    {status.configBackups.length}
+                  </span>
+                )}
               </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-purple-900/30 text-xs bg-purple-950/20 -mx-5 -mb-4 px-5 py-3 rounded-b-2xl">
-              <label className="flex items-center space-x-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={status?.autoCloudSyncEnabled !== false}
-                  onChange={(e) => handleToggleAutoCloudSync(e.target.checked)}
-                  className="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-purple-500 cursor-pointer"
-                />
-                <div>
-                  <span className="font-bold text-white block">
-                    Vollautomatische Cloud-Synchronisation aktiv
-                  </span>
-                  <span className="text-[11px] text-slate-400 block">
-                    Alle neuen Game.log-Dateien, user.cfg-Snapshots und Keybinds werden nach Spielende und App-Start automatisch synchronisiert.
-                  </span>
-                </div>
-              </label>
-
-              {typeof status?.cloudLogCount === 'number' && status.cloudLogCount > 0 && (
-                <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-mono text-xs shrink-0 self-start sm:self-auto">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{status.cloudLogCount} Logs aktuell in Cloud gesichert</span>
-                </div>
-              )}
+            <div className="flex items-center space-x-2 text-[11px] text-slate-400">
+              <span className="flex items-center space-x-1 text-emerald-400 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Automatischer Snapshot-Schutz aktiv</span>
+              </span>
             </div>
           </div>
 
-          {/* Keybind-Tresor (actionmaps.xml) */}
-          <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                  <Key className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-purple-300 tracking-wider">
-                    STEUERUNGS-BACKUPS (ACTIONMAPS.XML &amp; MAPPINGS)
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Sichert Joystick-, HOTAS-, HOSAS- und Tastaturbelegungen vor Spiel-Patches
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
-                  {status?.keybindItems?.length || status?.keybindBackups?.length || 0} Profile
-                </span>
-                <button
-                  onClick={() => handleOpenFolder('keybinds')}
-                  title="Keybinds-Ordner im Windows Explorer öffnen"
-                  className="p-1.5 rounded-lg bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border border-purple-800/60 transition cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
+          {backupSubTab === 'keybinds' ? (
+            <div className="space-y-6">
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900/80 to-sky-950/40 border border-purple-800/30 backdrop-blur shadow-xl space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
+                      <Cloud className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h2 className="text-sm font-bold text-white tracking-wide">CLOUD-SPEICHER &amp; SYNCHRONISATION</h2>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
+                          {cloudDisplay}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Hinterlege deinen Cloud-Ordner (Google Drive / OneDrive / Dropbox) zur standortübergreifenden Sicherung.
+                      </p>
+                    </div>
+                  </div>
 
-            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <span className="text-[11px] font-semibold text-slate-300 block">
-                Neues Steuerungs-Backup anlegen:
-              </span>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  placeholder="Optionale Notiz (z. B. VKB Dual-Stick Patch 4.0)..."
-                  value={keybindNote}
-                  onChange={(e) => setKeybindNote(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono"
-                />
-                <button
-                  onClick={handleCreateKeybindBackup}
-                  disabled={actionLoading !== null}
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/20 border border-purple-400 transition cursor-pointer shrink-0"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                  <span>Sichern</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[11px] font-semibold text-slate-400 block">
-                Gespeicherte Steuerungs-Profile:
-              </span>
-              <div className="space-y-2 overflow-y-auto max-h-[320px] pr-1">
-                {status?.keybindItems && status.keybindItems.length > 0 ? (
-                  status.keybindItems.map((k, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 transition flex items-center justify-between gap-3"
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleExportLogsZip}
+                      disabled={actionLoading !== null}
+                      className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
                     >
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-200 truncate font-mono">
-                          {k.name}
+                      <Download className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Logs als ZIP</span>
+                    </button>
+                    <button
+                      onClick={handleSyncLogsCloud}
+                      disabled={actionLoading !== null}
+                      className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-sky-950/70 hover:bg-sky-900/80 text-sky-300 text-xs font-bold border border-sky-800/80 transition cursor-pointer"
+                    >
+                      <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Logs in Cloud sichern</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenFolder('cloud')}
+                      title="Cloud-Ordner im Explorer öffnen"
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2 border-t border-slate-800/80">
+                  <input
+                    type="text"
+                    placeholder="Cloud-Pfad (z. B. I:\Meine Ablage\Backup\StarCitizen)..."
+                    value={cloudPath}
+                    onChange={(e) => setCloudPath(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500"
+                  />
+                  <button
+                    onClick={handleSaveCloudPath}
+                    disabled={actionLoading !== null}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold border border-purple-400 transition cursor-pointer shrink-0"
+                  >
+                    Pfad speichern
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-purple-900/30 text-xs bg-purple-950/20 -mx-5 -mb-4 px-5 py-3 rounded-b-2xl">
+                  <label className="flex items-center space-x-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={status?.autoCloudSyncEnabled !== false}
+                      onChange={(e) => handleToggleAutoCloudSync(e.target.checked)}
+                      className="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <div>
+                      <span className="font-bold text-white block">
+                        Vollautomatische Cloud-Synchronisation aktiv
+                      </span>
+                      <span className="text-[11px] text-slate-400 block">
+                        Alle neuen Game.log-Dateien, user.cfg-Snapshots und Keybinds werden nach Spielende und App-Start automatisch synchronisiert.
+                      </span>
+                    </div>
+                  </label>
+
+                  {((typeof status?.cloudLogCount === 'number' && status.cloudLogCount > 0) || status?.cloudLastBackupTime) && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-mono text-xs shrink-0 self-start sm:self-auto shadow-sm">
+                      <div className="flex items-center space-x-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{status?.cloudLogCount ?? 0} Logs aktuell in Cloud gesichert</span>
+                      </div>
+                      {status?.cloudLastBackupTime && (
+                        <div className="flex items-center space-x-1 text-[11px] text-emerald-400/90 border-t sm:border-t-0 sm:border-l border-emerald-800/80 pt-1 sm:pt-0 sm:pl-2.5">
+                          <Clock className="w-3 h-3 text-emerald-400/80 shrink-0" />
+                          <span>Stand: {status.cloudLastBackupTime} Uhr</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-[10px] text-slate-500 mt-1">
-                          <span className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{k.createdAt}</span>
-                          </span>
-                          <span>•</span>
-                          <span>{k.fileCount} Dateien ({k.sizeFormatted})</span>
-                          <span>•</span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded font-semibold border text-[9px] ${
-                              k.locationType.includes('Cloud')
-                                ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                : 'bg-slate-900 text-slate-400 border-slate-700'
-                            }`}
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Keybind-Tresor (actionmaps.xml) */}
+              <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                      <Key className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-purple-300 tracking-wider">
+                        STEUERUNGS-BACKUPS (ACTIONMAPS.XML &amp; MAPPINGS)
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Sichert Joystick-, HOTAS-, HOSAS- und Tastaturbelegungen vor Spiel-Patches
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
+                      {status?.keybindItems?.length || status?.keybindBackups?.length || 0} Profile
+                    </span>
+                    <button
+                      onClick={() => handleOpenFolder('keybinds')}
+                      title="Keybinds-Ordner im Windows Explorer öffnen"
+                      className="p-1.5 rounded-lg bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border border-purple-800/60 transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2">
+                  <span className="text-[11px] font-semibold text-slate-300 block">
+                    Neues Steuerungs-Backup anlegen:
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      placeholder="Optionale Notiz (z. B. VKB Dual-Stick Patch 4.0)..."
+                      value={keybindNote}
+                      onChange={(e) => setKeybindNote(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                    <button
+                      onClick={handleCreateKeybindBackup}
+                      disabled={actionLoading !== null}
+                      className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/20 border border-purple-400 transition cursor-pointer shrink-0"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                      <span>Sichern</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold text-slate-400 block">
+                    Gespeicherte Steuerungs-Profile:
+                  </span>
+                  <div className="space-y-2 overflow-y-auto max-h-[320px] pr-1">
+                    {status?.keybindItems && status.keybindItems.length > 0 ? (
+                      status.keybindItems.map((k, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 transition flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-200 truncate font-mono">
+                              {k.name}
+                            </div>
+                            <div className="flex items-center space-x-2 text-[10px] text-slate-500 mt-1">
+                              <span className="flex items-center space-x-1">
+                                <Clock className="w-3 h-3" />
+                                <span>{k.createdAt}</span>
+                              </span>
+                              <span>•</span>
+                              <span>{k.fileCount} Dateien ({k.sizeFormatted})</span>
+                              <span>•</span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded font-semibold border text-[9px] ${
+                                  k.locationType.includes('Cloud')
+                                    ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                    : 'bg-slate-900 text-slate-400 border-slate-700'
+                                }`}
+                              >
+                                {k.locationType}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleRestoreKeybind(k)}
+                            disabled={actionLoading !== null}
+                            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-950 hover:bg-purple-900/80 text-purple-300 text-xs font-bold border border-purple-800/80 transition cursor-pointer shrink-0"
+                            title="Steuerung in Star Citizen wiederherstellen"
                           >
-                            {k.locationType}
-                          </span>
+                            <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === `restoreKeybind_${k.name}` ? 'animate-spin' : ''}`} />
+                            <span>Rollback</span>
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic">
+                        Noch keine Keybind-Backups vorhanden. Klicke auf "Sichern", um deine Belegungen vor Patches zu sichern.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900/80 to-sky-950/40 border border-purple-800/40 backdrop-blur shadow-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
+                      <Archive className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2.5">
+                        <h2 className="text-base font-bold text-white tracking-wide">
+                          USER.CFG BACKUPS &amp; 1-KLICK ROLLBACK
+                        </h2>
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-bold">
+                          {status?.configBackups?.length || 0} Snapshots
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Jede Speicherung wird automatisch hier, im LIVE-Ordner (.bak) und in deiner Cloud archiviert. Du kannst jederzeit mit einem Klick auf einen früheren Stand zurückrollen.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <button
+                      onClick={() => handleOpenFolder('config')}
+                      className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                      title="Config-Backup-Ordner im Windows Explorer öffnen"
+                    >
+                      <FolderOpen className="w-4 h-4 text-sky-400" />
+                      <span>Ordner öffnen</span>
+                    </button>
+
+                    <button
+                      onClick={handleBackupUserCfgSnapshot}
+                      disabled={actionLoading !== null}
+                      className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/25 border border-purple-400 transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Jetzt sichern</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-3 border-t border-purple-900/40">
+                  <input
+                    type="text"
+                    placeholder="Optionale Notiz für manuelles Backup (z. B. Vor Grafik-Update, Vor Patch 4.0, RTX 5070 Tuning)..."
+                    value={configNote}
+                    onChange={(e) => setConfigNote(e.target.value)}
+                    className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <button
+                    onClick={handleBackupUserCfgSnapshot}
+                    disabled={actionLoading !== null}
+                    className="px-4 py-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-purple-200 text-xs font-semibold border border-purple-800 transition cursor-pointer shrink-0"
+                  >
+                    Snapshot anlegen
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+                    Archivierte Snapshot-Versionen
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Sortiert nach Datum (Neueste zuerst)
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 overflow-y-auto max-h-[500px] pr-1">
+                  {status?.configBackups && status.configBackups.length > 0 ? (
+                    status.configBackups.map((c, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-200 truncate font-mono group-hover:text-purple-300 transition">
+                            {c.name}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1 font-mono">
+                            <span className="flex items-center space-x-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>{c.createdAt}</span>
+                            </span>
+                            <span>•</span>
+                            <span>{c.sizeFormatted}</span>
+                            <span>•</span>
+                            <span
+                              className={`px-2 py-0.5 rounded font-semibold border text-[10px] ${
+                                c.locationType.includes('Cloud')
+                                  ? 'bg-sky-950 text-sky-400 border-sky-800'
+                                  : 'bg-slate-900 text-slate-400 border-slate-700'
+                              }`}
+                            >
+                              {c.locationType}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            onClick={() => handleRestoreConfigSnapshot(c)}
+                            disabled={actionLoading !== null}
+                            className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-purple-200 text-xs font-bold border border-purple-800 transition cursor-pointer"
+                            title="Diesen Stand wieder in die LIVE user.cfg einspielen (aktueller Stand wird zuvor automatisch gesichert)"
+                          >
+                            <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === `restoreCfg_${c.name}` ? 'animate-spin' : ''}`} />
+                            <span>Wiederherstellen</span>
+                          </button>
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => handleRestoreKeybind(k)}
-                        disabled={actionLoading !== null}
-                        className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-950 hover:bg-purple-900/80 text-purple-300 text-xs font-bold border border-purple-800/80 transition cursor-pointer shrink-0"
-                        title="Steuerung in Star Citizen wiederherstellen"
-                      >
-                        <RotateCcw className={`w-3.5 h-3.5 ${actionLoading === `restoreKeybind_${k.name}` ? 'animate-spin' : ''}`} />
-                        <span>Rollback</span>
-                      </button>
+                    ))
+                  ) : (
+                    <div className="p-8 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic space-y-2">
+                      <Archive className="w-8 h-8 text-slate-600 mx-auto" />
+                      <p>Noch keine user.cfg-Snapshots vorhanden.</p>
+                      <p className="text-[11px] text-slate-600">
+                        Klicke oben auf "Jetzt sichern", oder passe einen Wert an — vor jeder Änderung wird automatisch ein Stand gesichert.
+                      </p>
                     </div>
-                  ))
-                ) : (
-                  <div className="p-6 rounded-xl bg-slate-950 border border-slate-800/60 text-center text-xs text-slate-500 italic">
-                    Noch keine Keybind-Backups vorhanden. Klicke auf "Sichern", um deine Belegungen vor Patches zu sichern.
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -3745,6 +4297,174 @@ export const ToolsView: React.FC = () => {
                   <span>Als Template laden</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          BEFEHLS-LEXIKON MODAL / OVERLAY
+          ══════════════════════════════════════════════════════════════ */}
+      {showLexiconModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setShowLexiconModal(false)}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[88vh] rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 shrink-0">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner shrink-0">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-wide">
+                    STAR CITIZEN BEFEHLS-LEXIKON &amp; CVAR-REFERENZ
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Erklärungen, Wertebereiche, empfohlene Optimalwerte und 1-Klick-Übernahme in deine Live-user.cfg.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    applyPreset('5800x3d_5070');
+                    setShowLexiconModal(false);
+                    setCfgView('editor');
+                  }}
+                  className="hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md shadow-amber-600/20 border border-amber-400 transition cursor-pointer"
+                >
+                  <Rocket className="w-3.5 h-3.5" />
+                  <span>5800X3D / 5070 Profil</span>
+                </button>
+
+                <button
+                  onClick={() => setShowLexiconModal(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  title="Schließen"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Search Bar */}
+            <div className="p-4 border-b border-slate-800/80 bg-slate-950/60 shrink-0">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Befehl oder Stichwort suchen (z. B. SSDO, Nits, StreamPool, VSync, Con_Restricted)..."
+                  value={searchRef}
+                  onChange={(e) => setSearchRef(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Modal Content / Cards Grid */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredEntries.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 transition flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-[10px] font-bold text-emerald-400 font-mono uppercase tracking-wider">
+                          {item.category}
+                        </span>
+                        <span className="text-[9px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-semibold border border-slate-800">
+                          {item.tag}
+                        </span>
+                      </div>
+
+                      <div className="font-mono font-bold text-sm text-sky-300">
+                        {item.command} = {item.recommended}
+                      </div>
+
+                      <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                        {item.explanation}
+                      </p>
+
+                      <div className="mt-2 text-[11px] text-slate-500 font-mono">
+                        Wertebereich: <span className="text-slate-400">{item.valueDescription}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Empfehlung: <strong className="text-emerald-300">{item.recommended}</strong>
+                      </span>
+
+                      <button
+                        onClick={() => {
+                          updateSingleCvar(item.command, item.recommended);
+                          showToast(`✓ ${item.command} = ${item.recommended} in user.cfg eingefügt`);
+                        }}
+                        className="flex items-center space-x-1 px-3 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-[11px] font-semibold transition cursor-pointer"
+                      >
+                        <CheckCheck className="w-3 h-3" />
+                        <span>Wert übernehmen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ DELETE CONFIRM MODAL ══ */}
+      {deleteConfirmModal && deleteConfirmModal.open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setDeleteConfirmModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white tracking-wide">
+                  Screenshots unwiderruflich löschen?
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Möchtest du wirklich <strong className="text-rose-300">{deleteConfirmModal.count} {deleteConfirmModal.label}</strong> aus deinem Star Citizen Screenshot-Ordner auf der Festplatte löschen?
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Diese Aktion löscht die Dateien dauerhaft von der Festplatte.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setDeleteConfirmModal(null)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => handleExecuteDelete(deleteConfirmModal.mode, deleteConfirmModal.paths)}
+                disabled={screenshotActionLoading !== null}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-950/50 cursor-pointer disabled:opacity-40 flex items-center space-x-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{screenshotActionLoading ? 'Lösche...' : 'Unwiderruflich löschen'}</span>
+              </button>
             </div>
           </div>
         </div>

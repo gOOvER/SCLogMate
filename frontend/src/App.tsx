@@ -1,5 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import {
+  RefreshCw,
+  HardDrive,
+  Award,
+  BookOpen,
+  Box,
+  Coins,
+  Compass,
+  FileCode2,
+  Flame,
+  Info,
+  MapPin,
+  Radar,
+  Rocket,
+  Scroll,
+  Settings,
+  Shield,
+  ShoppingBag,
+  Target,
+} from 'lucide-react';
 import {
   bridge,
   AppStatus,
@@ -9,7 +28,7 @@ import {
   ScanProgress,
   applyFontFamily,
 } from './services/photinoBridge';
-import { Sidebar, NavTabId } from './components/Sidebar';
+import { Sidebar, NavTabId, resolveMainTab } from './components/Sidebar';
 import { MasterHeader } from './components/MasterHeader';
 import { SessionBar } from './components/SessionBar';
 import { HudBar } from './components/HudBar';
@@ -35,7 +54,6 @@ import { UpdateModal } from './components/UpdateModal';
 import { WikiDossierModal } from './components/WikiDossierModal';
 import { LocationDetectedPopup } from './components/LocationDetectedPopup';
 import { GlobalTooltip } from './components/GlobalTooltip';
-import { HardDrive } from 'lucide-react';
 import { UpdateInfoDto, WikiInfo, AutoLoadEntryDto, PluginDto } from './services/photinoBridge';
 import { useI18n } from './i18n';
 import { PluginHostView } from './views/PluginHostView';
@@ -276,9 +294,33 @@ export const App: React.FC = () => {
 
   const [navContext, setNavContext] = useState<NavTargetContext | null>(null);
 
-  const handleSelectTab = (tab: NavTabId, context?: NavTargetContext) => {
+  const handleSelectTab = (tab: NavTabId, context?: NavTargetContext, fromSidebar: boolean = false) => {
     setNavContext(context || null);
-    setActiveTab(tab);
+    if (fromSidebar) {
+      if (tab === 'hangar') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'hangar' ? activeTab : 'fleet');
+      } else if (tab === 'events') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'events' ? activeTab : 'events');
+      } else if (tab === 'missions') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'missions' ? activeTab : 'missions');
+      } else if (tab === 'finances') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'finances' ? activeTab : 'finances');
+      } else if (tab === 'starmap') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'starmap' ? activeTab : 'starmap');
+      } else if (tab === 'settings') {
+        const prevMain = resolveMainTab(activeTab);
+        setActiveTab(prevMain === 'settings' ? activeTab : 'settings');
+      } else {
+        setActiveTab(tab);
+      }
+    } else {
+      setActiveTab(tab);
+    }
   };
 
   const handleTriggerScan = async () => {
@@ -327,7 +369,7 @@ export const App: React.FC = () => {
       {/* 16-Tab Navigation Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={handleSelectTab}
+        onSelectTab={(tab) => handleSelectTab(tab, undefined, true)}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
         warehouseCount={warehouseTotal > 0 ? warehouseTotal : undefined}
@@ -404,7 +446,105 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* View Body: 16 Tabs exact matching Avalonia RC2 */}
+        {/* Consolidated Sub-Tab Navigation Bar */}
+        {(() => {
+          const resolvedMain = resolveMainTab(activeTab);
+          const mainHubs: Record<string, { title: string; subTabs: { id: NavTabId; label: string; icon: React.ElementType; badge?: number | string }[] }> = {
+            events: {
+              title: t('nav.hubLogbook'),
+              subTabs: [
+                { id: 'events', label: t('nav.events'), icon: Scroll, badge: events.length },
+                { id: 'blackbox', label: t('nav.blackbox'), icon: MapPin },
+              ],
+            },
+            missions: {
+              title: t('nav.hubMissions'),
+              subTabs: [
+                { id: 'missions', label: t('nav.missions'), icon: Target },
+                { id: 'reputation', label: t('nav.reputation'), icon: Award },
+              ],
+            },
+            finances: {
+              title: t('nav.hubFinances'),
+              subTabs: [
+                { id: 'finances', label: t('nav.finances'), icon: Coins },
+                { id: 'market', label: t('nav.market'), icon: ShoppingBag, badge: autoLoadCount },
+                { id: 'refinery', label: t('nav.refinery'), icon: Flame, badge: refineryCount },
+              ],
+            },
+            starmap: {
+              title: t('nav.hubUniverse'),
+              subTabs: [
+                { id: 'starmap', label: t('nav.starmap'), icon: Radar },
+                { id: 'places', label: t('nav.places'), icon: Compass },
+              ],
+            },
+            hangar: {
+              title: t('nav.hubHangar'),
+              subTabs: [
+                { id: 'fleet', label: t('nav.fleet'), icon: Rocket },
+                { id: 'warehouse', label: t('nav.warehouse'), icon: Box, badge: warehouseTotal },
+                { id: 'loadout', label: t('nav.loadout'), icon: Shield },
+                { id: 'blueprints', label: t('nav.blueprints'), icon: FileCode2 },
+                { id: 'wiki', label: t('nav.wiki'), icon: BookOpen },
+              ],
+            },
+            settings: {
+              title: t('nav.settings'),
+              subTabs: [
+                { id: 'settings', label: t('nav.settings'), icon: Settings },
+                { id: 'about', label: t('nav.about'), icon: Info },
+              ],
+            },
+          };
+
+          const currentHub = mainHubs[resolvedMain];
+          if (!currentHub || currentHub.subTabs.length <= 1 || activeTab.startsWith('plugin:')) return null;
+
+          return (
+            <div className="bg-[#030917]/95 border-b border-cyan-950/80 px-4 py-1.5 flex items-center justify-between gap-3 shrink-0 backdrop-blur-md select-none shadow-sm">
+              {/* Sub-Tab Navigation Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {currentHub.subTabs.map((sub) => {
+                  const Icon = sub.icon;
+                  const isActive = activeTab === sub.id || (activeTab === resolvedMain && sub.id === currentHub.subTabs[0].id);
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => handleSelectTab(sub.id, undefined, false)}
+                      className={`px-3 py-1 text-xs font-mono font-semibold rounded transition cursor-pointer flex items-center gap-2 shrink-0 ${
+                        isActive
+                          ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/80 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
+                      <span>{sub.label}</span>
+                      {sub.badge !== undefined && typeof sub.badge === 'number' && sub.badge > 0 && (
+                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                          isActive ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-500/40' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {sub.badge.toLocaleString('de-DE')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Section Breadcrumb on right */}
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono text-slate-500 shrink-0">
+                <span className="text-slate-400">{currentHub.title}</span>
+                <span className="text-slate-600">›</span>
+                <span className="text-cyan-400/90 font-medium">
+                  {currentHub.subTabs.find(s => s.id === activeTab)?.label || currentHub.subTabs[0].label}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* View Body */}
         <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4">
           {activeTab === 'events' && (
             <EventsView
@@ -442,7 +582,7 @@ export const App: React.FC = () => {
 
           {activeTab === 'market' && <MarketView />}
 
-          {activeTab === 'fleet' && (
+          {(activeTab === 'fleet' || activeTab === 'hangar') && (
             <FleetView
               initialSearch={navContext?.search}
               initialTab={navContext?.subTab as any}
@@ -466,7 +606,7 @@ export const App: React.FC = () => {
 
           {activeTab === 'settings' && <SettingsView />}
 
-          {activeTab === 'about' && <AboutView />}
+          {activeTab === 'about' && <AboutView status={status} />}
 
           {activeTab.startsWith('plugin:') && (() => {
             const pId = activeTab.slice(7);
@@ -531,7 +671,7 @@ export const App: React.FC = () => {
               {bridge.isConnected ? '● PHOTINO NATIVE' : '○ DEV BROWSER'}
             </span>
             <span>·</span>
-            <span className="text-cyan-400 font-semibold">{status?.version || 'v1.0.0-rc2'}</span>
+            <span className="text-cyan-400 font-semibold">{status?.version || 'v1.3.0'}</span>
           </div>
         </footer>
       </div>

@@ -18,7 +18,7 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 42; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v42: server_shards Tabelle für Shard-Tagebuch mit Good/Avoid-Flags, Notizen & CIG Support)
+    public const int CurrentSchemaVersion = 44; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v44: Faction Reputation Reconciliation & Prestige Tiers)
     public const int CurrentParserVersion = 45; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v45: Contract Payout Pairing & Failed vs. Abandoned Unterscheidung)
 
     public static bool WasParserResetRequired { get; set; }
@@ -1164,6 +1164,36 @@ public static class Database
             Logger.Log("DB Schema: Migration auf v42 (server_shards Tabelle & Shard-Tagebuch) erfolgreich angewendet.");
         }
 
+        if (dbSchemaVersion < 43)
+        {
+            try
+            {
+                PopulateServerShardsFromSessions(db);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v43 (server_shards Spielzeiten Bereinigung)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 43;");
+            dbSchemaVersion = 43;
+            Logger.Log("DB Schema: Migration auf v43 (Reconciliation server_shards Spielzeiten) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 44)
+        {
+            try
+            {
+                ReconcileFactionReputationsFromEvents(db);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v44 (Reconciliation Faction Reputations & Prestige Tiers)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 44;");
+            dbSchemaVersion = 44;
+            Logger.Log("DB Schema: Migration auf v44 (Reconciliation Faction Reputations & Prestige Tiers) erfolgreich angewendet.");
+        }
+
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -1442,13 +1472,15 @@ public static class Database
                         s.ExecuteNonQuery();
                     }
                     tx.Commit();
-                    if (parser.Meta.TryGetValue("shard", out var idxShard) && !string.IsNullOrWhiteSpace(idxShard) && idxShard != "—")
-                    {
-                        UpsertShardVisit(idxShard, last ?? first, (long)parser.InGameTime.TotalSeconds, "Normal Quit");
-                    }
                     added++;
                 }
                 catch (Exception ex) { Logger.Error("Index " + name, ex); }
+            }
+
+            if (added > 0)
+            {
+                PopulateServerShardsFromSessions(db);
+                ReconcileFactionReputationsFromEvents(db);
             }
 
             Exec(db, @"PRAGMA synchronous = NORMAL;
@@ -1562,10 +1594,6 @@ public static class Database
                             s.ExecuteNonQuery();
                         }
                         tx.Commit();
-                        if (parser.Meta.TryGetValue("shard", out var rscShard) && !string.IsNullOrWhiteSpace(rscShard) && rscShard != "—")
-                        {
-                            UpsertShardVisit(rscShard, last ?? first, (long)parser.InGameTime.TotalSeconds, "Normal Quit");
-                        }
                         sessionCount++;
                         eventCount += sessionEvents;
                     }
@@ -1585,6 +1613,9 @@ public static class Database
                            CREATE INDEX IF NOT EXISTS ix_events_kind_time ON events(kind, time);
                            PRAGMA synchronous = NORMAL;
                            PRAGMA wal_checkpoint(PASSIVE);");
+
+                PopulateServerShardsFromSessions(db);
+                ReconcileFactionReputationsFromEvents(db);
             }
 
             Logger.Log($"DB: Re-Scan beendet: {sessionCount} Sessions, {eventCount} Events.");
@@ -3016,6 +3047,207 @@ public static class Database
 
     #region Faction Reputation Tracking
 
+    private sealed record TakenMissionRecord(string Contractor, string Category, string Difficulty, string System, string Time);
+
+    /// <summary>
+    /// Ermittelt aus allen historischen MissionTaken / MissionReward / MissionDone Events
+    /// die exakten Missionserfolge und Rufpunkte (XP) pro Fraktion gemäß SC Alpha 4.9/4.10 Reputationskatalog.
+    /// </summary>
+    public static void ReconcileFactionReputationsFromEvents(SqliteConnection db)
+    {
+        try
+        {
+            var activeMissions = new Dictionary<string, List<TakenMissionRecord>>(StringComparer.OrdinalIgnoreCase);
+            var factionAggregates = new Dictionary<string, (int Count, int Xp, string LastTime)>(StringComparer.OrdinalIgnoreCase);
+
+            using (var cmd = db.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT kind, detail, amount, time, session
+                    FROM events
+                    WHERE kind IN ('MissionTaken', 'MissionReward', 'MissionDone')
+                    ORDER BY time ASC;";
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string kind = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                    string detail = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    long amount = reader.IsDBNull(2) ? 0 : reader.GetInt64(2);
+                    string time = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    string session = reader.IsDBNull(4) ? "" : reader.GetString(4);
+
+                    if (string.IsNullOrWhiteSpace(session))
+                        continue;
+
+                    if (!activeMissions.TryGetValue(session, out var sessionMissions))
+                    {
+                        sessionMissions = new List<TakenMissionRecord>();
+                        activeMissions[session] = sessionMissions;
+                    }
+
+                    if (kind == "MissionTaken")
+                    {
+                        var parts = detail.Split('·', StringSplitOptions.TrimEntries);
+                        string contractor = parts.Length > 0 ? parts[0] : "";
+                        string cat = parts.Length > 1 ? parts[1] : "";
+                        string diff = parts.Length > 2 ? parts[2] : "";
+                        string sys = parts.Length > 3 ? parts[3] : "";
+                        sessionMissions.Add(new TakenMissionRecord(contractor, cat, diff, sys, time));
+                    }
+                    else if (kind == "MissionReward" || kind == "MissionDone")
+                    {
+                        string title = detail
+                            .Replace("Contract Complete: ", "", StringComparison.OrdinalIgnoreCase)
+                            .Replace("Auftrag abgeschlossen: ", "", StringComparison.OrdinalIgnoreCase)
+                            .Trim();
+
+                        TakenMissionRecord? matched = null;
+                        // 1. Try matching contractor name directly in completed mission title
+                        for (int i = sessionMissions.Count - 1; i >= 0; i--)
+                        {
+                            var m = sessionMissions[i];
+                            if (!string.IsNullOrWhiteSpace(m.Contractor) &&
+                                title.Contains(m.Contractor, StringComparison.OrdinalIgnoreCase))
+                            {
+                                matched = m;
+                                break;
+                            }
+                        }
+
+                        // 2. Specific matching fallbacks for Orison Relief, Alliance Aid, Ling Family, Recco
+                        if (matched == null && title.Contains("orison relief", StringComparison.OrdinalIgnoreCase))
+                        {
+                            for (int i = sessionMissions.Count - 1; i >= 0; i--)
+                            {
+                                if (sessionMissions[i].Contractor.Contains("orison", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matched = sessionMissions[i];
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (matched == null && title.Contains("alliance aid", StringComparison.OrdinalIgnoreCase))
+                        {
+                            for (int i = sessionMissions.Count - 1; i >= 0; i--)
+                            {
+                                if (sessionMissions[i].Contractor.Contains("alliance", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matched = sessionMissions[i];
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (matched == null && title.Contains("ling family", StringComparison.OrdinalIgnoreCase))
+                        {
+                            for (int i = sessionMissions.Count - 1; i >= 0; i--)
+                            {
+                                if (sessionMissions[i].Contractor.Contains("ling", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matched = sessionMissions[i];
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (matched == null && (title.Contains("blackbox", StringComparison.OrdinalIgnoreCase) ||
+                                                title.Contains("flight recorder", StringComparison.OrdinalIgnoreCase) ||
+                                                title.Contains("ship in distress", StringComparison.OrdinalIgnoreCase) ||
+                                                title.Contains("missing mining", StringComparison.OrdinalIgnoreCase) ||
+                                                title.Contains("missing persons", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            for (int i = sessionMissions.Count - 1; i >= 0; i--)
+                            {
+                                if (sessionMissions[i].Contractor.Contains("recco", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matched = sessionMissions[i];
+                                    break;
+                                }
+                            }
+                        }
+
+                        // 3. Fallback to latest active mission in session if available
+                        if (matched == null && sessionMissions.Count > 0)
+                        {
+                            matched = sessionMissions[^1];
+                        }
+
+                        string contractor = matched?.Contractor ?? "";
+                        string diff = matched?.Difficulty ?? "";
+                        string cat = matched?.Category ?? "";
+
+                        // Determine Faction
+                        var faction = ReputationCatalog.MatchFaction(contractor) 
+                                      ?? ReputationCatalog.MatchFaction(title);
+                        if (faction == null) continue;
+
+                        int xp = ReputationCatalog.CalculateMissionXp(title, amount, diff, cat);
+
+                        if (!factionAggregates.TryGetValue(faction.Id, out var agg))
+                        {
+                            agg = (0, 0, time);
+                        }
+                        agg.Count++;
+                        agg.Xp += xp;
+                        agg.LastTime = time;
+                        factionAggregates[faction.Id] = agg;
+                    }
+                }
+            }
+
+            // Write into reputation table
+            using var tx = db.BeginTransaction();
+            using (var clearCmd = db.CreateCommand())
+            {
+                clearCmd.Transaction = tx;
+                clearCmd.CommandText = "DELETE FROM reputation;";
+                clearCmd.ExecuteNonQuery();
+            }
+
+            using (var insCmd = db.CreateCommand())
+            {
+                insCmd.Transaction = tx;
+                insCmd.CommandText = @"
+                    INSERT INTO reputation (faction_id, xp, completed_missions, last_updated)
+                    VALUES ($fid, $xp, $missions, $last);";
+
+                var pFid = insCmd.Parameters.Add("$fid", SqliteType.Text);
+                var pXp = insCmd.Parameters.Add("$xp", SqliteType.Integer);
+                var pMissions = insCmd.Parameters.Add("$missions", SqliteType.Integer);
+                var pLast = insCmd.Parameters.Add("$last", SqliteType.Text);
+
+                foreach (var kvp in factionAggregates)
+                {
+                    pFid.Value = kvp.Key;
+                    pXp.Value = kvp.Value.Xp;
+                    pMissions.Value = kvp.Value.Count;
+                    pLast.Value = kvp.Value.LastTime;
+                    insCmd.ExecuteNonQuery();
+                }
+            }
+            tx.Commit();
+
+            Logger.Log($"DB: Faction Reputation Reconciliation erfolgreich: {factionAggregates.Count} Fraktionen synchronisiert.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("DB: ReconcileFactionReputationsFromEvents fehlgeschlagen", ex);
+        }
+    }
+
+    public static void ReconcileFactionReputations()
+    {
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            using var db = new SqliteConnection(Conn);
+            db.Open();
+            ReconcileFactionReputationsFromEvents(db);
+        }
+    }
+
     public static Dictionary<string, (int Xp, int Missions, DateTime LastUpdated)> LoadFactionReputations()
     {
         EnsureInitialized();
@@ -4284,8 +4516,16 @@ public static class Database
                 var (flag, region, shardNum) = LogParser.ParseShardDetails(item.Shard);
                 using var ins = db.CreateCommand();
                 ins.CommandText = @"
-                    INSERT OR IGNORE INTO server_shards (shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes)
-                    VALUES (@id, @num, @reg, @flag, @first, @last, @visits, @sec, 'Normal Quit', 'Neutral', '');
+                    INSERT INTO server_shards (shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes)
+                    VALUES (@id, @num, @reg, @flag, @first, @last, @visits, @sec, 'Normal Quit', 'Neutral', '')
+                    ON CONFLICT(shard_id) DO UPDATE SET
+                        shard_number = @num,
+                        region = @reg,
+                        region_flag = @flag,
+                        first_seen = @first,
+                        last_seen = @last,
+                        visit_count = @visits,
+                        total_seconds = @sec;
                 ";
                 ins.Parameters.AddWithValue("@id", item.Shard);
                 ins.Parameters.AddWithValue("@num", shardNum);
@@ -4307,7 +4547,7 @@ public static class Database
     /// <summary>
     /// Aktualisiert oder legt einen Shard-Eintrag an, wenn ein Server betreten oder beendet wird.
     /// </summary>
-    public static void UpsertShardVisit(string shardId, DateTime? seenAt, long addSeconds, string? endReason)
+    public static void UpsertShardVisit(string shardId, DateTime? seenAt, long addSeconds, string? endReason, bool incrementVisit = true)
     {
         if (string.IsNullOrWhiteSpace(shardId) || shardId == "—" || shardId == "Alle Sessions" || shardId == "Kein Server") return;
         EnsureInitialized();
@@ -4323,10 +4563,10 @@ public static class Database
                 using var cmd = db.CreateCommand();
                 cmd.CommandText = @"
                     INSERT INTO server_shards (shard_id, shard_number, region, region_flag, first_seen, last_seen, visit_count, total_seconds, last_end_reason, rating, notes)
-                    VALUES (@id, @num, @reg, @flag, @ts, @ts, 1, @sec, @end, 'Neutral', '')
+                    VALUES (@id, @num, @reg, @flag, @ts, @ts, CASE WHEN @inc = 1 THEN 1 ELSE 0 END, @sec, @end, 'Neutral', '')
                     ON CONFLICT(shard_id) DO UPDATE SET
                         last_seen = @ts,
-                        visit_count = server_shards.visit_count + 1,
+                        visit_count = server_shards.visit_count + @inc,
                         total_seconds = server_shards.total_seconds + @sec,
                         last_end_reason = CASE WHEN @end != '' AND @end IS NOT NULL THEN @end ELSE server_shards.last_end_reason END;
                 ";
@@ -4335,6 +4575,7 @@ public static class Database
                 cmd.Parameters.AddWithValue("@reg", region);
                 cmd.Parameters.AddWithValue("@flag", flag);
                 cmd.Parameters.AddWithValue("@ts", ts);
+                cmd.Parameters.AddWithValue("@inc", incrementVisit ? 1 : 0);
                 cmd.Parameters.AddWithValue("@sec", Math.Max(0, addSeconds));
                 cmd.Parameters.AddWithValue("@end", (object?)endReason ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
