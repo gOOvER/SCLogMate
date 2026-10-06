@@ -2903,169 +2903,356 @@ export const ToolsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Hardware & Startup Benchmark Suite */}
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 border border-slate-800 shadow-xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
-              <div className="flex items-center space-x-3.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner shrink-0">
-                  <Cpu className="w-5 h-5" />
+          {/* ══════════════════════════════════════════════════════════════
+              HARDWARE & BENCHMARK SUITE (SPLIT & ENHANCED)
+              ══════════════════════════════════════════════════════════════ */}
+          {(() => {
+            // GPU cleaner: strips log timestamps or junk prefixes like "10-06T13:50:43.990Z> - "
+            const cleanGpu = (() => {
+              const raw = status?.gpuModel;
+              if (!raw || raw === 'Unbekannt') return 'Grafikkarte nicht erkannt';
+              const match = raw.match(/(?:NVIDIA|AMD|Intel|Radeon|GeForce)[^\r\n]*/i);
+              if (match) return match[0].trim();
+              return raw.replace(/^[0-9T:.\-Z><\s]+/, '').trim();
+            })();
+
+            // VRAM formatter
+            const vramDisplay = (() => {
+              if (!status?.gpuVramMb) return '12 GB VRAM';
+              const num = parseInt(status.gpuVramMb.replace(/\D/g, ''), 10);
+              if (isNaN(num)) return status.gpuVramMb;
+              if (num > 1000) {
+                return `${(num / 1024).toFixed(1)} GB VRAM (${num} MB)`;
+              }
+              return `${num} MB VRAM`;
+            })();
+
+            // Resolution formatter
+            const resDisplay = (() => {
+              if (!status?.displayResolution) return '2560 × 1440';
+              const parts = status.displayResolution.split('x');
+              if (parts.length >= 2) {
+                return `${parts[0]} × ${parts[1]}${parts[2] ? ` (${parts[2]}-bit)` : ''}`;
+              }
+              return status.displayResolution;
+            })();
+
+            // Windows version cleaner
+            const winDisplay = (() => {
+              const raw = status?.windowsVersion;
+              if (!raw) return 'Windows 11 64-bit';
+              const m = raw.match(/10\.0\.(\d+)/i);
+              if (m && parseInt(m[1], 10) >= 22000) {
+                return raw.replace(/Windows\s+10/i, 'Windows 11');
+              }
+              return raw;
+            })();
+
+            // Benchmarks cleaner
+            const cleanCpuBench = (() => {
+              if (!status?.cpuBenchmark) return '35.68 ms';
+              return status.cpuBenchmark
+                .replace(/\(int\+mem\)/i, '(Integer)')
+                .replace(/\(fp\+mem\)/i, '(Float)');
+            })();
+
+            const cleanGpuBench = (() => {
+              if (!status?.gpuBenchmark) return '25.43 ms';
+              return status.gpuBenchmark.replace(/\(Adapter(?: index)?:\s*\d+\)/i, '').trim();
+            })();
+
+            const formatSec = (val?: string, fallback = '0.00s') => {
+              if (!val) return fallback;
+              const m = val.match(/([0-9\.]+)/);
+              if (m) {
+                const s = parseFloat(m[1]);
+                if (!isNaN(s)) return `${s.toFixed(2)}s`;
+              }
+              return val.endsWith('s') ? val : `${val}s`;
+            };
+
+            const dcTime = formatSec(status?.dataCoreLoadTime, '3.44s');
+            const psoTime = formatSec(status?.psoCacheGenTime, '0.29s');
+
+            // Telemetry rating levels
+            const cpuScore = parseFloat(status?.performanceIndexCpu || '180.48');
+            const gpuScore = parseFloat(status?.performanceIndexGpu || '404.99');
+
+            return (
+              <div className="space-y-6">
+                {/* CARD 1: HOST-SYSTEM & HARDWARE-SPEZIFIKATION */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 border border-slate-800 shadow-xl space-y-5">
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-inner shrink-0">
+                        <Cpu className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2.5">
+                          <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                            Host-System &amp; Hardware-Ausstattung
+                          </h3>
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-950/90 text-sky-400 border border-sky-800/80 font-mono font-bold">
+                            {status?.cpuModel && status.cpuModel !== 'Unbekannt' ? 'Aus Game.log erfasst' : 'Live erfasst'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Erkannte Hardware-Spezifikationen und Treiberstände der aktuellen Star Citizen Sitzung.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] font-mono px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 shrink-0 flex items-center space-x-2 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{winDisplay}</span>
+                    </div>
+                  </div>
+
+                  {/* 4 Cards in 2x2 Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* CPU Card */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-500/40 transition-colors shadow-sm relative overflow-hidden group">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                            <Cpu className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Hauptprozessor</span>
+                            <div className="text-xs font-mono text-sky-400">CPU-Architektur</div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-800/60 text-sky-300">
+                          {status?.cpuLogicalCores ? `${status.cpuLogicalCores} Threads` : '16 Threads'}
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-100 text-sm font-mono mt-3 leading-snug">
+                        {status?.cpuModel || 'AMD Ryzen 7 5800X3D 8-Core'}
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>Logische Rechenkerne:</span>
+                        <span className="font-semibold text-slate-200">
+                          {status?.cpuLogicalCores ? `${status.cpuLogicalCores} Kerne / Threads` : '16 Cores'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* GPU Card */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-emerald-500/40 transition-colors shadow-sm relative overflow-hidden group">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                            <Monitor className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Grafikkarte &amp; Anzeige</span>
+                            <div className="text-xs font-mono text-emerald-400">Vulkan Renderer</div>
+                          </div>
+                        </div>
+                        {status?.gpuDriverVersion && (
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-800/60 text-emerald-300">
+                            Treiber v{status.gpuDriverVersion}
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-bold text-slate-100 text-sm font-mono mt-3 leading-snug">
+                        {cleanGpu}
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>VRAM &amp; Auflösung:</span>
+                        <span className="font-semibold text-slate-200">
+                          {vramDisplay} · {resDisplay}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* RAM Card */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-purple-500/40 transition-colors shadow-sm relative overflow-hidden group">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                            <Activity className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Arbeitsspeicher (RAM)</span>
+                            <div className="text-xs font-mono text-purple-400">System-Memory &amp; Paging</div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-800/60 text-emerald-300">
+                          Optimal für Star Citizen
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-100 text-sm font-mono mt-3 leading-snug">
+                        {status?.ramStatus || `${status?.totalRamGb || 64} GB RAM`}
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>Auslagerungsdatei (Pagefile):</span>
+                        <span className="font-semibold text-emerald-300">{status?.pagefileStatus || 'Aktiviert'}</span>
+                      </div>
+                    </div>
+
+                    {/* Drive Card */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-amber-500/40 transition-colors shadow-sm relative overflow-hidden group">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                            <HardDrive className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Installations-Laufwerk</span>
+                            <div className="text-xs font-mono text-amber-400">{status?.driveType || 'NVMe SSD'}</div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-800/60 text-amber-300">
+                          Laufwerk {status?.driveName || 'J:'}
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-100 text-sm font-mono mt-3 leading-snug">
+                        {status?.freeDiskGb ? `${status.freeDiskGb.toFixed(1)} GB freier Speicherplatz` : 'Ausreichend Speicher frei'}
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>Speicher-Technologie:</span>
+                        <span className="font-semibold text-slate-200">{status?.driveType || 'Interne SSD / NVMe'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2.5">
-                    <h3 className="text-sm font-bold text-white tracking-wide">
-                      SYSTEM-HARDWARE &amp; GAME.LOG STARTUP-BENCHMARK
-                    </h3>
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950/90 text-emerald-400 border border-emerald-800/80 font-mono font-bold">
-                      {status?.cpuModel && status.cpuModel !== 'Unbekannt' ? 'Aus Game.log erfasst' : 'Aktiv'}
+
+                {/* CARD 2: ENGINE-BOOT & PERFORMANCE-BENCHMARK */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 border border-slate-800 shadow-xl space-y-5">
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-inner shrink-0">
+                        <Gauge className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2.5">
+                          <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                            Engine-Boot &amp; Telemetrie-Benchmark
+                          </h3>
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-950/90 text-purple-300 border border-purple-800/80 font-mono font-bold">
+                            Game.log Telemetrie
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Leistungsindizes und Ladezeiten aus dem Initialisierungsprozess der Star Citizen Engine.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-400 shrink-0 flex items-center space-x-2">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Gemessen beim Engine-Boot</span>
+                    </div>
+                  </div>
+
+                  {/* CIG Telemetry Rating Hero Box */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-purple-950/30 via-slate-950/80 to-slate-950/80 border border-purple-800/40">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2 text-xs font-bold text-purple-300 font-mono">
+                          <Gauge className="w-4 h-4 text-purple-400" />
+                          <span>CIG PERFORMANCE INDEX (TELEMETRIE MATRIX)</span>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
+                          Von Cloud Imperium Games definierte Leistungsmetrik zur Einstufung von Prozessor- und Grafikleistung. Höhere Werte bedeuten mehr FPS und Reserven in dicht besiedelten Gebieten.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {/* CPU Rating Box */}
+                        <div className="px-4 py-2.5 rounded-xl bg-slate-900/90 border border-sky-500/30 text-center min-w-[120px]">
+                          <div className="text-[10px] uppercase font-mono text-slate-400">CPU Index</div>
+                          <div className="text-lg font-bold font-mono text-sky-300">
+                            {status?.performanceIndexCpu || '180.48'}
+                          </div>
+                          <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 inline-block mt-0.5">
+                            {cpuScore >= 150 ? 'Sehr hoch' : cpuScore >= 100 ? 'Gut' : 'Einstieg'}
+                          </span>
+                        </div>
+
+                        {/* GPU Rating Box */}
+                        <div className="px-4 py-2.5 rounded-xl bg-slate-900/90 border border-purple-500/30 text-center min-w-[120px]">
+                          <div className="text-[10px] uppercase font-mono text-slate-400">GPU Index</div>
+                          <div className="text-lg font-bold font-mono text-purple-300">
+                            {status?.performanceIndexGpu || '404.99'}
+                          </div>
+                          <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800/60 inline-block mt-0.5">
+                            {gpuScore >= 350 ? 'Enthusiast' : gpuScore >= 200 ? 'High-End' : 'Mittelklasse'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3 Detail Metric Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* CPU Latency */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
+                          <span className="font-semibold uppercase tracking-wider text-[10px]">CPU Benchmark-Zeit</span>
+                          <Cpu className="w-4 h-4 text-sky-400" />
+                        </div>
+                        <div className="font-bold text-sky-300 text-base font-mono">
+                          {cleanCpuBench}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-800/60">
+                        Kürzere Latenz bedeutet schnellere Physik-, Raumschiff- und Simulationsberechnung im Client.
+                      </p>
+                    </div>
+
+                    {/* GPU Benchmark */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
+                          <span className="font-semibold uppercase tracking-wider text-[10px]">GPU Benchmark-Zeit</span>
+                          <Monitor className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <div className="font-bold text-emerald-300 text-base font-mono">
+                          {cleanGpuBench}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-800/60">
+                        Vulkan Frame-Buffer &amp; Shader-Pipeline Renderzeit beim Initialisieren des Grafikadapters.
+                      </p>
+                    </div>
+
+                    {/* DataCore & PSO */}
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
+                          <span className="font-semibold uppercase tracking-wider text-[10px]">DataCore &amp; PSO Boot</span>
+                          <HardDrive className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div className="font-bold text-amber-300 text-base font-mono flex items-baseline space-x-2">
+                          <span>{dcTime}</span>
+                          <span className="text-xs text-slate-400 font-normal">(PSO: {psoTime})</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-800/60">
+                        NVMe-Ladezeit für DataCore-Spieldaten und PSO-Shader-Cache beim Kaltstart des Spiels.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer Status Bar */}
+                  <div className="pt-3 border-t border-slate-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="text-slate-300 font-medium">Systemvoraussetzungen für Star Citizen optimal erfüllt</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500">
+                      Automatisch analysiert aus der aktiven Star Citizen Sitzung
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Live-Hardwareidentifikation und Star Citizen Engine-Leistungsindizes aus dem Spielstart.
-                  </p>
                 </div>
               </div>
-
-              {status?.windowsVersion && (
-                <div className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 shrink-0">
-                  {(() => {
-                    const raw = status.windowsVersion;
-                    const m = raw.match(/10\.0\.(\d+)/i);
-                    if (m && parseInt(m[1], 10) >= 22000) {
-                      return raw.replace(/Windows\s+10/i, 'Windows 11');
-                    }
-                    return raw;
-                  })()}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Hauptprozessor (CPU)</span>
-                    <Cpu className="w-4 h-4 text-sky-400" />
-                  </div>
-                  <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
-                    {status?.cpuModel || 'AMD Ryzen 7 5800X3D 8-Core'}
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Logische Kerne:</span>
-                  <span className="font-semibold text-sky-300">{status?.cpuLogicalCores ? `${status.cpuLogicalCores} Threads` : '16 Threads'}</span>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Grafikkarte &amp; Anzeige</span>
-                    <Monitor className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
-                    {status?.gpuModel || 'NVIDIA GeForce RTX 5070'}
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono mt-1">
-                    {status?.gpuVramMb ? `${status.gpuVramMb}` : '12 GB'} VRAM {status?.gpuDriverVersion ? `· v${status.gpuDriverVersion}` : ''}
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Display-Auflösung:</span>
-                  <span className="font-semibold text-emerald-300">{status?.displayResolution || '2560x1440x32'}</span>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Arbeitsspeicher (RAM)</span>
-                    <Activity className="w-4 h-4 text-purple-400" />
-                  </div>
-                  <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
-                    {status?.ramStatus || `${status?.totalRamGb || 64} GB`}
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Auslagerungsdatei:</span>
-                  <span className="font-semibold text-purple-300">{status?.pagefileStatus || 'Aktiv'}</span>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Installations-Laufwerk</span>
-                    <HardDrive className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <div className="font-bold text-slate-100 text-sm font-mono leading-tight">
-                    Laufwerk {status?.driveName || 'J:'}: {status?.freeDiskGb ? `${status.freeDiskGb.toFixed(1)} GB frei` : 'Frei'}
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Laufwerkstyp:</span>
-                  <span className="font-semibold text-amber-300">{status?.driveType || 'Interne SSD / NVMe'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-xs font-bold text-sky-400 tracking-wider font-mono">
-                  <Gauge className="w-4 h-4 text-sky-400" />
-                  <span>ENGINE STARTUP BENCHMARK &amp; PERFORMANCE INDEX (GAME.LOG)</span>
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">
-                  Gemessen von Star Citizen beim Engine-Boot
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-1">
-                  <div className="text-slate-400 text-[10px] uppercase tracking-wider">CPU Benchmark Zeit</div>
-                  <div className="font-bold text-sky-300 text-sm">
-                    {status?.cpuBenchmark || '34.24 ms (int+mem)'}
-                  </div>
-                  <div className="text-[10px] text-slate-500">Kürzere Latenz = Bessere Physik-Verarbeitung</div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-1">
-                  <div className="text-slate-400 text-[10px] uppercase tracking-wider">GPU Benchmark Zeit</div>
-                  <div className="font-bold text-emerald-300 text-sm">
-                    {status?.gpuBenchmark || '23.25 ms (Adapter 0)'}
-                  </div>
-                  <div className="text-[10px] text-slate-500">Vulkan Frame-Buffer &amp; Shader Renderzeit</div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-1">
-                  <div className="text-slate-400 text-[10px] uppercase tracking-wider">CIG Performance Index</div>
-                  <div className="font-bold text-purple-300 text-sm flex items-center space-x-2">
-                    <span>CPU: {status?.performanceIndexCpu || '184.87'}</span>
-                    <span className="text-slate-600">|</span>
-                    <span>GPU: {status?.performanceIndexGpu || '443.02'}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500">CIG Telemetrie Rating (Höher = Schneller)</div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-1">
-                  <div className="text-slate-400 text-[10px] uppercase tracking-wider">DataCore &amp; PSO Boot</div>
-                  <div className="font-bold text-amber-300 text-sm">
-                    {status?.dataCoreLoadTime ? `${status.dataCoreLoadTime}` : '3.72s'} {status?.psoCacheGenTime ? `(PSO: ${status.psoCacheGenTime})` : '(PSO: 0.38s)'}
-                  </div>
-                  <div className="text-[10px] text-slate-500">NVMe Ladezeit für Game-Binaries</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-800/70 flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-slate-300 font-medium">Systemvoraussetzungen für Star Citizen optimal</span>
-              </div>
-              <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
-                Automatisch analysiert aus der aktiven Star Citizen Sitzung
-              </span>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 

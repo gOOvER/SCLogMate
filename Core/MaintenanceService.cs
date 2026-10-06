@@ -1076,16 +1076,14 @@ public static class MaintenanceService
                     info.DisplayResolution = line.Substring(idx + "Current display mode is ".Length).Trim();
                 }
                 // Logging video adapters: / - NVIDIA GeForce RTX 5070
-                else if (line.Contains("- NVIDIA ") || line.Contains("- AMD ") || line.Contains("- Intel "))
+                else if (line.Contains("NVIDIA ") || line.Contains("AMD ") || line.Contains("Intel "))
                 {
                     if (info.GpuModel == "Unbekannt" && !line.Contains("Microsoft Basic Render Driver"))
                     {
-                        var dashIdx = line.IndexOf('-');
-                        if (dashIdx >= 0)
+                        var m = System.Text.RegularExpressions.Regex.Match(line, @"(?:-\s*)?(NVIDIA\s+[^(\r\n]+|AMD\s+[^(\r\n]+|Intel\s+[^(\r\n]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (m.Success)
                         {
-                            var rest = line.Substring(dashIdx + 1).Trim();
-                            var parenIdx = rest.IndexOf('(');
-                            info.GpuModel = parenIdx > 0 ? rest.Substring(0, parenIdx).Trim() : rest;
+                            info.GpuModel = m.Groups[1].Value.Trim();
                         }
                     }
                 }
@@ -1129,14 +1127,28 @@ public static class MaintenanceService
                 // [PSOCacheGen] Loaded PSOCache (...) (0.378s)
                 else if (line.Contains("[PSOCacheGen] Loaded PSOCache"))
                 {
-                    var m = System.Text.RegularExpressions.Regex.Match(line, @"\(([0-9\.]+s)\)");
-                    if (m.Success) info.PsoCacheGenTime = m.Groups[1].Value;
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"\(([0-9\.]+)s?\)");
+                    if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double psoSec))
+                    {
+                        info.PsoCacheGenTime = $"{psoSec:F2}s";
+                    }
+                    else if (m.Success)
+                    {
+                        info.PsoCacheGenTime = m.Groups[1].Value + "s";
+                    }
                 }
                 // [DataCore] Binary Data Loaded. Total Time took 3.725363s
                 else if (line.Contains("[DataCore] Binary Data Loaded."))
                 {
-                    var m = System.Text.RegularExpressions.Regex.Match(line, @"Total Time took\s+([0-9\.]+s)");
-                    if (m.Success) info.DataCoreLoadTime = m.Groups[1].Value;
+                    var m = System.Text.RegularExpressions.Regex.Match(line, @"Total Time took\s+([0-9\.]+)s?");
+                    if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double dcSec))
+                    {
+                        info.DataCoreLoadTime = $"{dcSec:F2}s";
+                    }
+                    else if (m.Success)
+                    {
+                        info.DataCoreLoadTime = m.Groups[1].Value + "s";
+                    }
                 }
             }
         }

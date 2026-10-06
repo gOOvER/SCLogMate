@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sub-tab pills now explicitly activate the targeted view immediately.
 
 ### Changed
+- **Hardware Diagnostics & Engine Benchmark Suite Redesign (`frontend/src/views/ToolsView.tsx`, `Core/MaintenanceService.cs`)**:
+  - Decoupled the previously cramped monolithic 8-box hardware and benchmark card into two dedicated, aerospace-styled cards:
+    1. **Host-System & Hardware-Ausstattung**: Structured 2x2 grid displaying CPU architecture & logical cores, cleaned GPU specifications with VRAM & driver version, RAM memory & paging status with Star Citizen readiness badge, and installation drive space with NVMe storage indicators. Features a Windows OS build pill with live status indicator.
+    2. **Engine-Boot & Telemetrie-Benchmark**: Dedicated telemetry card featuring a prominent CIG Performance Index hero banner with dual CPU & GPU telemetry scores and tier badges (`Sehr hoch` / `Enthusiast`), alongside 3 dedicated metric cards for CPU physics latency, GPU frame-buffer/shader initialization, and NVMe DataCore & PSO shader cache boot times.
+  - Fixed GPU name regex and frontend sanitizers to strip Star Citizen log timestamp prefixes (e.g. `10-06T13:50:43.990Z> - `) and raw formatting artifacts.
+  - Formatted raw multi-decimal engine load times into clean `F2` seconds (e.g. `3.44s`, `0.29s`).
 - **Tools Promoted to Primary Sidebar Item Before Settings (`frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`)**:
   - Promoted "Werkzeuge" (`tools`) to a dedicated top-level primary navigation item in the main sidebar positioned directly before "Einstellungen" (`settings`).
   - Removed "Werkzeuge" from the "Einstellungen" sub-tab bar, eliminating double-nested tab strips over `ToolsView` and giving direct 1-click access to maintenance, `user.cfg Studio`, and backups.
