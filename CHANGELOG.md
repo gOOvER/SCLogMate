@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-07
 ### Fixed
 - **Complete Reputation & Factions Overhaul with Authentic Tiered XP & Dynamic Faction Catalog (`Core/ReputationService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ReputationView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
   - Overhauled the entire reputation calculation and faction tracking system to accurately reflect Star Citizen Alpha 4.9 / 4.10 mechanics.
@@ -1272,6 +1273,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
 
