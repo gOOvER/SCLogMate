@@ -1880,14 +1880,14 @@ class PhotinoBridge {
 
       case 'get_sanitized_diagnostic_summary':
         return {
-          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.3.0\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.4.0\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
         };
 
       case 'check_update':
         return {
           updateAvailable: false,
-          currentVersion: 'v1.3.0',
-          newVersion: 'v1.3.0',
+          currentVersion: 'v1.4.0',
+          newVersion: 'v1.4.0',
           releaseNotes: '',
           htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
         } as UpdateInfoDto;
@@ -1954,7 +1954,7 @@ class PhotinoBridge {
 
       case 'get_status':
         return {
-          version: 'v1.3.0',
+          version: 'v1.4.0',
           isLiveWatching: true,
           logPath: 'C:\\Games\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log',
           activeSessionName: 'Game.log (Aktuell)',
@@ -1963,7 +1963,7 @@ class PhotinoBridge {
           totalSpend: 980000,
           totalNet: 3270000,
           lastEventTime: new Date().toLocaleTimeString(),
-          dbSchemaVersion: 43,
+          dbSchemaVersion: 44,
         } as AppStatus;
 
       case 'get_sessions':

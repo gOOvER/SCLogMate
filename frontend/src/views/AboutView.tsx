@@ -25,9 +25,9 @@ export const AboutView: React.FC<AboutViewProps> = ({ status, version: propVersi
   const [fetchedStatus, setFetchedStatus] = useState<AppStatus | null>(null);
 
   const activeStatus = status || fetchedStatus;
-  const rawVersion = propVersion || activeStatus?.version || 'v1.3.0';
+  const rawVersion = propVersion || activeStatus?.version || 'v1.4.0';
   const appVersion = rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
-  const dbSchema = activeStatus?.dbSchemaVersion ?? 43;
+  const dbSchema = activeStatus?.dbSchemaVersion ?? 44;
 
   useEffect(() => {
     if (!status) {
