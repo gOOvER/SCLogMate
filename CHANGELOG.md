@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-07
+### Fixed
+- **Cloud Backup Timestamp Badge & Resolution (`Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ToolsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Fixed missing backup timestamp badge in Tools Cloud Backup view by adding dedicated timestamp pill beside `{cloudDisplay}` in the card header.
+  - Enhanced backend timestamp calculation to inspect both root `chosenCloud` and `SCLogMate/` subfolders, as well as fallback to latest local keybind and config backups if cloud storage was newly connected.
+  - Ensured footer synchronization status pill is persistently rendered with active state (`Stand: dd.MM.yyyy HH:mm Uhr` vs. `Bereit zur Synchronisation`).
+
 ## [1.4.0] - 2026-10-07
 ### Fixed
 - **Complete Reputation & Factions Overhaul with Authentic Tiered XP & Dynamic Faction Catalog (`Core/ReputationService.cs`, `Core/Database.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/views/ReputationView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
@@ -1273,6 +1280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
+
 
 
 
