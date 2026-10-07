@@ -6807,33 +6807,80 @@ public class PhotinoBridge
         {
             try
             {
+                var searchDirs = new List<string>();
                 var cloudBase = Path.Combine(chosenCloud, "SCLogMate");
-                if (Directory.Exists(cloudBase))
+                if (Directory.Exists(cloudBase)) searchDirs.Add(cloudBase);
+                if (Directory.Exists(chosenCloud) && !searchDirs.Contains(chosenCloud)) searchDirs.Add(chosenCloud);
+
+                foreach (var dir in searchDirs)
                 {
-                    var cloudLogsDir = Path.Combine(cloudBase, "Logs");
+                    var cloudLogsDir = Path.Combine(dir, "Logs");
                     if (Directory.Exists(cloudLogsDir))
                     {
-                        cloudLogCount = Directory.GetFiles(cloudLogsDir, "*.log").Length;
+                        var cnt = Directory.GetFiles(cloudLogsDir, "*.log").Length;
+                        if (cnt > cloudLogCount) cloudLogCount = cnt;
                     }
-
-                    var dirInfo = new DirectoryInfo(cloudBase);
-                    var allFiles = dirInfo.GetFiles("*.*", SearchOption.AllDirectories);
-                    if (allFiles.Length > 0)
+                    else
                     {
-                        DateTime maxTime = DateTime.MinValue;
+                        var directLogs = Directory.GetFiles(dir, "*.log").Length;
+                        if (directLogs > cloudLogCount) cloudLogCount = directLogs;
+                    }
+                }
+
+                DateTime maxTime = DateTime.MinValue;
+                foreach (var dir in searchDirs)
+                {
+                    try
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+                        var allFiles = dirInfo.GetFiles("*.*", SearchOption.AllDirectories);
                         foreach (var fi in allFiles)
                         {
                             if (fi.LastWriteTime > maxTime) maxTime = fi.LastWriteTime;
                             if (fi.CreationTime > maxTime) maxTime = fi.CreationTime;
                         }
-                        if (maxTime > DateTime.MinValue)
-                        {
-                            cloudLastBackupTime = maxTime.ToString("dd.MM.yyyy HH:mm");
-                        }
                     }
+                    catch { }
+                }
+
+                if (maxTime == DateTime.MinValue)
+                {
+                    if (keybindList.Count > 0)
+                    {
+                        var latestKeybind = keybindList.Max(k => k.CreatedAt);
+                        if (latestKeybind > maxTime) maxTime = latestKeybind;
+                    }
+                    if (configList.Count > 0)
+                    {
+                        var latestConfig = configList.Max(c => c.CreatedAt);
+                        if (latestConfig > maxTime) maxTime = latestConfig;
+                    }
+                }
+
+                if (maxTime > DateTime.MinValue)
+                {
+                    cloudLastBackupTime = maxTime.ToString("dd.MM.yyyy HH:mm");
                 }
             }
             catch { }
+        }
+        else
+        {
+            DateTime maxTime = DateTime.MinValue;
+            if (keybindList.Count > 0)
+            {
+                var latestKeybind = keybindList.Max(k => k.CreatedAt);
+                if (latestKeybind > maxTime) maxTime = latestKeybind;
+            }
+            if (configList.Count > 0)
+            {
+                var latestConfig = configList.Max(c => c.CreatedAt);
+                if (latestConfig > maxTime) maxTime = latestConfig;
+            }
+            if (maxTime > DateTime.MinValue)
+            {
+                cloudLastBackupTime = maxTime.ToString("dd.MM.yyyy HH:mm");
+            }
         }
 
         var scFolderResolved = _screenshotCleanup.ResolveScreenshotFolder();

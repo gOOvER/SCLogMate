@@ -77,7 +77,7 @@ export const MasterHeader: React.FC<MasterHeaderProps> = ({
             <span className="text-amber-400">MATE</span>
           </div>
           <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-mono text-[11px] font-bold">
-            {status?.version ? (status.version.startsWith('v') ? status.version : `v${status.version}`) : 'v1.4.0'}
+            {status?.version ? (status.version.startsWith('v') ? status.version : `v${status.version}`) : 'v1.4.1'}
           </span>
           {updateInfo?.updateAvailable && (
             <button

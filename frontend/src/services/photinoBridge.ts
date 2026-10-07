@@ -1880,14 +1880,14 @@ class PhotinoBridge {
 
       case 'get_sanitized_diagnostic_summary':
         return {
-          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.4.0\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.4.1\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
         };
 
       case 'check_update':
         return {
           updateAvailable: false,
-          currentVersion: 'v1.4.0',
-          newVersion: 'v1.4.0',
+          currentVersion: 'v1.4.1',
+          newVersion: 'v1.4.1',
           releaseNotes: '',
           htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
         } as UpdateInfoDto;
@@ -1954,7 +1954,7 @@ class PhotinoBridge {
 
       case 'get_status':
         return {
-          version: 'v1.4.0',
+          version: 'v1.4.1',
           isLiveWatching: true,
           logPath: 'C:\\Games\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log',
           activeSessionName: 'Game.log (Aktuell)',
@@ -2761,6 +2761,8 @@ class PhotinoBridge {
           freeDiskGb: 485.6,
           pagefileStatus: 'Aktiv (NVMe SSD)',
           cloudStoragePath: 'C:\\Users\\Pilot\\OneDrive\\StarCitizen',
+          cloudLogCount: 14,
+          cloudLastBackupTime: '07.10.2026 15:59',
           keybindBackups: [
             'backup_2026-03-01_dualstick (5 Dateien, 1.2 MB)',
             'backup_2026-02-15_flight (4 Dateien, 980 KB)',

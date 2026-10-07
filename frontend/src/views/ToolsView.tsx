@@ -3316,11 +3316,22 @@ export const ToolsView: React.FC = () => {
                       <Cloud className="w-6 h-6" />
                     </div>
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-sm font-bold text-white tracking-wide">CLOUD-SPEICHER &amp; SYNCHRONISATION</h2>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-mono font-semibold">
                           {cloudDisplay}
                         </span>
+                        {status?.cloudLastBackupTime ? (
+                          <span className="flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 font-mono font-semibold shadow-sm">
+                            <Clock className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span>Stand: {status.cloudLastBackupTime} Uhr</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-400 border border-slate-800 font-mono">
+                            <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>Noch keine Sicherung</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
                         Hinterlege deinen Cloud-Ordner (Google Drive / OneDrive / Dropbox) zur standortübergreifenden Sicherung.
@@ -3390,7 +3401,7 @@ export const ToolsView: React.FC = () => {
                     </div>
                   </label>
 
-                  {((typeof status?.cloudLogCount === 'number' && status.cloudLogCount > 0) || status?.cloudLastBackupTime) && (
+                  {((typeof status?.cloudLogCount === 'number' && status.cloudLogCount > 0) || status?.cloudLastBackupTime) ? (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-mono text-xs shrink-0 self-start sm:self-auto shadow-sm">
                       <div className="flex items-center space-x-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -3402,6 +3413,11 @@ export const ToolsView: React.FC = () => {
                           <span>Stand: {status.cloudLastBackupTime} Uhr</span>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 font-mono text-xs shrink-0 self-start sm:self-auto shadow-sm">
+                      <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>Bereit zur Synchronisation</span>
                     </div>
                   )}
                 </div>
