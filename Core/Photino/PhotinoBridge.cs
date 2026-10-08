@@ -4969,10 +4969,6 @@ public class PhotinoBridge
                         {
                             dbEvents = Database.LoadRecentEvents(1000, "Game.log");
                         }
-                        if (dbEvents.Count == 0)
-                        {
-                            dbEvents = Database.LoadRecentEvents(1000);
-                        }
 
                         foreach (var e in dbEvents.OrderBy(x => x.Time))
                         {
@@ -6142,7 +6138,7 @@ public class PhotinoBridge
             while ((line = reader.ReadLine()) != null && lineCount < 3000)
             {
                 lineCount++;
-                p.Feed(line);
+                p.FeedMetaOnly(line);
             }
         }
         catch (Exception ex)
@@ -6266,7 +6262,17 @@ public class PhotinoBridge
             {
                 try
                 {
-                    if (statusMsg != null && statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(statusMsg)) return;
+
+                    if (statusMsg.Contains("rotiert", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lock (_liveEventsLock)
+                        {
+                            _liveEvents.Clear();
+                        }
+                        _parser.Reset();
+                    }
+                    else if (statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!_isWebviewReady) return;
 

@@ -731,6 +731,28 @@ public partial class LogParser
     public IReadOnlySet<string> CurrentShipCrew => _currentShipCrew;
     public string? CurrentShipOwner { get; private set; }
 
+    /// <summary>
+    /// Liest ausschließlich Metadaten (Build, Version, Character, Shard etc.) aus,
+    /// ohne den Ereignis-Zustand (Missions, Deduplication, Loadout etc.) des Parsers zu verändern.
+    /// </summary>
+    public void FeedMetaOnly(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+
+        if (line.Length >= 25 && line[0] == '<')
+        {
+            var mTs = TsRegex().Match(line);
+            if (mTs.Success && DateTime.TryParse(mTs.Groups["ts"].Value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dtParsed))
+            {
+                _lastSeenTime = dtParsed;
+                if (!_firstTime.HasValue) _firstTime = dtParsed;
+            }
+        }
+
+        CaptureMeta(line);
+    }
+
     public LogEntry? Feed(string line)
     {
         if (string.IsNullOrEmpty(line)) return null;

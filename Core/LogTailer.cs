@@ -79,7 +79,7 @@ public class LogTailer
                         lines.Add(line);
                     }
 
-                    position = fs.Position;
+                    position = fs.Length;
                     if (_carry is not null)
                     {
                         lines.Insert(0, _carry);

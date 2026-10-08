@@ -1,10 +1,18 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
+### Fixed
+- **Live Stream Event Ingestion & Session Isolation (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `Core/LogTailer.cs`)**:
+  - Fixed an issue where the active Star Citizen `Game.log` appeared not to be parsed in the Live-Stream view because `ScanLogHeaderAndMeta` was feeding log lines through `p.Feed(line)`, prematurely consuming events into parser deduplication sets without emitting them to `_liveEvents`.
+  - Added dedicated `FeedMetaOnly` method to `LogParser` so header/metadata scanning strictly extracts version, character, shard, and hardware specs without touching game state or event deduplication history.
+  - Removed accidental fallback in `PhotinoBridge.GetEvents` that queried historical events from `Database.LoadRecentEvents(1000)` without session filter, which erroneously injected previous sessions (e.g. yesterday's logout/EndSession) into the live stream table.
+  - Handled log rotation in `PhotinoBridge` by clearing `_liveEvents` and resetting parser state upon receiving rotation notifications.
+  - Fixed `SQLite Error 19: 'NOT NULL constraint failed: server_shards.last_end_reason'` in `Database.UpsertShardVisit` by ensuring `@end` parameter safely defaults to empty string instead of `DBNull.Value`.
+  - Ensured `LogTailer` sets position to `fs.Length` upon reaching EOF for consistent stream resumption.
 
 ## [1.4.1] - 2026-10-07
 ### Fixed

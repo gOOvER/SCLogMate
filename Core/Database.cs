@@ -4577,7 +4577,7 @@ public static class Database
                 cmd.Parameters.AddWithValue("@ts", ts);
                 cmd.Parameters.AddWithValue("@inc", incrementVisit ? 1 : 0);
                 cmd.Parameters.AddWithValue("@sec", Math.Max(0, addSeconds));
-                cmd.Parameters.AddWithValue("@end", (object?)endReason ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@end", (object?)endReason ?? "");
                 cmd.ExecuteNonQuery();
             }
             catch (Exception ex)
