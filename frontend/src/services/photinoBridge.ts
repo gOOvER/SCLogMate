@@ -1880,14 +1880,14 @@ class PhotinoBridge {
 
       case 'get_sanitized_diagnostic_summary':
         return {
-          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.4.1\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
+          summary: `=== SCLogMate System- & Diagnose-Zusammenfassung ===\nSCLogMate Version: v1.4.2\nBetriebssystem: Windows 10/11\nStatus: Operational ✓`
         };
 
       case 'check_update':
         return {
           updateAvailable: false,
-          currentVersion: 'v1.4.1',
-          newVersion: 'v1.4.1',
+          currentVersion: 'v1.4.2',
+          newVersion: 'v1.4.2',
           releaseNotes: '',
           htmlUrl: 'https://github.com/gOOvER/SCLogMate/releases',
         } as UpdateInfoDto;
@@ -1954,7 +1954,7 @@ class PhotinoBridge {
 
       case 'get_status':
         return {
-          version: 'v1.4.1',
+          version: 'v1.4.2',
           isLiveWatching: true,
           logPath: 'C:\\Games\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log',
           activeSessionName: 'Game.log (Aktuell)',

@@ -671,7 +671,7 @@ export const App: React.FC = () => {
               {bridge.isConnected ? '● PHOTINO NATIVE' : '○ DEV BROWSER'}
             </span>
             <span>·</span>
-            <span className="text-cyan-400 font-semibold">{status?.version || 'v1.4.1'}</span>
+            <span className="text-cyan-400 font-semibold">{status?.version || 'v1.4.2'}</span>
           </div>
         </footer>
       </div>
