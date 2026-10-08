@@ -1,10 +1,12 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
+
+## [1.4.2] - 2026-10-08
 ### Fixed
 - **Live Stream Event Ingestion & Session Isolation (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `Core/LogTailer.cs`)**:
   - Fixed an issue where the active Star Citizen `Game.log` appeared not to be parsed in the Live-Stream view because `ScanLogHeaderAndMeta` was feeding log lines through `p.Feed(line)`, prematurely consuming events into parser deduplication sets without emitting them to `_liveEvents`.
@@ -1288,6 +1290,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial public release of SCLogReader by miwidot.
+
 
 
 
