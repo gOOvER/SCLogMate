@@ -111,6 +111,14 @@ public static partial class MissionCatalog
             if (strippedExact != null) return strippedExact;
         }
 
+        // Event-Präfix entfernen (z. B. "RSI Disc. Month: Important Supply Haul" -> "Important Supply Haul")
+        var eventStripped = Regex.Replace(strippedTitle, @"^RSI\s+Disc\.?\s+Month:\s*", "", RegexOptions.IgnoreCase).Trim();
+        if (eventStripped.Length != strippedTitle.Length)
+        {
+            var eventExact = Lookup(eventStripped);
+            if (eventExact != null) return eventExact;
+        }
+
         var rawNorm = Normalize(strippedTitle);
         if (rawNorm.Length < 4) return null;
 

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.8] - 2026-10-10
+### Added
+- **RSI Discovery Month 4.10.2 Event Missions & Official Payout Catalog (`Data/missions.json`, `Core/MissionCatalog.cs`, `Core/Database.cs`)**:
+  - Embedded official contract payout definitions for Star Citizen 4.10.2 RSI Discovery Month missions:
+    - `RSI Disc. Month: Important Supply Haul`: 124,000 aUEC (Covalex Shipping / Hauling)
+    - `RSI Disc. Month: UCM Order (S)`: 30,250 aUEC (Adagio Holdings / Hauling)
+    - `RSI Disc. Month: UCM Order (M)`: 42,250 aUEC (Adagio Holdings / Hauling)
+    - `RSI Disc. Month: UCM Order (L)`: 101,750 aUEC (Adagio Holdings / Hauling)
+    - `RSI Disc. Month: Ling Small Haul`: 66,750 aUEC (Ling Family Hauling / Hauling)
+    - `RSI Disc. Month: Orange Lvl. - Defend Ship`: 70,750 aUEC (Foxwell Enforcement / Defense)
+    - `VisitingIASI`: 45,000 aUEC (Foxwell Enforcement / Patrol)
+  - Enhanced `MissionCatalog.FuzzyLookup` to dynamically strip `RSI Disc. Month:` and `RSI Discovery Month:` event prefixes, guaranteeing instant catalog resolution.
+  - Implemented schema migration v45 (`CurrentSchemaVersion = 45`, `CurrentParserVersion = 49`) to retroactively populate missing reward amounts on completed RSI Discovery Month event missions across existing historical session records.
+
 ## [1.4.7] - 2026-10-10
 ### Changed
 - **Party Member Join/Leave Event Text Clarification (`Core/LogParser.cs`)**:

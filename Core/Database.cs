@@ -18,8 +18,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 44; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v44: Faction Reputation Reconciliation & Prestige Tiers)
-    public const int CurrentParserVersion = 48; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v48: Extrahierte Missions-Datenbank scunpacked-data, Entfernung des 25k-Fallbacks & echte Missionsbelohnungen)
+    public const int CurrentSchemaVersion = 45; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v45: RSI Discovery Month Event Missions Payout Reconciliation)
+    public const int CurrentParserVersion = 49; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v49: RSI Discovery Month Event Missions embedded in missions.json & FuzzyLookup)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }
@@ -1192,6 +1192,30 @@ public static class Database
             Exec(db, "PRAGMA user_version = 44;");
             dbSchemaVersion = 44;
             Logger.Log("DB Schema: Migration auf v44 (Reconciliation Faction Reputations & Prestige Tiers) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 45)
+        {
+            try
+            {
+                // RSI Discovery Month Event Missions retroaktiv mit den offiziellen Belohnungswerten befüllen
+                Exec(db, @"
+                    UPDATE events SET amount = 124000, kind = 'MissionReward' WHERE (detail LIKE '%Important Supply Haul%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 30250, kind = 'MissionReward' WHERE (detail LIKE '%UCM Order (S)%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 42250, kind = 'MissionReward' WHERE (detail LIKE '%UCM Order (M)%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 101750, kind = 'MissionReward' WHERE (detail LIKE '%UCM Order (L)%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 66750, kind = 'MissionReward' WHERE (detail LIKE '%Ling Small Haul%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 70750, kind = 'MissionReward' WHERE (detail LIKE '%Orange Lvl. - Defend Ship%') AND (amount IS NULL OR amount = 0);
+                    UPDATE events SET amount = 45000, kind = 'MissionReward' WHERE (detail LIKE '%VisitingIASI%') AND (amount IS NULL OR amount = 0);
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v45 (RSI Discovery Month Event Rewards)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 45;");
+            dbSchemaVersion = 45;
+            Logger.Log("DB Schema: Migration auf v45 (RSI Discovery Month Event Rewards) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
