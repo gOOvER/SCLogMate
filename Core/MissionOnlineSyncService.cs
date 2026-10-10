@@ -156,7 +156,7 @@ public static class MissionOnlineSyncService
             // 1. Alle Missionen aus MissionCatalog (auch ohne Belohnung, damit SCVerse fehlende Aufträge erhält)
             foreach (var m in MissionCatalog.AllMissions)
             {
-                if (!string.IsNullOrWhiteSpace(m.Title))
+                if (!string.IsNullOrWhiteSpace(m.Title) && !MissionCatalog.IsPlaceholderMission(m.Title, m.Contractor, m.Faction))
                 {
                     map[m.Title.Trim()] = m;
                 }
@@ -174,7 +174,7 @@ public static class MissionOnlineSyncService
                     else if (cleanTitle.StartsWith("Auftrag abgeschlossen: ", StringComparison.OrdinalIgnoreCase))
                         cleanTitle = cleanTitle.Substring("Auftrag abgeschlossen: ".Length).Trim();
 
-                    if (!string.IsNullOrWhiteSpace(cleanTitle) && !map.ContainsKey(cleanTitle))
+                    if (!string.IsNullOrWhiteSpace(cleanTitle) && !map.ContainsKey(cleanTitle) && !MissionCatalog.IsPlaceholderMission(cleanTitle))
                     {
                         var cat = MissionCatalog.Lookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(cleanTitle);
                         map[cleanTitle] = new MissionInfo
@@ -192,7 +192,7 @@ public static class MissionOnlineSyncService
                 var contracts = Database.GetActiveContracts();
                 foreach (var c in contracts)
                 {
-                    if (!string.IsNullOrWhiteSpace(c.Title) && !map.ContainsKey(c.Title))
+                    if (!string.IsNullOrWhiteSpace(c.Title) && !map.ContainsKey(c.Title) && !MissionCatalog.IsPlaceholderMission(c.Title, c.ContractedBy))
                     {
                         var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
                         map[c.Title] = new MissionInfo
@@ -326,7 +326,7 @@ public static class MissionOnlineSyncService
         foreach (var el in missionsArr.EnumerateArray())
         {
             var title = el.TryGetProperty("title", out var tProp) ? tProp.GetString() ?? "" : "";
-            if (string.IsNullOrWhiteSpace(title)) continue;
+            if (string.IsNullOrWhiteSpace(title) || MissionCatalog.IsPlaceholderMission(title)) continue;
 
             var id = el.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
             var contractor = el.TryGetProperty("contractor", out var cProp) ? cProp.GetString() ?? "Unbekannt" : "Unbekannt";
@@ -388,7 +388,7 @@ public static class MissionOnlineSyncService
         string? faction = null,
         string? missionType = null)
     {
-        if (string.IsNullOrWhiteSpace(title) || reward <= 0) return false;
+        if (string.IsNullOrWhiteSpace(title) || reward <= 0 || MissionCatalog.IsPlaceholderMission(title, contractor, faction)) return false;
 
         try
         {

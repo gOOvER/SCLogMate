@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.13] - 2026-10-10
+### Fixed
+- **Filter CIG Internal Test & Placeholder Missions (`Core/MissionCatalog.cs`, `Core/MissionOnlineSyncService.cs`)**:
+  - Implemented `MissionCatalog.IsPlaceholderMission` to identify and reject CIG development artifacts (e.g., `< = TEST NAME = >`, `<= PLACEHOLDER =>`, `<= UNINITIALIZED =>`, `[PH]`).
+  - Guarded `MissionCatalog.Add` and cache loaders so placeholder missions extracted from raw game data or received via sync are immediately dropped.
+  - Prevented test and placeholder missions from ever being pushed to the central SCVerse cloud database.
+
 ## [1.4.12] - 2026-10-10
 ### Added
 - **Automatic Periodic Background Synchronization (`Core/MissionOnlineSyncService.cs`, `ViewModels/MainViewModel.cs`, `Core/Photino/PhotinoBridge.cs`)**:

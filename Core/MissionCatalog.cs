@@ -292,8 +292,40 @@ public static partial class MissionCatalog
         return trimmed;
     }
 
+    /// <summary>
+    /// Prüft, ob ein Missionstitel oder Auftraggeber ein CIG-interner Test-, Platzhalter- oder Dummy-Eintrag ist.
+    /// </summary>
+    public static bool IsPlaceholderMission(string? title, string? contractor = null, string? faction = null)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return true;
+        var t = title.Trim();
+        if (t.Contains("< =") || t.Contains("<=") || t.Contains("= >") || t.Contains("=>")) return true;
+        if (t.Contains("TEST NAME", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.Contains("UNINITIALIZED", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.Contains("[PH]", StringComparison.OrdinalIgnoreCase) || t.StartsWith("[PH", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.Equals("Test", StringComparison.OrdinalIgnoreCase) || t.Equals("Test Mission", StringComparison.OrdinalIgnoreCase) || t.Equals("Dummy", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.StartsWith("test_", StringComparison.OrdinalIgnoreCase) || t.StartsWith("test -", StringComparison.OrdinalIgnoreCase)) return true;
+
+        if (!string.IsNullOrWhiteSpace(contractor))
+        {
+            if (contractor.Contains("< =") || contractor.Contains("<=") || contractor.Contains("UNINITIALIZED", StringComparison.OrdinalIgnoreCase) || contractor.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase) || contractor.Contains("TEST NAME", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(faction))
+        {
+            if (faction.Contains("< =") || faction.Contains("<=") || faction.Contains("UNINITIALIZED", StringComparison.OrdinalIgnoreCase) || faction.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase) || faction.Contains("TEST NAME", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     private static void Add(MissionInfo info, params string[] aliases)
     {
+        if (IsPlaceholderMission(info.Title, info.Contractor, info.Faction)) return;
+
         lock (_catalog)
         {
             var norm = Normalize(info.Title);
