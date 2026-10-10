@@ -7733,6 +7733,7 @@ public class PhotinoBridge
         EventKind.SessionChange => "server",
         EventKind.Blueprint => "blueprint",
         EventKind.Loot => "inventory",
+        EventKind.Party or EventKind.Friend => "crew",
         _ => "system"
     };
 

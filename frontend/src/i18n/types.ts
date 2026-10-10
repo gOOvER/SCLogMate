@@ -153,6 +153,7 @@ export interface Translations {
     catBlueprint: string;
     catSystem: string;
     catServer: string;
+    catCrew: string;
     tabLive: string;
     tabArchive: string;
     tabCombat: string;

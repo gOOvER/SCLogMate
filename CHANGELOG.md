@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.7] - 2026-10-10
+### Changed
+- **Party Member Join/Leave Event Text Clarification (`Core/LogParser.cs`)**:
+  - Fixed incomplete party event descriptions where member disconnects and departures were displayed as an incomplete sentence (`"◂ <Player> hat verlassen"`).
+  - Clarified both join and leave log strings to explicitly state group membership (`"◂ <Player> hat die Gruppe verlassen"` and `"▸ <Player> ist der Gruppe beigetreten"`).
+
+### Added
+- **Dedicated Party/Crew Category Badge in Events View (`Core/Photino/PhotinoBridge.cs`, `frontend/src/views/EventsView.tsx`, `frontend/src/i18n/`)**:
+  - Mapped `EventKind.Party` and `EventKind.Friend` to the `"crew"` category instead of falling back to the generic `"system"` (`>_ System`) badge.
+  - Added dedicated `👥 Gruppe` (German) / `👥 Party` (English) indigo badge styling with `Users` icon in the event list.
+
 ## [1.4.6] - 2026-10-10
 ### Fixed
 - **Party Shared Mission & Contract Objective False Positives in Aurora Voice Triggers (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:

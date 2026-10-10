@@ -24,6 +24,7 @@ import {
   Activity,
   Package,
   Scroll,
+  Users,
 } from 'lucide-react';
 import { ContextMenu } from '../components/ContextMenu';
 import { NavTabId } from '../components/Sidebar';
@@ -402,6 +403,14 @@ export const EventsView: React.FC<EventsViewProps> = ({
             <Scroll className="w-2.5 h-2.5 text-cyan-400" />
             <span>{t('events.catBlueprint')}</span>
           </button>
+        );
+      case 'crew':
+      case 'party':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/60 text-indigo-300 border border-indigo-800/60 shrink-0">
+            <Users className="w-2.5 h-2.5 text-indigo-400" />
+            <span>{t('events.catCrew')}</span>
+          </span>
         );
       default:
         return (

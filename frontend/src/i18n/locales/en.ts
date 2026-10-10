@@ -150,6 +150,7 @@ export const en: Translations = {
     catBlueprint: 'Blueprint',
     catSystem: 'System',
     catServer: 'Server',
+    catCrew: 'Party',
     tabLive: 'Live Stream',
     tabArchive: 'Session Archive',
     tabCombat: 'Combat Analytics',

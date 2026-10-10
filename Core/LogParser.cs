@@ -2838,7 +2838,7 @@ public partial class LogParser
                         _recentPartyEvents.Remove("l:" + who);
                         _lastParty = key;
                         PruneRecentPartyEvents(ts);
-                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist der Gruppe beigetreten" };
                     }
                     return null;
                 }
@@ -2855,7 +2855,7 @@ public partial class LogParser
                         _recentPartyEvents.Remove("j:" + who);
                         _lastParty = key;
                         PruneRecentPartyEvents(ts);
-                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat die Gruppe verlassen" };
                     }
                     return null;
                 }
@@ -2878,7 +2878,7 @@ public partial class LogParser
                         _recentPartyEvents.Remove("l:" + who);
                         _lastParty = key;
                         PruneRecentPartyEvents(ts);
-                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist der Gruppe beigetreten" };
                     }
                 }
             }
@@ -2897,7 +2897,7 @@ public partial class LogParser
                         _recentPartyEvents.Remove("j:" + who);
                         _lastParty = key;
                         PruneRecentPartyEvents(ts);
-                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat die Gruppe verlassen" };
                     }
                 }
             }

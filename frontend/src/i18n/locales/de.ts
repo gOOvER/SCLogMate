@@ -150,6 +150,7 @@ export const de: Translations = {
     catBlueprint: 'Bauplan',
     catSystem: 'System',
     catServer: 'Server',
+    catCrew: 'Gruppe',
     tabLive: 'Live-Stream',
     tabArchive: 'Sitzungsarchiv',
     tabCombat: 'Combat-Analytics',
