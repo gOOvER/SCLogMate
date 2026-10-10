@@ -10,6 +10,10 @@ import {
   Trash2,
   Truck,
   X,
+  Building2,
+  MapPin,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { HaulingChainerTab } from '../components/HaulingChainerTab';
@@ -34,6 +38,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [selectedMission, setSelectedMission] = useState<MissionItemDto | null>(null);
 
   const autoSwitchedRef = useRef<string | null>(null);
 
@@ -415,9 +420,14 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
               </tr>
             ) : (
               currentList.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-900/40 transition">
+                <tr
+                  key={m.id}
+                  onClick={() => setSelectedMission(m)}
+                  className="hover:bg-slate-900/60 transition cursor-pointer group"
+                  title={locale === 'en' ? 'Click to open details' : 'Klicken für Missionsdetails'}
+                >
                   <td className="py-3 px-4">
-                    <div className="font-semibold text-slate-200">{m.title}</div>
+                    <div className="font-semibold text-slate-200 group-hover:text-cyan-300 transition">{m.title}</div>
                     {m.description && (
                       <div className="text-[11px] text-slate-400 truncate max-w-md">
                         {m.description}
@@ -469,6 +479,138 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
           </tbody>
         </table>
       </div>
+      )}
+
+      {/* Mission Detail Modal */}
+      {selectedMission && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-xl sc-glass rounded-xl border border-cyan-500/50 p-6 shadow-[0_0_40px_rgba(0,240,255,0.2)] max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="sc-badge text-[10px]">
+                    {selectedMission.missionType || 'Auftrag'}
+                  </span>
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-cyan-400" />
+                    {selectedMission.starSystems || 'Stanton'}
+                  </span>
+                  {selectedMission.isIllegal && (
+                    <span className="sc-badge-red text-[10px]">
+                      Illegal
+                    </span>
+                  )}
+                  {selectedMission.isActive && (
+                    <span className="sc-badge-green text-[10px]">
+                      Live Aktiv
+                    </span>
+                  )}
+                  {selectedMission.isCompleted && (
+                    <span className="sc-badge text-[10px]">
+                      Erledigt
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-lg font-bold text-white font-mono">
+                  {selectedMission.title}
+                </h2>
+                {(selectedMission.contractor || selectedMission.faction) && (
+                  <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+                    <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{selectedMission.contractor || selectedMission.faction}</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedMission(null)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-900 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto py-4 space-y-4 text-xs pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+              {/* Payout & Rep */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/30">
+                  <span className="text-[10px] uppercase font-bold text-emerald-400/80 block">
+                    {locale === 'en' ? 'Base Payout' : 'Auszahlung / Belohnung'}
+                  </span>
+                  <div className="text-xl font-bold font-mono text-emerald-300 mt-0.5">
+                    {selectedMission.baseReward > 0 ? (
+                      <>+{formatNumber(selectedMission.baseReward)} <span className="text-xs text-emerald-500">aUEC</span></>
+                    ) : (
+                      <span className="text-slate-400 text-sm font-normal">Variabel</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-cyan-950/20 border border-cyan-500/30">
+                  <span className="text-[10px] uppercase font-bold text-cyan-400/80 block">
+                    {locale === 'en' ? 'Reputation Gain' : 'Ruf-Gewinn'}
+                  </span>
+                  <div className="text-xl font-bold font-mono text-cyan-300 mt-0.5">
+                    {selectedMission.reputationGain > 0 ? (
+                      <>+{selectedMission.reputationGain} <span className="text-xs text-cyan-500">Rep</span></>
+                    ) : (
+                      <span className="text-slate-400 text-sm font-normal">Standard</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Objective Steps */}
+              {selectedMission.stepsTotal && selectedMission.stepsTotal > 0 ? (
+                <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 block">
+                    {locale === 'en' ? 'Mission Progress' : 'Fortschritt / Zielschritte'}
+                  </span>
+                  <div className="font-mono text-xs text-slate-200">
+                    {selectedMission.progressText || `Schritt ${selectedMission.stepsDone ?? 0} von ${selectedMission.stepsTotal}`}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Description / Briefing */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{locale === 'en' ? 'Briefing Description' : 'Missions-Briefing'}</span>
+                </span>
+                <div className="p-3.5 rounded-lg bg-slate-950/60 border border-slate-800 font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border-l-2 border-l-cyan-500">
+                  {selectedMission.description || (
+                    <span className="text-slate-500 italic">
+                      {locale === 'en' ? 'No description available for this contract.' : 'Keine Beschreibung im Game-Log oder Katalog hinterlegt.'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-slate-800 pt-3 flex items-center justify-between">
+              <button
+                onClick={() => setSelectedMission(null)}
+                className="px-4 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition cursor-pointer"
+              >
+                {locale === 'en' ? 'Close' : 'Schließen'}
+              </button>
+
+              <a
+                href={`https://scverse.de/missions?search=${encodeURIComponent(selectedMission.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-1.5 rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-semibold border border-cyan-700/60 hover:border-cyan-400 transition cursor-pointer flex items-center gap-1.5"
+                title="In SCVerse Web-Missionsdatenbank öffnen"
+              >
+                <span>SCVerse Web-Portal</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast Notification */}

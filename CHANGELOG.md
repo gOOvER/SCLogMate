@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+### Added
+- **Interactive Mission Details Modal (`frontend/src/views/MissionsView.tsx`)**:
+  - Clicking on any contract in the Active Contracts, Completed Missions history, or SC Catalog table now opens an interactive mobiGlas details popup.
+  - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.
+
 ## [1.4.13] - 2026-10-10
 ### Fixed
 - **Filter CIG Internal Test & Placeholder Missions (`Core/MissionCatalog.cs`, `Core/MissionOnlineSyncService.cs`)**:
