@@ -1463,10 +1463,10 @@
 
                 <Button Grid.Column="2" Classes="btn-secondary" Height="30" Margin="0,0,8,0"
                         Command="{Binding SyncOnlineMissionsCommand}"
-                        ToolTip.Tip="Missionskatalog beidseitig (Push lokaler Daten &amp; Pull aus Cloud) mit SCVerse synchronisieren" VerticalAlignment="Center">
+                        ToolTip.Tip="Automatischer Cloud-Sync aktiv (alle 15 Min.). Klicken für sofortige Aktualisierung." VerticalAlignment="Center">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Text="☁" Foreground="#58A6FF" VerticalAlignment="Center" />
-                    <TextBlock Text="SCVerse 2-Way Sync" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Aktualisieren" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
 

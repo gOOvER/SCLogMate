@@ -3488,7 +3488,7 @@ public partial class MainViewModel : ObservableObject
         // Automatische DB-Synchronisation & Hintergrund-Indexierung
         _ = AutoSyncAndIndexDatabaseAsync();
 
-        // Online-Missionskatalog aus SCVerse synchronisieren
+        // Online-Missionskatalog aus SCVerse synchronisieren (automatischer Hintergrund-Sync)
         MissionOnlineSyncService.MissionsSynchronized += () =>
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -3499,7 +3499,7 @@ public partial class MainViewModel : ObservableObject
                 EventsView?.Refresh();
             });
         };
-        _ = MissionOnlineSyncService.SyncCatalogAsync();
+        MissionOnlineSyncService.StartAutoSync();
 
         // Update-Prüfung: einmal beim Start + danach alle 6 Stunden
         CheckForUpdate();
@@ -6723,15 +6723,17 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task SyncOnlineMissions()
     {
-        Status = "Synchronisiere Missionskatalog beidseitig mit SCVerse Cloud (Push & Pull)...";
+        Status = "Synchronisiere Missionskatalog mit SCVerse Cloud...";
         var res = await MissionOnlineSyncService.TwoWaySyncAsync(force: true);
         MissionCatalogList.Clear();
         foreach (var m in MissionCatalog.AllMissions) MissionCatalogList.Add(m);
         OnPropertyChanged(nameof(TotalMissionsCount));
         EventsView?.Refresh();
         Status = res.Success
-            ? $"✓ SCVerse 2-Way Sync: {res.Pushed} gesendet, {res.Pulled} aktualisiert!"
-            : $"Fehler beim SCVerse Sync: {res.Message}";
+            ? (res.Pushed > 0 || res.Pulled > 0
+                ? $"✓ Missions-Sync: {res.Pushed} gesendet, {res.Pulled} aktualisiert."
+                : "✓ Missionskatalog ist auf dem neuesten Stand.")
+            : $"Fehler beim Missions-Sync: {res.Message}";
     }
 
     #endregion

@@ -1438,12 +1438,12 @@ public class PhotinoBridge
             await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
         }, null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
 
-        // Online-Missionskatalog aus SCVerse synchronisieren
+        // Online-Missionskatalog aus SCVerse synchronisieren (automatischer Hintergrund-Sync)
         MissionOnlineSyncService.MissionsSynchronized += () =>
         {
             Broadcast("MISSIONS_UPDATED", GetMissionsData());
         };
-        _ = MissionOnlineSyncService.SyncCatalogAsync();
+        MissionOnlineSyncService.StartAutoSync();
 
         // Auto-Clipboard-POI-Watcher initialisieren & Events an Frontend streamen
         PoiClipboardWatcher.OnLocationDetected += reading =>

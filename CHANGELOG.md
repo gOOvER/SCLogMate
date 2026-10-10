@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.12] - 2026-10-10
+### Added
+- **Automatic Periodic Background Synchronization (`Core/MissionOnlineSyncService.cs`, `ViewModels/MainViewModel.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Implemented `StartAutoSync()` with an automated background timer executing every 15 minutes, plus an initial sync pass 3 seconds after application launch.
+  - Added smart debouncing and diff-checking for push operations so local missions are only transmitted when new entries exist or when explicitly forced.
+  - Automatically records sync timestamps upon successful API responses to maintain continuous incremental delta polling.
+
+### Changed
+- **Streamlined UI Action & Background Sync Indicator (`frontend/src/views/MissionsView.tsx`, `Views/MainWindow.axaml`, `ViewModels/MainViewModel.cs`)**:
+  - Removed the technical "SCVerse 2-Way Sync" button title, replacing it with a clean "Aktualisieren" action.
+  - Added clear tooltip indicators informing users that cloud synchronization runs fully autonomously in the background.
+  - Updated status bar messages to concise and user-friendly status updates.
+
 ## [1.4.11] - 2026-10-10
 ### Changed
 - **Bidirectional Data Enrichment & Mutual Auto-Sync (`Core/MissionOnlineSyncService.cs`, `Core/MissionCatalog.cs`)**:

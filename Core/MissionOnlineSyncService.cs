@@ -17,6 +17,10 @@ public static class MissionOnlineSyncService
     private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
     private static readonly System.Threading.Lock _syncLock = new();
     private static bool _cacheLoaded;
+    private static System.Threading.Timer? _autoSyncTimer;
+    private static int _lastPushedMissionCount = -1;
+    private static DateTime _lastPushUtc = DateTime.MinValue;
+    private static DateTime _lastPullCheckUtc = DateTime.MinValue;
 
     public static event Action? MissionsSynchronized;
     public static bool IsSyncing { get; private set; }
@@ -46,7 +50,35 @@ public static class MissionOnlineSyncService
     }
 
     /// <summary>
-    /// Führt eine vollständige bidirektionale Synchronisation (Two-Way Sync) durch:
+    /// Startet den automatischen Hintergrund-Sync:
+    /// - Lädt initial den Offline-Cache
+    /// - Führt nach kurzem Delay (3s) den ersten automatischen Sync im Hintergrund durch
+    /// - Wiederholt den Sync danach automatisch alle 15 Minuten
+    /// </summary>
+    public static void StartAutoSync()
+    {
+        EnsureCacheLoaded();
+
+        lock (_syncLock)
+        {
+            if (_autoSyncTimer != null) return;
+
+            _autoSyncTimer = new System.Threading.Timer(async _ =>
+            {
+                try
+                {
+                    await TwoWaySyncAsync(force: false).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[MissionOnlineSync] Fehler im automatischen Hintergrund-Sync: {ex.Message}");
+                }
+            }, null, TimeSpan.FromSeconds(3), TimeSpan.FromMinutes(15));
+        }
+    }
+
+    /// <summary>
+    /// Führt eine vollständige bidirektionale Synchronisation durch:
     /// 1. Lokale Missionsdaten & entdeckte Belohnungen an die SCVerse Cloud senden (Push)
     /// 2. Neue & aktualisierte Missionen aus der SCVerse Cloud herunterladen (Pull)
     /// </summary>
@@ -66,7 +98,7 @@ public static class MissionOnlineSyncService
         try
         {
             // Schritt 1: Push lokaler Missionen mit Belohnungen zur SCVerse Cloud
-            int pushed = await PushLocalMissionsAsync().ConfigureAwait(false);
+            int pushed = await PushLocalMissionsAsync(force).ConfigureAwait(false);
 
             // Schritt 2: Pull neuer & aktualisierter Missionen aus der SCVerse Cloud
             int pulled = await PullCloudMissionsAsync(force).ConfigureAwait(false);
@@ -85,7 +117,7 @@ public static class MissionOnlineSyncService
         }
         catch (Exception ex)
         {
-            Logger.Log($"[MissionOnlineSync] Fehler bei 2-Way Sync: {ex.Message}");
+            Logger.Log($"[MissionOnlineSync] Fehler beim Cloud-Sync: {ex.Message}");
             return new TwoWaySyncResult(0, 0, false, $"Fehler: {ex.Message}");
         }
         finally
@@ -98,7 +130,7 @@ public static class MissionOnlineSyncService
     }
 
     /// <summary>
-    /// Startet den bidirektionalen Sync und liefert die Summe übertragener Einträge.
+    /// Startet den Sync und liefert die Summe übertragener Einträge.
     /// </summary>
     public static async Task<int> SyncCatalogAsync(bool force = false)
     {
@@ -109,10 +141,16 @@ public static class MissionOnlineSyncService
     /// <summary>
     /// Sendet alle lokal bekannten Missionen mit Belohnungswert in Batches an die SCVerse Cloud (Push).
     /// </summary>
-    public static async Task<int> PushLocalMissionsAsync()
+    public static async Task<int> PushLocalMissionsAsync(bool force = false)
     {
         try
         {
+            // Wenn nicht erzwungen und bereits alle Missionen synchronisiert wurden und weniger als 2 Stunden vergangen sind: überspringen
+            if (!force && _lastPushedMissionCount == MissionCatalog.AllMissions.Count && (DateTime.UtcNow - _lastPushUtc).TotalHours < 2)
+            {
+                return 0;
+            }
+
             var map = new Dictionary<string, MissionInfo>(StringComparer.OrdinalIgnoreCase);
 
             // 1. Alle Missionen aus MissionCatalog (auch ohne Belohnung, damit SCVerse fehlende Aufträge erhält)
@@ -203,7 +241,7 @@ public static class MissionOnlineSyncService
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-                req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.11");
+                req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.12");
 
                 var resp = await _httpClient.SendAsync(req).ConfigureAwait(false);
                 if (resp.IsSuccessStatusCode)
@@ -218,6 +256,8 @@ public static class MissionOnlineSyncService
 
             if (totalUploaded > 0)
             {
+                _lastPushedMissionCount = missionsToPush.Count;
+                _lastPushUtc = DateTime.UtcNow;
                 Logger.Log($"[MissionOnlineSync] {totalUploaded} lokale Missionen an SCVerse Cloud synchronisiert (Push).");
             }
             return totalUploaded;
@@ -243,11 +283,12 @@ public static class MissionOnlineSyncService
             LastSyncUtc = parsedTime;
         }
 
-        // Wenn nicht erzwungen und die letzte Synchronisation weniger als 30 Minuten her ist: überspringen
-        if (!force && lastSyncTime > DateTime.MinValue && (DateTime.UtcNow - lastSyncTime).TotalMinutes < 30)
+        // Wenn nicht erzwungen und die letzte Prüfung weniger als 5 Minuten her ist: überspringen
+        if (!force && (DateTime.UtcNow - _lastPullCheckUtc).TotalMinutes < 5)
         {
             return 0;
         }
+        _lastPullCheckUtc = DateTime.UtcNow;
 
         var requestUrl = BaseApiUrl;
         if (lastSyncTime > DateTime.MinValue && !force)
@@ -260,7 +301,7 @@ public static class MissionOnlineSyncService
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Get, requestUrl);
-        req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.9");
+        req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.12");
 
         var response = await _httpClient.SendAsync(req).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
@@ -323,10 +364,11 @@ public static class MissionOnlineSyncService
             }
         }
 
+        Database.SetMeta("missions_online_last_sync", syncedAt);
+        LastSyncUtc = DateTime.UtcNow;
+
         if (updatedCount > 0)
         {
-            Database.SetMeta("missions_online_last_sync", syncedAt);
-            LastSyncUtc = DateTime.UtcNow;
             SaveCacheFile();
             MissionsSynchronized?.Invoke();
             Logger.Log($"[MissionOnlineSync] {updatedCount} Missionen erfolgreich aus SCVerse heruntergeladen und lokal aktualisiert.");

@@ -78,10 +78,10 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
     try {
       const res = await bridge.sendRequest<{ success: boolean; pushed?: number; pulled?: number; message: string }>('sync_missions_online');
       await fetchMissions();
-      showToast(res.message || 'Missionskatalog beidseitig mit SCVerse synchronisiert.');
+      showToast(res.message || (locale === 'en' ? 'Missions updated from SCVerse.' : 'Missionskatalog mit SCVerse aktualisiert.'));
     } catch (err: any) {
       console.error('Failed to sync missions online:', err);
-      showToast('Fehler bei der Online-Synchronisation.');
+      showToast(locale === 'en' ? 'Failed to sync with SCVerse.' : 'Fehler bei der Online-Synchronisation.');
     } finally {
       setIsSyncing(false);
     }
@@ -353,10 +353,10 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 text-xs font-semibold border border-sky-800/80 transition cursor-pointer shrink-0 ml-1 ${
                 isSyncing ? 'opacity-50 cursor-not-allowed' : ''
               }`}
-              title="Missionskatalog beidseitig (Push lokaler Daten &amp; Pull aus Cloud) mit SCVerse synchronisieren"
+              title={locale === 'en' ? 'Auto-sync active (every 15 min). Click to refresh now.' : 'Automatischer Cloud-Sync aktiv (alle 15 Min.). Klicken für sofortige Aktualisierung.'}
             >
               <Cloud className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? '2-Way Sync...' : 'SCVerse 2-Way Sync'}</span>
+              <span>{isSyncing ? (locale === 'en' ? 'Syncing...' : 'Aktualisiere...') : (locale === 'en' ? 'Refresh' : 'Aktualisieren')}</span>
             </button>
           </div>
         )}
