@@ -439,6 +439,7 @@ public partial class LogParser
     DateTime _lastQt = DateTime.MinValue;   // Drosselung der QT-Marker
     string? _lastNotif;                     // gegen Notification-Spam
     string? _lastParty;                     // gegen Party-Spam (Wiederholungen)
+    DateTime _lastHangarTime = DateTime.MinValue;   // Drosselung von Hangar-/Tor-Anforderungen
     DateTime _lastCorpseDeathAt = DateTime.MinValue; // Drosselung des Leichen-Spawnpunkts (Burst-Gruppierung)
     DateTime? _awaitingRespawnAt;           // Zeitstempel des letzten Tods für Respawn-Erkennung
     string? _diedAtLocation;                // Ort des letzten Tods
@@ -472,6 +473,7 @@ public partial class LogParser
         _lastNotif = null;
         _lastParty = null;
         _recentPartyEvents.Clear();
+        _lastHangarTime = DateTime.MinValue;
         _lastCorpseDeathAt = DateTime.MinValue;
         _awaitingRespawnAt = null;
         _diedAtLocation = null;
@@ -795,6 +797,19 @@ public partial class LogParser
                     SwitchGameRules(rules, _lastSeenTime.Value);
                 }
             }
+        }
+
+        // Wiederholungen, Animationen/Fades (UpdateNotificationItem) und Queue-Dumps des HUD-Systems ausfiltern.
+        // Echte HUD-Benachrichtigungen werden beim Hinzufügen geloggt ("Added notification ... to queue. New queue size: ...").
+        // Spätere Queue-Inhaltsausgaben ("   \"...: \" [id]") und Lifecycle-Updates ("Action: StartFade / Remove / Next")
+        // sind veraltete Wiederholungen bereits geparster Ereignisse und dürfen keine neuen Events triggern.
+        if (line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: Next", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: StartFade", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: Remove", StringComparison.OrdinalIgnoreCase) ||
+            (NotificationQueueItemRegex().IsMatch(line) && !line.Contains("to queue", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
         }
 
         bool isNotif = line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase);
@@ -1643,12 +1658,22 @@ public partial class LogParser
                     text.Contains("Hangar Queue", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Hangar-Warteschlange", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "In Hangar-Warteschlange eingereiht" };
+                    if (_lastNotif != "Joined hangar queue")
+                    {
+                        _lastNotif = "Joined hangar queue";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "In Hangar-Warteschlange eingereiht" };
+                    }
+                    return null;
                 }
                 if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
+                    if (_lastNotif != "Hangar Request Completed")
+                    {
+                        _lastNotif = "Hangar Request Completed";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Hangar, Detail = "Hangar-Zuweisung erhalten" };
+                    }
+                    return null;
                 }
 
                 // Sperrzonen & Strafversetzung (Restricted Area)
@@ -1656,13 +1681,23 @@ public partial class LogParser
                     text.Contains("umgesetzt", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("relocation", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Impound, Detail = "⛔ Sperrzone: Zwangsumbettung (Relocated)" };
+                    if (_lastNotif != "relocated")
+                    {
+                        _lastNotif = "relocated";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Impound, Detail = "⛔ Sperrzone: Zwangsumbettung (Relocated)" };
+                    }
+                    return null;
                 }
                 if (text.Contains("Leaving Restricted Area", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Sperrgebiet verlassen", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Sperrbereich verlassen", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Sperrgebiet verlassen" };
+                    if (_lastNotif != "Leaving Restricted Area")
+                    {
+                        _lastNotif = "Leaving Restricted Area";
+                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Jurisdiction, Detail = "🟢 Sperrgebiet verlassen" };
+                    }
+                    return null;
                 }
 
                 // Betankung (Starfarer / Ship-to-Ship Refueling)
@@ -2217,11 +2252,23 @@ public partial class LogParser
                 }
                 else if (line.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "Hangar-Anforderung bereit / Tor geöffnet" };
+                    if (_lastNotif != "Hangar Request Completed" || (ts - _lastHangarTime).TotalSeconds >= 10)
+                    {
+                        _lastNotif = "Hangar Request Completed";
+                        _lastHangarTime = ts;
+                        return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "Hangar-Anforderung bereit / Tor geöffnet" };
+                    }
+                    return null;
                 }
                 else if (line.Contains("Joined hangar queue", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "In Hangar-Warteschlange eingereiht" };
+                    if (_lastNotif != "Joined hangar queue" || (ts - _lastHangarTime).TotalSeconds >= 10)
+                    {
+                        _lastNotif = "Joined hangar queue";
+                        _lastHangarTime = ts;
+                        return new LogEntry { Time = ts, Kind = EventKind.Hangar, Detail = "In Hangar-Warteschlange eingereiht" };
+                    }
+                    return null;
                 }
             }
         }
@@ -3275,8 +3322,13 @@ public partial class LogParser
                     return new LogEntry { Time = ParseTs(line), Kind = kind.Value, Detail = cleanTxt };
                 }
 
-                // Chat / Channel-Meldungen ignorieren
-                if (txt.Contains("left the channel", StringComparison.OrdinalIgnoreCase) || txt.Contains("joined channel", StringComparison.OrdinalIgnoreCase))
+                // Chat / Channel / Group-Meldungen ignorieren
+                if (txt.Contains("left the channel", StringComparison.OrdinalIgnoreCase) ||
+                    txt.Contains("joined channel", StringComparison.OrdinalIgnoreCase) ||
+                    txt.Contains("left the group", StringComparison.OrdinalIgnoreCase) ||
+                    txt.Contains("joined the group", StringComparison.OrdinalIgnoreCase) ||
+                    txt.Contains("left group", StringComparison.OrdinalIgnoreCase) ||
+                    txt.Contains("joined group", StringComparison.OrdinalIgnoreCase))
                     return null;
 
                 // unbekannte Notification -> für Diagnose merken
@@ -3451,7 +3503,6 @@ public partial class LogParser
             t.Contains("Private Property", StringComparison.OrdinalIgnoreCase) || t.Contains("Privatbesitz", StringComparison.OrdinalIgnoreCase)) return EventKind.Jurisdiction;
 
         if (t.StartsWith("Partystart", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Party start", StringComparison.OrdinalIgnoreCase) ||
-            t.Contains("GRUPPE", StringComparison.OrdinalIgnoreCase) || t.Contains("Group", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Gruppenanführer", StringComparison.OrdinalIgnoreCase) || t.Contains("Party Leader", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Party", StringComparison.OrdinalIgnoreCase)) return EventKind.Party;
 
