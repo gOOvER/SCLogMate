@@ -1701,13 +1701,17 @@ public partial class LogParser
                 }
 
                 // Betankung (Starfarer / Ship-to-Ship Refueling)
-                if (text.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
-                    text.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                if ((text.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase)) &&
+                    !text.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+                    !text.Contains("Mission", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Maintenance, Ship = _lastShip, Detail = "⛽ Betankung abgeschlossen" };
                 }
-                if (text.Contains("Refuel Request Accepted", StringComparison.OrdinalIgnoreCase) ||
-                    text.Contains("Betankungsanforderung akzeptiert", StringComparison.OrdinalIgnoreCase))
+                if ((text.Contains("Refuel Request Accepted", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankungsanforderung akzeptiert", StringComparison.OrdinalIgnoreCase)) &&
+                    !text.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+                    !text.Contains("Mission", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Info, Ship = _lastShip, Detail = "⛽ Betankungsanfrage akzeptiert" };
                 }
@@ -1721,8 +1725,12 @@ public partial class LogParser
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Ship = _lastShip, Detail = "⛽ Vom Tanker abgedockt" };
                 }
-                if (text.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) ||
-                    text.Contains("Betankungsvorgang", StringComparison.OrdinalIgnoreCase))
+                if ((text.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Betankungsvorgang", StringComparison.OrdinalIgnoreCase)) &&
+                    !text.Contains("~action", StringComparison.OrdinalIgnoreCase) &&
+                    !text.Contains("Target", StringComparison.OrdinalIgnoreCase) &&
+                    !text.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+                    !text.Contains("Mission", StringComparison.OrdinalIgnoreCase))
                 {
                     return new LogEntry { Time = ParseTs(line), Kind = EventKind.Vehicle, Ship = _lastShip, Detail = "⛽ Betankungsvorgang aktiv" };
                 }

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.6] - 2026-10-10
+### Fixed
+- **Party Shared Mission & Contract Objective False Positives in Aurora Voice Triggers (`Core/AuroraVoiceService.cs`, `Core/LogParser.cs`)**:
+  - Fixed an issue where Aurora perpetually fired refueling audio announcements (`Befehle\Aurora\Tanken\*.mp3`) whenever party members shared, accepted, or progressed contracts involving refueling (e.g. `RSI Disc. Month: Refuel Request`).
+  - The root cause was naive substring matching on `line.Contains("Refueling")` in `AuroraVoiceService.ProcessLiveLine`, which was triggered by in-game mission objective hints logged every few seconds (`"Refueling Process: Target the client's ship with ~action... and send a docking request using ~action... Be sure to align your fuel nozzle with the front of their ship."`).
+  - Added comprehensive negative guards across `OnDocking()`, `OnRefuel()`, and `OnRepair()` to strictly ignore lines containing `Contract`, `Mission`, `Objective`, `Shared:`, `Party`, `~action`, `~mission`, `Refueling Process`, and `Refuel Request`.
+  - Refined vehicle maintenance and refuel voice triggers to only fire on authentic player ship events and landing pad services (`LandingServices: Refuel`, `LandingServices::Refuel`, `Refuel Request Complete`, `Betankung begonnen`, `Betankung abgeschlossen`, `Tanken begonnen`).
+  - Added guards in `Core/LogParser.cs` to prevent contract hints and objective notifications from generating spurious `EventKind.Maintenance` or `EventKind.Vehicle` log entries.
+
 ## [1.4.5] - 2026-10-10
 ### Fixed
 - **Aurora Voice Companion Queue-Dump & Repetitive Audio Spam Elimination (`Core/AuroraVoiceService.cs`)**:

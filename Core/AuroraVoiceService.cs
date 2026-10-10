@@ -785,38 +785,67 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // 8. Andocken (nur bei echten Docking-Anfragen / ATC-Freigaben, KEINE statischen Engine-Mesh/Port-Objekte wie DockingTube oder Docking collar)
+        // 8. Andocken (nur bei echten Docking-Anfragen / ATC-Freigaben, KEINE statischen Engine-Mesh/Port-Objekte wie DockingTube oder Docking collar, KEINE Party-/Missions-Texte!)
         if (AtcAndLandingEnabled &&
             !line.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) &&
             !line.Contains("~action", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~mission", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Mission", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Objective", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Shared:", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Party", StringComparison.OrdinalIgnoreCase) &&
             (
                 line.Contains("RequestDocking", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("Docking Request", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Assigned to Docking", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Docking complete", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("Andockfreigabe", StringComparison.OrdinalIgnoreCase)))
+                line.Contains("Andockfreigabe", StringComparison.OrdinalIgnoreCase) ||
+                (line.Contains("Docking Request", StringComparison.OrdinalIgnoreCase) && !line.Contains("send a docking request", StringComparison.OrdinalIgnoreCase))))
         {
             OnDocking();
             return;
         }
 
-        // 9. Tanken
-        if (MaintenanceEnabled && (
-            line.Contains("LandingServices: Refuel", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Refueling", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Tanken begonnen", StringComparison.OrdinalIgnoreCase)))
+        // 9. Tanken (nur bei echten Landing Services oder Starfarer-Betankung, KEINE Party-Aufträge/Missionstexte wie "Refuel Request" oder "Refueling Process"!)
+        if (MaintenanceEnabled &&
+            !line.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Mission", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Objective", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Shared:", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Party", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~action", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~mission", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Refuel Request", StringComparison.OrdinalIgnoreCase) &&
+            (
+                line.Contains("LandingServices: Refuel", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("LandingServices::Refuel", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Refuel Request Complete", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Betankung begonnen", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Betankung abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Tanken begonnen", StringComparison.OrdinalIgnoreCase)))
         {
             OnRefuel();
             return;
         }
 
-        // 10. Reparatur & Wartung
-        if (MaintenanceEnabled && (
-            line.Contains("LandingServices: Repair", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Repairing", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Reparatur", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("LandingServices: Restock", StringComparison.OrdinalIgnoreCase)))
+        // 10. Reparatur & Wartung (nur bei echten Landing Services oder Reparatur-Events, KEINE Aufträge/Missionstexte!)
+        if (MaintenanceEnabled &&
+            !line.Contains("Contract", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Mission", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Objective", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Shared:", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("Party", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~action", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~mission", StringComparison.OrdinalIgnoreCase) &&
+            (
+                line.Contains("LandingServices: Repair", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("LandingServices::Repair", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("LandingServices: Restock", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("LandingServices::Restock", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Reparatur begonnen", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Reparatur abgeschlossen", StringComparison.OrdinalIgnoreCase)))
         {
             OnRepair();
             return;
