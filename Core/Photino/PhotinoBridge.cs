@@ -2625,14 +2625,21 @@ public class PhotinoBridge
                     {
                         try
                         {
-                            var count = await MissionOnlineSyncService.SyncCatalogAsync(force: true);
+                            var syncRes = await MissionOnlineSyncService.TwoWaySyncAsync(force: true);
                             Broadcast("MISSIONS_UPDATED", GetMissionsData());
-                            SendResponse(req.Id, "sync_missions_online_response", new { success = true, count, message = $"{count} Missionen erfolgreich aus SCVerse synchronisiert." });
+                            SendResponse(req.Id, "sync_missions_online_response", new
+                            {
+                                success = syncRes.Success,
+                                pushed = syncRes.Pushed,
+                                pulled = syncRes.Pulled,
+                                count = syncRes.Pushed + syncRes.Pulled,
+                                message = syncRes.Message
+                            });
                         }
                         catch (Exception ex)
                         {
                             Logger.Error("sync_missions_online", ex);
-                            SendResponse(req.Id, "sync_missions_online_response", new { success = false, count = 0, message = ex.Message });
+                            SendResponse(req.Id, "sync_missions_online_response", new { success = false, pushed = 0, pulled = 0, count = 0, message = ex.Message });
                         }
                         break;
                     }

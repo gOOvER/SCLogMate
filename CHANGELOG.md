@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.10] - 2026-10-10
+### Added
+- **Full Bidirectional (Two-Way) Synchronization (`Core/MissionOnlineSyncService.cs`)**:
+  - Implemented true two-way sync (`TwoWaySyncAsync`) between SCLogMate and SCVerse Cloud:
+    - **Push**: Gathers locally discovered missions and catalog entries with rewards and batch-uploads them in chunks to `POST https://scverse.de/api/missions`.
+    - **Pull**: Fetches cloud updates, additions, and community payouts from `GET https://scverse.de/api/missions` and merges them locally.
+  - Added automatic real-time reporting in `MainViewModel.HandleMissionCompleted`: completed missions with payout values detected during live gameplay are now pushed asynchronously to SCVerse Cloud immediately.
+  - Enhanced UI controls in Desktop Avalonia (`Views/MainWindow.axaml`, `ViewModels/MainViewModel.cs`) and Web frontend (`frontend/src/views/MissionsView.tsx`) to show **SCVerse 2-Way Sync** with real-time counters of pushed and pulled items.
+
 ## [1.4.9] - 2026-10-10
 ### Added
 - **Central SCVerse Mission Database & Online Synchronization (`Core/MissionOnlineSyncService.cs`, `Core/MissionCatalog.cs`, `Core/Database.cs`)**:

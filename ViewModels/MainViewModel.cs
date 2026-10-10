@@ -4529,6 +4529,21 @@ public partial class MainViewModel : ObservableObject
         if (reward > 0)
         {
             Status = $"★ Auftrag abgeschlossen & Belohnung verbucht: {completedTitle} · +{reward:N0} aUEC";
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var catInfo = MissionCatalog.Lookup(completedTitle) ?? MissionCatalog.FuzzyLookup(completedTitle);
+                    await MissionOnlineSyncService.ReportMissionRewardAsync(
+                        completedTitle,
+                        (int)reward,
+                        matchContract?.ContractedBy ?? catInfo?.Contractor,
+                        matchContract?.ContractedBy ?? catInfo?.Faction,
+                        catInfo?.MissionType ?? "Auftrag"
+                    ).ConfigureAwait(false);
+                }
+                catch { }
+            });
         }
         else
         {
@@ -6708,15 +6723,15 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task SyncOnlineMissions()
     {
-        Status = "Synchronisiere Missionskatalog mit SCVerse Cloud...";
-        var count = await MissionOnlineSyncService.SyncCatalogAsync(force: true);
+        Status = "Synchronisiere Missionskatalog beidseitig mit SCVerse Cloud (Push & Pull)...";
+        var res = await MissionOnlineSyncService.TwoWaySyncAsync(force: true);
         MissionCatalogList.Clear();
         foreach (var m in MissionCatalog.AllMissions) MissionCatalogList.Add(m);
         OnPropertyChanged(nameof(TotalMissionsCount));
         EventsView?.Refresh();
-        Status = count > 0
-            ? $"✓ {count} Missionen aus SCVerse Cloud synchronisiert!"
-            : "✓ Missionskatalog ist bereits auf dem neuesten Stand.";
+        Status = res.Success
+            ? $"✓ SCVerse 2-Way Sync: {res.Pushed} gesendet, {res.Pulled} aktualisiert!"
+            : $"Fehler beim SCVerse Sync: {res.Message}";
     }
 
     #endregion
