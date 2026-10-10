@@ -19,7 +19,7 @@ namespace SCLogMate.Core;
 public static class Database
 {
     public const int CurrentSchemaVersion = 44; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v44: Faction Reputation Reconciliation & Prestige Tiers)
-    public const int CurrentParserVersion = 45; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v45: Contract Payout Pairing & Failed vs. Abandoned Unterscheidung)
+    public const int CurrentParserVersion = 46; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v46: Party Connect & Leave Deduplizierung & HUD-Queue-Filter)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }

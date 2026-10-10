@@ -292,7 +292,7 @@ public partial class LogParser
     private static partial Regex InjuryLineRegex();
 
     // Party-Mitglieder rein/raus (Name in der Folgezeile oder Notification-Header)
-    [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ist Party beigetreten|has joined the party|joined the party|joined party)")]
+    [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ist (?:der )?Party beigetreten|has joined the party|joined the party|joined party)")]
     private static partial Regex PartyJoinRegex();
 
     [GeneratedRegex(@"Added notification ""(?:New Member Joined|Member Joined):\s*(?<who>[^""]+)")]
@@ -303,6 +303,9 @@ public partial class LogParser
 
     [GeneratedRegex(@"Added notification ""(?:Member Left|Member departed):\s*(?<who>[^""]+)")]
     private static partial Regex PartyMemberLeaveNotifRegex();
+
+    [GeneratedRegex(@":\s*""\s*\[\d+\]")]
+    private static partial Regex NotificationQueueItemRegex();
 
     // Lager & Inventarbewegungen
     [GeneratedRegex(@"Inventory\[\d+:Location:(?<id>\d+)\]")]
@@ -445,6 +448,7 @@ public partial class LogParser
     readonly HashSet<string> _missionsDone = new();
     readonly HashSet<string> _missionsTaken = new();
     readonly Dictionary<string, DateTime> _seenBlueprints = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, DateTime> _recentPartyEvents = new(StringComparer.OrdinalIgnoreCase);
     bool _metaComplete;
 
     /// <summary>Intelligente Zustandsmaschine für Spielerstandort und Quantum-Reisen.</summary>
@@ -467,6 +471,7 @@ public partial class LogParser
         _lastQt = DateTime.MinValue;
         _lastNotif = null;
         _lastParty = null;
+        _recentPartyEvents.Clear();
         _lastCorpseDeathAt = DateTime.MinValue;
         _awaitingRespawnAt = null;
         _diedAtLocation = null;
@@ -2762,23 +2767,51 @@ public partial class LogParser
         // Party-Mitglied beigetreten / verlassen (mit Name)
         if (line.Contains("Party", StringComparison.OrdinalIgnoreCase) || line.Contains("party", StringComparison.OrdinalIgnoreCase))
         {
-            var pj = PartyJoinRegex().Match(line);
-            if (pj.Success)
+            // UpdateNotificationItem, Action-Updates (Next, StartFade, Remove) und nachfolgende Queue-Dumps ausfiltern
+            bool isUpdateOrAction = line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase)
+                                 || line.Contains("Action:", StringComparison.OrdinalIgnoreCase);
+
+            // In Star Citizen Logs hat die tatsächliche Hinzufügung einer HUD-Notification das Format:
+            // <timestamp> ... has joined the party.: " [80] to queue. New queue size: ...
+            // Nachfolgende Queue-Dumps des HUD-Systems wiederholen:
+            // <timestamp> ... has joined the party.: " [80] (ohne "to queue")
+            bool isQueueDump = NotificationQueueItemRegex().IsMatch(line) && !line.Contains("to queue", StringComparison.OrdinalIgnoreCase);
+
+            if (!isUpdateOrAction && !isQueueDump)
             {
-                var key = "j:" + pj.Groups["who"].Value;
-                if (key == _lastParty) return null;
-                _lastParty = key;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {pj.Groups["who"].Value} ist beigetreten" };
-            }
-            var pl = PartyLeaveRegex().Match(line);
-            if (pl.Success)
-            {
-                var who = pl.Groups["who"].Value;
-                if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
-                var key = "l:" + who;
-                if (key == _lastParty) return null;
-                _lastParty = key;
-                return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                var pj = PartyJoinRegex().Match(line);
+                if (pj.Success)
+                {
+                    var who = pj.Groups["who"].Value.Trim();
+                    var ts = ParseTs(line);
+                    var key = "j:" + who;
+                    if (!_recentPartyEvents.TryGetValue(key, out var lastTs) || (ts - lastTs).TotalSeconds >= 15)
+                    {
+                        _recentPartyEvents[key] = ts;
+                        _recentPartyEvents.Remove("l:" + who);
+                        _lastParty = key;
+                        PruneRecentPartyEvents(ts);
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                    }
+                    return null;
+                }
+                var pl = PartyLeaveRegex().Match(line);
+                if (pl.Success)
+                {
+                    var who = pl.Groups["who"].Value.Trim();
+                    if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+                    var ts = ParseTs(line);
+                    var key = "l:" + who;
+                    if (!_recentPartyEvents.TryGetValue(key, out var lastTs) || (ts - lastTs).TotalSeconds >= 15)
+                    {
+                        _recentPartyEvents[key] = ts;
+                        _recentPartyEvents.Remove("j:" + who);
+                        _lastParty = key;
+                        PruneRecentPartyEvents(ts);
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                    }
+                    return null;
+                }
             }
         }
 
@@ -2790,11 +2823,15 @@ public partial class LogParser
                 var who = pjn.Groups["who"].Value.Trim();
                 if (!who.Contains("channel", StringComparison.OrdinalIgnoreCase) && !who.Contains("Kanal", StringComparison.OrdinalIgnoreCase))
                 {
+                    var ts = ParseTs(line);
                     var key = "j:" + who;
-                    if (key != _lastParty)
+                    if (!_recentPartyEvents.TryGetValue(key, out var lastTs) || (ts - lastTs).TotalSeconds >= 15)
                     {
+                        _recentPartyEvents[key] = ts;
+                        _recentPartyEvents.Remove("l:" + who);
                         _lastParty = key;
-                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
+                        PruneRecentPartyEvents(ts);
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"▸ {who} ist beigetreten" };
                     }
                 }
             }
@@ -2805,11 +2842,15 @@ public partial class LogParser
                 if (!who.Contains("channel", StringComparison.OrdinalIgnoreCase) && !who.Contains("Kanal", StringComparison.OrdinalIgnoreCase))
                 {
                     if (who.Equals("Du", StringComparison.OrdinalIgnoreCase)) who = "Du";
+                    var ts = ParseTs(line);
                     var key = "l:" + who;
-                    if (key != _lastParty)
+                    if (!_recentPartyEvents.TryGetValue(key, out var lastTs) || (ts - lastTs).TotalSeconds >= 15)
                     {
+                        _recentPartyEvents[key] = ts;
+                        _recentPartyEvents.Remove("j:" + who);
                         _lastParty = key;
-                        return new LogEntry { Time = ParseTs(line), Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
+                        PruneRecentPartyEvents(ts);
+                        return new LogEntry { Time = ts, Kind = EventKind.Party, Detail = $"◂ {who} hat verlassen" };
                     }
                 }
             }
@@ -3868,6 +3909,18 @@ public partial class LogParser
     {
         if (string.IsNullOrEmpty(str)) return str;
         return CamelCaseSplitRegex().Replace(str, " $1").Trim();
+    }
+
+    private void PruneRecentPartyEvents(DateTime now)
+    {
+        if (_recentPartyEvents.Count > 100)
+        {
+            foreach (var (k, v) in _recentPartyEvents.ToList())
+            {
+                if ((now - v).TotalMinutes > 5)
+                    _recentPartyEvents.Remove(k);
+            }
+        }
     }
 }
 

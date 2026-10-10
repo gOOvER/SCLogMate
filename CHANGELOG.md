@@ -1,10 +1,17 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
+### Fixed
+- **Party Connect & Leave Deduplication (`Core/LogParser.cs`, `Core/Database.cs`)**:
+  - Fixed an issue where party joins and leaves were displayed multiple times in the Live-Stream and session event log.
+  - Excluded repetitive HUD notification lifecycle events (`<UpdateNotificationItem>`, `Action: Next`, `Action: StartFade`, `Action: Remove`) from triggering party join/leave parsing.
+  - Filtered out recurring HUD notification queue dumps (`... : " [<id>]` without `to queue`), ensuring only the initial notification queueing event (`to queue. New queue size:`) is evaluated.
+  - Added a per-player debounce cache (`_recentPartyEvents`) so interleaved notifications for multiple players (e.g. one leaving while another joins) do not bypass state deduplication.
+  - Bumped `CurrentParserVersion` to 46 in `Core/Database.cs` to trigger a clean re-index of historical sessions and purge duplicate party events from the database.
 
 ## [1.4.2] - 2026-10-08
 ### Fixed
