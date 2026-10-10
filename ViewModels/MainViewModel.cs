@@ -3488,6 +3488,19 @@ public partial class MainViewModel : ObservableObject
         // Automatische DB-Synchronisation & Hintergrund-Indexierung
         _ = AutoSyncAndIndexDatabaseAsync();
 
+        // Online-Missionskatalog aus SCVerse synchronisieren
+        MissionOnlineSyncService.MissionsSynchronized += () =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                MissionCatalogList.Clear();
+                foreach (var m in MissionCatalog.AllMissions) MissionCatalogList.Add(m);
+                OnPropertyChanged(nameof(TotalMissionsCount));
+                EventsView?.Refresh();
+            });
+        };
+        _ = MissionOnlineSyncService.SyncCatalogAsync();
+
         // Update-Prüfung: einmal beim Start + danach alle 6 Stunden
         CheckForUpdate();
         _updateTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(6) };
@@ -6690,6 +6703,20 @@ public partial class MainViewModel : ObservableObject
         _settings.RsOverlayPositionY = 50;
         Settings.Save(_settings);
         Status = "✓ [DEBUG] Overlay-Positionen auf Standard (50,50 / 400,50) zurückgesetzt.";
+    }
+
+    [RelayCommand]
+    public async Task SyncOnlineMissions()
+    {
+        Status = "Synchronisiere Missionskatalog mit SCVerse Cloud...";
+        var count = await MissionOnlineSyncService.SyncCatalogAsync(force: true);
+        MissionCatalogList.Clear();
+        foreach (var m in MissionCatalog.AllMissions) MissionCatalogList.Add(m);
+        OnPropertyChanged(nameof(TotalMissionsCount));
+        EventsView?.Refresh();
+        Status = count > 0
+            ? $"✓ {count} Missionen aus SCVerse Cloud synchronisiert!"
+            : "✓ Missionskatalog ist bereits auf dem neuesten Stand.";
     }
 
     #endregion

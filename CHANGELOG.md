@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.9] - 2026-10-10
+### Added
+- **Central SCVerse Mission Database & Online Synchronization (`Core/MissionOnlineSyncService.cs`, `Core/MissionCatalog.cs`, `Core/Database.cs`)**:
+  - Connected SCLogMate to the centralized, crowd-sourced SCVerse Mission Database API (`https://scverse.de/api/missions`).
+  - Implemented automatic non-blocking background synchronization on startup with delta sync support (`?since=<lastSyncUtc>`), caching online missions locally in `%APPDATA%\SCLogMate\missions_online.json`.
+  - Added retroactive reward reconciliation: whenever an online mission with a payout is synchronized or updated, historical event records with 0 aUEC are automatically updated across local SQLite sessions.
+  - Implemented `ReportMissionRewardAsync` to submit newly discovered or corrected mission payout amounts from clients to the central SCVerse Cloud.
+  - Added dedicated **SCVerse Sync** button in both the Desktop Avalonia UI (`Views/MainWindow.axaml`, `ViewModels/MainViewModel.cs`) and Web UI (`frontend/src/views/MissionsView.tsx`).
+  - Added Photino RPC dispatch handlers `sync_missions_online` and `report_mission_reward`, expanding catalog limit to 1,500 entries.
+
 ## [1.4.8] - 2026-10-10
 ### Added
 - **RSI Discovery Month 4.10.2 Event Missions & Official Payout Catalog (`Data/missions.json`, `Core/MissionCatalog.cs`, `Core/Database.cs`)**:

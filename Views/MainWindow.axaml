@@ -1461,6 +1461,15 @@
                   </Border>
                 </StackPanel>
 
+                <Button Grid.Column="2" Classes="btn-secondary" Height="30" Margin="0,0,8,0"
+                        Command="{Binding SyncOnlineMissionsCommand}"
+                        ToolTip.Tip="Missionskatalog mit zentraler SCVerse Cloud synchronisieren" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="☁" Foreground="#58A6FF" VerticalAlignment="Center" />
+                    <TextBlock Text="SCVerse Sync" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+
                 <TextBox Grid.Column="3" Classes="path" Height="30" Text="{Binding MissionSearchText}"
                          Watermark="🔍 Mission, Auftraggeber, Typ, Bauplan..." VerticalAlignment="Center" />
               </Grid>

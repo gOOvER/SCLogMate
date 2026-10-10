@@ -1438,6 +1438,13 @@ public class PhotinoBridge
             await CheckForAppUpdatesAsync(broadcastIfAvailable: true);
         }, null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(6));
 
+        // Online-Missionskatalog aus SCVerse synchronisieren
+        MissionOnlineSyncService.MissionsSynchronized += () =>
+        {
+            Broadcast("MISSIONS_UPDATED", GetMissionsData());
+        };
+        _ = MissionOnlineSyncService.SyncCatalogAsync();
+
         // Auto-Clipboard-POI-Watcher initialisieren & Events an Frontend streamen
         PoiClipboardWatcher.OnLocationDetected += reading =>
         {
@@ -2613,6 +2620,45 @@ public class PhotinoBridge
                 case "get_missions":
                     SendResponse(req.Id, "missions_response", GetMissionsData());
                     break;
+
+                case "sync_missions_online":
+                    {
+                        try
+                        {
+                            var count = await MissionOnlineSyncService.SyncCatalogAsync(force: true);
+                            Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                            SendResponse(req.Id, "sync_missions_online_response", new { success = true, count, message = $"{count} Missionen erfolgreich aus SCVerse synchronisiert." });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("sync_missions_online", ex);
+                            SendResponse(req.Id, "sync_missions_online_response", new { success = false, count = 0, message = ex.Message });
+                        }
+                        break;
+                    }
+
+                case "report_mission_reward":
+                    {
+                        if (req.Payload.HasValue)
+                        {
+                            var p = req.Payload.Value;
+                            var title = p.TryGetProperty("title", out var tProp) ? tProp.GetString() ?? "" : "";
+                            var reward = p.TryGetProperty("reward", out var rProp) ? rProp.GetInt32() : 0;
+                            var contractor = p.TryGetProperty("contractor", out var cProp) ? cProp.GetString() : null;
+                            var faction = p.TryGetProperty("faction", out var fProp) ? fProp.GetString() : null;
+                            var mType = p.TryGetProperty("missionType", out var mtProp) ? mtProp.GetString() : null;
+
+                            if (!string.IsNullOrWhiteSpace(title) && reward > 0)
+                            {
+                                var ok = await MissionOnlineSyncService.ReportMissionRewardAsync(title, reward, contractor, faction, mType);
+                                Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                                SendResponse(req.Id, "report_mission_reward_response", new { success = ok, message = ok ? "Missionsbelohnung erfolgreich übermittelt und lokal hinterlegt." : "Fehler beim Übermitteln." });
+                                break;
+                            }
+                        }
+                        SendResponse(req.Id, "report_mission_reward_response", new { success = false, message = "Ungültige Missionsdaten." });
+                        break;
+                    }
 
                 case "clear_contracts":
                     Database.ClearActiveContracts();
@@ -5679,7 +5725,7 @@ public class PhotinoBridge
     private object GetMissionsData()
     {
         Database.EnsureInitialized();
-        var catalog = MissionCatalog.AllMissions.Take(250).Select(m => new MissionItemDto
+        var catalog = MissionCatalog.AllMissions.Take(1500).Select(m => new MissionItemDto
         {
             Id = m.Id,
             Title = m.Title,

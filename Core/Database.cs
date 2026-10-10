@@ -4744,5 +4744,43 @@ public static class Database
         return null;
     }
 
+    #region Online Missions Sync Reconciliation
+
+    /// <summary>
+    /// Aktualisiert den Belohnungswert (amount) für alle Events, deren Detail dem übergebenen Missionsnamen entspricht und deren Betrag 0 oder NULL ist.
+    /// </summary>
+    public static int UpdateMissionRewardInEvents(string title, int reward)
+    {
+        if (string.IsNullOrWhiteSpace(title) || reward <= 0) return 0;
+        lock (_writeLock)
+        {
+            EnsureInitialized();
+            try
+            {
+                using var db = new SqliteConnection(Conn);
+                db.Open();
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE events
+                    SET amount = @reward,
+                        kind = CASE WHEN kind IN ('Mission', 'MissionDone', 'MissionTaken') THEN 'MissionReward' ELSE kind END
+                    WHERE (amount IS NULL OR amount = 0)
+                      AND (kind IN ('Mission', 'MissionDone', 'MissionTaken', 'MissionReward'))
+                      AND (detail = @title OR detail LIKE '%' || @title || '%');
+                ";
+                cmd.Parameters.AddWithValue("@reward", reward);
+                cmd.Parameters.AddWithValue("@title", title);
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Database.UpdateMissionRewardInEvents({title}, {reward})", ex);
+                return 0;
+            }
+        }
+    }
+
+    #endregion
+
     #endregion
 }

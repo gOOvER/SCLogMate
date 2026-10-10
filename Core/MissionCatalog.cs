@@ -54,7 +54,16 @@ public static partial class MissionCatalog
     private static readonly List<MissionInfo> _catalog = new();
     private static readonly Dictionary<string, MissionInfo> _lookupByNormTitle = new(StringComparer.OrdinalIgnoreCase);
 
-    public static IReadOnlyList<MissionInfo> AllMissions => _catalog;
+    public static IReadOnlyList<MissionInfo> AllMissions
+    {
+        get
+        {
+            lock (_catalog)
+            {
+                return _catalog.ToList();
+            }
+        }
+    }
 
     static MissionCatalog()
     {
@@ -65,7 +74,10 @@ public static partial class MissionCatalog
     {
         if (string.IsNullOrWhiteSpace(title)) return null;
         var norm = Normalize(title);
-        return _lookupByNormTitle.TryGetValue(norm, out var m) ? m : null;
+        lock (_catalog)
+        {
+            return _lookupByNormTitle.TryGetValue(norm, out var m) ? m : null;
+        }
     }
 
     private static readonly HashSet<string> _genericStopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -282,44 +294,109 @@ public static partial class MissionCatalog
 
     private static void Add(MissionInfo info, params string[] aliases)
     {
-        var norm = Normalize(info.Title);
-        if (_lookupByNormTitle.TryGetValue(norm, out var existing))
+        lock (_catalog)
         {
-            var idx = _catalog.IndexOf(existing);
-            if (idx >= 0) _catalog[idx] = info;
-            else _catalog.Add(info);
-        }
-        else
-        {
-            _catalog.Add(info);
-        }
-        _lookupByNormTitle[norm] = info;
-
-        // Wenn der Titel Platzhalter wie (~mission(Ship)) oder [Ship] enthält, auch ohne Platzhalter registrieren
-        if (info.Title.Contains("~mission(") || info.Title.Contains('['))
-        {
-            var cleanPlaceholder = Regex.Replace(info.Title, @"\s*\(?~mission\([^)]*\)\)?", "").Trim();
-            cleanPlaceholder = Regex.Replace(cleanPlaceholder, @"\s*\[[^\]]*\]", "").Trim();
-            if (!string.IsNullOrWhiteSpace(cleanPlaceholder) && !cleanPlaceholder.Equals(info.Title, StringComparison.OrdinalIgnoreCase))
+            var norm = Normalize(info.Title);
+            if (_lookupByNormTitle.TryGetValue(norm, out var existing))
             {
-                var cpNorm = Normalize(cleanPlaceholder);
-                if (!_lookupByNormTitle.ContainsKey(cpNorm))
+                var idx = _catalog.IndexOf(existing);
+                if (idx >= 0) _catalog[idx] = info;
+                else _catalog.Add(info);
+            }
+            else
+            {
+                _catalog.Add(info);
+            }
+            _lookupByNormTitle[norm] = info;
+
+            // Wenn der Titel Platzhalter wie (~mission(Ship)) oder [Ship] enthält, auch ohne Platzhalter registrieren
+            if (info.Title.Contains("~mission(") || info.Title.Contains('['))
+            {
+                var cleanPlaceholder = Regex.Replace(info.Title, @"\s*\(?~mission\([^)]*\)\)?", "").Trim();
+                cleanPlaceholder = Regex.Replace(cleanPlaceholder, @"\s*\[[^\]]*\]", "").Trim();
+                if (!string.IsNullOrWhiteSpace(cleanPlaceholder) && !cleanPlaceholder.Equals(info.Title, StringComparison.OrdinalIgnoreCase))
                 {
-                    _lookupByNormTitle[cpNorm] = info;
+                    var cpNorm = Normalize(cleanPlaceholder);
+                    if (!_lookupByNormTitle.ContainsKey(cpNorm))
+                    {
+                        _lookupByNormTitle[cpNorm] = info;
+                    }
+                }
+            }
+
+            if (aliases != null)
+            {
+                foreach (var alias in aliases)
+                {
+                    if (!string.IsNullOrWhiteSpace(alias))
+                    {
+                        var aNorm = Normalize(alias);
+                        _lookupByNormTitle[aNorm] = info;
+                    }
                 }
             }
         }
+    }
 
-        if (aliases != null)
+    /// <summary>
+    /// Registriert oder aktualisiert eine Mission dynamisch zur Laufzeit (z. B. via Online-Sync aus SCVerse).
+    /// </summary>
+    public static void RegisterOrUpdate(MissionInfo info, params string[] aliases)
+    {
+        Add(info, aliases);
+    }
+
+    /// <summary>
+    /// Lädt lokal zwischengespeicherte Online-Missionsdaten aus %APPDATA%\SCLogMate\missions_online.json.
+    /// </summary>
+    public static int LoadOnlineCache(string filePath)
+    {
+        try
         {
-            foreach (var alias in aliases)
+            if (!System.IO.File.Exists(filePath)) return 0;
+            var json = System.IO.File.ReadAllText(filePath);
+            if (string.IsNullOrWhiteSpace(json)) return 0;
+
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            int count = 0;
+            foreach (var el in doc.RootElement.EnumerateArray())
             {
-                if (!string.IsNullOrWhiteSpace(alias))
+                var id = el.TryGetProperty("Id", out var idProp) ? idProp.GetString() ?? "" : "";
+                var title = el.TryGetProperty("Title", out var tProp) ? tProp.GetString() ?? "" : "";
+                if (string.IsNullOrWhiteSpace(title)) continue;
+
+                var contractor = el.TryGetProperty("Contractor", out var cProp) ? cProp.GetString() ?? "Unbekannt" : "Unbekannt";
+                var faction = el.TryGetProperty("Faction", out var fProp) ? fProp.GetString() ?? contractor : contractor;
+                var type = el.TryGetProperty("MissionType", out var mProp) ? mProp.GetString() ?? "Auftrag" : "Auftrag";
+                var reward = el.TryGetProperty("BaseReward", out var rProp) && rProp.TryGetInt32(out var rVal) ? rVal : 0;
+                var fee = el.TryGetProperty("ContractFee", out var feeProp) && feeProp.TryGetInt32(out var feeVal) ? feeVal : 0;
+                var rep = el.TryGetProperty("ReputationGain", out var repProp) && repProp.TryGetInt32(out var repVal) ? repVal : 0;
+                var illegal = el.TryGetProperty("IsIllegal", out var illProp) && illProp.GetBoolean();
+                var sys = el.TryGetProperty("StarSystems", out var sysProp) ? sysProp.GetString() ?? "Stanton" : "Stanton";
+                var desc = el.TryGetProperty("Description", out var dProp) ? dProp.GetString() ?? "" : "";
+
+                Add(new MissionInfo
                 {
-                    var aNorm = Normalize(alias);
-                    _lookupByNormTitle[aNorm] = info;
-                }
+                    Id = id,
+                    Title = title,
+                    Contractor = contractor,
+                    Faction = faction,
+                    MissionType = type,
+                    BaseReward = reward,
+                    ContractFee = fee,
+                    ReputationGain = rep,
+                    IsIllegal = illegal,
+                    StarSystems = sys,
+                    Description = desc
+                });
+                count++;
             }
+            return count;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[MissionCatalog] Fehler beim Laden des Online-Caches: {ex.Message}");
+            return 0;
         }
     }
 

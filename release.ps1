@@ -38,7 +38,7 @@ Set-Content $notesFile $notes -Encoding UTF8
 Write-Host "==> Frontend bauen (npm run build)" -ForegroundColor Cyan
 Push-Location (Join-Path $root 'frontend')
 $env:PATH = "C:\Users\goove\AppData\Local\Author Software\nvm\.nodejs;C:\Users\goove\AppData\Local\Author Software\nvm;$env:PATH"
-npm run build
+cmd.exe /c "npm run build"
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Frontend-Build fehlgeschlagen.' }
 Pop-Location
 

@@ -3,6 +3,7 @@ import { bridge, MissionItemDto, MissionsResponseDto } from '../services/photino
 import {
   CheckCircle2,
   Clock,
+  Cloud,
   Radio,
   Search,
   Target,
@@ -32,6 +33,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
   const [search, setSearch] = useState<string>(initialSearch || '');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const autoSwitchedRef = useRef<string | null>(null);
 
@@ -67,6 +69,21 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
     } catch (err) {
       console.error('Failed to clear contracts:', err);
       showToast('Fehler beim Leeren der Aufträge');
+    }
+  };
+
+  const handleSyncOnlineMissions = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await bridge.sendRequest<{ success: boolean; count: number; message: string }>('sync_missions_online');
+      await fetchMissions();
+      showToast(res.message || 'Missionskatalog mit SCVerse synchronisiert.');
+    } catch (err: any) {
+      console.error('Failed to sync missions online:', err);
+      showToast('Fehler bei der Online-Synchronisation.');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -328,6 +345,18 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
               <span>✕ {t('missions.clearActive')}</span>
+            </button>
+
+            <button
+              onClick={handleSyncOnlineMissions}
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 text-xs font-semibold border border-sky-800/80 transition cursor-pointer shrink-0 ml-1 ${
+                isSyncing ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              title="Missionskatalog mit der zentralen SCVerse Cloud synchronisieren"
+            >
+              <Cloud className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sync...' : 'SCVerse Sync'}</span>
             </button>
           </div>
         )}
