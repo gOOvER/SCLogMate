@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [1.4.11] - 2026-10-10
+### Changed
+- **Bidirectional Data Enrichment & Mutual Auto-Sync (`Core/MissionOnlineSyncService.cs`, `Core/MissionCatalog.cs`)**:
+  - Implemented smart field merging in `MissionCatalog.Add`: incoming catalog syncs now enrich missing or generic fields (rewards, contractors, factions, mission categories, descriptions, fees, reputation, star systems) without overwriting existing high-fidelity values.
+  - Enhanced `PushLocalMissionsAsync` to gather and transmit all locally discovered missions—including active contracts, OCR discoveries, and completed missions from historical SQLite records—guaranteeing that any mission missing on SCVerse Cloud is immediately created and populated.
+  - Added automatic offline cache serialization (`SaveCacheFile()`) and event dispatch (`MissionsSynchronized`) immediately after successful cloud pull operations.
+
 ## [1.4.10] - 2026-10-10
 ### Added
 - **Full Bidirectional (Two-Way) Synchronization (`Core/MissionOnlineSyncService.cs`)**:

@@ -113,10 +113,68 @@ public static class MissionOnlineSyncService
     {
         try
         {
-            var missionsToPush = MissionCatalog.AllMissions
-                .Where(m => !string.IsNullOrWhiteSpace(m.Title) && m.BaseReward > 0)
-                .ToList();
+            var map = new Dictionary<string, MissionInfo>(StringComparer.OrdinalIgnoreCase);
 
+            // 1. Alle Missionen aus MissionCatalog (auch ohne Belohnung, damit SCVerse fehlende Aufträge erhält)
+            foreach (var m in MissionCatalog.AllMissions)
+            {
+                if (!string.IsNullOrWhiteSpace(m.Title))
+                {
+                    map[m.Title.Trim()] = m;
+                }
+            }
+
+            // 2. Lokale SQLite-Events & Verträge nach fehlenden Aufträgen durchsuchen
+            try
+            {
+                var historyEvents = Database.AllMissionHistoryEvents(limit: 500);
+                foreach (var ev in historyEvents)
+                {
+                    var cleanTitle = ev.Detail ?? ev.KindText;
+                    if (cleanTitle.StartsWith("Contract Complete: ", StringComparison.OrdinalIgnoreCase))
+                        cleanTitle = cleanTitle.Substring("Contract Complete: ".Length).Trim();
+                    else if (cleanTitle.StartsWith("Auftrag abgeschlossen: ", StringComparison.OrdinalIgnoreCase))
+                        cleanTitle = cleanTitle.Substring("Auftrag abgeschlossen: ".Length).Trim();
+
+                    if (!string.IsNullOrWhiteSpace(cleanTitle) && !map.ContainsKey(cleanTitle))
+                    {
+                        var cat = MissionCatalog.Lookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(cleanTitle);
+                        map[cleanTitle] = new MissionInfo
+                        {
+                            Title = cleanTitle,
+                            BaseReward = (int)ev.Amount > 0 ? (int)ev.Amount : (cat?.BaseReward ?? 0),
+                            Contractor = cat?.Contractor ?? "Star Citizen Auftragsmanager",
+                            Faction = cat?.Faction ?? "Star Citizen Auftragsmanager",
+                            MissionType = cat?.MissionType ?? "Auftrag",
+                            StarSystems = cat?.StarSystems ?? "Stanton"
+                        };
+                    }
+                }
+
+                var contracts = Database.GetActiveContracts();
+                foreach (var c in contracts)
+                {
+                    if (!string.IsNullOrWhiteSpace(c.Title) && !map.ContainsKey(c.Title))
+                    {
+                        var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
+                        map[c.Title] = new MissionInfo
+                        {
+                            Title = c.Title,
+                            BaseReward = c.Reward > 0 ? c.Reward : (cat?.BaseReward ?? 0),
+                            Contractor = !string.IsNullOrWhiteSpace(c.ContractedBy) ? c.ContractedBy : (cat?.Contractor ?? "Star Citizen Auftragsmanager"),
+                            Faction = !string.IsNullOrWhiteSpace(c.ContractedBy) ? c.ContractedBy : (cat?.Faction ?? "Star Citizen Auftragsmanager"),
+                            MissionType = cat?.MissionType ?? "Auftrag",
+                            StarSystems = cat?.StarSystems ?? "Stanton"
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[MissionOnlineSync] Ergänzung lokaler Missionsdaten für Push: {ex.Message}");
+            }
+
+            var missionsToPush = map.Values.ToList();
             if (missionsToPush.Count == 0) return 0;
 
             int totalUploaded = 0;
@@ -145,7 +203,7 @@ public static class MissionOnlineSyncService
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-                req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.9");
+                req.Headers.Add("User-Agent", "SCLogMate-Sync/1.4.11");
 
                 var resp = await _httpClient.SendAsync(req).ConfigureAwait(false);
                 if (resp.IsSuccessStatusCode)
@@ -160,7 +218,7 @@ public static class MissionOnlineSyncService
 
             if (totalUploaded > 0)
             {
-                Logger.Log($"[MissionOnlineSync] {totalUploaded} lokale Missionen an SCVerse Cloud übertragen.");
+                Logger.Log($"[MissionOnlineSync] {totalUploaded} lokale Missionen an SCVerse Cloud synchronisiert (Push).");
             }
             return totalUploaded;
         }
@@ -269,7 +327,9 @@ public static class MissionOnlineSyncService
         {
             Database.SetMeta("missions_online_last_sync", syncedAt);
             LastSyncUtc = DateTime.UtcNow;
-            Logger.Log($"[MissionOnlineSync] {updatedCount} Missionen erfolgreich aus SCVerse heruntergeladen.");
+            SaveCacheFile();
+            MissionsSynchronized?.Invoke();
+            Logger.Log($"[MissionOnlineSync] {updatedCount} Missionen erfolgreich aus SCVerse heruntergeladen und lokal aktualisiert.");
         }
 
         return updatedCount;

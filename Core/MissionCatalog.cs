@@ -299,15 +299,41 @@ public static partial class MissionCatalog
             var norm = Normalize(info.Title);
             if (_lookupByNormTitle.TryGetValue(norm, out var existing))
             {
+                var merged = new MissionInfo
+                {
+                    Id = !string.IsNullOrWhiteSpace(existing.Id) ? existing.Id : info.Id,
+                    Title = existing.Title,
+                    Contractor = !string.IsNullOrWhiteSpace(info.Contractor) && info.Contractor != "Unbekannt" && info.Contractor != "Star Citizen Auftragsmanager"
+                        ? info.Contractor
+                        : (!string.IsNullOrWhiteSpace(existing.Contractor) ? existing.Contractor : info.Contractor),
+                    Faction = !string.IsNullOrWhiteSpace(info.Faction) && info.Faction != "Unbekannt"
+                        ? info.Faction
+                        : (!string.IsNullOrWhiteSpace(existing.Faction) ? existing.Faction : info.Faction),
+                    MissionType = !string.IsNullOrWhiteSpace(info.MissionType) && info.MissionType != "Auftrag" && info.MissionType != "Other" && info.MissionType != "Sonstiges"
+                        ? info.MissionType
+                        : (!string.IsNullOrWhiteSpace(existing.MissionType) ? existing.MissionType : info.MissionType),
+                    BaseReward = info.BaseReward > 0 ? info.BaseReward : existing.BaseReward,
+                    ContractFee = info.ContractFee > 0 ? info.ContractFee : existing.ContractFee,
+                    ReputationGain = info.ReputationGain != 0 ? info.ReputationGain : existing.ReputationGain,
+                    IsIllegal = info.IsIllegal || existing.IsIllegal,
+                    StarSystems = !string.IsNullOrWhiteSpace(info.StarSystems) && info.StarSystems != "Stanton"
+                        ? info.StarSystems
+                        : (!string.IsNullOrWhiteSpace(existing.StarSystems) ? existing.StarSystems : info.StarSystems),
+                    Blueprints = info.Blueprints != null && info.Blueprints.Length > 0 ? info.Blueprints : existing.Blueprints,
+                    Description = !string.IsNullOrWhiteSpace(info.Description) ? info.Description : existing.Description
+                };
+
                 var idx = _catalog.IndexOf(existing);
-                if (idx >= 0) _catalog[idx] = info;
-                else _catalog.Add(info);
+                if (idx >= 0) _catalog[idx] = merged;
+                else _catalog.Add(merged);
+                _lookupByNormTitle[norm] = merged;
+                info = merged;
             }
             else
             {
                 _catalog.Add(info);
+                _lookupByNormTitle[norm] = info;
             }
-            _lookupByNormTitle[norm] = info;
 
             // Wenn der Titel Platzhalter wie (~mission(Ship)) oder [Ship] enthält, auch ohne Platzhalter registrieren
             if (info.Title.Contains("~mission(") || info.Title.Contains('['))
