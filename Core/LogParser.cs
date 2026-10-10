@@ -2454,24 +2454,16 @@ public partial class LogParser
                         }
                     }
 
-                    // 3. Fallback auf Missions-Katalog oder Heuristik
+                    // 3. Fallback auf Missions-Katalog (1800+ extrahierte Missionen aus scunpacked-data / StarCitizenWiki)
                     if (reward <= 0)
                     {
                         if (cat != null && cat.BaseReward > 0)
                         {
                             reward = cat.BaseReward;
                         }
-                        else if (full.Contains("Missing Person", StringComparison.OrdinalIgnoreCase))
-                        {
-                            reward = 21250;
-                        }
-                        else if (full.Contains("Bounty", StringComparison.OrdinalIgnoreCase) || full.Contains("Target", StringComparison.OrdinalIgnoreCase))
-                        {
-                            reward = 32000;
-                        }
                         else
                         {
-                            reward = 25000; // Standard aUEC für Belohnungs-Events
+                            reward = 0; // Kein fiktiver/geratener Betrag; echte Belohnung wird ggf. via Payout-Pairing oder OCR nachgetragen
                         }
                     }
 

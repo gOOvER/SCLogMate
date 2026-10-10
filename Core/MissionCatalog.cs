@@ -225,6 +225,8 @@ public static partial class MissionCatalog
     {
         var clean = StripGameMarkup(s);
         var noTags = Regex.Replace(clean, @"\[[^\]]*\]", " ");
+        noTags = Regex.Replace(noTags, @"~mission\([^)]*\)", " ");
+        noTags = Regex.Replace(noTags, @"\blv1\b", "lvl", RegexOptions.IgnoreCase);
         var lower = noTags.ToLowerInvariant();
         var sb = new System.Text.StringBuilder(lower.Length);
         foreach (var ch in lower)
@@ -272,10 +274,33 @@ public static partial class MissionCatalog
 
     private static void Add(MissionInfo info, params string[] aliases)
     {
-        _catalog.Add(info);
         var norm = Normalize(info.Title);
-        if (!_lookupByNormTitle.ContainsKey(norm))
-            _lookupByNormTitle[norm] = info;
+        if (_lookupByNormTitle.TryGetValue(norm, out var existing))
+        {
+            var idx = _catalog.IndexOf(existing);
+            if (idx >= 0) _catalog[idx] = info;
+            else _catalog.Add(info);
+        }
+        else
+        {
+            _catalog.Add(info);
+        }
+        _lookupByNormTitle[norm] = info;
+
+        // Wenn der Titel Platzhalter wie (~mission(Ship)) oder [Ship] enthält, auch ohne Platzhalter registrieren
+        if (info.Title.Contains("~mission(") || info.Title.Contains('['))
+        {
+            var cleanPlaceholder = Regex.Replace(info.Title, @"\s*\(?~mission\([^)]*\)\)?", "").Trim();
+            cleanPlaceholder = Regex.Replace(cleanPlaceholder, @"\s*\[[^\]]*\]", "").Trim();
+            if (!string.IsNullOrWhiteSpace(cleanPlaceholder) && !cleanPlaceholder.Equals(info.Title, StringComparison.OrdinalIgnoreCase))
+            {
+                var cpNorm = Normalize(cleanPlaceholder);
+                if (!_lookupByNormTitle.ContainsKey(cpNorm))
+                {
+                    _lookupByNormTitle[cpNorm] = info;
+                }
+            }
+        }
 
         if (aliases != null)
         {
@@ -284,15 +309,64 @@ public static partial class MissionCatalog
                 if (!string.IsNullOrWhiteSpace(alias))
                 {
                     var aNorm = Normalize(alias);
-                    if (!_lookupByNormTitle.ContainsKey(aNorm))
-                        _lookupByNormTitle[aNorm] = info;
+                    _lookupByNormTitle[aNorm] = info;
                 }
             }
         }
     }
 
+    private static void LoadExtractedMissions()
+    {
+        try
+        {
+            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+            using var stream = asm.GetManifestResourceStream("SCLogMate.Data.missions.json");
+            if (stream == null) return;
+
+            using var doc = System.Text.Json.JsonDocument.Parse(stream);
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var id = el.TryGetProperty("Id", out var idProp) ? idProp.GetString() ?? "" : "";
+                var title = el.TryGetProperty("Title", out var tProp) ? tProp.GetString() ?? "" : "";
+                if (string.IsNullOrWhiteSpace(title)) continue;
+
+                var contractor = el.TryGetProperty("Contractor", out var cProp) ? cProp.GetString() ?? "Unbekannt" : "Unbekannt";
+                var faction = el.TryGetProperty("Faction", out var fProp) ? fProp.GetString() ?? contractor : contractor;
+                var type = el.TryGetProperty("MissionType", out var mProp) ? mProp.GetString() ?? "Auftrag" : "Auftrag";
+                var reward = el.TryGetProperty("BaseReward", out var rProp) && rProp.TryGetInt32(out var rVal) ? rVal : 0;
+                var fee = el.TryGetProperty("ContractFee", out var feeProp) && feeProp.TryGetInt32(out var feeVal) ? feeVal : 0;
+                var rep = el.TryGetProperty("ReputationGain", out var repProp) && repProp.TryGetInt32(out var repVal) ? repVal : 0;
+                var illegal = el.TryGetProperty("IsIllegal", out var illProp) && illProp.GetBoolean();
+                var sys = el.TryGetProperty("StarSystems", out var sysProp) ? sysProp.GetString() ?? "Stanton" : "Stanton";
+                var desc = el.TryGetProperty("Description", out var dProp) ? dProp.GetString() ?? "" : "";
+
+                Add(new MissionInfo
+                {
+                    Id = id,
+                    Title = title,
+                    Contractor = contractor,
+                    Faction = faction,
+                    MissionType = type,
+                    BaseReward = reward,
+                    ContractFee = fee,
+                    ReputationGain = rep,
+                    IsIllegal = illegal,
+                    StarSystems = sys,
+                    Description = desc
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"Fehler beim Laden von missions.json: {ex.Message}");
+        }
+    }
+
     private static void InitializeCatalog()
     {
+        // ── EXTRAHIERTE SPRACH- & MISSIONS-DATEN (scunpacked-data / StarCitizenWiki) ──────────
+        LoadExtractedMissions();
+
         // ── BOUNTY HUNTER GUILD & SICHERHEITSKRÄFTE (KOPFGELDJAGD) ──────────────────────────
         Add(new MissionInfo
         {

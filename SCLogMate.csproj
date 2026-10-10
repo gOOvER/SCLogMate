@@ -13,7 +13,7 @@
     <Product>SCLogMate</Product>
     <Title>SCLogMate</Title>
     <Description>SCLogMate – Star Citizen Live Log Companion &amp; Analytics</Description>
-    <Version>1.4.3</Version>
+    <Version>1.4.4</Version>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <Authors>gOOvER</Authors>
     <RepositoryUrl>https://github.com/gOOvER/SCLogMate</RepositoryUrl>
@@ -33,6 +33,7 @@
     <EmbeddedResource Include="SCLogMate.ico" />
     <EmbeddedResource Include="Data\blueprints.json" />
     <EmbeddedResource Include="Data\seed_data.json" />
+    <EmbeddedResource Include="Data\missions.json" />
     <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
