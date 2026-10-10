@@ -39,6 +39,9 @@ public partial class AuroraVoiceService : IDisposable
     public bool ShipSystemsEnabled { get; set; } = true;
 
     private bool _isAtStation;
+    private bool? _isMonitoredSpace;
+    private bool? _isSafetyZone;
+    private bool? _isRestrictedZone;
 
     private readonly HashSet<string> _greetedShipsAtCurrentStation = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastCrashOrDeathTime = DateTime.MinValue;
@@ -48,8 +51,8 @@ public partial class AuroraVoiceService : IDisposable
     private const int JurisdictionCooldownSeconds = 300; // 5 Minuten Mindestabstand für dieselbe Jurisdiktion
 
     // Sequential audio queue to prevent overlapping and audio cutting off
-    private readonly System.Threading.Channels.Channel<(string FilePath, int DelayMs)> _audioChannel =
-        System.Threading.Channels.Channel.CreateUnbounded<(string FilePath, int DelayMs)>(
+    private readonly System.Threading.Channels.Channel<(string FilePath, int DelayMs, string? TriggerKey)> _audioChannel =
+        System.Threading.Channels.Channel.CreateUnbounded<(string FilePath, int DelayMs, string? TriggerKey)>(
             new System.Threading.Channels.UnboundedChannelOptions
             {
                 SingleReader = true,
@@ -587,11 +590,24 @@ public partial class AuroraVoiceService : IDisposable
     {
         if (!_isEnabled || !_isInstalled) return;
 
+        // Queue-Dumps, Animationen/Fades und veraltete HUD-Wiederholungen sofort ausfiltern:
+        if (line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: Next", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: StartFade", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Action: Remove", StringComparison.OrdinalIgnoreCase) ||
+            (NotificationQueueItemRegex().IsMatch(line) && !line.Contains("to queue", StringComparison.OrdinalIgnoreCase)) ||
+            NotificationQueueLineRegex().IsMatch(line))
+        {
+            return;
+        }
+
         // Erkennung von Stationsaktivitäten / Hangar / Landung / Docking / Spawnen
         if (line.Contains("Hangaranfrage", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Assigned to Hangar", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Landing Request", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("SetVehicleSpawn", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("VehicleListQuery", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("LoadingPlatformManager", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("OnClientSpawned", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("PlayerSpawnZone", StringComparison.OrdinalIgnoreCase) ||
@@ -617,6 +633,9 @@ public partial class AuroraVoiceService : IDisposable
             _lastSessionOrLoginTime = DateTime.UtcNow;
             _currentJurisdiction = null;
             _lastJurisdictionChangeTime = DateTime.MinValue;
+            _isMonitoredSpace = null;
+            _isSafetyZone = null;
+            _isRestrictedZone = null;
             IsAtStation = true;
         }
 
@@ -628,6 +647,9 @@ public partial class AuroraVoiceService : IDisposable
             _lastCrashOrDeathTime = DateTime.UtcNow;
             _greetedShipsAtCurrentStation.Clear();
             _currentJurisdiction = null;
+            _isMonitoredSpace = null;
+            _isSafetyZone = null;
+            _isRestrictedZone = null;
         }
 
         // ClearDriver / Pilotensitz verlassen: Niemals Begrüßung auslösen, aber Sitz-Verlassen-Sound abspielen
@@ -655,8 +677,8 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 2. Safety Zones (Armistice)
-        if (SafetyZonesEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
+        // 2. Safety Zones (Armistice) - Nur bei echten neuen Benachrichtigungen
+        if (SafetyZonesEnabled && line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entering Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Schutzzone - Kampfhandlung untersagt", StringComparison.OrdinalIgnoreCase) ||
@@ -673,8 +695,8 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 3. Monitored Space
-        if (MonitoredSpaceEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
+        // 3. Monitored Space - Nur bei echten neuen Benachrichtigungen
+        if (MonitoredSpaceEnabled && line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entered Monitored Space", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Kontrollierten Raum betreten", StringComparison.OrdinalIgnoreCase))
@@ -690,8 +712,8 @@ public partial class AuroraVoiceService : IDisposable
             }
         }
 
-        // 4. Restricted Zones
-        if (RestrictedZonesEnabled && !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase))
+        // 4. Restricted Zones - Nur bei echten neuen Benachrichtigungen
+        if (RestrictedZonesEnabled && line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase))
         {
             if (line.Contains("Entering Private Property", StringComparison.OrdinalIgnoreCase) ||
                 line.Contains("Restricted Area - Vehicles Will Be Impounded", StringComparison.OrdinalIgnoreCase) ||
@@ -711,8 +733,8 @@ public partial class AuroraVoiceService : IDisposable
 
         // 5. Jurisdictions / Rechtsgebiete (NUR bei echten HUD-Benachrichtigungen über den Eintritt in ein Rechtsgebiet!)
         if (JurisdictionsEnabled &&
-            (line.Contains("<SHUDEvent_OnNotification>", StringComparison.OrdinalIgnoreCase) || line.Contains("Added notification", StringComparison.OrdinalIgnoreCase)) &&
-            !line.Contains("UpdateNotificationItem", StringComparison.OrdinalIgnoreCase) &&
+            line.Contains("Added notification \"", StringComparison.OrdinalIgnoreCase) &&
+            line.Contains("to queue", StringComparison.OrdinalIgnoreCase) &&
             (line.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) ||
              line.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase) ||
              line.Contains("Hoheitsgebiet", StringComparison.OrdinalIgnoreCase) ||
@@ -764,13 +786,16 @@ public partial class AuroraVoiceService : IDisposable
         }
 
         // 8. Andocken (nur bei echten Docking-Anfragen / ATC-Freigaben, KEINE statischen Engine-Mesh/Port-Objekte wie DockingTube oder Docking collar)
-        if (AtcAndLandingEnabled && (
-            line.Contains("RequestDocking", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Docking Request", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Assigned to Docking", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Docking complete", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Andockfreigabe", StringComparison.OrdinalIgnoreCase)))
+        if (AtcAndLandingEnabled &&
+            !line.Contains("Refueling Process", StringComparison.OrdinalIgnoreCase) &&
+            !line.Contains("~action", StringComparison.OrdinalIgnoreCase) &&
+            (
+                line.Contains("RequestDocking", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Docking Request", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Assigned to Docking", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Docking complete", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Docking granted", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Andockfreigabe", StringComparison.OrdinalIgnoreCase)))
         {
             OnDocking();
             return;
@@ -801,7 +826,8 @@ public partial class AuroraVoiceService : IDisposable
         if (QuantumArrivalEnabled && (
             line.Contains("<Quantum Drive Spooling>", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("<Quantum Drive Engaged>", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Quantum Travel Initiated", StringComparison.OrdinalIgnoreCase)))
+            line.Contains("Quantum Travel Initiated", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Quantum Travel Calibration Complete", StringComparison.OrdinalIgnoreCase)))
         {
             OnQuantumInitiated();
             return;
@@ -810,7 +836,8 @@ public partial class AuroraVoiceService : IDisposable
         // 12. Quantum Arrival
         if (QuantumArrivalEnabled)
         {
-            if (line.Contains("<Quantum Drive Arrived - Arrived at Final Destination>", StringComparison.OrdinalIgnoreCase))
+            if (line.Contains("<Quantum Drive Arrived - Arrived at Final Destination>", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("CSCItemNavigation::OnQuantumDriveArrived", StringComparison.OrdinalIgnoreCase))
             {
                 OnQuantumArrival();
                 return;
@@ -857,7 +884,7 @@ public partial class AuroraVoiceService : IDisposable
             return;
         }
 
-        // Schiffs-Begrüßung NUR beim Neueinstieg / Wechsel des Fahrzeugs (EventKind.Vehicle) im Hangar, NIEMALS beim Quantum-Sprung, Claim oder Crash!
+        // Schiffs-Begrüßung beim Einstieg / Wechsel des Fahrzeugs (EventKind.Vehicle) im Hangar
         if (e.Kind == EventKind.Vehicle && e.Ship != null && ShipGreetingsEnabled)
         {
             if (!e.Detail.Contains("Claim", StringComparison.OrdinalIgnoreCase) &&
@@ -865,36 +892,48 @@ public partial class AuroraVoiceService : IDisposable
                 !e.Detail.Contains("zerstört", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("Kollision", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("verlassen", StringComparison.OrdinalIgnoreCase) &&
-                !e.Detail.Contains("Pilotensitz", StringComparison.OrdinalIgnoreCase))
+                !e.Detail.Contains("Pilotensitz verlassen", StringComparison.OrdinalIgnoreCase))
             {
                 OnShipIdentified(e.Ship);
             }
         }
         else if (e.Kind == EventKind.Quantum)
         {
-            IsAtStation = false;
-            _greetedShipsAtCurrentStation.Clear();
-            if (QuantumArrivalEnabled)
+            if (e.Detail.Contains("Ankunft", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("Arrived", StringComparison.OrdinalIgnoreCase))
             {
-                OnQuantumArrival();
+                IsAtStation = false;
+                _greetedShipsAtCurrentStation.Clear();
+                if (QuantumArrivalEnabled)
+                {
+                    OnQuantumArrival();
+                }
+            }
+            else if (e.Detail.Contains("Kalibrierung", StringComparison.OrdinalIgnoreCase) || e.Detail.Contains("Engaged", StringComparison.OrdinalIgnoreCase))
+            {
+                if (QuantumArrivalEnabled)
+                {
+                    OnQuantumInitiated();
+                }
             }
         }
         else if (e.Kind == EventKind.Hangar)
         {
+            IsAtStation = true;
 
             // Nur bei echten ATC Lande-/Startfreigaben oder Zuweisungen – NIEMALS bei Fracht- oder Schiffsaufzügen und NIEMALS bei Warteschlange!
             if (AtcAndLandingEnabled &&
                 !string.IsNullOrEmpty(e.Detail) &&
                 !e.Detail.Contains("aufzug", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("elevator", StringComparison.OrdinalIgnoreCase) &&
-                !e.Detail.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("Warteschlange", StringComparison.OrdinalIgnoreCase) &&
                 !e.Detail.Contains("queue", StringComparison.OrdinalIgnoreCase) &&
                 (e.Detail.Contains("Landefreigabe", StringComparison.OrdinalIgnoreCase) ||
                  e.Detail.Contains("Startfreigabe", StringComparison.OrdinalIgnoreCase) ||
                  e.Detail.Contains("Hangar-Zuweisung", StringComparison.OrdinalIgnoreCase) ||
                  e.Detail.Contains("Hangarzuweisung", StringComparison.OrdinalIgnoreCase) ||
-                 e.Detail.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase)))
+                 e.Detail.Contains("Hangar Assignment", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Tor geöffnet", StringComparison.OrdinalIgnoreCase) ||
+                 e.Detail.Contains("Hangar-Anforderung bereit", StringComparison.OrdinalIgnoreCase)))
             {
                 OnAtcLanding();
             }
@@ -979,6 +1018,9 @@ public partial class AuroraVoiceService : IDisposable
     {
         if (!_isEnabled || !_isInstalled || !SafetyZonesEnabled) return;
 
+        if (_isSafetyZone == entering) return;
+        _isSafetyZone = entering;
+
         // Während Login-/Ladephase unterdrücken
         if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
         {
@@ -1005,6 +1047,9 @@ public partial class AuroraVoiceService : IDisposable
     {
         if (!_isEnabled || !_isInstalled || !MonitoredSpaceEnabled) return;
 
+        if (_isMonitoredSpace == entering) return;
+        _isMonitoredSpace = entering;
+
         // Während Login-Phase unterdrücken
         if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
         {
@@ -1020,6 +1065,9 @@ public partial class AuroraVoiceService : IDisposable
     public void OnRestrictedZoneChanged(bool entering)
     {
         if (!_isEnabled || !_isInstalled || !RestrictedZonesEnabled) return;
+
+        if (_isRestrictedZone == entering) return;
+        _isRestrictedZone = entering;
 
         // Während Login-Phase unterdrücken
         if ((DateTime.UtcNow - _lastSessionOrLoginTime).TotalSeconds < 45)
@@ -1267,7 +1315,7 @@ public partial class AuroraVoiceService : IDisposable
         if (sound != null && File.Exists(sound))
         {
             Logger.Log($"[AuroraVoiceService] Test-Sound angefordert: {sound}");
-            PlayFileAsync(sound, 0);
+            PlayFileAsync(sound, 0, "test_sound");
         }
         else
         {
@@ -1308,13 +1356,13 @@ public partial class AuroraVoiceService : IDisposable
         var selected = eligible[_rand.Next(eligible.Count)];
         _lastPlayedSound[key] = selected;
 
-        PlayFileAsync(selected, delayMs);
+        PlayFileAsync(selected, delayMs, key);
         return true;
     }
 
-    private void PlayFileAsync(string filePath, int delayMs)
+    private void PlayFileAsync(string filePath, int delayMs, string? triggerKey = null)
     {
-        _audioChannel.Writer.TryWrite((filePath, delayMs));
+        _audioChannel.Writer.TryWrite((filePath, delayMs, triggerKey));
     }
 
     private async Task ProcessAudioQueueAsync(CancellationToken ct)
@@ -1327,7 +1375,7 @@ public partial class AuroraVoiceService : IDisposable
                 if (item.DelayMs > 0)
                     await Task.Delay(item.DelayMs, ct);
 
-                await PlayAudioFileCoreAsync(item.FilePath, ct);
+                await PlayAudioFileCoreAsync(item.FilePath, item.TriggerKey, ct);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -1337,7 +1385,7 @@ public partial class AuroraVoiceService : IDisposable
         }
     }
 
-    private async Task PlayAudioFileCoreAsync(string filePath, CancellationToken ct)
+    private async Task PlayAudioFileCoreAsync(string filePath, string? triggerKey, CancellationToken ct)
     {
         if (!File.Exists(filePath))
         {
@@ -1372,7 +1420,7 @@ public partial class AuroraVoiceService : IDisposable
                 player.Source = mediaSource;
                 player.Volume = Math.Clamp(_volume / 100.0, 0.0, 1.0);
                 player.Play();
-                Logger.Log($"[AuroraVoiceService] Audio abgespielt: {Path.GetFileName(filePath)} (Lautstärke: {_volume}%)");
+                Logger.Log($"[AuroraVoiceService] Audio abgespielt ({triggerKey ?? "allgemein"}): {Path.GetFileName(filePath)} (Lautstärke: {_volume}%)");
             }
             catch (Exception ex)
             {
@@ -1452,6 +1500,12 @@ public partial class AuroraVoiceService : IDisposable
         }
         catch { }
     }
+
+    [GeneratedRegex(@":\s*""\s*\[\d+\]")]
+    private static partial Regex NotificationQueueItemRegex();
+
+    [GeneratedRegex(@"^\s*""[^""]+""\s*\[\d+\]")]
+    private static partial Regex NotificationQueueLineRegex();
 
     [GeneratedRegex(@"<SHUDEvent_OnNotification> Added notification ""You have joined channel ''(?<ch>.+?)''\.", RegexOptions.IgnoreCase)]
     private static partial Regex ShipChannelEnRegex();

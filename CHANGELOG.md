@@ -6,7 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
-## [1.4.4] - 2026-10-10
+## [1.4.5] - 2026-10-10
+### Fixed
+- **Aurora Voice Companion Queue-Dump & Repetitive Audio Spam Elimination (`Core/AuroraVoiceService.cs`)**:
+  - Fixed an issue where Aurora perpetually repeated "Überwachungsnetz aktiv" (`1_Chapter_1.mp3`, `2_Chapter_1.mp3`) and "Überwachungsbereich verlassen" (`3_Chapter_1.mp3`, `4_Chapter_1.mp3`) every few seconds whenever any notification occurred in-game.
+  - Implemented early filtering in `AuroraVoiceService.ProcessLiveLine` to drop all HUD notification queue dumps (`^\s*"[^"]+"\s*\[\d+\]`, `: " [id]`) and lifecycle updates (`UpdateNotificationItem`, `Action: Next`, `Action: StartFade`, `Action: Remove`), preventing stale queued history from re-triggering audio cues and clogging the sequential playback channel.
+  - Strictly required genuine newly added HUD notification lines (`Added notification "`, `to queue`) for safety zone, monitored space, restricted area, and jurisdiction triggers.
+  - Added state deduplication tracking (`_isMonitoredSpace`, `_isSafetyZone`, `_isRestrictedZone`) to suppress duplicate alerts unless the player actually crosses a zone boundary.
+- **Ship Boarding & Pilot Seat Welcome Greeting Restoration (`Core/AuroraVoiceService.cs`)**:
+  - Fixed a regression where occupying the pilot seat (`Pilotensitz eingenommen`) never triggered the authentic ship greeting ("Willkommen an Bord der...") because `e.Detail.Contains("Pilotensitz")` mistakenly excluded seat entry alongside seat departure (`Pilotensitz verlassen`).
+  - Prevented false-positive station state drops from prematurely suppressing ship greetings when boarding vehicles at stations or outposts.
+- **ATC Clearance, Quantum Travel, and Maintenance Audio Triggers (`Core/AuroraVoiceService.cs`)**:
+  - Connected Star Citizen 4.10 persistent hangar clearance events (`Hangar-Anforderung bereit`, `Tor geöffnet`) to `OnAtcLanding()`.
+  - Added Quantum Travel calibration completion triggers (`Quantum Travel Calibration Complete`) to `OnQuantumInitiated()` ("Sprung einleiten") and recognized modern engine arrival lines (`CSCItemNavigation::OnQuantumDriveArrived`).
+  - Enhanced audio diagnostics to log the exact trigger key in `SCLogMate.debug.log` (`Audio abgespielt (triggerKey): filename`).
 ### Fixed
 - **Removal of Fictitious 25,000 aUEC Mission Reward Fallback (`Core/LogParser.cs`)**:
   - Eliminated the arbitrary `25000` aUEC fallback (as well as hardcoded `32000` and `21250` estimates) assigned to completed missions lacking a static reward entry.
