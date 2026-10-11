@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **German & Star Citizen Deutsch+ (SCDL) Full Localization Compatibility (`Core/LogParser.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - Full end-to-end support for both official CIG German localization and the community mod *Star Citizen Deutsch+* (SCDL) across log events, notifications, HUD updates, and screenshot OCR.
+  - Added localized slot headers to the screenshot loadout watcher (`Kühler`, `Kraftwerk`, `Schildgenerator`, `Quantenantrieb`, `Sprungmodul`, `Waffe`, `Geschützturm`, `Traktorstrahl`, `Bergungskopf`, `Schiffsmodul`, `Frachtmodul`, `Wohnmodul`, `Medizinisches Modul`, `Raffineriemodul`, etc.).
+  - Added Deutsch+ HUD and ATC notifications (`Hangaranfrage genehmigt`, `Waffenstillstandszone - Kampfhandlung untersagt!`, `Waffenstillstandszone betreten/verlassen`, `Sicherheitsbereich verlassen`, `Überweisung erhalten`, and multi-job refinery completions).
 - **Ship Module Recognition & Loadout Sync Support (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/FleetCatalog.cs`, `Core/Database.cs`)**:
   - Added full OCR detection for ship module slots and modular bays (`Module`, `Modul`, `Modules`, `Retaliator Front/Rear Torpedo Bay`, `Cargo Module`, etc.) across mobiGlas Vehicle Loadout Manager (VLM) and ASOP terminal screens.
   - Updated composite key indexing in `Database.SaveFleetShipComponents` to cleanly preserve and merge multiple modular bay slots without collision or overwriting.
@@ -24,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.
 
 ### Fixed
+- **Screenshot Module Scanning Loop Early Break (`Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - Fixed an issue where scanning screenshots of ships with installed modules failed because the component search loop prematurely broke on lines starting with `Module` or `Modul`, mistaking the installed component for the next slot header.
 - **Star Citizen Deutsch+ Localization & Objective Sub-Step Disambiguation (`Core/LogParser.cs`, `Core/Database.cs`)**:
   - Fixed an issue where the community translation mod *Star Citizen Deutsch+* (SCDL) translates HUD objective activations as `Neuer Auftrag: %s`, causing objective updates (e.g. `Ich brauche 0/1 Fettfreies Eis...`) to overwrite active contract titles and duplicate active contract records.
   - Added `NotificationObjectiveIdRegex` to strictly distinguish true contract acceptances (`ObjectiveId: []`) from sub-objectives (`ObjectiveId: [dropoff_...]`).

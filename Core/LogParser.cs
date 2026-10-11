@@ -101,7 +101,7 @@ public partial class LogParser
     private static partial Regex AttachRegex();
 
     // Auftrag/Contract – vollständiger Text (Name, Rang, Route), nicht am ':' abschneiden.
-    [GeneratedRegex(@"Added notification ""(?<full>(?:Neuer Auftrag|Auftrag (?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|Contract (?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|New Contract Available|New Objective)[^""]*)")]
+    [GeneratedRegex(@"Added notification ""(?<full>(?:Neuer Auftrag|Auftrag (?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|Contract (?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled|Available)|New Contract Available|Contract Available|New Objective|Neues Ziel|Teilziel|Abgeschlossen|Gescheitert)[^""]*)")]
     private static partial Regex MissionLineRegex();
 
     [GeneratedRegex(@"MissionId:\s*\[(?<id>[0-9a-fA-F-]+)\]")]
@@ -287,7 +287,7 @@ public partial class LogParser
     private static partial Regex QtCalibrationRegex();
 
     // Veredelungs-/Refinery-Auftrag abgeschlossen.
-    [GeneratedRegex(@"Added notification ""(?:Ein Auftrag zur Veredelung wurde abgeschlossen|Ein Raffinerie-Arbeitsauftrag wurde abgeschlossen|A refining job has completed|Refining order completed|Refinery job complete|A Refinery Work Order has been Completed)(?<txt>[^""]*)")]
+    [GeneratedRegex(@"Added notification ""(?:Ein Auftrag zur Veredelung wurde abgeschlossen|Ein Raffinerie-Arbeitsauftrag wurde abgeschlossen|\d+\s+Raffinerie-Auftr(?:a|ä)ge wurden(?: bei)?|A refining job has completed|Refining order completed|Refinery job complete|A Refinery Work Order has been Completed|\d+\s+refining jobs? (?:have|has) completed)(?<txt>[^""]*)")]
     private static partial Regex RefineryLineRegex();
 
     // Verletzung/Lähmung festgestellt (Schweregrad + Körperteil + Behandlungsstufe).
@@ -301,7 +301,7 @@ public partial class LogParser
     [GeneratedRegex(@"Added notification ""(?:New Member Joined|Member Joined):\s*(?<who>[^""]+)")]
     private static partial Regex PartyMemberJoinNotifRegex();
 
-    [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ha(?:t|st)(?: die)? Party verlassen|has left the party|left the party|left party)")]
+    [GeneratedRegex(@"(?<who>[A-Za-z0-9_\-]+) (?:ha(?:t|st)(?: die)? Party verlassen|wurde aus der Party geworfen|has left the party|left the party|left party)")]
     private static partial Regex PartyLeaveRegex();
 
     [GeneratedRegex(@"Added notification ""(?:Member Left|Member departed):\s*(?<who>[^""]+)")]
@@ -419,7 +419,7 @@ public partial class LogParser
     [GeneratedRegex(@"Update Shard Id>.*New Shard Id:\s*(?<s>[^\s\.]+)")]
     private static partial Regex UpdateShardRegex();
 
-    [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Neues\s+Ziel|Teilziel|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled|Available)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Neues\s+Ziel|Teilziel|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich|Abgeschlossen|Gescheitert):\s*", RegexOptions.IgnoreCase)]
     private static partial Regex CleanMissionTitlePrefixRegex();
 
     [GeneratedRegex(@"(\B[A-Z])")]
@@ -1558,7 +1558,8 @@ public partial class LogParser
                 // 1. Armistice / Schutzzone betreten
                 if (text.StartsWith("Entering Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
                     text.StartsWith("Betreten einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
-                    text.StartsWith("Schutzzone betreten", StringComparison.OrdinalIgnoreCase))
+                    text.StartsWith("Schutzzone betreten", StringComparison.OrdinalIgnoreCase) ||
+                    (text.StartsWith("Waffenstillstandszone", StringComparison.OrdinalIgnoreCase) && !text.Contains("verlassen", StringComparison.OrdinalIgnoreCase)))
                 {
                     var ts = ParseTs(line);
                     // Entprellung / Hysterese-Schutz gegen Randzonen-Flackern:
@@ -1575,7 +1576,8 @@ public partial class LogParser
                 // 2. Armistice / Schutzzone verlassen
                 if (text.StartsWith("Leaving Armistice Zone", StringComparison.OrdinalIgnoreCase) ||
                     text.StartsWith("Verlassen einer Waffenverbotszone", StringComparison.OrdinalIgnoreCase) ||
-                    text.StartsWith("Schutzzone verlassen", StringComparison.OrdinalIgnoreCase))
+                    text.StartsWith("Schutzzone verlassen", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("Waffenstillstandszone verlassen", StringComparison.OrdinalIgnoreCase))
                 {
                     var ts = ParseTs(line);
                     // Entprellung / Hysterese-Schutz gegen Randzonen-Flackern:
@@ -1669,6 +1671,7 @@ public partial class LogParser
                     return null;
                 }
                 if (text.Contains("Hangar Request Completed", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Hangaranfrage genehmigt", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Hangar-Anforderung abgeschlossen", StringComparison.OrdinalIgnoreCase))
                 {
                     if (_lastNotif != "Hangar Request Completed")
@@ -1693,6 +1696,7 @@ public partial class LogParser
                 }
                 if (text.Contains("Leaving Restricted Area", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Sperrgebiet verlassen", StringComparison.OrdinalIgnoreCase) ||
+                    text.Contains("Sicherheitsbereich verlassen", StringComparison.OrdinalIgnoreCase) ||
                     text.Contains("Sperrbereich verlassen", StringComparison.OrdinalIgnoreCase))
                 {
                     if (_lastNotif != "Leaving Restricted Area")
@@ -2393,45 +2397,62 @@ public partial class LogParser
 
                 var cat = MissionCatalog.FuzzyLookup(cleanTitle) ?? MissionCatalog.FuzzyLookup(full);
 
-                bool isComplete = (full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
+                bool hasProgressCounter = Regex.IsMatch(full, @"\b\d+\s*/\s*\d+\b");
+                bool hasObjectivePrefix = full.Contains("Ich brauche", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Bringe", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Bring", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Need", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Deliver", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Liefern", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Aufsuchen", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Go to", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Erreiche", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Reach", StringComparison.OrdinalIgnoreCase);
+
+                bool isComplete = !hasObjectiveId && !hasProgressCounter && (
+                                  full.Contains("Complete", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("Erfolgreich", StringComparison.OrdinalIgnoreCase)) &&
                                   !full.Contains("Objective", StringComparison.OrdinalIgnoreCase) &&
                                   !full.Contains("Teilziel", StringComparison.OrdinalIgnoreCase);
 
-                bool isFailed = full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                bool isFailed = !hasObjectiveId && (
+                                full.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
                                 full.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase) ||
                                 full.Contains("Time Expired", StringComparison.OrdinalIgnoreCase) ||
-                                full.Contains("Zeit abgelaufen", StringComparison.OrdinalIgnoreCase);
+                                full.Contains("Zeit abgelaufen", StringComparison.OrdinalIgnoreCase) ||
+                                (full.Contains("Gescheitert", StringComparison.OrdinalIgnoreCase) && !full.Contains("Objective", StringComparison.OrdinalIgnoreCase)));
 
-                bool isAbandoned = !isFailed && (
+                bool isAbandoned = !isFailed && !hasObjectiveId && (
                                    full.Contains("Abandoned", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Withdrawn", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Cancelled", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("abgebrochen", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
-                                   full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase));
-
-                bool hasProgressCounter = Regex.IsMatch(full, @"\b\d+\s*/\s*\d+\b");
-                bool hasObjectivePrefix = full.Contains("Ich brauche", StringComparison.OrdinalIgnoreCase) ||
-                                          full.Contains("Bringe", StringComparison.OrdinalIgnoreCase) ||
-                                          full.Contains("Bring", StringComparison.OrdinalIgnoreCase) ||
-                                          full.Contains("Need", StringComparison.OrdinalIgnoreCase);
+                                   (full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase) && !full.Contains("Objective", StringComparison.OrdinalIgnoreCase)));
 
                 bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Neues Ziel", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("Teilziel", StringComparison.OrdinalIgnoreCase) ||
+                                   full.StartsWith("Abgeschlossen:", StringComparison.OrdinalIgnoreCase) ||
+                                   full.StartsWith("Gescheitert:", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Objective Complete", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Objective Failed", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Objective Withdrawn", StringComparison.OrdinalIgnoreCase) ||
                                    hasObjectiveId ||
                                    hasProgressCounter ||
-                                   (hasObjectivePrefix && (full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) || full.Contains("New Contract", StringComparison.OrdinalIgnoreCase)));
+                                   (hasObjectivePrefix && (full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) || full.Contains("New Contract", StringComparison.OrdinalIgnoreCase) || full.Contains("Contract Available", StringComparison.OrdinalIgnoreCase)));
 
                 bool isAccepted = !isObjective && (
                                   full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("geteilt", StringComparison.OrdinalIgnoreCase) ||
-                                  (!hasObjectiveId && !hasProgressCounter && full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase)) ||
-                                  full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase));
+                                  (!hasObjectiveId && !hasProgressCounter && (
+                                      full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
+                                      full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase) ||
+                                      full.Contains("Contract Available", StringComparison.OrdinalIgnoreCase)
+                                  )));
 
                 bool isSalvageClaim = cleanTitle.Contains("Salvage Rights", StringComparison.OrdinalIgnoreCase) ||
                                       cleanTitle.Contains("Salvage Claim", StringComparison.OrdinalIgnoreCase) ||
@@ -3517,13 +3538,25 @@ public partial class LogParser
         if (t.Contains("beschlagnahmt", StringComparison.OrdinalIgnoreCase) || t.Contains("Beschlagnahm", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("impound", StringComparison.OrdinalIgnoreCase)) return EventKind.Impound;
 
+        if (t.Contains("Refinery", StringComparison.OrdinalIgnoreCase) || t.Contains("Raffinerie", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Veredelung", StringComparison.OrdinalIgnoreCase) || t.Contains("Refining", StringComparison.OrdinalIgnoreCase)) return EventKind.Refinery;
+
+        if (t.Contains("FREUND", StringComparison.OrdinalIgnoreCase) || t.Contains("Freund hinzu", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Friend", StringComparison.OrdinalIgnoreCase)) return EventKind.Friend;
+
+        if (t.Contains("beschlagnahmt", StringComparison.OrdinalIgnoreCase) || t.Contains("Beschlagnahm", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("impound", StringComparison.OrdinalIgnoreCase)) return EventKind.Impound;
+
         if (t.Contains("Kampfunfähig", StringComparison.OrdinalIgnoreCase) || t.Contains("Notfalldienste", StringComparison.OrdinalIgnoreCase) || 
             t.Contains("Incapacitat", StringComparison.OrdinalIgnoreCase) || t.Contains("Emergency Medical", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Emergency Services", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Wiederbelebt", StringComparison.OrdinalIgnoreCase) || t.Contains("Revived", StringComparison.OrdinalIgnoreCase) ||
-            t.Contains("Killed", StringComparison.OrdinalIgnoreCase)) return EventKind.Death;
+            t.Contains("Killed", StringComparison.OrdinalIgnoreCase) || t.Contains("Getötet", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Gestorben", StringComparison.OrdinalIgnoreCase) || t.Contains("Player Death", StringComparison.OrdinalIgnoreCase)) return EventKind.Death;
 
         if (t.StartsWith("Auftrag", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) || 
+            t.StartsWith("Neues Ziel", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Teilziel", StringComparison.OrdinalIgnoreCase) ||
+            t.StartsWith("Abgeschlossen", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Gescheitert", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Mission", StringComparison.OrdinalIgnoreCase) || t.Contains("Contract", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Objective", StringComparison.OrdinalIgnoreCase) || t.Contains("Journal Entry", StringComparison.OrdinalIgnoreCase) ||
             t.StartsWith("Downloading", StringComparison.OrdinalIgnoreCase)) return EventKind.Mission;
@@ -3539,6 +3572,8 @@ public partial class LogParser
         if (t.Contains("Rechtsgebiet", StringComparison.OrdinalIgnoreCase) || t.Contains("Kontrollierten Raum", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Jurisdiction", StringComparison.OrdinalIgnoreCase) || t.Contains("Monitored Space", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Schutzzone", StringComparison.OrdinalIgnoreCase) || t.Contains("Armistice", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Waffenstillstand", StringComparison.OrdinalIgnoreCase) || t.Contains("Sicherheitsbereich", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Restricted Area", StringComparison.OrdinalIgnoreCase) || t.Contains("Sperrgebiet", StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Private Property", StringComparison.OrdinalIgnoreCase) || t.Contains("Privatbesitz", StringComparison.OrdinalIgnoreCase)) return EventKind.Jurisdiction;
 
         if (t.StartsWith("Partystart", StringComparison.OrdinalIgnoreCase) || t.StartsWith("Party start", StringComparison.OrdinalIgnoreCase) ||
@@ -3554,9 +3589,9 @@ public partial class LogParser
 
         if (t.Contains("Blueprint", StringComparison.OrdinalIgnoreCase) || t.Contains("Bauplan", StringComparison.OrdinalIgnoreCase)) return EventKind.Blueprint;
 
-        if (t.Contains("Refinery", StringComparison.OrdinalIgnoreCase) || t.Contains("Raffinerie", StringComparison.OrdinalIgnoreCase)) return EventKind.Refinery;
-
-        if (t.Contains("has sent you", StringComparison.OrdinalIgnoreCase) || t.Contains("überwiesen", StringComparison.OrdinalIgnoreCase)) return EventKind.Offer;
+        if (t.Contains("has sent you", StringComparison.OrdinalIgnoreCase) || t.Contains("überwiesen", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Überweisung", StringComparison.OrdinalIgnoreCase) || t.Contains("Transfer Recieved", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Transfer Received", StringComparison.OrdinalIgnoreCase)) return EventKind.Offer;
 
         if (t.Contains("bereitgestellt", StringComparison.OrdinalIgnoreCase) ||
             (t.Contains("Retrieve", StringComparison.OrdinalIgnoreCase) && !t.Trim().TrimEnd(':').Trim().Equals("Retrieve", StringComparison.OrdinalIgnoreCase)))

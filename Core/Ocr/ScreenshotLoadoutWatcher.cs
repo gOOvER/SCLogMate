@@ -325,16 +325,24 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
         bool isVlm = ocrText.Contains("Vehicle Loadout", StringComparison.OrdinalIgnoreCase) ||
                      ocrText.Contains("Loadout Manager", StringComparison.OrdinalIgnoreCase) ||
-                     ocrText.Contains("VLM", StringComparison.OrdinalIgnoreCase);
+                     ocrText.Contains("VLM", StringComparison.OrdinalIgnoreCase) ||
+                     ocrText.Contains("Fahrzeugausrüstung", StringComparison.OrdinalIgnoreCase) ||
+                     ocrText.Contains("Fahrzeug-Ausrüstung", StringComparison.OrdinalIgnoreCase) ||
+                     ocrText.Contains("Ausrüstungsmanager", StringComparison.OrdinalIgnoreCase) ||
+                     ocrText.Contains("Schiffsausrüstung", StringComparison.OrdinalIgnoreCase);
 
         bool isFleetManager = ocrText.Contains("Fleet Manager", StringComparison.OrdinalIgnoreCase) ||
                               ocrText.Contains("Vehicle Information", StringComparison.OrdinalIgnoreCase) ||
+                              ocrText.Contains("Flottenmanager", StringComparison.OrdinalIgnoreCase) ||
+                              ocrText.Contains("Flotten-Manager", StringComparison.OrdinalIgnoreCase) ||
+                              ocrText.Contains("Fahrzeuginformation", StringComparison.OrdinalIgnoreCase) ||
                               ocrText.Contains("ASOP", StringComparison.OrdinalIgnoreCase);
 
         bool hasComponents = ocrText.Contains("Cooler", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Power Plant", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Shield", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Quantum Drive", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Quantum", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Weapon", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Radar", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Module", StringComparison.OrdinalIgnoreCase) ||
@@ -343,7 +351,15 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                              ocrText.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Kühler", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Kraftwerk", StringComparison.OrdinalIgnoreCase) ||
-                             ocrText.Contains("Schild", StringComparison.OrdinalIgnoreCase);
+                             ocrText.Contains("Schild", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Quantenantrieb", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Sprungmodul", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Waffe", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Geschützturm", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Schiffsmodul", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Frachtmodul", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Wohnmodul", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Medizinisches Modul", StringComparison.OrdinalIgnoreCase);
 
         if (!isLoadoutEstimate && !isVlm && !isFleetManager && !hasComponents)
         {
@@ -509,42 +525,42 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             string? slotType = null;
             string? slotLabel = null;
 
-            if (Regex.IsMatch(cleanLine, @"^Cooler(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(cleanLine, @"^(?:Cooler|Kühler)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Cooler";
                 slotLabel = CleanSlotLabel(cleanLine, "Cooler");
             }
-            else if (Regex.IsMatch(cleanLine, @"^Power\s*Plant(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Power\s*Plant|Kraftwerk)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "PowerPlant";
                 slotLabel = CleanSlotLabel(cleanLine, "Power Plant");
             }
-            else if (Regex.IsMatch(cleanLine, @"^(?:Shield\s*Generator|Shield)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Shield\s*Generator|Shield|Schildgenerator|Schild)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Shield";
                 slotLabel = CleanSlotLabel(cleanLine, "Shield Generator");
             }
-            else if (Regex.IsMatch(cleanLine, @"^Quantum\s*Drive", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Quantum\s*Drive|Quantenantrieb)", RegexOptions.IgnoreCase))
             {
                 slotType = "QuantumDrive";
                 slotLabel = "Quantum Drive";
             }
-            else if (Regex.IsMatch(cleanLine, @"^Jump\s*Module", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Jump\s*Module|Sprungmodul)", RegexOptions.IgnoreCase))
             {
                 slotType = "QuantumDrive";
                 slotLabel = "Jump Module";
             }
-            else if (Regex.IsMatch(cleanLine, @"^Weapon\s*-\s*(Left|Right|Front|Top\s*Left|Top\s*Right|Top|Bottom|Rear)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Weapon|Waffe)\s*-\s*(Left|Right|Front|Top\s*Left|Top\s*Right|Top|Bottom|Rear|Links|Rechts|Vorne|Oben|Unten|Hinten)", RegexOptions.IgnoreCase))
             {
                 slotType = "Weapon";
                 slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(cleanLine, @"^Turret\s*Weapon\s*Slot\s*\d+", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Turret\s*Weapon\s*Slot|Geschützturm-Waffenslot)\s*\d+", RegexOptions.IgnoreCase))
             {
                 slotType = "Turret";
                 slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(cleanLine, @"^(?:Remote|Manned)\s*Turret", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Remote|Manned|Bemannt(?:er)?|Ferngesteuert(?:er)?)\s*(?:Turret|Geschützturm)", RegexOptions.IgnoreCase))
             {
                 slotType = "Turret";
                 slotLabel = cleanLine;
@@ -554,27 +570,32 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 slotType = "Avionics";
                 slotLabel = CleanSlotLabel(cleanLine, "Radar");
             }
-            else if (Regex.IsMatch(cleanLine, @"^Flight\s*Blade", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Flight\s*Blade|Flugklinge)", RegexOptions.IgnoreCase))
             {
                 slotType = "Avionics";
                 slotLabel = "Flight Blade";
             }
-            else if (Regex.IsMatch(cleanLine, @"^(?:Tractor\s*(?:Mount|Turret)|Salvage\s*Head)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Tractor\s*(?:Mount|Turret)|Salvage\s*Head|Traktorstrahl|Bergungskopf)", RegexOptions.IgnoreCase))
             {
                 slotType = "Utility";
                 slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(cleanLine, @"^(?:Ship\s*Module|Module|Modul)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Ship\s*Module|Schiffsmodul|Module|Modul)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
             {
                 slotType = "Module";
                 slotLabel = CleanSlotLabel(cleanLine, "Module");
             }
-            else if (Regex.IsMatch(cleanLine, @"^Module\s*-\s*(Front|Rear|Center|Left|Right|Top|Bottom)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Module|Modul)\s*-\s*(Front|Rear|Center|Left|Right|Top|Bottom|Vorne|Hinten|Mitte|Links|Rechts|Oben|Unten)", RegexOptions.IgnoreCase))
             {
                 slotType = "Module";
                 slotLabel = cleanLine;
             }
-            else if (Regex.IsMatch(cleanLine, @"^(?:Cargo|Torpedo|Habitation|Living|Medical|Refinery|Workshop|Dropship)\s*(?:Module|Bay)", RegexOptions.IgnoreCase))
+            else if (Regex.IsMatch(cleanLine, @"^(?:Front|Rear|Center|Left|Right|Top|Bottom|Vorderes|Hinteres|Mittleres|Linkes|Rechtes|Oberes|Unteres)\s*(?:Module|Modul)", RegexOptions.IgnoreCase))
+            {
+                slotType = "Module";
+                slotLabel = cleanLine;
+            }
+            else if (Regex.IsMatch(cleanLine, @"^(?:Cargo|Torpedo|Habitation|Living|Medical|Refinery|Workshop|Dropship|Fracht|Wohn|Medizinisch(?:es)?|Veredelung|Raffinerie|Werkstatt|Truppentransport)\s*(?:Module|Bay|Modul|Bucht)", RegexOptions.IgnoreCase))
             {
                 slotType = "Module";
                 slotLabel = cleanLine;
@@ -590,24 +611,48 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                     var candClean = Regex.Replace(cand, @"^(?:[><|•·\*\.└├│\-]+|L\s+)[\s\-]*", "").Trim();
 
                     if (candClean.StartsWith("Cooler", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Kühler", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Kraftwerk", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Shield", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Schild", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Quantum", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Quanten", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Jump Module", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Sprungmodul", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Weapon -", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Waffe -", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Turret Weapon", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Geschützturm", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Radar", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Flugklinge", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Missile", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Rakete", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Tractor", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Traktor", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Salvage", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Module", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Modul", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Ship Module", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Cargo Module", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Torpedo Module", StringComparison.OrdinalIgnoreCase))
+                        candClean.StartsWith("Bergung", StringComparison.OrdinalIgnoreCase))
                     {
                         break;
+                    }
+
+                    // Für Modul-Slots: Nur abbrechen wenn es ein WEITERER Slot-Header ist, nicht wenn es der Modul-Itemname ist!
+                    if (slotType == "Module")
+                    {
+                        if (Regex.IsMatch(candClean, @"^(?:Ship\s*Module|Schiffsmodul|Module|Modul)\s+[0-9IVX]+", RegexOptions.IgnoreCase) ||
+                            Regex.IsMatch(candClean, @"^(?:Module|Modul)\s*-\s*(Front|Rear|Center|Left|Right|Top|Bottom|Vorne|Hinten|Mitte|Links|Rechts)", RegexOptions.IgnoreCase) ||
+                            Regex.IsMatch(candClean, @"^(?:Front|Rear|Center|Left|Right|Top|Bottom|Vorderes|Hinteres|Mittleres|Linkes|Rechtes)\s*(?:Module|Modul)", RegexOptions.IgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (Regex.IsMatch(candClean, @"^(?:Ship\s*Module|Schiffsmodul|Module|Modul)(?:\s+[0-9IVX]+)?", RegexOptions.IgnoreCase))
+                        {
+                            break;
+                        }
                     }
 
                     if (candClean.Equals("Empty", StringComparison.OrdinalIgnoreCase) ||
@@ -763,10 +808,10 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
         var typeKeywords = new[]
         {
-            "Cooler", "Jump Module", "Missile Rack", "Liveries", "Livery", "Paint",
-            "Power Plant", "Quantum Drives", "Quantum Drive", "Radar", "Shield Generator",
-            "Shield", "Tractor Beam", "Scraper Beam", "Mining Laser", "Turret", "Gun",
-            "Weapon", "Flight Blade", "Avionics", "Module", "Modules", "Ship Module", "Modul", "Misc."
+            "Cooler", "Kühler", "Jump Module", "Sprungmodul", "Missile Rack", "Raketengestell", "Liveries", "Livery", "Paint", "Lackierung",
+            "Power Plant", "Kraftwerk", "Quantum Drives", "Quantum Drive", "Quantenantrieb", "Radar", "Shield Generator", "Schildgenerator",
+            "Shield", "Schild", "Tractor Beam", "Traktorstrahl", "Scraper Beam", "Mining Laser", "Bergbau-Laser", "Turret", "Geschützturm", "Gun",
+            "Weapon", "Waffe", "Flight Blade", "Flugklinge", "Avionics", "Module", "Modules", "Ship Module", "Modul", "Schiffsmodul", "Misc."
         };
 
         int coolerCount = 0;
@@ -1040,6 +1085,14 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                      clean.Contains("Dropship Module", StringComparison.OrdinalIgnoreCase) ||
                      clean.Contains("Workshop Module", StringComparison.OrdinalIgnoreCase) ||
                      clean.Contains("Ship Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Frachtmodul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Wohnmodul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Medizinisches Modul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Raffineriemodul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Veredelungsmodul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Werkstattmodul", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Truppentransport", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Schiffsmodul", StringComparison.OrdinalIgnoreCase) ||
                      clean.Contains("Module", StringComparison.OrdinalIgnoreCase) ||
                      clean.Contains("Modul", StringComparison.OrdinalIgnoreCase))
             {
@@ -1063,22 +1116,26 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         ref int coolerCount, ref int powerPlantCount, ref int shieldCount,
         ref int weaponCount, ref int turretCount, ref int utilityCount, ref int missileCount, ref int moduleCount)
     {
-        if (type.Equals("Cooler", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Cooler", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Kühler", StringComparison.OrdinalIgnoreCase))
         {
             coolerCount++;
             return ("Cooler", coolerCount > 1 ? $"Cooler {coolerCount}" : "Cooler 1");
         }
-        if (type.Equals("Power Plant", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Power Plant", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Kraftwerk", StringComparison.OrdinalIgnoreCase))
         {
             powerPlantCount++;
             return ("PowerPlant", powerPlantCount > 1 ? $"Power Plant {powerPlantCount}" : "Power Plant 1");
         }
         if (type.Equals("Quantum Drives", StringComparison.OrdinalIgnoreCase) ||
-            type.Equals("Quantum Drive", StringComparison.OrdinalIgnoreCase))
+            type.Equals("Quantum Drive", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Quantenantrieb", StringComparison.OrdinalIgnoreCase))
         {
             return ("QuantumDrive", "Quantum Drive");
         }
-        if (type.Equals("Jump Module", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Jump Module", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Sprungmodul", StringComparison.OrdinalIgnoreCase))
         {
             return ("QuantumDrive", "Jump Module");
         }
@@ -1086,35 +1143,43 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         {
             return ("Avionics", "Radar");
         }
-        if (type.Equals("Flight Blade", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Flight Blade", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Flugklinge", StringComparison.OrdinalIgnoreCase))
         {
             return ("Avionics", "Flight Blade");
         }
         if (type.Equals("Shield Generator", StringComparison.OrdinalIgnoreCase) ||
-            type.Equals("Shield", StringComparison.OrdinalIgnoreCase))
+            type.Equals("Schildgenerator", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Shield", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Schild", StringComparison.OrdinalIgnoreCase))
         {
             shieldCount++;
             return ("Shield", shieldCount > 1 ? $"Shield Generator {shieldCount}" : "Shield Generator 1");
         }
         if (type.Equals("Tractor Beam", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Traktorstrahl", StringComparison.OrdinalIgnoreCase) ||
             type.Equals("Scraper Beam", StringComparison.OrdinalIgnoreCase) ||
-            type.Equals("Mining Laser", StringComparison.OrdinalIgnoreCase))
+            type.Equals("Mining Laser", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Bergbau-Laser", StringComparison.OrdinalIgnoreCase))
         {
             utilityCount++;
             return ("Utility", $"Utility {utilityCount}");
         }
-        if (type.Equals("Turret", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Turret", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Geschützturm", StringComparison.OrdinalIgnoreCase))
         {
             turretCount++;
             return ("Turret", turretCount > 1 ? $"Turret {turretCount}" : "Turret 1");
         }
         if (type.Equals("Gun", StringComparison.OrdinalIgnoreCase) ||
-            type.Equals("Weapon", StringComparison.OrdinalIgnoreCase))
+            type.Equals("Weapon", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Waffe", StringComparison.OrdinalIgnoreCase))
         {
             weaponCount++;
             return ("Weapon", $"Weapon {weaponCount}");
         }
-        if (type.Equals("Missile Rack", StringComparison.OrdinalIgnoreCase))
+        if (type.Equals("Missile Rack", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Raketengestell", StringComparison.OrdinalIgnoreCase))
         {
             missileCount++;
             return ("Weapon", $"Missile Rack {missileCount}");
@@ -1122,7 +1187,8 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         if (type.Equals("Module", StringComparison.OrdinalIgnoreCase) ||
             type.Equals("Modules", StringComparison.OrdinalIgnoreCase) ||
             type.Equals("Ship Module", StringComparison.OrdinalIgnoreCase) ||
-            type.Equals("Modul", StringComparison.OrdinalIgnoreCase))
+            type.Equals("Modul", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Schiffsmodul", StringComparison.OrdinalIgnoreCase))
         {
             moduleCount++;
             return ("Module", moduleCount > 1 ? $"Module {moduleCount}" : "Module 1");
