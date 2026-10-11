@@ -21,6 +21,7 @@ import {
   Coins,
   Radar,
   Clipboard,
+  Layers,
 } from 'lucide-react';
 import { PipsAnalyzerBadge } from './PipsAnalyzerBadge';
 import { useI18n } from '../i18n';
@@ -102,6 +103,9 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     if (sl.includes('radar') || st.includes('radar') || sl.includes('agrippa') || sl.includes('cassandra') || sl.includes('circe')) {
       return <Radar className="w-3.5 h-3.5 text-indigo-400" />;
     }
+    if (sl.includes('module') || st.includes('module') || sl.includes('modul') || st.includes('modul') || sl.includes('bay')) {
+      return <Layers className="w-3.5 h-3.5 text-purple-400" />;
+    }
     switch (st) {
       case 'weapon':
         return <Crosshair className="w-3.5 h-3.5 text-amber-400" />;
@@ -123,6 +127,11 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
         return <Zap className="w-3.5 h-3.5 text-yellow-400" />;
       case 'utility':
         return <Wrench className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'module':
+      case 'modules':
+      case 'shipmodule':
+      case 'modul':
+        return <Layers className="w-3.5 h-3.5 text-purple-400" />;
       default:
         return <Wrench className="w-3.5 h-3.5 text-slate-400" />;
     }
@@ -149,6 +158,11 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
         return 'border-yellow-500/30 bg-yellow-950/20 text-yellow-300';
       case 'utility':
         return 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300';
+      case 'module':
+      case 'modules':
+      case 'shipmodule':
+      case 'modul':
+        return 'border-purple-500/30 bg-purple-950/20 text-purple-300';
       default:
         return 'border-slate-700/50 bg-slate-900/30 text-slate-300';
     }
@@ -175,7 +189,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     setIsScanning(true);
     setFeedback('Scanne Screenshots (OCR läuft)...');
     try {
-      const res = await bridge.scanScreenshotLoadout();
+      const res = await bridge.scanScreenshotLoadout(undefined, ship.name);
       if (res.success) {
         setFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         onRefreshFleet();
@@ -194,7 +208,7 @@ export const ShipLoadoutModal: React.FC<ShipLoadoutModalProps> = ({
     setIsScanning(true);
     setFeedback('Scanne Zwischenablage (OCR läuft)...');
     try {
-      const res = await bridge.scanClipboardLoadout();
+      const res = await bridge.scanClipboardLoadout(ship.name);
       if (res.success) {
         setFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         onRefreshFleet();

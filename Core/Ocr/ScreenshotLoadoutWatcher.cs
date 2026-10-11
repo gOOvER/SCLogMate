@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
@@ -44,6 +45,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
 
     public bool IsWatching => _watcher != null && _watcher.EnableRaisingEvents;
     public string? WatchedFolder { get; private set; }
+    public Func<string?>? CurrentShipProvider { get; set; }
 
     public ScreenshotLoadoutWatcher(OcrEngineService ocr)
     {
@@ -149,6 +151,15 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 {
                     // 1. Schiffsloadout / ASOP Fleet Manager prüfen
                     var res = ParseLoadoutFromText(ocrText, fullPath);
+                    if (string.IsNullOrWhiteSpace(res.ShipName) && CurrentShipProvider != null)
+                    {
+                        var prov = CurrentShipProvider();
+                        if (!string.IsNullOrWhiteSpace(prov) && FleetCatalog.IsKnownCatalogShip(prov))
+                        {
+                            res = res with { ShipName = prov };
+                        }
+                    }
+
                     if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) &&
                         ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
                     {
@@ -246,7 +257,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     /// <summary>
     /// Analysiert eine Screenshot-Bilddatei auf Schiffsloadout (VLM mobiGlas oder ASOP Fleet Manager).
     /// </summary>
-    public async Task<ScreenshotLoadoutResult> AnalyzeScreenshotAsync(string imagePath)
+    public async Task<ScreenshotLoadoutResult> AnalyzeScreenshotAsync(string imagePath, string? fallbackShip = null)
     {
         if (!File.Exists(imagePath))
             return new(false, null, null, Array.Empty<ScannedShipComponent>(), imagePath, "Datei existiert nicht.");
@@ -267,7 +278,16 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         if (string.IsNullOrWhiteSpace(ocrText))
             return new(false, null, null, Array.Empty<ScannedShipComponent>(), imagePath, "Kein Text im Bild erkannt.");
 
-        return ParseLoadoutFromText(ocrText, imagePath);
+        var res = ParseLoadoutFromText(ocrText, imagePath);
+        if (string.IsNullOrWhiteSpace(res.ShipName))
+        {
+            var candidate = !string.IsNullOrWhiteSpace(fallbackShip) ? fallbackShip : CurrentShipProvider?.Invoke();
+            if (!string.IsNullOrWhiteSpace(candidate) && FleetCatalog.IsKnownCatalogShip(candidate))
+            {
+                res = res with { ShipName = candidate };
+            }
+        }
+        return res;
     }
 
     /// <summary>
@@ -316,7 +336,14 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                              ocrText.Contains("Shield", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Quantum Drive", StringComparison.OrdinalIgnoreCase) ||
                              ocrText.Contains("Weapon", StringComparison.OrdinalIgnoreCase) ||
-                             ocrText.Contains("Radar", StringComparison.OrdinalIgnoreCase);
+                             ocrText.Contains("Radar", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Module", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Modul", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Modules", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Kühler", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Kraftwerk", StringComparison.OrdinalIgnoreCase) ||
+                             ocrText.Contains("Schild", StringComparison.OrdinalIgnoreCase);
 
         if (!isLoadoutEstimate && !isVlm && !isFleetManager && !hasComponents)
         {
@@ -379,7 +406,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     private static readonly HashSet<string> UiNoise = new(StringComparer.OrdinalIgnoreCase)
     {
         "Avionics", "Propulsion", "Systems", "Vhcl. Wpns.", "Utility", "Liveries", "Misc.", "HEALTH",
-        "HOME", "COMMS", "CONTRACTS", "MAPS", "JOURNAL", "ASSETS", "REP", "WALLET", "LANDING", "VEHICLES",
+        "Modules", "Module", "Modul", "Ship Module", "HOME", "COMMS", "CONTRACTS", "MAPS", "JOURNAL", "ASSETS", "REP", "WALLET", "LANDING", "VEHICLES",
         "SIZE", "GRADE", "Slot", "Size", "Type", "Awaiting Selection...", "Select an item from the",
         "Only showing ships and equipment located in Crusader.", "For a full list use the mobiGlas Assets app.",
         "For a full list use the mobiGIas Assets app.", "view its details.", "><", "x", "X", "Empty", "EQUIPPED",
@@ -405,7 +432,11 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 trimmed.StartsWith("Missile", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("Turret", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("Livery", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.StartsWith("Liveries", StringComparison.OrdinalIgnoreCase))
+                trimmed.StartsWith("Liveries", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Module", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Modul", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Modules", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("Ship Module", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             // Pattern: Hersteller Präfix + Modell (z.B. "RSI HERMES", "ARGO MOTH")
@@ -435,6 +466,16 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             if (trimmed.Contains("REDEEMER", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Redeemer").NormalizedName;
             if (trimmed.Contains("TITAN", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Avenger Titan").NormalizedName;
             if (trimmed.Contains("CUTLASS", StringComparison.OrdinalIgnoreCase)) return FleetCatalog.Lookup("Cutlass Black").NormalizedName;
+
+            // Fuzzy check across all known ships in FleetCatalog
+            foreach (var ship in FleetCatalog.AllShips)
+            {
+                var baseName = ship.NormalizedName.Split('·')[0].Trim();
+                if (baseName.Length >= 4 && trimmed.Contains(baseName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ship.NormalizedName;
+                }
+            }
         }
         return null;
     }
@@ -523,6 +564,21 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 slotType = "Utility";
                 slotLabel = cleanLine;
             }
+            else if (Regex.IsMatch(cleanLine, @"^(?:Ship\s*Module|Module|Modul)(?:\s*([0-9IVX]+))?", RegexOptions.IgnoreCase))
+            {
+                slotType = "Module";
+                slotLabel = CleanSlotLabel(cleanLine, "Module");
+            }
+            else if (Regex.IsMatch(cleanLine, @"^Module\s*-\s*(Front|Rear|Center|Left|Right|Top|Bottom)", RegexOptions.IgnoreCase))
+            {
+                slotType = "Module";
+                slotLabel = cleanLine;
+            }
+            else if (Regex.IsMatch(cleanLine, @"^(?:Cargo|Torpedo|Habitation|Living|Medical|Refinery|Workshop|Dropship)\s*(?:Module|Bay)", RegexOptions.IgnoreCase))
+            {
+                slotType = "Module";
+                slotLabel = cleanLine;
+            }
 
             if (slotType != null && slotLabel != null)
             {
@@ -544,7 +600,12 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                         candClean.StartsWith("Flight Blade", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Missile", StringComparison.OrdinalIgnoreCase) ||
                         candClean.StartsWith("Tractor", StringComparison.OrdinalIgnoreCase) ||
-                        candClean.StartsWith("Salvage", StringComparison.OrdinalIgnoreCase))
+                        candClean.StartsWith("Salvage", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Module", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Modul", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Ship Module", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Cargo Module", StringComparison.OrdinalIgnoreCase) ||
+                        candClean.StartsWith("Torpedo Module", StringComparison.OrdinalIgnoreCase))
                     {
                         break;
                     }
@@ -705,7 +766,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             "Cooler", "Jump Module", "Missile Rack", "Liveries", "Livery", "Paint",
             "Power Plant", "Quantum Drives", "Quantum Drive", "Radar", "Shield Generator",
             "Shield", "Tractor Beam", "Scraper Beam", "Mining Laser", "Turret", "Gun",
-            "Weapon", "Flight Blade", "Avionics", "Misc."
+            "Weapon", "Flight Blade", "Avionics", "Module", "Modules", "Ship Module", "Modul", "Misc."
         };
 
         int coolerCount = 0;
@@ -715,6 +776,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         int turretCount = 0;
         int utilityCount = 0;
         int missileCount = 0;
+        int moduleCount = 0;
 
         // 1. Spaltenbasierte Extraktion: Star Citizen ASOP rendert NAME links und TYPE rechts als separate Tabellenspalten
         if (nameIdx >= 0 && qtyTypeIdx > nameIdx)
@@ -761,7 +823,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                     }
 
                     var (slotType, slotLabel) = MapTypeToSlot(type, ref coolerCount, ref powerPlantCount,
-                        ref shieldCount, ref weaponCount, ref turretCount, ref utilityCount, ref missileCount);
+                        ref shieldCount, ref weaponCount, ref turretCount, ref utilityCount, ref missileCount, ref moduleCount);
 
                     if (slotType != null && slotLabel != null)
                     {
@@ -793,6 +855,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         turretCount = 0;
         utilityCount = 0;
         missileCount = 0;
+        moduleCount = 0;
 
         foreach (var line in lines)
         {
@@ -967,6 +1030,23 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
                 weaponCount++;
                 slotLabel = $"Weapon {weaponCount}";
             }
+            // 12. Ship Modules (Torpedo Bay, Cargo Bay, Living Module, Medical Module, etc.)
+            else if (clean.Contains("Torpedo", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Cargo Bay", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Cargo Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Living Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Medical Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Refinery Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Dropship Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Workshop Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Ship Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Module", StringComparison.OrdinalIgnoreCase) ||
+                     clean.Contains("Modul", StringComparison.OrdinalIgnoreCase))
+            {
+                slotType = "Module";
+                moduleCount++;
+                slotLabel = moduleCount > 1 ? $"Module {moduleCount}" : "Module 1";
+            }
 
             if (slotType != null && slotLabel != null)
             {
@@ -981,7 +1061,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
     private static (string? SlotType, string? SlotLabel) MapTypeToSlot(
         string type,
         ref int coolerCount, ref int powerPlantCount, ref int shieldCount,
-        ref int weaponCount, ref int turretCount, ref int utilityCount, ref int missileCount)
+        ref int weaponCount, ref int turretCount, ref int utilityCount, ref int missileCount, ref int moduleCount)
     {
         if (type.Equals("Cooler", StringComparison.OrdinalIgnoreCase))
         {
@@ -1039,15 +1119,132 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
             missileCount++;
             return ("Weapon", $"Missile Rack {missileCount}");
         }
+        if (type.Equals("Module", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Modules", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Ship Module", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("Modul", StringComparison.OrdinalIgnoreCase))
+        {
+            moduleCount++;
+            return ("Module", moduleCount > 1 ? $"Module {moduleCount}" : "Module 1");
+        }
 
         return (null, null);
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetClipboardData(uint uFormat);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern UIntPtr GlobalSize(IntPtr hMem);
+
+    private const uint CF_DIB = 8;
+    private const uint CF_DIBV5 = 17;
+
+    private static string? SaveWin32ClipboardDib()
+    {
+        if (!OpenClipboard(IntPtr.Zero)) return null;
+        try
+        {
+            IntPtr hMem = GetClipboardData(CF_DIB);
+            if (hMem == IntPtr.Zero) hMem = GetClipboardData(CF_DIBV5);
+            if (hMem == IntPtr.Zero) return null;
+
+            IntPtr pDib = GlobalLock(hMem);
+            if (pDib == IntPtr.Zero) return null;
+
+            try
+            {
+                int dibSize = (int)GlobalSize(hMem);
+                if (dibSize < 40) return null;
+
+                int headerSize = Marshal.ReadInt32(pDib, 0);
+                short bitCount = Marshal.ReadInt16(pDib, 14);
+                int compression = Marshal.ReadInt32(pDib, 16);
+                int clrUsed = Marshal.ReadInt32(pDib, 32);
+
+                int colorTableSize = 0;
+                if (clrUsed > 0)
+                {
+                    colorTableSize = clrUsed * 4;
+                }
+                else if (bitCount <= 8)
+                {
+                    colorTableSize = (1 << bitCount) * 4;
+                }
+                else if (compression == 3) // BI_BITFIELDS
+                {
+                    colorTableSize = 12;
+                }
+
+                int offBits = 14 + headerSize + colorTableSize;
+                int totalFileSize = 14 + dibSize;
+
+                byte[] fileBytes = new byte[totalFileSize];
+                fileBytes[0] = 0x42; // 'B'
+                fileBytes[1] = 0x4D; // 'M'
+                BitConverter.GetBytes(totalFileSize).CopyTo(fileBytes, 2);
+                fileBytes[6] = 0;
+                fileBytes[7] = 0;
+                fileBytes[8] = 0;
+                fileBytes[9] = 0;
+                BitConverter.GetBytes(offBits).CopyTo(fileBytes, 10);
+
+                Marshal.Copy(pDib, fileBytes, 14, dibSize);
+
+                var tempPath = Path.Combine(Path.GetTempPath(), $"sclogmate_clipboard_{DateTime.UtcNow.Ticks}.bmp");
+                File.WriteAllBytes(tempPath, fileBytes);
+                return tempPath;
+            }
+            finally
+            {
+                GlobalUnlock(hMem);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"SaveWin32ClipboardDib error: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            CloseClipboard();
+        }
+    }
+
     /// <summary>
     /// Speichert ein Bild aus der Windows-Zwischenablage als temporäre Datei auf der Festplatte.
+    /// Nutzt primär den nativen Win32 DIB-Extraktor (extrem schnell, keine Thread-Affinität,
+    /// zuverlässig mit Win+Shift+S, Snipping Tool und PrtScn) und UWP DataTransfer als Fallback.
     /// </summary>
     public static async Task<string?> SaveClipboardImageToFileAsync()
     {
+        // 1. Zuerst nativer Win32 DIB-Extraktor
+        try
+        {
+            var win32Path = SaveWin32ClipboardDib();
+            if (!string.IsNullOrWhiteSpace(win32Path) && File.Exists(win32Path))
+            {
+                return win32Path;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"SaveWin32ClipboardDib: {ex.Message}");
+        }
+
+        // 2. WinRT Fallback (UWP DataTransfer)
         try
         {
             var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
@@ -1072,7 +1269,7 @@ public sealed partial class ScreenshotLoadoutWatcher : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.Log($"SaveClipboardImageToFileAsync: {ex.Message}");
+            Logger.Log($"SaveClipboardImageToFileAsync (WinRT): {ex.Message}");
         }
         return null;
     }

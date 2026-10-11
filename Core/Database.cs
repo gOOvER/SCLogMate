@@ -3566,12 +3566,16 @@ public static class Database
                             if (type.Equals("Weapons", StringComparison.OrdinalIgnoreCase) ||
                                 type.Equals("Weapon", StringComparison.OrdinalIgnoreCase) ||
                                 type.Equals("Utility", StringComparison.OrdinalIgnoreCase) ||
+                                type.Equals("Module", StringComparison.OrdinalIgnoreCase) ||
+                                type.Equals("Modules", StringComparison.OrdinalIgnoreCase) ||
                                 label.Contains("Weapon", StringComparison.OrdinalIgnoreCase) ||
                                 label.Contains("Gun", StringComparison.OrdinalIgnoreCase) ||
                                 label.Contains("Scraper", StringComparison.OrdinalIgnoreCase) ||
                                 label.Contains("Tractor", StringComparison.OrdinalIgnoreCase) ||
                                 label.Contains("Utility", StringComparison.OrdinalIgnoreCase) ||
-                                label.Contains("Blade", StringComparison.OrdinalIgnoreCase))
+                                label.Contains("Blade", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Module", StringComparison.OrdinalIgnoreCase) ||
+                                label.Contains("Modul", StringComparison.OrdinalIgnoreCase))
                             {
                                 return $"{type}_{label}_{compName}";
                             }

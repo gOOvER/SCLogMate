@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ship Module Recognition & Loadout Sync Support (`Core/Ocr/ScreenshotLoadoutWatcher.cs`, `Core/FleetCatalog.cs`, `Core/Database.cs`)**:
+  - Added full OCR detection for ship module slots and modular bays (`Module`, `Modul`, `Modules`, `Retaliator Front/Rear Torpedo Bay`, `Cargo Module`, etc.) across mobiGlas Vehicle Loadout Manager (VLM) and ASOP terminal screens.
+  - Updated composite key indexing in `Database.SaveFleetShipComponents` to cleanly preserve and merge multiple modular bay slots without collision or overwriting.
+  - Added ship catalog aliases for modular variants such as `Retaliator Bomber`, `Aegis Retaliator`, `Aegis Retaliator Base`, and `Drake Caterpillar`.
+- **Target Ship Fallback for Loadout Scans (`Core/Photino/PhotinoBridge.cs`, `frontend/src/services/photinoBridge.ts`, `frontend/src/components/ShipLoadoutModal.tsx`, `frontend/src/views/FleetView.tsx`)**:
+  - Implemented `targetShipName` fallback when scanning screenshots or pasting from clipboard. If the ship name header is scrolled out of view in mobiGlas, recognized components are safely merged into the active/selected ship instead of being rejected.
+- **Native Win32 DIB Clipboard Extraction (`Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
+  - Replaced WinRT UWP clipboard extraction with high-reliability Win32 native `CF_DIB` image decoding with synthesized BMP headers, bypassing thread apartment restrictions for seamless `Ctrl+V` pasting.
+- **Star Citizen HDR PrintScreen Blackout Detection (`Core/Ocr/OcrEngineService.cs`)**:
+  - Added detection and diagnostic guidance for Star Citizen's in-game HDR PrintScreen blackout bug when unreadable all-black screenshots are created by the game engine.
+- **Ship Loadout UI Module Visualization (`frontend/src/components/ShipLoadoutModal.tsx`)**:
+  - Added dedicated styling and `Layers` icon for ship module slots in the loadout inspector modal.
 - **Interactive Mission Details Modal (`frontend/src/views/MissionsView.tsx`)**:
   - Clicking on any contract in the Active Contracts, Completed Missions history, or SC Catalog table now opens an interactive mobiGlas details popup.
   - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.

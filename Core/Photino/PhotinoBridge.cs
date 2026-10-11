@@ -1178,25 +1178,34 @@ public class PhotinoBridge
             () => Settings.Load().Balance);
         _walletCapture.BalanceCaptured += OnBalanceCaptured;
 
-        _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine);
+        _screenshotWatcher = new ScreenshotLoadoutWatcher(_ocrEngine)
+        {
+            CurrentShipProvider = () => (!string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—") ? _currentShip : null
+        };
         _screenshotCleanup = new ScreenshotCleanupService(_ocrEngine);
         _screenshotWatcher.OnLoadoutDetected += res =>
         {
             try
             {
-                if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName) && ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
+                var targetShip = res.ShipName;
+                if (string.IsNullOrWhiteSpace(targetShip) && !string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—" && FleetCatalog.IsKnownCatalogShip(_currentShip))
+                {
+                    targetShip = _currentShip;
+                }
+
+                if (res.Success && !string.IsNullOrWhiteSpace(targetShip) && ((res.Components != null && res.Components.Count > 0) || !string.IsNullOrWhiteSpace(res.Livery)))
                 {
                     var compsJson = res.Components != null && res.Components.Count > 0
                         ? JsonSerializer.Serialize(res.Components, JsonOpts)
                         : "[]";
-                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson, res.IsFullSnapshot);
+                    Database.SaveFleetShipComponents(targetShip, res.Livery, compsJson, res.IsFullSnapshot);
                     Broadcast("FLEET_UPDATED", GetFleetResponse());
 
                     var compCount = res.Components?.Count ?? 0;
                     var subtitle = !string.IsNullOrWhiteSpace(res.Livery)
                         ? $"{compCount} Komponenten · Lackierung: {res.Livery}"
                         : $"{compCount} Komponenten erfasst";
-                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", res.ShipName, subtitle, 0x00EED322u);
+                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", targetShip, subtitle, 0x00EED322u);
                 }
             }
             catch (Exception ex)
@@ -2054,10 +2063,18 @@ public class PhotinoBridge
                 case "scan_screenshot_loadout":
                     {
                         string? filePath = null;
-                        if (req.Payload.HasValue && req.Payload.Value.TryGetProperty("filePath", out var fpEl))
+                        string? targetShipName = null;
+                        if (req.Payload.HasValue)
                         {
-                            filePath = fpEl.GetString();
+                            if (req.Payload.Value.TryGetProperty("filePath", out var fpEl)) filePath = fpEl.GetString();
+                            if (req.Payload.Value.TryGetProperty("targetShipName", out var tsEl)) targetShipName = tsEl.GetString();
+                            else if (req.Payload.Value.TryGetProperty("shipName", out var snEl)) targetShipName = snEl.GetString();
                         }
+                        if (string.IsNullOrWhiteSpace(targetShipName) && !string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—" && FleetCatalog.IsKnownCatalogShip(_currentShip))
+                        {
+                            targetShipName = _currentShip;
+                        }
+
                         if (string.IsNullOrWhiteSpace(filePath))
                         {
                             // 1. Zuerst prüfen, ob ein Bild in der Windows-Zwischenablage liegt (z.B. Win+Shift+S / Snipping Tool / PrtScn)
@@ -2066,17 +2083,19 @@ public class PhotinoBridge
                                 var clipFile = await ScreenshotLoadoutWatcher.SaveClipboardImageToFileAsync();
                                 if (!string.IsNullOrWhiteSpace(clipFile) && File.Exists(clipFile))
                                 {
-                                    var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile);
-                                    if (clipRes.Success && !string.IsNullOrWhiteSpace(clipRes.ShipName) &&
+                                    var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile, targetShipName);
+                                    var effectiveShip = !string.IsNullOrWhiteSpace(clipRes.ShipName) ? clipRes.ShipName : targetShipName;
+                                    if (clipRes.Success && !string.IsNullOrWhiteSpace(effectiveShip) &&
                                         ((clipRes.Components != null && clipRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(clipRes.Livery)))
                                     {
                                         var compsJson = clipRes.Components != null && clipRes.Components.Count > 0
                                             ? JsonSerializer.Serialize(clipRes.Components, JsonOpts)
                                             : "[]";
-                                        Database.SaveFleetShipComponents(clipRes.ShipName, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
+                                        Database.SaveFleetShipComponents(effectiveShip, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
                                         Broadcast("FLEET_UPDATED", GetFleetResponse());
                                         SendResponse(req.Id, "scan_screenshot_loadout_response", clipRes with {
-                                            Message = $"[Zwischenablage] {clipRes.ShipName}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
+                                            ShipName = effectiveShip,
+                                            Message = $"[Zwischenablage] {effectiveShip}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
                                         });
                                         break;
                                     }
@@ -2116,20 +2135,21 @@ public class PhotinoBridge
                                     {
                                         try
                                         {
-                                            var res = await _screenshotWatcher.AnalyzeScreenshotAsync(file);
-                                            if (res.Success && !string.IsNullOrWhiteSpace(res.ShipName))
+                                            var res = await _screenshotWatcher.AnalyzeScreenshotAsync(file, targetShipName);
+                                            var effectiveShip = !string.IsNullOrWhiteSpace(res.ShipName) ? res.ShipName : targetShipName;
+                                            if (res.Success && !string.IsNullOrWhiteSpace(effectiveShip))
                                             {
                                                 if (res.Components != null && res.Components.Count > 0)
                                                 {
                                                     var compsJson = JsonSerializer.Serialize(res.Components, JsonOpts);
-                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, compsJson, res.IsFullSnapshot);
+                                                    Database.SaveFleetShipComponents(effectiveShip, res.Livery, compsJson, res.IsFullSnapshot);
                                                     totalComponents += res.Components.Count;
                                                 }
                                                 else if (!string.IsNullOrWhiteSpace(res.Livery))
                                                 {
-                                                    Database.SaveFleetShipComponents(res.ShipName, res.Livery, "[]", res.IsFullSnapshot);
+                                                    Database.SaveFleetShipComponents(effectiveShip, res.Livery, "[]", res.IsFullSnapshot);
                                                 }
-                                                processedShips.Add(res.ShipName);
+                                                processedShips.Add(effectiveShip);
                                             }
                                         }
                                         catch (Exception ex)
@@ -2165,35 +2185,51 @@ public class PhotinoBridge
                         }
                         else
                         {
-                            var scrLoadoutRes = await _screenshotWatcher.AnalyzeScreenshotAsync(filePath);
-                            if (scrLoadoutRes.Success && !string.IsNullOrWhiteSpace(scrLoadoutRes.ShipName) && ((scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(scrLoadoutRes.Livery)))
+                            var scrLoadoutRes = await _screenshotWatcher.AnalyzeScreenshotAsync(filePath, targetShipName);
+                            var effectiveShip = !string.IsNullOrWhiteSpace(scrLoadoutRes.ShipName) ? scrLoadoutRes.ShipName : targetShipName;
+                            if (scrLoadoutRes.Success && !string.IsNullOrWhiteSpace(effectiveShip) && ((scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(scrLoadoutRes.Livery)))
                             {
                                 try
                                 {
                                     var compsJson = scrLoadoutRes.Components != null && scrLoadoutRes.Components.Count > 0
                                         ? JsonSerializer.Serialize(scrLoadoutRes.Components, JsonOpts)
                                         : "[]";
-                                    Database.SaveFleetShipComponents(scrLoadoutRes.ShipName, scrLoadoutRes.Livery, compsJson, scrLoadoutRes.IsFullSnapshot);
+                                    Database.SaveFleetShipComponents(effectiveShip, scrLoadoutRes.Livery, compsJson, scrLoadoutRes.IsFullSnapshot);
                                     Broadcast("FLEET_UPDATED", GetFleetResponse());
 
                                     var compCount = scrLoadoutRes.Components?.Count ?? 0;
                                     var subtitle = !string.IsNullOrWhiteSpace(scrLoadoutRes.Livery)
                                         ? $"{compCount} Komponenten · Lackierung: {scrLoadoutRes.Livery}"
                                         : $"{compCount} Komponenten erfasst";
-                                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", scrLoadoutRes.ShipName, subtitle, 0x00EED322u);
+                                    _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", effectiveShip, subtitle, 0x00EED322u);
                                 }
                                 catch (Exception ex)
                                 {
                                     Logger.Error("scan_screenshot_loadout Save", ex);
                                 }
+                                SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes with { ShipName = effectiveShip });
                             }
-                            SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes);
+                            else
+                            {
+                                SendResponse(req.Id, "scan_screenshot_loadout_response", scrLoadoutRes);
+                            }
                         }
                         break;
                     }
 
                 case "scan_clipboard_loadout":
                     {
+                        string? targetShipName = null;
+                        if (req.Payload.HasValue)
+                        {
+                            if (req.Payload.Value.TryGetProperty("targetShipName", out var tsEl)) targetShipName = tsEl.GetString();
+                            else if (req.Payload.Value.TryGetProperty("shipName", out var snEl)) targetShipName = snEl.GetString();
+                        }
+                        if (string.IsNullOrWhiteSpace(targetShipName) && !string.IsNullOrWhiteSpace(_currentShip) && _currentShip != "—" && FleetCatalog.IsKnownCatalogShip(_currentShip))
+                        {
+                            targetShipName = _currentShip;
+                        }
+
                         try
                         {
                             var clipFile = await ScreenshotLoadoutWatcher.SaveClipboardImageToFileAsync();
@@ -2203,24 +2239,26 @@ public class PhotinoBridge
                                 break;
                             }
 
-                            var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile);
-                            if (clipRes.Success && !string.IsNullOrWhiteSpace(clipRes.ShipName) &&
+                            var clipRes = await _screenshotWatcher.AnalyzeScreenshotAsync(clipFile, targetShipName);
+                            var effectiveShip = !string.IsNullOrWhiteSpace(clipRes.ShipName) ? clipRes.ShipName : targetShipName;
+                            if (clipRes.Success && !string.IsNullOrWhiteSpace(effectiveShip) &&
                                 ((clipRes.Components != null && clipRes.Components.Count > 0) || !string.IsNullOrWhiteSpace(clipRes.Livery)))
                             {
                                 var compsJson = clipRes.Components != null && clipRes.Components.Count > 0
                                     ? JsonSerializer.Serialize(clipRes.Components, JsonOpts)
                                     : "[]";
-                                Database.SaveFleetShipComponents(clipRes.ShipName, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
+                                Database.SaveFleetShipComponents(effectiveShip, clipRes.Livery, compsJson, clipRes.IsFullSnapshot);
                                 Broadcast("FLEET_UPDATED", GetFleetResponse());
 
                                 var compCount = clipRes.Components?.Count ?? 0;
                                 var subtitle = !string.IsNullOrWhiteSpace(clipRes.Livery)
                                     ? $"{compCount} Komponenten · Lackierung: {clipRes.Livery}"
                                     : $"{compCount} Komponenten erfasst";
-                                _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", clipRes.ShipName, subtitle, 0x00EED322u);
+                                _toastOverlay.ShowToast("🛸", "SCHIFFS-AUSRÜSTUNG ERFASST", effectiveShip, subtitle, 0x00EED322u);
 
                                 SendResponse(req.Id, "scan_clipboard_loadout_response", clipRes with {
-                                    Message = $"[Zwischenablage] {clipRes.ShipName}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
+                                    ShipName = effectiveShip,
+                                    Message = $"[Zwischenablage] {effectiveShip}: {clipRes.Components?.Count ?? 0} Komponenten erfolgreich erfasst."
                                 });
                             }
                             else

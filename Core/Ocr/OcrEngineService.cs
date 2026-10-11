@@ -111,6 +111,27 @@ public sealed class OcrEngineService : IDisposable
             using var sBmp = await decoder.GetSoftwareBitmapAsync();
             using var converted = SoftwareBitmap.Convert(sBmp, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
 
+            int pixelCount = converted.PixelWidth * converted.PixelHeight;
+            if (pixelCount > 0)
+            {
+                byte[] sampleBuf = new byte[Math.Min(pixelCount * 4, 16384)];
+                converted.CopyToBuffer(sampleBuf.AsBuffer());
+                bool isPitchBlack = true;
+                for (int i = 0; i < sampleBuf.Length; i += 4)
+                {
+                    if (sampleBuf[i] > 6 || sampleBuf[i + 1] > 6 || sampleBuf[i + 2] > 6)
+                    {
+                        isPitchBlack = false;
+                        break;
+                    }
+                }
+                if (isPitchBlack)
+                {
+                    Logger.Log($"RecognizeImageFileAsync: Bild '{Path.GetFileName(filePath)}' ist komplett schwarz (Star Citizen HDR/Vulkan Screenshot-Bug). Bitte Snipping Tool (Win+Shift+S) oder Zwischenablage (Strg+V) verwenden.");
+                    return null;
+                }
+            }
+
             await _ocrLock.WaitAsync();
             try
             {

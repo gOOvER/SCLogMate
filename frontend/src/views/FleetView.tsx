@@ -173,7 +173,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
     setIsScanningScreenshot(true);
     setScreenshotFeedback('Scanne Screenshots (OCR läuft)...');
     try {
-      const res = await bridge.scanScreenshotLoadout();
+      const res = await bridge.scanScreenshotLoadout(undefined, selectedLoadoutShip?.name);
       if (res.success) {
         setScreenshotFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         fetchFleet();
@@ -192,7 +192,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
     setIsScanningScreenshot(true);
     setScreenshotFeedback('Scanne Zwischenablage (OCR läuft)...');
     try {
-      const res = await bridge.scanClipboardLoadout();
+      const res = await bridge.scanClipboardLoadout(selectedLoadoutShip?.name);
       if (res.success) {
         setScreenshotFeedback(res.message || `✓ ${res.shipName || 'Schiff'} erkannt (${res.components?.length || 0} Komponenten)`);
         fetchFleet();
