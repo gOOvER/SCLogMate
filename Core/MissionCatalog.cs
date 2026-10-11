@@ -1614,11 +1614,47 @@ public static partial class MissionCatalog
         // ── WIKELO EMPORIUM & SAMMLER (BERGUNG & SUCHE) ─────────────────────
         Add(new MissionInfo
         {
+            Id = "wikelo_arrive_to_system",
+            Title = "Wikelo Arrive to System",
+            Contractor = "Wikelo",
+            Faction = "Wikelo Emporium",
+            MissionType = "Beschaffung",
+            BaseReward = 0,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Einführung in die Sammler-Aufträge des Wikelo Emporiums. Beschaffe und liefere seltene Artefakte und Fracht ab."
+        });
+        Add(new MissionInfo
+        {
+            Id = "wikelo_arrive_de",
+            Title = "Wikelo kommt im System an",
+            Contractor = "Wikelo",
+            Faction = "Wikelo Emporium",
+            MissionType = "Beschaffung",
+            BaseReward = 0,
+            ReputationGain = 300,
+            StarSystems = "Stanton",
+            Description = "Einführung in die Sammler-Aufträge des Wikelo Emporiums. Beschaffe und liefere seltene Artefakte und Fracht ab."
+        });
+        Add(new MissionInfo
+        {
+            Id = "wikelo_sehr_hungrig",
+            Title = "Sehr hungrig",
+            Contractor = "Wikelo",
+            Faction = "Wikelo Emporium",
+            MissionType = "Beschaffung",
+            BaseReward = 0,
+            ReputationGain = 100,
+            StarSystems = "Stanton",
+            Description = "Bringe Essen und Trinken zum Wikelo Emporium."
+        });
+        Add(new MissionInfo
+        {
             Id = "wikelo_collector_intro",
             Title = "Wikelo: The Collector Intro",
-            Contractor = "Wikelo Emporium",
-            Faction = "Wikelo",
-            MissionType = "Bergung/Lieferung",
+            Contractor = "Wikelo",
+            Faction = "Wikelo Emporium",
+            MissionType = "Beschaffung",
             BaseReward = 25000,
             ReputationGain = 300,
             StarSystems = "Stanton",
@@ -1628,9 +1664,9 @@ public static partial class MissionCatalog
         {
             Id = "wikelo_collector_intro_short",
             Title = "The Collector Intro",
-            Contractor = "Wikelo Emporium",
-            Faction = "Wikelo",
-            MissionType = "Bergung/Lieferung",
+            Contractor = "Wikelo",
+            Faction = "Wikelo Emporium",
+            MissionType = "Beschaffung",
             BaseReward = 25000,
             ReputationGain = 300,
             StarSystems = "Stanton",

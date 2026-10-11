@@ -18,8 +18,8 @@ namespace SCLogMate.Core;
 /// </summary>
 public static class Database
 {
-    public const int CurrentSchemaVersion = 45; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v45: RSI Discovery Month Event Missions Payout Reconciliation)
-    public const int CurrentParserVersion = 49; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v49: RSI Discovery Month Event Missions embedded in missions.json & FuzzyLookup)
+    public const int CurrentSchemaVersion = 46; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v46: Clean up invalid active contract objective entries)
+    public const int CurrentParserVersion = 50; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v50: Wikelo contractor classification & Deutsch+ objective filter)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }
@@ -1216,6 +1216,33 @@ public static class Database
             Exec(db, "PRAGMA user_version = 45;");
             dbSchemaVersion = 45;
             Logger.Log("DB Schema: Migration auf v45 (RSI Discovery Month Event Rewards) erfolgreich angewendet.");
+        }
+
+        if (dbSchemaVersion < 46)
+        {
+            try
+            {
+                Exec(db, @"
+                    DELETE FROM contracts WHERE status='Active' AND (
+                        title LIKE 'Ich brauche %' OR 
+                        title LIKE 'Need %' OR 
+                        title LIKE 'Bringe %' OR 
+                        title LIKE 'Bring %' OR 
+                        title LIKE '% 0/1%' OR 
+                        title LIKE '% 0/2%' OR 
+                        title LIKE '% 0/3%' OR 
+                        title LIKE '% 0/4%' OR 
+                        title LIKE '% 0/5%'
+                    );
+                ");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Migration v46 (Clean Active Contract Objectives)", ex);
+            }
+            Exec(db, "PRAGMA user_version = 46;");
+            dbSchemaVersion = 46;
+            Logger.Log("DB Schema: Migration auf v46 (Bereinigung von Ziel-Fortschrittszeilen in aktiven Verträgen) erfolgreich angewendet.");
         }
 
         SetMeta(db, "schemaVersion", CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture));
@@ -2813,10 +2840,14 @@ public static class Database
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
+            var title = r.GetString(0);
+            if (System.Text.RegularExpressions.Regex.IsMatch(title, @"^\b(?:Ich brauche|Need|Bringe|Bring)\s+\d+\s*/\s*\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                continue;
+
             DateTime.TryParse(r.GetString(3), out var dt);
             list.Add(new Models.ContractDetails
             {
-                Title = r.GetString(0),
+                Title = title,
                 Reward = r.GetInt32(1),
                 ContractedBy = r.GetString(2),
                 ScannedAt = dt != default ? dt : DateTime.UtcNow

@@ -107,6 +107,9 @@ public partial class LogParser
     [GeneratedRegex(@"MissionId:\s*\[(?<id>[0-9a-fA-F-]+)\]")]
     private static partial Regex NotificationMissionIdRegex();
 
+    [GeneratedRegex(@"ObjectiveId:\s*\[(?<id>[^\]]*)\]")]
+    private static partial Regex NotificationObjectiveIdRegex();
+
     // Echte Blaupausen / Crafting Blueprints erhalten
     private static readonly string[] BlueprintMarkers = {
         "Received Blueprint:",
@@ -338,7 +341,7 @@ public partial class LogParser
     private static partial Regex MissionMarkerRegex();
 
     // Comms-Benachrichtigung für Missionsannahme mit Auftraggeber & Fraktion (SC 4.x)
-    [GeneratedRegex(@"<CommsNotifications>\s+SendCommsNotification\s+\+Missions\.Organization\.(?:MissionGiver\.)?(?<giver>[A-Za-z0-9_]+)(?:,AI\.Faction\.(?<faction>[A-Za-z0-9_]+))?.*?Mission:\s+\[(?<id>[0-9a-fA-F-]+)\]")]
+    [GeneratedRegex(@"<CommsNotifications>\s+SendCommsNotification\s+\+Missions\.Organization\.(?:MissionGiver\.)?(?<giver>[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)(?:,AI\.Faction\.(?<faction>[A-Za-z0-9_]+))?.*?Mission:\s+\[(?<id>[0-9a-fA-F-]+)\]")]
     private static partial Regex CommsNotificationRegex();
 
     // Standorte, Zonen & Schutzzonen
@@ -416,7 +419,7 @@ public partial class LogParser
     [GeneratedRegex(@"Update Shard Id>.*New Shard Id:\s*(?<s>[^\s\.]+)")]
     private static partial Regex UpdateShardRegex();
 
-    [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(?:Contract\s+(?:Accepted|Complete|Completed|Failed|Shared|Withdrawn|Abandoned|Cancelled)|Auftrag\s+(?:angenommen|abgeschlossen|fehlgeschlagen|geteilt|zurückgezogen|abgebrochen|aufgegeben)|New\s+(?:Contract\s+Available|Objective)|Neuer\s+Auftrag|Neues\s+Ziel|Teilziel|Mission\s+(?:Complete|Completed|Accepted|Finished)|Erfolgreich):\s*", RegexOptions.IgnoreCase)]
     private static partial Regex CleanMissionTitlePrefixRegex();
 
     [GeneratedRegex(@"(\B[A-Z])")]
@@ -2365,6 +2368,10 @@ public partial class LogParser
                     ? midMatch.Groups["id"].Value
                     : "";
 
+                var objMatch = NotificationObjectiveIdRegex().Match(line);
+                string objId = objMatch.Success ? objMatch.Groups["id"].Value.Trim() : "";
+                bool hasObjectiveId = !string.IsNullOrWhiteSpace(objId);
+
                 var rawFull = ms.Groups["full"].Value;
                 bool hasBpTag = rawFull.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
                                 line.Contains("[BP]", StringComparison.OrdinalIgnoreCase) ||
@@ -2372,6 +2379,9 @@ public partial class LogParser
 
                 var cleanTitle = MissionCatalog.StripGameMarkup(CleanMissionTitlePrefixRegex().Replace(full, "").Trim(' ', ':'));
                 cleanTitle = cleanTitle.Replace("[BP]", "").Trim(' ', ':');
+                // Entferne Ziel-/Fortschritts-Phrasen wie "Ich brauche 0/1 ...", "Need 0/1 ...", "Bringe 0/1 ..."
+                cleanTitle = Regex.Replace(cleanTitle, @"^\b(?:Ich brauche|Need|Bringe|Bring)\s+\d+\s*/\s*\d+\s*(?:of\s+)?(?:SCU\s+)?", "", RegexOptions.IgnoreCase).Trim(' ', ':');
+                cleanTitle = Regex.Replace(cleanTitle, @"\b\d+\s*/\s*\d+\s*(?:of\s+)?(?:SCU\s+)?", "", RegexOptions.IgnoreCase).Trim(' ', ':');
                 bool isBlackboxDangerous = cleanTitle.Contains("Blackbox", StringComparison.OrdinalIgnoreCase) &&
                                            cleanTitle.Contains("Dangerous", StringComparison.OrdinalIgnoreCase);
                 var normTitle = cleanTitle.ToLowerInvariant().Trim();
@@ -2402,14 +2412,26 @@ public partial class LogParser
                                    full.Contains("aufgegeben", StringComparison.OrdinalIgnoreCase) ||
                                    full.Contains("zurückgezogen", StringComparison.OrdinalIgnoreCase));
 
-                bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase);
+                bool hasProgressCounter = Regex.IsMatch(full, @"\b\d+\s*/\s*\d+\b");
+                bool hasObjectivePrefix = full.Contains("Ich brauche", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Bringe", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Bring", StringComparison.OrdinalIgnoreCase) ||
+                                          full.Contains("Need", StringComparison.OrdinalIgnoreCase);
 
-                bool isAccepted = full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
+                bool isObjective = full.Contains("New Objective", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Neues Ziel", StringComparison.OrdinalIgnoreCase) ||
+                                   full.Contains("Teilziel", StringComparison.OrdinalIgnoreCase) ||
+                                   hasObjectiveId ||
+                                   hasProgressCounter ||
+                                   (hasObjectivePrefix && (full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) || full.Contains("New Contract", StringComparison.OrdinalIgnoreCase)));
+
+                bool isAccepted = !isObjective && (
+                                  full.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("angenommen", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("Shared", StringComparison.OrdinalIgnoreCase) ||
                                   full.Contains("geteilt", StringComparison.OrdinalIgnoreCase) ||
-                                  full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase) ||
-                                  full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase);
+                                  (!hasObjectiveId && !hasProgressCounter && full.Contains("Neuer Auftrag", StringComparison.OrdinalIgnoreCase)) ||
+                                  full.Contains("New Contract Available", StringComparison.OrdinalIgnoreCase));
 
                 bool isSalvageClaim = cleanTitle.Contains("Salvage Rights", StringComparison.OrdinalIgnoreCase) ||
                                       cleanTitle.Contains("Salvage Claim", StringComparison.OrdinalIgnoreCase) ||
@@ -2667,16 +2689,33 @@ public partial class LogParser
                 {
                     lock (_stateLock)
                     {
-                        if (_contracts.TryGetValue(mId, out var existing))
+                        string targetKey = !string.IsNullOrEmpty(mId) && _contracts.ContainsKey(mId)
+                            ? mId
+                            : (_contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress) ?? mId);
+
+                        if (!string.IsNullOrEmpty(targetKey))
                         {
-                            _contracts[mId] = existing with { StepsTotal = existing.StepsTotal + 1 };
-                        }
-                        else
-                        {
-                            var activeKey = _contracts.Keys.LastOrDefault(k => _contracts[k].Outcome == ContractOutcome.InProgress);
-                            if (activeKey != null)
+                            if (!_contractObjectives.TryGetValue(targetKey, out var steps))
                             {
-                                _contracts[activeKey] = _contracts[activeKey] with { StepsTotal = _contracts[activeKey].StepsTotal + 1 };
+                                steps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                                _contractObjectives[targetKey] = steps;
+                            }
+
+                            string stepKey = !string.IsNullOrWhiteSpace(objId) ? objId : cleanTitle;
+                            bool isNewStep = !steps.ContainsKey(stepKey);
+                            if (isNewStep)
+                            {
+                                steps[stepKey] = "ACTIVE";
+                            }
+
+                            if (_contracts.TryGetValue(targetKey, out var existing))
+                            {
+                                int newTotal = Math.Max(existing.StepsTotal, steps.Count);
+                                if (isNewStep && newTotal == existing.StepsTotal)
+                                {
+                                    newTotal++;
+                                }
+                                _contracts[targetKey] = existing with { StepsTotal = newTotal };
                             }
                         }
                     }
@@ -3844,9 +3883,9 @@ public partial class LogParser
         // 1. Direkte Comms / Funkübertragung prüfen
         if (_missionComms.TryGetValue(mId, out var comms))
         {
-            if (!string.IsNullOrWhiteSpace(comms.Giver) && comms.Giver != "Unbekannt")
+            if (!string.IsNullOrWhiteSpace(comms.Giver) && comms.Giver != "Unbekannt" && comms.Giver != "Civilian")
                 return comms.Giver;
-            if (!string.IsNullOrWhiteSpace(comms.Faction) && comms.Faction != "Unbekannt")
+            if (!string.IsNullOrWhiteSpace(comms.Faction) && comms.Faction != "Unbekannt" && comms.Faction != "Civilian")
                 return comms.Faction;
         }
 
@@ -3856,14 +3895,23 @@ public partial class LogParser
             if (!string.IsNullOrWhiteSpace(existingContract.Issuer) &&
                 existingContract.Issuer != "Unbekannt" &&
                 existingContract.Issuer != "mobiGlas" &&
-                existingContract.Issuer != "TheBackpocket")
+                existingContract.Issuer != "TheBackpocket" &&
+                existingContract.Issuer != "Civilian")
+            {
+                if (existingContract.Issuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
+                    existingContract.Issuer.Equals("Civilian.Collector", StringComparison.OrdinalIgnoreCase) ||
+                    existingContract.Issuer.Equals("Collector", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Wikelo";
+                }
                 return existingContract.Issuer;
+            }
         }
 
         // 3. Missionskatalog (ohne generische Fallbacks wie 'Salvage Broker' oder 'Civilian')
         if (cat != null)
         {
-            if (!string.IsNullOrWhiteSpace(cat.Contractor) && cat.Contractor != "Salvage Broker")
+            if (!string.IsNullOrWhiteSpace(cat.Contractor) && cat.Contractor != "Salvage Broker" && cat.Contractor != "Civilian")
                 return cat.Contractor;
             if (!string.IsNullOrWhiteSpace(cat.Faction) && cat.Faction != "Civilian")
                 return cat.Faction;
@@ -3915,6 +3963,13 @@ public partial class LogParser
     {
         if (string.IsNullOrWhiteSpace(raw)) return "Unbekannt";
         var clean = raw.Trim();
+        if (clean.Equals("Civilian.Collector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("Collector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("Wikelo", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Wikelo";
+        }
         return clean switch
         {
             "ReccoBattaglia" => "Recco Battaglia",
@@ -3942,6 +3997,14 @@ public partial class LogParser
     {
         if (string.IsNullOrWhiteSpace(raw)) return "Unbekannt";
         var clean = raw.Trim();
+        if (clean.Equals("Civilian.Collector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("Collector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("Wikelo", StringComparison.OrdinalIgnoreCase) ||
+            clean.Equals("WikeloEmporium", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Wikelo Emporium";
+        }
         return clean switch
         {
             "PeopleAlliance" => "People's Alliance",

@@ -27,7 +27,14 @@ public static class Missions
         var us = g.IndexOf('_');
         var raw = us > 0 ? g[..us] : g;
 
-        // Spezifische Behandlung für dynamische Missionsgeneratoren (CIG Engine Strings)
+        if (raw.Equals("TheCollector", System.StringComparison.OrdinalIgnoreCase) ||
+            raw.Equals("Wikelo", System.StringComparison.OrdinalIgnoreCase) ||
+            raw.Equals("Collector", System.StringComparison.OrdinalIgnoreCase) ||
+            raw.Equals("Civilian.Collector", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return "Wikelo";
+        }
+
         if (raw.Equals("TheBackpocket", System.StringComparison.OrdinalIgnoreCase))
         {
             if (Has(contract, "ORS_") || Has(contract, "Orison")) return "Orison Relief Services";
@@ -86,7 +93,8 @@ public static class Missions
         if (Has(s, "Assassinat") || Has(s, "Eliminate") || Has(s, "KillShip") || Has(s, "HeadHunt") || Has(s, "ShipWaveAttack") || Has(s, "BoardShip")) return "Kampf/Kill";
         if (Has(s, "Patrol") || Has(s, "Defend")) return "Patrouille/Verteidigung";
         if (Has(s, "RecoverData") || Has(s, "DataDownload") || Has(s, "BlackBox") || Has(s, "Uplink") || Has(s, "DataDrive") || Has(s, "Data")) return "Daten";
-        if (Has(s, "MissingPerson") || Has(s, "MissingPersons") || Has(s, "RecoverItem") || Has(s, "Collector")) return "Person/Bergung";
+        if (Has(s, "TheCollector") || Has(s, "Wikelo") || Has(s, "FoodOrder") || Has(s, "GenericCollect")) return "Beschaffung";
+        if (Has(s, "MissingPerson") || Has(s, "MissingPersons") || Has(s, "RecoverItem")) return "Person/Bergung";
         if (Has(s, "Mining")) return "Bergbau";
         if (Has(s, "Salvage")) return "Bergung";
         if (Has(s, "Investigat")) return "Ermittlung";
@@ -105,7 +113,7 @@ public static class Missions
 
     static string SystemOf(string c)
     {
-        if (Has(c, "Stanton") || Has(c, "Hurston") || Has(c, "Crusader") || Has(c, "MicroTech") || Has(c, "ArcCorp") || Has(c, "ORS_") || Has(c, "Adaigo") || Has(c, "Adagio")) return "Stanton";
+        if (Has(c, "Stanton") || Has(c, "Hurston") || Has(c, "Crusader") || Has(c, "MicroTech") || Has(c, "ArcCorp") || Has(c, "ORS_") || Has(c, "Adaigo") || Has(c, "Adagio") || Has(c, "TheCollector") || Has(c, "Wikelo")) return "Stanton";
         if (Has(c, "Nyx") || Has(c, "Battaglia") || Has(c, "Levski") || Has(c, "Delamar") || Has(c, "RoX_")) return "Nyx";
         if (Has(c, "Pyro") || Has(c, "RoughAnimals") || Has(c, "Headhunters")) return "Pyro";
         return "k.A.";

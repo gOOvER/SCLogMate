@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clicking on any contract in the Active Contracts, Completed Missions history, or SC Catalog table now opens an interactive mobiGlas details popup.
   - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.
 
+### Fixed
+- **Star Citizen Deutsch+ Localization & Objective Sub-Step Disambiguation (`Core/LogParser.cs`, `Core/Database.cs`)**:
+  - Fixed an issue where the community translation mod *Star Citizen Deutsch+* (SCDL) translates HUD objective activations as `Neuer Auftrag: %s`, causing objective updates (e.g. `Ich brauche 0/1 Fettfreies Eis...`) to overwrite active contract titles and duplicate active contract records.
+  - Added `NotificationObjectiveIdRegex` to strictly distinguish true contract acceptances (`ObjectiveId: []`) from sub-objectives (`ObjectiveId: [dropoff_...]`).
+  - Added pattern matching to filter progress counters (`\b\d+\s*/\s*\d+\b`) and objective request prefixes (`Ich brauche`, `Need`, `Bringe`, `Bring`) from contract acceptance detection.
+  - Implemented objective ID deduplication in `_contractObjectives` to prevent repeated HUD notifications from artificially inflating `StepsTotal`.
+  - Added DB migration v46 to purge objective fragments and progress lines from active contract records.
+- **Wikelo Emporium & "TheCollector" Classification (`Core/Missions.cs`, `Core/MissionCatalog.cs`, `Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`)**:
+  - Mapped generator name `TheCollector`, comms organization `+Missions.Organization.Civilian.Collector`, and prefix `Wikelo` to contractor `Wikelo` and faction `Wikelo Emporium`.
+  - Corrected mission type for Wikelo collector contracts from `Person/Bergung` to `Beschaffung`.
+  - Added catalog entries for `Wikelo Arrive to System` and `Sehr hungrig` (Food Orders).
+  - Prevented generic fallback `Civilian` from overriding the true `Wikelo` contractor in active contract views.
+
 ## [1.4.13] - 2026-10-10
 ### Fixed
 - **Filter CIG Internal Test & Placeholder Missions (`Core/MissionCatalog.cs`, `Core/MissionOnlineSyncService.cs`)**:

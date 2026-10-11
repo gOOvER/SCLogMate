@@ -5790,12 +5790,43 @@ public class PhotinoBridge
         // 1. Live-Verträge aus dem LogParser (Game.log) mit Status InProgress
         foreach (var c in _parser.ContractsList.Where(c => c.Outcome == ContractOutcome.InProgress))
         {
-            var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
-            var issuer = !string.IsNullOrWhiteSpace(c.Issuer) && c.Issuer != "Unbekannt" && c.Issuer != "Star Citizen Auftragsmanager"
-                ? c.Issuer
+            var rawTitle = !string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag";
+            var displayTitle = Regex.Replace(rawTitle, @"^\b(?:Ich brauche|Need|Bringe|Bring)\s+\d+\s*/\s*\d+\s*(?:of\s+)?(?:SCU\s+)?", "", RegexOptions.IgnoreCase).Trim(' ', ':');
+            displayTitle = Regex.Replace(displayTitle, @"\b\d+\s*/\s*\d+\s*(?:of\s+)?(?:SCU\s+)?", "", RegexOptions.IgnoreCase).Trim(' ', ':');
+            if (string.IsNullOrWhiteSpace(displayTitle)) displayTitle = rawTitle;
+
+            var cat = MissionCatalog.Lookup(displayTitle) ?? MissionCatalog.FuzzyLookup(displayTitle) ??
+                      MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
+
+            var rawIssuer = !string.IsNullOrWhiteSpace(c.Issuer) ? c.Issuer : "";
+            if (rawIssuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
+                rawIssuer.Equals("Civilian.Collector", StringComparison.OrdinalIgnoreCase) ||
+                rawIssuer.Equals("Collector", StringComparison.OrdinalIgnoreCase) ||
+                displayTitle.Contains("Wikelo", StringComparison.OrdinalIgnoreCase) ||
+                displayTitle.Contains("Sehr hungrig", StringComparison.OrdinalIgnoreCase) ||
+                rawTitle.Contains("Wikelo", StringComparison.OrdinalIgnoreCase) ||
+                rawTitle.Contains("Sehr hungrig", StringComparison.OrdinalIgnoreCase) ||
+                rawTitle.Contains("TheCollector", StringComparison.OrdinalIgnoreCase))
+            {
+                rawIssuer = "Wikelo";
+            }
+
+            var issuer = !string.IsNullOrWhiteSpace(rawIssuer) && rawIssuer != "Unbekannt" && rawIssuer != "Civilian" && rawIssuer != "Star Citizen Auftragsmanager"
+                ? rawIssuer
                 : (cat?.Contractor ?? "Star Citizen Auftragsmanager");
-            var faction = !string.IsNullOrWhiteSpace(cat?.Faction) ? cat.Faction : issuer;
-            var mType = !string.IsNullOrWhiteSpace(c.Type) && c.Type != "Auftrag" ? c.Type : (cat?.MissionType ?? "Auftrag");
+            if (issuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) || issuer.Equals("Collector", StringComparison.OrdinalIgnoreCase))
+                issuer = "Wikelo";
+
+            var faction = !string.IsNullOrWhiteSpace(cat?.Faction) && cat.Faction != "Civilian"
+                ? cat.Faction
+                : (issuer == "Wikelo" ? "Wikelo Emporium" : issuer);
+
+            var mType = !string.IsNullOrWhiteSpace(c.Type) && c.Type != "Auftrag" && c.Type != "Person/Bergung"
+                ? c.Type
+                : (cat?.MissionType ?? (issuer == "Wikelo" ? "Beschaffung" : "Auftrag"));
+            if (issuer == "Wikelo" && (mType == "Person/Bergung" || mType == "Auftrag"))
+                mType = "Beschaffung";
+
             var sys = !string.IsNullOrWhiteSpace(c.System) && c.System != "k.A." && c.System != "Stanton"
                 ? c.System
                 : (cat?.StarSystems ?? (!string.IsNullOrWhiteSpace(c.System) ? c.System : "Stanton"));
@@ -5804,7 +5835,7 @@ public class PhotinoBridge
             activeContracts.Add(new MissionItemDto
             {
                 Id = !string.IsNullOrWhiteSpace(c.MissionId) ? c.MissionId : Guid.NewGuid().ToString("N"),
-                Title = cat?.Title ?? (!string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag"),
+                Title = cat?.Title ?? displayTitle,
                 Contractor = issuer,
                 Faction = faction,
                 MissionType = mType,
@@ -5815,7 +5846,7 @@ public class PhotinoBridge
                 Blueprints = cat?.Blueprints ?? Array.Empty<string>(),
                 Time = c.AcceptedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
                 StepsDone = c.StepsDone,
-                StepsTotal = c.StepsTotal,
+                StepsTotal = Math.Max(1, c.StepsTotal),
                 ProgressText = c.StepsText
             });
         }
@@ -5823,25 +5854,55 @@ public class PhotinoBridge
         // 2. OCR-gescannte Verträge aus SQLite
         foreach (var c in Database.GetActiveContracts())
         {
-            if (!activeContracts.Any(a => string.Equals(a.Title, c.Title, StringComparison.OrdinalIgnoreCase)))
+            var rawTitle = !string.IsNullOrWhiteSpace(c.Title) ? c.Title : "Aktiver Auftrag";
+            // Reine Ziel-/Fortschritts-Fragmente überspringen
+            if (Regex.IsMatch(rawTitle, @"^\b(?:Ich brauche|Need|Bringe|Bring)\s+\d+\s*/\s*\d+", RegexOptions.IgnoreCase))
+                continue;
+
+            var displayTitle = Regex.Replace(rawTitle, @"\b\d+\s*/\s*\d+\s*(?:of\s+)?(?:SCU\s+)?", "", RegexOptions.IgnoreCase).Trim(' ', ':');
+            if (string.IsNullOrWhiteSpace(displayTitle)) displayTitle = rawTitle;
+
+            if (!activeContracts.Any(a => string.Equals(a.Title, displayTitle, StringComparison.OrdinalIgnoreCase) || string.Equals(a.Title, c.Title, StringComparison.OrdinalIgnoreCase)))
             {
-                var cat = MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
-                var issuer = !string.IsNullOrWhiteSpace(c.ContractedBy)
-                    ? c.ContractedBy
+                var cat = MissionCatalog.Lookup(displayTitle) ?? MissionCatalog.FuzzyLookup(displayTitle) ??
+                          MissionCatalog.Lookup(c.Title) ?? MissionCatalog.FuzzyLookup(c.Title);
+
+                var rawIssuer = !string.IsNullOrWhiteSpace(c.ContractedBy) ? c.ContractedBy : "";
+                if (rawIssuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
+                    rawIssuer.Equals("Civilian.Collector", StringComparison.OrdinalIgnoreCase) ||
+                    rawIssuer.Equals("Collector", StringComparison.OrdinalIgnoreCase) ||
+                    displayTitle.Contains("Wikelo", StringComparison.OrdinalIgnoreCase) ||
+                    displayTitle.Contains("Sehr hungrig", StringComparison.OrdinalIgnoreCase))
+                {
+                    rawIssuer = "Wikelo";
+                }
+
+                var issuer = !string.IsNullOrWhiteSpace(rawIssuer) && rawIssuer != "Civilian"
+                    ? rawIssuer
                     : (cat?.Contractor ?? "Star Citizen Auftragsmanager");
-                var faction = !string.IsNullOrWhiteSpace(cat?.Faction) ? cat.Faction : issuer;
+                if (issuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase))
+                    issuer = "Wikelo";
+
+                var faction = !string.IsNullOrWhiteSpace(cat?.Faction) && cat.Faction != "Civilian"
+                    ? cat.Faction
+                    : (issuer == "Wikelo" ? "Wikelo Emporium" : issuer);
+
+                var mType = cat?.MissionType ?? (issuer == "Wikelo" ? "Beschaffung" : "Auftrag");
+                if (issuer == "Wikelo" && (mType == "Person/Bergung" || mType == "Auftrag"))
+                    mType = "Beschaffung";
+
                 var reward = c.Reward > 0 ? c.Reward : (cat?.BaseReward ?? 0);
 
                 activeContracts.Add(new MissionItemDto
                 {
                     Id = Guid.NewGuid().ToString("N"),
-                    Title = cat?.Title ?? c.Title,
+                    Title = cat?.Title ?? displayTitle,
                     Contractor = issuer,
                     Faction = faction,
-                    MissionType = cat?.MissionType ?? "Auftrag",
+                    MissionType = mType,
                     BaseReward = reward,
                     IsActive = true,
-                    Description = !string.IsNullOrWhiteSpace(c.DisplayText) ? c.DisplayText : (cat?.Description ?? "Aktiver Auftrag"),
+                    Description = !string.IsNullOrWhiteSpace(c.DisplayText) ? c.DisplayText : (cat?.Description ?? $"{mType} • System: {cat?.StarSystems ?? "Stanton"}"),
                     StarSystems = cat?.StarSystems ?? "Stanton",
                     Blueprints = cat?.Blueprints ?? Array.Empty<string>(),
                     Time = c.ScannedAt.ToLocalTime().ToString("dd.MM. HH:mm"),
