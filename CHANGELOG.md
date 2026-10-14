@@ -37,9 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive Mission Details Modal (`frontend/src/views/MissionsView.tsx`)**:
   - Clicking on any contract in the Active Contracts, Completed Missions history, or SC Catalog table now opens an interactive mobiGlas details popup.
   - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.
-- **Combat Gauntlet Payouts & Flight School Recognition (`Data/missions.json`, `Core/Missions.cs`, `Core/Database.cs`)**:
-  - Added baseline aUEC rewards for all 8 scenarios of Gilly's Flight School Combat Gauntlet (ranging from 15,000 to 300,000 aUEC), allowing automatic financial ledger calculation upon contract completion.
-  - Bumped `Database.CurrentParserVersion` to 51 to re-index historical sessions and retroactively credit completed flight school gauntlet missions.
+- **Combat Gauntlet & Cargo Recovery Verified In-Game Payouts (`Data/missions.json`)**:
+  - Calibrated exact in-game mobiGlas contract rewards for Gilly's Flight School Combat Gauntlet based on live contract data (Scenario #1: 23,000, Scenario #2: 36,000, Scenario #3: 55,000, Scenario #4: 79,000, Scenario #7: 227,000, Scenario #8: 349,000 aUEC).
+  - Added verified base rewards for hauling recovery contracts: *Large Covalex Shipment Needs Recovering* (67,000 aUEC) and *Rescue Incomplete Ling Delivery* (55,000 aUEC).
 - **Primary Residence Inventory Reward Detection (`Core/LogParser.cs`)**:
   - Added support for item and scrip rewards sent directly to home storage (`You've Earned: ... Access It/Them at Your Primary Residence's Inventory`), logging them as clear loot events (`🎁 Belohnung: <Name> (Heimat-Inventar)`).
 
