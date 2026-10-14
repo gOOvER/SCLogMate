@@ -9,6 +9,7 @@ import {
   Target,
   Trash2,
   Truck,
+  Trophy,
   X,
   Building2,
   MapPin,
@@ -17,10 +18,11 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { HaulingChainerTab } from '../components/HaulingChainerTab';
+import { CampaignsTab } from '../components/CampaignsTab';
 
 export interface MissionsViewProps {
   initialSearch?: string;
-  initialTab?: 'active' | 'history' | 'catalog' | 'hauling';
+  initialTab?: 'active' | 'history' | 'campaigns' | 'catalog' | 'hauling';
 }
 
 export const MissionsView: React.FC<MissionsViewProps> = ({
@@ -32,8 +34,9 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
     active: [],
     history: [],
     catalog: [],
+    campaigns: [],
   });
-  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'catalog' | 'hauling'>(initialTab || 'active');
+  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'campaigns' | 'catalog' | 'hauling'>(initialTab || 'active');
   const [search, setSearch] = useState<string>(initialSearch || '');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
@@ -42,7 +45,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
 
   const autoSwitchedRef = useRef<string | null>(null);
 
-  const handleTabClick = (tab: 'active' | 'history' | 'catalog' | 'hauling') => {
+  const handleTabClick = (tab: 'active' | 'history' | 'campaigns' | 'catalog' | 'hauling') => {
     autoSwitchedRef.current = initialSearch || '__user_selected__';
     setActiveTab(tab);
   };
@@ -180,80 +183,103 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
       ? getFilteredList(data.history)
       : getFilteredList(data.catalog);
 
+  const primaryCampaign = data.campaigns?.find((c) => c.isActive) || data.campaigns?.[0];
+  const primaryCampaignPoints = primaryCampaign?.totalPoints ?? 0;
+
   return (
     <div className="flex flex-col min-h-full space-y-4">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
         <div
           onClick={() => handleTabClick('active')}
-          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-emerald-500/50 ${
+          className={`sc-glass rounded-lg p-3 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-emerald-500/50 ${
             activeTab === 'active' ? 'ring-1 ring-emerald-500/40 bg-emerald-950/15' : ''
           }`}
         >
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               Aktive Aufträge (Live)
             </span>
             <Radio className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-emerald-300">
-            {data.active.length} <span className="text-xs font-normal text-slate-400">angenommen</span>
+          <div className="mt-1.5 text-2xl font-bold font-mono text-emerald-300">
+            {data.active.length} <span className="text-xs font-normal text-slate-400">aktiv</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">Aus Game.log &amp; SQLite Master-DB</div>
+          <div className="mt-0.5 text-[11px] text-slate-400 truncate">Aus Game.log &amp; DB</div>
         </div>
 
         <div
           onClick={() => handleTabClick('history')}
-          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-cyan-500/50 ${
+          className={`sc-glass rounded-lg p-3 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-cyan-500/50 ${
             activeTab === 'history' ? 'ring-1 ring-cyan-500/40 bg-cyan-950/15' : ''
           }`}
         >
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Abgeschlossene Missionen
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Abgeschlossen
             </span>
             <CheckCircle2 className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-cyan-300">
-            {formatNumber(data.totalCompleted ?? data.history.length)} <span className="text-xs font-normal text-slate-400">im Log erfasst</span>
+          <div className="mt-1.5 text-2xl font-bold font-mono text-cyan-300">
+            {formatNumber(data.totalCompleted ?? data.history.length)} <span className="text-xs font-normal text-slate-400">Runs</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">Historische Missionsabschlüsse &amp; Belohnungen</div>
+          <div className="mt-0.5 text-[11px] text-slate-400 truncate">Historische Missionsabschlüsse</div>
+        </div>
+
+        <div
+          onClick={() => handleTabClick('campaigns')}
+          className={`sc-glass rounded-lg p-3 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-amber-500/50 ${
+            activeTab === 'campaigns' ? 'ring-1 ring-amber-500/40 bg-amber-950/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]' : ''
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Kampagnen &amp; Events
+            </span>
+            <Trophy className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="mt-1.5 text-2xl font-bold font-mono text-amber-300">
+            {formatNumber(primaryCampaignPoints)} <span className="text-xs font-normal text-slate-400">pts</span>
+          </div>
+          <div className="mt-0.5 text-[11px] text-amber-400/90 font-medium truncate">
+            {primaryCampaign?.title || 'RSI Discovery'}
+          </div>
         </div>
 
         <div
           onClick={() => handleTabClick('catalog')}
-          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-amber-500/50 ${
+          className={`sc-glass rounded-lg p-3 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-amber-500/50 ${
             activeTab === 'catalog' ? 'ring-1 ring-amber-500/40 bg-amber-950/15' : ''
           }`}
         >
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              SC Auftrags-Katalog
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Auftrags-Katalog
             </span>
             <Target className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-amber-300">
-            {data.catalog.length} <span className="text-xs font-normal text-slate-400">Missionstypen</span>
+          <div className="mt-1.5 text-2xl font-bold font-mono text-amber-300">
+            {data.catalog.length} <span className="text-xs font-normal text-slate-400">Typen</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">CIG Spieldatenbank (Stanton &amp; Pyro)</div>
+          <div className="mt-0.5 text-[11px] text-slate-400 truncate">CIG Spieldatenbank</div>
         </div>
 
         <div
           onClick={() => handleTabClick('hauling')}
-          className={`sc-glass rounded-lg p-4 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-indigo-500/50 ${
+          className={`sc-glass rounded-lg p-3 border border-slate-800 sc-hud-corner cursor-pointer transition hover:border-indigo-500/50 ${
             activeTab === 'hauling' ? 'ring-1 ring-indigo-500/40 bg-indigo-950/20' : ''
           }`}
         >
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               Hauling Chainer
             </span>
             <Truck className="w-4 h-4 text-indigo-400" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-indigo-300">
+          <div className="mt-1.5 text-2xl font-bold font-mono text-indigo-300">
             Multi-Run <span className="text-xs font-normal text-slate-400">Planer</span>
           </div>
-          <div className="mt-1 text-xs text-slate-400">Frachtraum-Füllstand &amp; Routen</div>
+          <div className="mt-0.5 text-[11px] text-slate-400 truncate">Frachtraum &amp; Routen</div>
         </div>
       </div>
 
@@ -283,6 +309,22 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
           </button>
 
           <button
+            onClick={() => handleTabClick('campaigns')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'campaigns'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-400" /> 🏆 {locale === 'en' ? 'Campaigns & Events' : 'Kampagnen & Events'}
+            {primaryCampaignPoints > 0 && (
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300">
+                {formatNumber(primaryCampaignPoints)} pts
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => handleTabClick('catalog')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'catalog'
@@ -306,7 +348,7 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
         </div>
 
         {/* Filter & Search */}
-        {activeTab !== 'hauling' && (
+        {activeTab !== 'hauling' && activeTab !== 'campaigns' && (
           <div className="flex items-center gap-2">
             <select
               value={typeFilter}
@@ -370,6 +412,14 @@ export const MissionsView: React.FC<MissionsViewProps> = ({
       {/* Main Content */}
       {activeTab === 'hauling' ? (
         <HaulingChainerTab />
+      ) : activeTab === 'campaigns' ? (
+        <CampaignsTab
+          campaigns={data.campaigns}
+          onSelectMission={(title) => {
+            setSearch(title);
+            handleTabClick('catalog');
+          }}
+        />
       ) : (
         <div className="flex-1 sc-glass rounded-lg border border-slate-800 overflow-y-auto">
         <table className="w-full text-left text-xs border-collapse">

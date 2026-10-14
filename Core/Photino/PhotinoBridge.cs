@@ -2659,6 +2659,10 @@ public class PhotinoBridge
                     SendResponse(req.Id, "missions_response", GetMissionsData());
                     break;
 
+                case "get_campaign_progress":
+                    SendResponse(req.Id, "campaign_progress_response", CampaignCatalog.GetCampaignProgress(_parser.ContractsList));
+                    break;
+
                 case "sync_missions_online":
                     {
                         try
@@ -5982,11 +5986,14 @@ public class PhotinoBridge
             };
         }).ToList();
 
+        var campaigns = CampaignCatalog.GetCampaignProgress(_parser.ContractsList);
+
         return new
         {
             active = activeContracts,
             history,
             catalog,
+            campaigns,
             totalCompleted = Math.Max(totalCompleted, history.Count)
         };
     }
@@ -6410,6 +6417,41 @@ public class PhotinoBridge
             _tailer?.Stop();
             _tailer = new LogTailer(path);
             _tailer.LineEx += (line, isLive) => OnLogLineReceived(line, isLive);
+            _tailer.Rotated += backupPath =>
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath))
+                    {
+                        Logger.Log($"PhotinoBridge: Log-Rotation erkannt. Indexiere rotierte Sitzung '{backupPath}' in SQLite-Datenbank...");
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                Database.IndexNew(new[] { backupPath });
+                                Broadcast<object?>("SESSIONS_UPDATED", null);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error("PhotinoBridge.IndexRotatedBackup", ex);
+                            }
+                        });
+                    }
+
+                    lock (_liveEventsLock)
+                    {
+                        _liveEvents.Clear();
+                    }
+                    _parser.Reset();
+                    Broadcast("LIVE_EVENTS_LOADED", new List<LogEventDto>());
+                    Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                    Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("PhotinoBridge.TailerRotated", ex);
+                }
+            };
             _tailer.Status += statusMsg =>
             {
                 try

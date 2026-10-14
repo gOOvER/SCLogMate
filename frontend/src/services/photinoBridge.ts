@@ -280,10 +280,67 @@ export interface MissionItemDto {
   time?: string;
 }
 
+export interface CampaignTierDto {
+  tierLevel: number;
+  minPoints: number;
+  badge: string;
+  reward: string;
+  reached: boolean;
+}
+
+export interface CampaignSuggestionDto {
+  contract: string;
+  title: string;
+  issuer: string;
+  points: number;
+  needed: number;
+  done: number;
+}
+
+export interface CampaignTrackDto {
+  id: string;
+  name: string;
+  overall: boolean;
+  color: string;
+  points: number;
+  currentTier: number;
+  nextTierPoints?: number;
+  pointsToNext?: number;
+  progressPercent: number;
+  tiers: CampaignTierDto[];
+  fastestSuggestions: CampaignSuggestionDto[];
+}
+
+export interface CampaignContractStatusDto {
+  contractId: string;
+  title: string;
+  issuer: string;
+  points: number;
+  trackId: string;
+  trackName: string;
+  completedCount: number;
+  openCount: number;
+  lastCompleted?: string;
+}
+
+export interface CampaignStatusDto {
+  id: string;
+  title: string;
+  description: string;
+  tagline: string;
+  icon: string;
+  isActive: boolean;
+  totalCompleted: number;
+  totalPoints: number;
+  tracks: CampaignTrackDto[];
+  contracts: CampaignContractStatusDto[];
+}
+
 export interface MissionsResponseDto {
   active: MissionItemDto[];
   history: MissionItemDto[];
   catalog: MissionItemDto[];
+  campaigns?: CampaignStatusDto[];
   totalCompleted?: number;
 }
 
@@ -2248,7 +2305,68 @@ class PhotinoBridge {
             },
           ],
           catalog: [],
+          campaigns: [
+            {
+              id: 'Iasi_ScenarioProgress',
+              title: 'RSI Discovery Month',
+              description: 'Willkommen zum jährlichen RSI Discovery Event! Schließe Event-Aufträge rund um Stanton ab.',
+              tagline: 'RSI Entdeckungs-Monat · Alpha 4.10+',
+              icon: '🚀',
+              isActive: true,
+              totalCompleted: 6,
+              totalPoints: 2450,
+              tracks: [
+                {
+                  id: 'overall',
+                  name: 'Gesamtfortschritt (Your Total)',
+                  overall: true,
+                  color: '#F59E0B',
+                  points: 2450,
+                  currentTier: 0,
+                  nextTierPoints: 4500,
+                  pointsToNext: 2050,
+                  progressPercent: 54.4,
+                  tiers: [
+                    { tierLevel: 1, minPoints: 4500, badge: 'R_PU_IASI_OP_1', reward: 'BriskAir IC-10 Kühler & Delphi RS-10 Radar', reached: false },
+                    { tierLevel: 2, minPoints: 9900, badge: 'R_PU_IASI_OP_2', reward: 'Ursa Rover Starwalker-Livery & Helios IP-10 Kraftwerk', reached: false },
+                    { tierLevel: 3, minPoints: 24000, badge: 'R_PU_IASI_OP_3', reward: 'Zeus Mk II PHB Flight Blades & Helios IP-20', reached: false },
+                    { tierLevel: 4, minPoints: 30000, badge: 'R_PU_IASI_OP_4', reward: 'Helios IP-30 & Constellation Starwalker-Livery', reached: false }
+                  ],
+                  fastestSuggestions: [
+                    { contract: 'Iasi_ResourceGathering_Mining_Quantanium', title: 'Procure Refined Quantainium', issuer: 'Shubin Interstellar', points: 1142, needed: 2, done: 0 },
+                    { contract: 'Iasi_HaulCargo_AtoB_Supply_SecuritySupplies', title: 'Important Supply Haul', issuer: 'Covalex Shipping', points: 625, needed: 4, done: 2 },
+                    { contract: 'Iasi_Patrol_Hard', title: 'Orange Lvl. - Neutralize Threats', issuer: 'Foxwell Enforcement', points: 417, needed: 5, done: 3 }
+                  ]
+                },
+                {
+                  id: 'defense',
+                  name: 'Verteidigung & Flottenschutz',
+                  overall: false,
+                  color: '#EF4444',
+                  points: 1251,
+                  currentTier: 0,
+                  nextTierPoints: 2000,
+                  pointsToNext: 749,
+                  progressPercent: 62.5,
+                  tiers: [
+                    { tierLevel: 1, minPoints: 2000, badge: 'R_PU_IASI_DEFENSE_1', reward: 'Scorpius Echo-Livery & Sovereign IP-20 Kraftwerk', reached: false },
+                    { tierLevel: 2, minPoints: 4000, badge: 'R_PU_IASI_DEFENSE_2', reward: 'Meteor PHB & TSB Flight Blades', reached: false }
+                  ],
+                  fastestSuggestions: [
+                    { contract: 'Iasi_Patrol_Hard', title: 'Orange Lvl. - Neutralize Threats', issuer: 'Foxwell Enforcement', points: 417, needed: 2, done: 3 }
+                  ]
+                }
+              ],
+              contracts: [
+                { contractId: 'Iasi_Patrol_Hard', title: 'Orange Lvl. - Neutralize Threats', issuer: 'Foxwell Enforcement', points: 417, trackId: 'defense', trackName: 'Verteidigung', completedCount: 3, openCount: 0, lastCompleted: '14.10. 15:40' },
+                { contractId: 'Iasi_HaulCargo_AtoB_Supply_SecuritySupplies', title: 'Important Supply Haul', issuer: 'Covalex Shipping', points: 625, trackId: 'transport', trackName: 'Transport & Logistik', completedCount: 2, openCount: 1, lastCompleted: '14.10. 14:10' }
+              ]
+            }
+          ]
         } as MissionsResponseDto;
+
+      case 'get_campaign_progress':
+        return ((this.handleMockRequest('get_missions', payload) as unknown) as MissionsResponseDto).campaigns || [];
 
       case 'get_reputation':
       case 'set_reputation':

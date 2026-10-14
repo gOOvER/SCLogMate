@@ -17,6 +17,7 @@ public sealed record ContractRecord
     public DateTime AcceptedAt { get; init; }
     public DateTime? CompletedAt { get; init; }
     public string Title { get; init; } = "";
+    public string ContractCode { get; init; } = "";
     public string Issuer { get; init; } = "Unbekannt";
     public string Type { get; init; } = "Sonstige";
     public string Difficulty { get; init; } = "k.A.";

@@ -3782,6 +3782,17 @@ public partial class MainViewModel : ObservableObject
         _tailer = new LogTailer(LogPath);
         _tailer.LineEx += (line, isLive) => OnLine(line, isLive);
         _tailer.Status += s => Dispatcher.UIThread.Post(() => Status = s);
+        _tailer.Rotated += backupPath =>
+        {
+            if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath))
+            {
+                Task.Run(() =>
+                {
+                    try { Database.IndexNew(new[] { backupPath }); }
+                    catch (Exception ex) { Logger.Error("MainViewModel.IndexRotated", ex); }
+                });
+            }
+        };
         _tailer.Start(fromStart: true);
         Running = true;
         SyncBlueprints();
@@ -3924,6 +3935,17 @@ public partial class MainViewModel : ObservableObject
         _tailer?.Stop();
         _tailer = new LogTailer(liveLog);
         _tailer.LineEx += (line, isLive) => OnLine(line, isLive);
+        _tailer.Rotated += backupPath =>
+        {
+            if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath))
+            {
+                Task.Run(() =>
+                {
+                    try { Database.IndexNew(new[] { backupPath }); }
+                    catch (Exception ex) { Logger.Error("MainViewModel.IndexRotatedAll", ex); }
+                });
+            }
+        };
         _tailer.Start(fromStart: true);
     }
 

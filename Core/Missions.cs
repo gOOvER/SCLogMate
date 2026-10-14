@@ -50,6 +50,15 @@ public static class Missions
             return "Civilian Defense";
         }
 
+        if (Has(contract, "Iasi_") || raw.Equals("Iasi", System.StringComparison.OrdinalIgnoreCase))
+        {
+            if (Has(contract, "Patrol") || Has(contract, "DefendShip")) return "Foxwell Enforcement";
+            if (Has(contract, "Eliminate") || Has(contract, "Target")) return "Northrock Service Group";
+            if (Has(contract, "Haul") || Has(contract, "Cargo") || Has(contract, "Courier") || Has(contract, "Box")) return "Covalex Shipping";
+            if (Has(contract, "Mining") || Has(contract, "Resource") || Has(contract, "Salvage")) return "Shubin Interstellar";
+            return "RSI Discovery Event";
+        }
+
         if (raw.Equals("Unaffiliated", System.StringComparison.OrdinalIgnoreCase) ||
             raw.Equals("Unaffiliated_Generator", System.StringComparison.OrdinalIgnoreCase))
         {
@@ -122,7 +131,7 @@ public static class Missions
 
     static string SystemOf(string c)
     {
-        if (Has(c, "Stanton") || Has(c, "Hurston") || Has(c, "Crusader") || Has(c, "MicroTech") || Has(c, "ArcCorp") || Has(c, "ORS_") || Has(c, "Adaigo") || Has(c, "Adagio") || Has(c, "TheCollector") || Has(c, "Wikelo")) return "Stanton";
+        if (Has(c, "Stanton") || Has(c, "Hurston") || Has(c, "Crusader") || Has(c, "MicroTech") || Has(c, "ArcCorp") || Has(c, "ORS_") || Has(c, "Adaigo") || Has(c, "Adagio") || Has(c, "TheCollector") || Has(c, "Wikelo") || Has(c, "Iasi_")) return "Stanton";
         if (Has(c, "Nyx") || Has(c, "Battaglia") || Has(c, "Levski") || Has(c, "Delamar") || Has(c, "RoX_")) return "Nyx";
         if (Has(c, "Pyro") || Has(c, "RoughAnimals") || Has(c, "Headhunters")) return "Pyro";
         return "k.A.";

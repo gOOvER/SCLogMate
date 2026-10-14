@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **In-Game Campaign & Event Progress Tracker (`Core/CampaignCatalog.cs`, `Core/Photino/PhotinoBridge.cs`, `frontend/src/components/CampaignsTab.tsx`, `frontend/src/views/MissionsView.tsx`, `frontend/src/services/photinoBridge.ts`)**:
+  - Implemented comprehensive campaign & event progression tracking modeled after CIG DataCore `ScenarioProgress` (supporting *RSI Discovery Month*, *Orison Relief Services*, *Alliance Aid*, and *Return of XenoThreat*).
+  - Displays overall points earned, tier milestones (Tier 1–4), reward badges, and exact item unlocks (components, liveries, armors, and weapons).
+  - Multi-track progression breakdown across Defense, Transport/Logistics, and Collection/Mining categories with custom visual progress bars.
+  - Added "Fastest Path" suggestions calculating the exact contracts and completion counts required to close the gap to the next milestone tier.
+  - Integrated a dedicated `🏆 Kampagnen & Events` dashboard and top KPI card directly into the Missions view.
+- **LogTailer Rotation Guard & Session Loss Prevention on Game Restart (`Core/LogTailer.cs`, `Core/Photino/PhotinoBridge.cs`, `ViewModels/MainViewModel.cs`, `Core/Database.cs`)**:
+  - Added robust detection for Star Citizen log rotations when the game is restarted or crashes while SCLogMate remains running.
+  - When `Game.log` is rotated into `logbackups/`, `LogTailer` now scans for the newly rotated backup file, drains any trailing bytes/lines that were flushed right before the game shutdown, and fires a `Rotated` event.
+  - Automatically triggers background SQLite indexing (`Database.IndexNew`) for the rotated log file, ensuring the completed session is permanently saved under its distinct archive filename without session overwrite or event loss.
+  - Bumped `Database.CurrentParserVersion` to 52 for contract code extraction and rotation indexing.
 - **German & Star Citizen Deutsch+ (SCDL) Full Localization Compatibility (`Core/LogParser.cs`, `Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
   - Full end-to-end support for both official CIG German localization and the community mod *Star Citizen Deutsch+* (SCDL) across log events, notifications, HUD updates, and screenshot OCR.
   - Added localized slot headers to the screenshot loadout watcher (`Kühler`, `Kraftwerk`, `Schildgenerator`, `Quantenantrieb`, `Sprungmodul`, `Waffe`, `Geschützturm`, `Traktorstrahl`, `Bergungskopf`, `Schiffsmodul`, `Frachtmodul`, `Wohnmodul`, `Medizinisches Modul`, `Raffineriemodul`, etc.).

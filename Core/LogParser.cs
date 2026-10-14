@@ -3026,6 +3026,7 @@ public partial class LogParser
                             MissionId = mId,
                             AcceptedAt = ParseTs(line),
                             Title = Missions.Format(info),
+                            ContractCode = con,
                             Issuer = info.Faction,
                             Type = info.Type,
                             Difficulty = info.Difficulty,
@@ -3041,6 +3042,7 @@ public partial class LogParser
                         _contracts[mId] = existing with
                         {
                             Title = keepTitle ? existing.Title : Missions.Format(info),
+                            ContractCode = !string.IsNullOrEmpty(con) ? con : existing.ContractCode,
                             Issuer = info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && info.Faction != "Unaffiliated" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "TheBackpocket" || existing.Issuer == "Unaffiliated" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
                             Type = info.Type != "Sonstige" && info.Type != "Auftrag" ? info.Type : existing.Type,
                             Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
@@ -3053,7 +3055,8 @@ public partial class LogParser
                         // Nur ein Event emittieren, wenn der Faction-Name kein generischer CIG-Engine-String (TheBackpocket/Unbekannt/Unaffiliated) ist
                         if (info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && info.Faction != "Unaffiliated")
                         {
-                            return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
+                            var detailStr = Missions.Format(info) + (!string.IsNullOrWhiteSpace(con) ? $" · {con}" : "");
+                            return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = detailStr };
                         }
                     }
                 }

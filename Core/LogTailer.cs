@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,6 +21,7 @@ public class LogTailer
     public event Action<string>? Line;
     public event Action<string, bool>? LineEx;
     public event Action<string>? Status;
+    public event Action<string?>? Rotated;
 
     public bool IsLiveStreaming { get; private set; } = false;
 
@@ -64,10 +66,44 @@ public class LogTailer
 
                     if (fs.Length < position)
                     {
+                        // Star Citizen hat Game.log rotiert (nach logbackups\ verschoben und neu erstellt)
+                        string? rotatedBackupPath = null;
+                        try
+                        {
+                            var dir = Path.GetDirectoryName(_path) ?? ".";
+                            var backupsDir = Path.Combine(dir, "logbackups");
+                            if (Directory.Exists(backupsDir))
+                            {
+                                var recentBackup = new DirectoryInfo(backupsDir)
+                                    .GetFiles("*.log")
+                                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                                    .FirstOrDefault();
+
+                                if (recentBackup != null && (DateTime.UtcNow - recentBackup.LastWriteTimeUtc).TotalMinutes < 5)
+                                {
+                                    rotatedBackupPath = recentBackup.FullName;
+                                    DrainRotatedBackup(recentBackup.FullName, position, cts);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("LogTailer.FindRotatedBackup", ex);
+                        }
+
                         position = 0;
                         _carry = null;
-                        NotifyStatus(cts, "Log rotiert – neu eingelesen");
+                        NotifyStatus(cts, "Log rotiert – Sitzung archiviert & neu eingelesen");
                         SetLiveStreaming(cts, false);
+
+                        try
+                        {
+                            Rotated?.Invoke(rotatedBackupPath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("LogTailer.RotatedInvoke", ex);
+                        }
                     }
 
                     fs.Seek(position, SeekOrigin.Begin);
@@ -111,6 +147,51 @@ public class LogTailer
 
             try { await Task.Delay(500, ct); }
             catch (OperationCanceledException) { break; }
+        }
+    }
+
+    /// <summary>
+    /// Liest eventuell verbliebene Nachzügler-Zeilen aus dem rotierten Archiv-Log ein,
+    /// die vor dem Verschieben der Game.log noch nicht übertragen wurden.
+    /// </summary>
+    void DrainRotatedBackup(string backupPath, long previousOffset, CancellationTokenSource cts)
+    {
+        try
+        {
+            if (!File.Exists(backupPath)) return;
+            using var bfs = new FileStream(backupPath, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+
+            if (bfs.Length <= previousOffset) return;
+
+            bfs.Seek(previousOffset, SeekOrigin.Begin);
+            using var bsr = new StreamReader(bfs);
+            var trailingLines = new System.Collections.Generic.List<string>();
+            string? line;
+            while ((line = bsr.ReadLine()) != null)
+            {
+                trailingLines.Add(line);
+            }
+
+            if (trailingLines.Count == 0) return;
+
+            if (_carry is not null)
+            {
+                trailingLines.Insert(0, _carry);
+                _carry = null;
+            }
+
+            var entries = LogEntryReader.ReadEntries(trailingLines);
+            foreach (var entry in entries)
+            {
+                if (!IsCurrent(cts)) return;
+                Line?.Invoke(entry);
+                LineEx?.Invoke(entry, IsLiveStreaming);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("LogTailer.DrainRotatedBackup", ex);
         }
     }
 
