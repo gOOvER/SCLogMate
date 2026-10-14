@@ -50,6 +50,14 @@ public static class Missions
             return "Civilian Defense";
         }
 
+        if (raw.Equals("Unaffiliated", System.StringComparison.OrdinalIgnoreCase) ||
+            raw.Equals("Unaffiliated_Generator", System.StringComparison.OrdinalIgnoreCase))
+        {
+            if (Has(contract, "GillysPilotSchool") || Has(contract, "FlightSchool") || Has(contract, "PilotSchool") || Has(contract, "CombatGauntlet"))
+                return "Gilly's Flight School";
+            return "Unbekannt";
+        }
+
         return raw switch
         {
             "Battaglia" => "Recco Battaglia",
@@ -97,6 +105,7 @@ public static class Missions
         if (Has(s, "MissingPerson") || Has(s, "MissingPersons") || Has(s, "RecoverItem")) return "Person/Bergung";
         if (Has(s, "Mining")) return "Bergbau";
         if (Has(s, "Salvage")) return "Bergung";
+        if (Has(s, "GillysPilotSchool") || Has(s, "CombatGauntlet") || Has(s, "PilotSchool")) return "Söldner";
         if (Has(s, "Investigat")) return "Ermittlung";
         return "Auftrag";
     }

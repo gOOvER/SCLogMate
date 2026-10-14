@@ -19,7 +19,7 @@ namespace SCLogMate.Core;
 public static class Database
 {
     public const int CurrentSchemaVersion = 46; // Erhöhen bei Tabellen- oder Spalten-Änderungen (v46: Clean up invalid active contract objective entries)
-    public const int CurrentParserVersion = 50; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v50: Wikelo contractor classification & Deutsch+ objective filter)
+    public const int CurrentParserVersion = 51; // Erhöhen, wenn der LogParser neue Felder/Events liefert (v51: Combat Gauntlet rewards, clean mission acceptance titles, primary residence loot)
 
     public static bool WasParserResetRequired { get; set; }
     public static bool WasMigrationApplied { get; set; }

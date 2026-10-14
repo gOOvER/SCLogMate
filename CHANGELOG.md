@@ -26,8 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive Mission Details Modal (`frontend/src/views/MissionsView.tsx`)**:
   - Clicking on any contract in the Active Contracts, Completed Missions history, or SC Catalog table now opens an interactive mobiGlas details popup.
   - Displays complete mission briefing text, payout in aUEC, reputation gains, live step objectives/progress, contractor/faction, star system, legality flags, and a direct link to the central SCVerse web mission catalog.
+- **Combat Gauntlet Payouts & Flight School Recognition (`Data/missions.json`, `Core/Missions.cs`, `Core/Database.cs`)**:
+  - Added baseline aUEC rewards for all 8 scenarios of Gilly's Flight School Combat Gauntlet (ranging from 15,000 to 300,000 aUEC), allowing automatic financial ledger calculation upon contract completion.
+  - Bumped `Database.CurrentParserVersion` to 51 to re-index historical sessions and retroactively credit completed flight school gauntlet missions.
+- **Primary Residence Inventory Reward Detection (`Core/LogParser.cs`)**:
+  - Added support for item and scrip rewards sent directly to home storage (`You've Earned: ... Access It/Them at Your Primary Residence's Inventory`), logging them as clear loot events (`🎁 Belohnung: <Name> (Heimat-Inventar)`).
 
 ### Fixed
+- **Mission Acceptance Formatting & "Unaffiliated" Title Display (`Core/LogParser.cs`, `Core/Missions.cs`)**:
+  - Fixed an issue where accepting a mission omitted the mission title and displayed raw metadata like `Unaffiliated · Auftrag · k.A. · Stanton`. Mission acceptances now cleanly display as `Auftrag angenommen: <Titel> (<Auftraggeber>) • +<Betrag> aUEC`.
+  - Mapped CIG internal generator `Unaffiliated_Generator` and `GillysPilotSchool` contracts to contractor `Gilly's Flight School` and type `Söldner`, eliminating duplicate raw engine marker entries.
 - **Screenshot Module Scanning Loop Early Break (`Core/Ocr/ScreenshotLoadoutWatcher.cs`)**:
   - Fixed an issue where scanning screenshots of ships with installed modules failed because the component search loop prematurely broke on lines starting with `Module` or `Modul`, mistaking the installed component for the next slot header.
 - **Star Citizen Deutsch+ Localization & Objective Sub-Step Disambiguation (`Core/LogParser.cs`, `Core/Database.cs`)**:

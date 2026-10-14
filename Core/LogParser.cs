@@ -189,6 +189,7 @@ public partial class LogParser
         if (quoteIdx >= 0) remaining = remaining[..quoteIdx];
 
         int accessIdx = remaining.IndexOf("Access it at", StringComparison.OrdinalIgnoreCase);
+        if (accessIdx < 0) accessIdx = remaining.IndexOf("Access them at", StringComparison.OrdinalIgnoreCase);
         if (accessIdx >= 0) remaining = remaining[..accessIdx];
 
         int greifIdx = remaining.IndexOf("Greife", StringComparison.OrdinalIgnoreCase);
@@ -2834,11 +2835,11 @@ public partial class LogParser
                         }
                         else
                         {
-                            bool wasSynthetic = existing.Title.Contains(" · ") || existing.Issuer == "TheBackpocket" || existing.Issuer == "Unbekannt";
+                            bool wasSynthetic = existing.Title.Contains(" · ") || existing.Issuer == "TheBackpocket" || existing.Issuer == "Unbekannt" || existing.Issuer == "Unaffiliated";
                             _contracts[mId] = existing with
                             {
                                 Title = resolvedTitle,
-                                Issuer = finalIssuer != "Unbekannt" && finalIssuer != "TheBackpocket" ? finalIssuer : (existing.Issuer != "mobiGlas" && existing.Issuer != "Unbekannt" && existing.Issuer != "TheBackpocket" ? existing.Issuer : (cat?.Contractor ?? "Unbekannt")),
+                                Issuer = finalIssuer != "Unbekannt" && finalIssuer != "TheBackpocket" && finalIssuer != "Unaffiliated" ? finalIssuer : (existing.Issuer != "mobiGlas" && existing.Issuer != "Unbekannt" && existing.Issuer != "TheBackpocket" && existing.Issuer != "Unaffiliated" ? existing.Issuer : (cat?.Contractor ?? "Unbekannt")),
                                 Type = finalType != "Auftrag" ? finalType : (existing.Type != "Sonstige" && existing.Type != "Auftrag" ? existing.Type : finalType),
                                 Reward = finalReward > 0 ? finalReward : existing.Reward,
                                 System = finalSystem != "Stanton" && finalSystem != "k.A." ? finalSystem : (existing.System != "k.A." ? existing.System : finalSystem)
@@ -2850,12 +2851,15 @@ public partial class LogParser
                     if (shouldEmit)
                     {
                         var rec = _contracts[mId];
+                        var titlePrefix = rec.Title;
+                        var issuerSuffix = !string.IsNullOrWhiteSpace(rec.Issuer) && rec.Issuer != "Unbekannt" && !rec.Title.Contains(rec.Issuer, StringComparison.OrdinalIgnoreCase) ? $" ({rec.Issuer})" : "";
+                        var rewardSuffix = finalReward > 0 ? $" • +{finalReward:N0} aUEC" : "";
                         return new LogEntry
                         {
                             Time = ParseTs(line),
                             Kind = EventKind.MissionTaken,
                             Amount = finalReward,
-                            Detail = $"{rec.Issuer} · {rec.Type} · {rec.Difficulty} · {rec.System}"
+                            Detail = $"Auftrag angenommen: {titlePrefix}{issuerSuffix}{rewardSuffix}"
                         };
                     }
                     return null;
@@ -3037,7 +3041,7 @@ public partial class LogParser
                         _contracts[mId] = existing with
                         {
                             Title = keepTitle ? existing.Title : Missions.Format(info),
-                            Issuer = info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "TheBackpocket" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
+                            Issuer = info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && info.Faction != "Unaffiliated" && (existing.Issuer == "Unbekannt" || existing.Issuer == "mobiGlas" || existing.Issuer == "TheBackpocket" || existing.Issuer == "Unaffiliated" || existing.Issuer == "Battaglia") ? info.Faction : existing.Issuer,
                             Type = info.Type != "Sonstige" && info.Type != "Auftrag" ? info.Type : existing.Type,
                             Difficulty = info.Difficulty != "k.A." ? info.Difficulty : existing.Difficulty,
                             System = info.System != "k.A." ? info.System : existing.System
@@ -3046,8 +3050,8 @@ public partial class LogParser
 
                     if (_missionsTaken.Add(mId))
                     {
-                        // Nur ein Event emittieren, wenn der Faction-Name kein generischer CIG-Engine-String (TheBackpocket/Unbekannt) ist
-                        if (info.Faction != "Unbekannt" && info.Faction != "TheBackpocket")
+                        // Nur ein Event emittieren, wenn der Faction-Name kein generischer CIG-Engine-String (TheBackpocket/Unbekannt/Unaffiliated) ist
+                        if (info.Faction != "Unbekannt" && info.Faction != "TheBackpocket" && info.Faction != "Unaffiliated")
                         {
                             return new LogEntry { Time = ParseTs(line), Kind = EventKind.MissionTaken, Detail = Missions.Format(info) };
                         }
@@ -3271,6 +3275,22 @@ public partial class LogParser
                 }
                 _seenBlueprints[$"loot:{lootName}"] = t;
                 return new LogEntry { Time = t, Kind = EventKind.Loot, Detail = $"🎁 Belohnung: {lootName} (Frachtaufzug)" };
+            }
+        }
+
+        // Heimat-Inventar Belohnung (z. B. "You've earned: MG Scrip\nAccess It at Your Primary Residence's Inventory" oder "You've earned: 3 Rewards\nAccess Them at Your Primary Residence's Inventory")
+        if (line.Contains("Primary Residence", StringComparison.OrdinalIgnoreCase) || line.Contains("Heimat-Inventar", StringComparison.OrdinalIgnoreCase))
+        {
+            var resRewardName = ExtractEarnedRewardName(line);
+            if (!string.IsNullOrWhiteSpace(resRewardName))
+            {
+                var t = ParseTs(line);
+                if (_seenBlueprints.TryGetValue($"residence:{resRewardName}", out var lastT) && (t - lastT).TotalSeconds < 30)
+                {
+                    return null;
+                }
+                _seenBlueprints[$"residence:{resRewardName}"] = t;
+                return new LogEntry { Time = t, Kind = EventKind.Loot, Detail = $"🎁 Belohnung: {resRewardName} (Heimat-Inventar)" };
             }
         }
 
@@ -3931,6 +3951,7 @@ public partial class LogParser
                 existingContract.Issuer != "Unbekannt" &&
                 existingContract.Issuer != "mobiGlas" &&
                 existingContract.Issuer != "TheBackpocket" &&
+                existingContract.Issuer != "Unaffiliated" &&
                 existingContract.Issuer != "Civilian")
             {
                 if (existingContract.Issuer.Equals("TheCollector", StringComparison.OrdinalIgnoreCase) ||
@@ -3943,12 +3964,12 @@ public partial class LogParser
             }
         }
 
-        // 3. Missionskatalog (ohne generische Fallbacks wie 'Salvage Broker' oder 'Civilian')
+        // 3. Missionskatalog (ohne generische Fallbacks wie 'Salvage Broker' oder 'Civilian' oder 'Unaffiliated')
         if (cat != null)
         {
-            if (!string.IsNullOrWhiteSpace(cat.Contractor) && cat.Contractor != "Salvage Broker" && cat.Contractor != "Civilian")
+            if (!string.IsNullOrWhiteSpace(cat.Contractor) && cat.Contractor != "Salvage Broker" && cat.Contractor != "Civilian" && cat.Contractor != "Unaffiliated")
                 return cat.Contractor;
-            if (!string.IsNullOrWhiteSpace(cat.Faction) && cat.Faction != "Civilian")
+            if (!string.IsNullOrWhiteSpace(cat.Faction) && cat.Faction != "Civilian" && cat.Faction != "Unaffiliated")
                 return cat.Faction;
         }
 
