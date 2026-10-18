@@ -1143,6 +1143,8 @@ public class PhotinoBridge
     private System.Threading.Timer? _updateCheckTimer;
     private System.Threading.Timer? _refineryCheckTimer;
     private System.Threading.Timer? _serverPingTimer;
+    private System.Threading.Timer? _gameProcessTimer;
+    private bool _lastIsGameRunning = false;
     private int? _currentPingMs;
     private string? _lastPingTarget;
     private DateTime _lastPingTime = DateTime.MinValue;
@@ -1246,6 +1248,7 @@ public class PhotinoBridge
 
         _refineryCheckTimer = new System.Threading.Timer(_ => CheckRefineryCompletions(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
         _serverPingTimer = new System.Threading.Timer(_ => TriggerServerPing(), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(20));
+        _gameProcessTimer = new System.Threading.Timer(_ => CheckGameProcess(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3));
 
         // Globaler Hotkey (Alt+H) für Mini-HUD
         GlobalHotkey.HotkeyPressed += () =>
@@ -4071,6 +4074,29 @@ public class PhotinoBridge
         }
     }
 
+    private void CheckGameProcess()
+    {
+        try
+        {
+            bool isGameRunning = Process.GetProcessesByName("StarCitizen").Length > 0;
+            if (isGameRunning != _lastIsGameRunning)
+            {
+                _lastIsGameRunning = isGameRunning;
+                if (!isGameRunning)
+                {
+                    _currentPingMs = null;
+                    _lastPingTarget = null;
+                }
+                if (_isWebviewReady)
+                {
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                }
+            }
+        }
+        catch { }
+    }
+
     private void TriggerServerPing(string? hintShard = null, string? hintRegion = null)
     {
         if (_isMeasuringPing) return;
@@ -4079,6 +4105,15 @@ public class PhotinoBridge
         try
         {
             isGameRunning = Process.GetProcessesByName("StarCitizen").Length > 0;
+            if (isGameRunning != _lastIsGameRunning)
+            {
+                _lastIsGameRunning = isGameRunning;
+                if (_isWebviewReady)
+                {
+                    Broadcast("HUD_UPDATE", GetHudTelemetry(_selectedSession));
+                    Broadcast("STATUS_UPDATE", GetAppStatus());
+                }
+            }
         }
         catch { }
 
@@ -7858,9 +7893,16 @@ public class PhotinoBridge
             {
                 _lastEndReason = entry.Detail;
             }
-            else if (entry.Detail != null && entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase))
+            else if (entry.Detail != null && (
+                entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("Logoff", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("Spiel beendet", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("Hauptmenü", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("Player requested disconnect", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("ExitToMenu", StringComparison.OrdinalIgnoreCase) ||
+                entry.Detail.Contains("getrennt", StringComparison.OrdinalIgnoreCase)))
             {
-                _lastEndReason = "Normal Quit";
+                _lastEndReason = entry.Detail;
             }
 
             if (isLive)
@@ -7906,25 +7948,34 @@ public class PhotinoBridge
                 {
                     Broadcast("MISSIONS_UPDATED", GetMissionsData());
                 }
-                if (entry.Kind == EventKind.SessionChange && _parser.Meta.TryGetValue("shard", out var curShard) && !string.IsNullOrEmpty(curShard))
+                if (entry.Kind == EventKind.SessionChange)
                 {
-                    TriggerServerPing(curShard);
-                    Database.UpsertShardVisit(curShard, entry.Time, 0, null, true);
-                    Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
+                    bool isDisconnect = entry.Detail != null && (
+                        entry.Detail.Contains("Logoff", StringComparison.OrdinalIgnoreCase) ||
+                        entry.Detail.Contains("Spiel beendet", StringComparison.OrdinalIgnoreCase) ||
+                        entry.Detail.Contains("Hauptmenü", StringComparison.OrdinalIgnoreCase) ||
+                        entry.Detail.Contains("getrennt", StringComparison.OrdinalIgnoreCase) ||
+                        entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase));
+
+                    if (_parser.Meta.TryGetValue("shard", out var curShard) && !string.IsNullOrEmpty(curShard))
+                    {
+                        if (isDisconnect)
+                        {
+                            Database.UpsertShardVisit(curShard, entry.Time, 0, entry.Detail ?? "Normal Quit", false);
+                        }
+                        else
+                        {
+                            TriggerServerPing(curShard);
+                            Database.UpsertShardVisit(curShard, entry.Time, 0, null, true);
+                        }
+                        Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
+                    }
                 }
                 else if (entry.Kind == EventKind.Crash)
                 {
                     if (_parser.Meta.TryGetValue("shard", out var crashShard) && !string.IsNullOrEmpty(crashShard))
                     {
                         Database.UpsertShardVisit(crashShard, entry.Time, 0, entry.Detail, false);
-                        Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
-                    }
-                }
-                else if (entry.Detail != null && entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (_parser.Meta.TryGetValue("shard", out var exitShard) && !string.IsNullOrEmpty(exitShard))
-                    {
-                        Database.UpsertShardVisit(exitShard, entry.Time, 0, "Normal Quit", false);
                         Broadcast("SERVER_SHARDS_UPDATED", Database.GetAllServerShards());
                     }
                 }

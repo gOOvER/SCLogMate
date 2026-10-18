@@ -20,6 +20,12 @@ public partial class LogParser
     [GeneratedRegex(@"^<(?<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)>")]
     private static partial Regex TsRegex();
 
+    [GeneratedRegex(@"<Channel Disconnected>.*?cause=(?<cause>\d+).*?reason=""(?<reason>[^""]+)""", RegexOptions.IgnoreCase)]
+    private static partial Regex ChannelDisconnectedRegex();
+
+    [GeneratedRegex(@"<SystemQuit>.*?CSystem::Quit.*?cause=(?<cause>\d+).*?reason=(?<reason>[^,\r\n\]]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex SystemQuitRegex();
+
     [GeneratedRegex(@"Added notification ""(?:(?:Überweisung erhalten von|Transfer received from|Payment received from):\s*(?<who>.+?)|(?<who>[A-Za-z0-9_\-]+)\s+(?:has sent you|hat dir gesendet):?)\s*$")]
     private static partial Regex RecvHdrRegex();
 
@@ -3436,7 +3442,45 @@ public partial class LogParser
             return new LogEntry { Time = ParseTs(line), Kind = EventKind.Crash, Detail = msg };
         }
 
-        // Session-Ende / Disconnect / Shard-Exit
+        // Session-Ende / Disconnect / Shard-Exit (Modern Star Citizen PU & Legacy)
+        if (line.Contains("<Channel Disconnected>", StringComparison.OrdinalIgnoreCase) && !line.Contains("isRemote=0", StringComparison.OrdinalIgnoreCase))
+        {
+            _lastJoinedShard = null;
+            var m = ChannelDisconnectedRegex().Match(line);
+            var reason = m.Success ? m.Groups["reason"].Value.Trim() : "Getrennt";
+
+            string detail;
+            if (reason.Contains("Player requested disconnect", StringComparison.OrdinalIgnoreCase))
+                detail = "Spieler abgemeldet / Logoff (Player requested disconnect)";
+            else if (reason.Contains("ExitToMenu", StringComparison.OrdinalIgnoreCase))
+                detail = "Zurück ins Hauptmenü (ExitToMenu)";
+            else if (reason.Contains("player inactive", StringComparison.OrdinalIgnoreCase))
+                detail = "Verbindung getrennt (Inaktivität / AFK Timeout)";
+            else if (reason.Contains("game shutdown", StringComparison.OrdinalIgnoreCase) || reason.Contains("DGS disconnecting", StringComparison.OrdinalIgnoreCase))
+                detail = "Server-Shutdown / Verbindung getrennt (30k)";
+            else
+                detail = $"Server-Verbindung getrennt ({reason})";
+
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = detail };
+        }
+
+        if (line.Contains("<SystemQuit>", StringComparison.OrdinalIgnoreCase) && line.Contains("CSystem::Quit", StringComparison.OrdinalIgnoreCase))
+        {
+            _lastJoinedShard = null;
+            var m = SystemQuitRegex().Match(line);
+            var reason = m.Success ? m.Groups["reason"].Value.Trim() : "Quit";
+
+            string detail;
+            if (reason.Contains("Quit via console", StringComparison.OrdinalIgnoreCase))
+                detail = "Spiel beendet (Konsole: quit)";
+            else if (reason.Contains("User closed the app", StringComparison.OrdinalIgnoreCase))
+                detail = "Spiel beendet (Fenster geschlossen)";
+            else
+                detail = $"Spiel beendet ({reason})";
+
+            return new LogEntry { Time = ParseTs(line), Kind = EventKind.SessionChange, Detail = detail };
+        }
+
         if (line.Contains("CDisciplineServiceExternal::EndSession", StringComparison.Ordinal))
         {
             _lastJoinedShard = null;

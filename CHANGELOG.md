@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added support for item and scrip rewards sent directly to home storage (`You've Earned: ... Access It/Them at Your Primary Residence's Inventory`), logging them as clear loot events (`🎁 Belohnung: <Name> (Heimat-Inventar)`).
 
 ### Fixed
+- **Star Citizen Disconnect, Logoff & SystemQuit Event Detection (`Core/LogParser.cs`, `Core/Photino/PhotinoBridge.cs`, `Core/Database.cs`, `frontend/src/utils/eventTranslation.ts`)**:
+  - Implemented comprehensive detection for modern Star Citizen session endings, player logoffs, and application shutdowns (`<Channel Disconnected>`, `<SystemQuit>`, and console quit commands).
+  - Previously, `LogParser` only looked for the deprecated CIG log token `CDisciplineServiceExternal::EndSession` (no longer emitted in modern PU builds), causing disconnects and `quit` commands to be ignored and leaving the event log and UI telemetry stuck on the last active in-game event.
+  - Added extraction for reason codes: player logoffs (`Remote Disconnect - Player requested disconnect`), main menu exits (`ExitToMenu`), AFK timeouts (`player inactive`), server shutdowns / 30k errors (`DGS disconnecting all channels before game shutdown`), and console/window quit commands (`Quit via console command`, `User closed the app`).
+  - Added automated background game process monitor (`_gameProcessTimer`) in `PhotinoBridge.cs` polling every 3 seconds to immediately broadcast status updates and transition the header telemetry badge between "Live-Game" and "Offline" when `StarCitizen.exe` closes or starts.
+  - Corrected shard visit finalization in SQLite to mark shards as cleanly closed on disconnect/quit rather than left perpetually open.
+  - Bumped `Database.CurrentParserVersion` to 53 to index disconnect and quit events for historical session logs.
 - **Startup Live Log Ingestion & Stream Synchronization (`Core/Photino/PhotinoBridge.cs`, `Core/LogTailer.cs`, `frontend/src/views/EventsView.tsx`, `Core/Logger.cs`)**:
   - Fixed an issue where the active Star Citizen `Game.log` was not read on app startup or was left empty due to an asynchronous startup race condition between the frontend `get_events` request and `StartLogTailer`.
   - Added synchronous `CatchUpLiveEvents` backlog reading directly upon bridge initialization so all pre-existing events, active ship, and locations from `Game.log` are instantly loaded into `_liveEvents` before the UI renders.
