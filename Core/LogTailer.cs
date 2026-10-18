@@ -129,6 +129,7 @@ public class LogTailer
                         entries.RemoveAt(entries.Count - 1);
                     }
 
+                    bool hasNewEntries = entries.Count > 0;
                     foreach (var entry in entries)
                     {
                         if (!IsCurrent(cts)) return;
@@ -136,8 +137,11 @@ public class LogTailer
                         LineEx?.Invoke(entry, IsLiveStreaming);
                     }
 
-                    SetLiveStreaming(cts, true); // Nach dem ersten kompletten Durchlauf sind alle neuen Zeilen echte Live-Events
-                    NotifyStatus(cts, $"live · {DateTime.Now:HH:mm:ss}");
+                    if (!IsLiveStreaming || hasNewEntries)
+                    {
+                        SetLiveStreaming(cts, true); // Nach dem ersten Durchlauf sind alle neuen Zeilen echte Live-Events
+                        NotifyStatus(cts, $"live · {DateTime.Now:HH:mm:ss}");
+                    }
                 }
             }
             catch (OperationCanceledException) { break; }

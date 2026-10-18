@@ -1432,6 +1432,12 @@ public class PhotinoBridge
         _currentLogPath = Settings.Load().LogPath ?? PathFinder.FindBest();
         Localization.Hint(_currentLogPath);
 
+        // Sofortige Initialisierung und Backlog-Catchup des LogTailers für die aktive Game.log
+        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+        {
+            StartLogTailer(_currentLogPath);
+        }
+
         // Initialize plugin manager subsystem (discovers plugins, starts HTTP server)
         PluginManager.Instance.Initialize();
 
@@ -1570,11 +1576,21 @@ public class PhotinoBridge
                 {
                     try
                     {
-                        if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+                        if (_tailer == null && !string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
                         {
-                            ScanLogHeaderAndMeta(_currentLogPath, _parser);
-                            ScanLogTailForShard(_currentLogPath, _parser);
                             StartLogTailer(_currentLogPath);
+                        }
+                        else
+                        {
+                            List<LogEventDto> snapshot;
+                            lock (_liveEventsLock)
+                            {
+                                snapshot = _liveEvents.Take(100).ToList();
+                            }
+                            Broadcast("LIVE_EVENTS_LOADED", snapshot);
+                            Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                            Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                            Broadcast("STATUS_UPDATE", GetAppStatus());
                         }
                     }
                     catch (Exception ex)
@@ -5053,6 +5069,11 @@ public class PhotinoBridge
         {
             lock (_liveEventsLock)
             {
+                if (_liveEvents.Count == 0 && !string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
+                {
+                    CatchUpLiveEvents(_currentLogPath);
+                }
+
                 if (_liveEvents.Count == 0)
                 {
                     try
@@ -6289,7 +6310,7 @@ public class PhotinoBridge
         try
         {
             var p = targetParser ?? _parser;
-            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
 
             int lineCount = 0;
@@ -6312,7 +6333,7 @@ public class PhotinoBridge
         try
         {
             var p = targetParser ?? _parser;
-            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             long offset = Math.Max(0, fs.Length - 5_000_000);
             if (offset > 0) fs.Seek(offset, SeekOrigin.Begin);
 
@@ -6350,6 +6371,35 @@ public class PhotinoBridge
             }
         }
         catch { }
+    }
+
+    private void CatchUpLiveEvents(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        try
+        {
+            ScanLogHeaderAndMeta(filePath, _parser);
+            ScanLogTailForShard(filePath, _parser);
+
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 65536);
+            using var sr = new StreamReader(fs, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 65536);
+            var lines = new List<string>();
+            string? line;
+            while ((line = sr.ReadLine()) != null)
+            {
+                lines.Add(line);
+            }
+
+            var entries = LogEntryReader.ReadEntries(lines);
+            foreach (var entry in entries)
+            {
+                OnLogLineReceived(entry, isLive: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"PhotinoBridge.CatchUpLiveEvents({filePath})", ex);
+        }
     }
 
     private string? ResolveSessionFilePath(string sessionName)
@@ -6411,8 +6461,10 @@ public class PhotinoBridge
             }
 
             _parser.Reset();
-            ScanLogHeaderAndMeta(path, _parser);
-            ScanLogTailForShard(path, _parser);
+            _currentShip = null;
+
+            // Bestehende Events des Logs synchron erfassen (Backlog-Catchup)
+            CatchUpLiveEvents(path);
 
             _tailer?.Stop();
             _tailer = new LogTailer(path);
@@ -6438,14 +6490,22 @@ public class PhotinoBridge
                         });
                     }
 
-                    lock (_liveEventsLock)
+                    if (!string.IsNullOrEmpty(_currentLogPath) && File.Exists(_currentLogPath))
                     {
-                        _liveEvents.Clear();
+                        StartLogTailer(_currentLogPath);
                     }
-                    _parser.Reset();
-                    Broadcast("LIVE_EVENTS_LOADED", new List<LogEventDto>());
-                    Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
-                    Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                    else
+                    {
+                        lock (_liveEventsLock)
+                        {
+                            _liveEvents.Clear();
+                        }
+                        _parser.Reset();
+                        _currentShip = null;
+                        Broadcast("LIVE_EVENTS_LOADED", new List<LogEventDto>());
+                        Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                        Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -6465,6 +6525,7 @@ public class PhotinoBridge
                             _liveEvents.Clear();
                         }
                         _parser.Reset();
+                        _currentShip = null;
                     }
                     else if (statusMsg.StartsWith("live", StringComparison.OrdinalIgnoreCase))
                     {
@@ -6485,9 +6546,22 @@ public class PhotinoBridge
                 }
             };
 
-            _tailer.Start(fromStart: true);
+            _tailer.Start(fromStart: false);
             _activeSessionName = Path.GetFileName(path);
-            Logger.Log($"PhotinoBridge: LogTailer gestartet für {path}");
+            Logger.Log($"PhotinoBridge: LogTailer gestartet für {path} ({_liveEvents.Count} Events initial erfasst)");
+
+            if (_isWebviewReady)
+            {
+                List<LogEventDto> snapshot;
+                lock (_liveEventsLock)
+                {
+                    snapshot = _liveEvents.Take(100).ToList();
+                }
+                Broadcast("LIVE_EVENTS_LOADED", snapshot);
+                Broadcast("HUD_UPDATE", GetHudTelemetry("__live__"));
+                Broadcast("MISSIONS_UPDATED", GetMissionsData());
+                Broadcast("STATUS_UPDATE", GetAppStatus());
+            }
         }
         catch (Exception ex)
         {
@@ -7774,16 +7848,25 @@ public class PhotinoBridge
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(entry.Ship) && entry.Ship != "—" && entry.Kind is EventKind.Vehicle or EventKind.Quantum or EventKind.Maintenance)
+            {
+                var cat = FleetCatalog.Lookup(entry.Ship);
+                _currentShip = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : entry.Ship;
+            }
+
+            if (entry.Kind == EventKind.Crash)
+            {
+                _lastEndReason = entry.Detail;
+            }
+            else if (entry.Detail != null && entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase))
+            {
+                _lastEndReason = "Normal Quit";
+            }
+
             if (isLive)
             {
                 CheckAndTriggerToast(entry, dto);
                 Database.InsertCustomEvent(_activeSessionName ?? "Game.log", entry.Time, entry.Kind, entry.Amount, entry.Detail ?? "", entry.Ship);
-
-                if (!string.IsNullOrWhiteSpace(entry.Ship) && entry.Ship != "—" && entry.Kind is EventKind.Vehicle or EventKind.Quantum or EventKind.Maintenance)
-                {
-                    var cat = FleetCatalog.Lookup(entry.Ship);
-                    _currentShip = cat.NormalizedName != "Unbekannt" ? cat.NormalizedName : entry.Ship;
-                }
 
                 if (entry.Kind == EventKind.Maintenance && (entry.Detail?.Contains("Betankung") == true || entry.Detail?.Contains("Refuel") == true || entry.Detail?.Contains("Wartung") == true))
                 {
@@ -7831,7 +7914,6 @@ public class PhotinoBridge
                 }
                 else if (entry.Kind == EventKind.Crash)
                 {
-                    _lastEndReason = entry.Detail;
                     if (_parser.Meta.TryGetValue("shard", out var crashShard) && !string.IsNullOrEmpty(crashShard))
                     {
                         Database.UpsertShardVisit(crashShard, entry.Time, 0, entry.Detail, false);
@@ -7840,7 +7922,6 @@ public class PhotinoBridge
                 }
                 else if (entry.Detail != null && entry.Detail.Contains("EndSession", StringComparison.OrdinalIgnoreCase))
                 {
-                    _lastEndReason = "Normal Quit";
                     if (_parser.Meta.TryGetValue("shard", out var exitShard) && !string.IsNullOrEmpty(exitShard))
                     {
                         Database.UpsertShardVisit(exitShard, entry.Time, 0, "Normal Quit", false);

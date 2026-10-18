@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added support for item and scrip rewards sent directly to home storage (`You've Earned: ... Access It/Them at Your Primary Residence's Inventory`), logging them as clear loot events (`🎁 Belohnung: <Name> (Heimat-Inventar)`).
 
 ### Fixed
+- **Startup Live Log Ingestion & Stream Synchronization (`Core/Photino/PhotinoBridge.cs`, `Core/LogTailer.cs`, `frontend/src/views/EventsView.tsx`, `Core/Logger.cs`)**:
+  - Fixed an issue where the active Star Citizen `Game.log` was not read on app startup or was left empty due to an asynchronous startup race condition between the frontend `get_events` request and `StartLogTailer`.
+  - Added synchronous `CatchUpLiveEvents` backlog reading directly upon bridge initialization so all pre-existing events, active ship, and locations from `Game.log` are instantly loaded into `_liveEvents` before the UI renders.
+  - Implemented automatic on-demand catch-up in `GetEvents("__live__")` if `_liveEvents` is ever queried while empty and `Game.log` exists.
+  - Fixed `_currentShip` and `_lastEndReason` tracking in `OnLogLineReceived` to update during backlog ingestion as well as live streaming, restoring the player's active ship immediately on launch.
+  - Added `FileShare.Delete` to header and tail file stream scans to eliminate sharing violation access errors while Star Citizen keeps `Game.log` open.
+  - Resolved `LogTailer` status polling spam by only firing status updates and broadcasting snapshots when new lines/events are actually detected or when transitioning to live streaming.
+  - Appended start headers in `Core/Logger.cs` instead of overwriting the debug log file to preserve running diagnostic logs.
 - **Mission Acceptance Formatting & "Unaffiliated" Title Display (`Core/LogParser.cs`, `Core/Missions.cs`)**:
   - Fixed an issue where accepting a mission omitted the mission title and displayed raw metadata like `Unaffiliated · Auftrag · k.A. · Stanton`. Mission acceptances now cleanly display as `Auftrag angenommen: <Titel> (<Auftraggeber>) • +<Betrag> aUEC`.
   - Mapped CIG internal generator `Unaffiliated_Generator` and `GillysPilotSchool` contracts to contractor `Gilly's Flight School` and type `Söldner`, eliminating duplicate raw engine marker entries.

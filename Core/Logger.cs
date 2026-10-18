@@ -30,9 +30,9 @@ public static class Logger
 
         try
         {
-            // pro Start frische Datei
-            File.WriteAllText(Path,
-                $"=== SCLogMate {Updater.CurrentVersion} · Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
+            // Bei Start anfügen statt die laufende Debug-Datei zu überschreiben
+            File.AppendAllText(Path,
+                $"{Environment.NewLine}=== SCLogMate {Updater.CurrentVersion} · Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
         }
         catch { /* nicht schreibbar -> egal */ }
     }

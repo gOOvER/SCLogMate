@@ -126,10 +126,8 @@ export const EventsView: React.FC<EventsViewProps> = ({
     });
 
     const unbindLiveLoaded = bridge.on<LogEventItem[]>('LIVE_EVENTS_LOADED', (loadedEvents) => {
-      if (Array.isArray(loadedEvents) && loadedEvents.length > 0) {
+      if (Array.isArray(loadedEvents)) {
         setEvents(loadedEvents);
-      } else {
-        fetchEvents(limit, '__live__');
       }
     });
 
